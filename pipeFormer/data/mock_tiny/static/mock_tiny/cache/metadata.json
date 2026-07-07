@@ -1,0 +1,42 @@
+{
+  "data_hash": "1fb50e523559e27f7fc54cef048c23e2",
+  "cache_format_version": "2.1",
+  "created_at": "2026-07-07T15:05:31.582598",
+  "sample_percentage": 1.0,
+  "train_samples": 2,
+  "val_samples": 1,
+  "total_dims": 14,
+  "boundary_dims": 4,
+  "equipment_dims": 10,
+  "data_shape_per_sample": [
+    1439,
+    14
+  ],
+  "max_sequence_length": 1438,
+  "token_dtype": "uint16",
+  "contains_tokens": true,
+  "tokenizer_vocab_size": 60,
+  "tokenizer_stats_dir": "/data2/cse12310948/project2/Forecast_Grounded_Decision_QA/pipeFormer/data/mock_tiny/static/mock_tiny/tokenizer_save",
+  "variable_hash": "741a95e66a11a623f7916b3e4dc8d4cb",
+  "static_dir": "/data2/cse12310948/project2/Forecast_Grounded_Decision_QA/pipeFormer/data/mock_tiny/static/mock_tiny",
+  "variable_names": [
+    "T_001:BC000",
+    "T_001:BC001",
+    "T_001:BC002",
+    "T_001:BC003",
+    "B_001_v000",
+    "B_001_v001",
+    "C_001_v000",
+    "C_001_v001",
+    "P_001_v000",
+    "P_001_v001",
+    "R_001_v000",
+    "TE_001_v000",
+    "N_001_v000",
+    "N_002_v000"
+  ],
+  "token_cache_files": {
+    "train": "train_tokens.parquet",
+    "val": "val_tokens.parquet"
+  }
+}
