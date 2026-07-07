@@ -1,0 +1,5 @@
+管道划分,站名,lon,lat,类型,控制类型,输入流量,计算流量
+Demo-West,North Source,105.0,35.0,source,fixed,1500.0,-1500.0
+Demo-West,Central Hub,106.0,35.4,hub,balance,,1500.0
+Demo-West,East City Gate,107.1,35.8,delivery,demand,,900.0
+Demo-West,South Industrial Gate,106.5,34.9,delivery,demand,,600.0

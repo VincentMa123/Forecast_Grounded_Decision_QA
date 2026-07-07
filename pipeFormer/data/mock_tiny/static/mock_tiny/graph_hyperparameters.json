@@ -1,0 +1,29 @@
+{
+  "graph": {
+    "is_subgraph": true,
+    "center_node": "P_001",
+    "neighbor_count": 13,
+    "total_nodes": 8,
+    "total_edges": 8,
+    "node_type_counts": {
+      "B": 1,
+      "C": 1,
+      "E": 1,
+      "N": 2,
+      "P": 1,
+      "R": 1,
+      "T": 1
+    },
+    "mock_data": true
+  },
+  "variables": {
+    "total_variables": 14,
+    "boundary_variables": 4,
+    "equipment_variables": 10
+  },
+  "tokenizer": {
+    "quantile_step": 0.1,
+    "constant_freq_threshold": 0.995,
+    "constant_variable_threshold": 0.995
+  }
+}

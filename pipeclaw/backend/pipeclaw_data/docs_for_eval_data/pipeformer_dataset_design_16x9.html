@@ -1,0 +1,205 @@
+﻿<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>PipeFormer 数据集设计总览</title>
+  <style>
+    :root {
+      --bg-1: #efe7d6;
+      --bg-2: #e6efe8;
+      --panel: rgba(255,255,255,0.80);
+      --ink: #182220;
+      --muted: #566764;
+      --accent: #9d412d;
+      --accent-2: #1f6b61;
+      --line: rgba(24,34,32,0.12);
+      --shadow: 0 24px 68px rgba(48, 38, 30, 0.14);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      color: var(--ink);
+      font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(157,65,45,0.18), transparent 24%),
+        radial-gradient(circle at 84% 16%, rgba(31,107,97,0.18), transparent 22%),
+        linear-gradient(135deg, var(--bg-1) 0%, #faf6ee 44%, var(--bg-2) 100%);
+    }
+    .canvas {
+      width: min(1600px, 96vw);
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.66);
+      box-shadow: var(--shadow);
+      background: rgba(255,255,255,0.42);
+      backdrop-filter: blur(10px);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.16fr 0.84fr;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 14px;
+      height: 100%;
+      padding: 22px;
+    }
+    .hero, .panel {
+      background: var(--panel);
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      padding: 18px 20px;
+      overflow: hidden;
+    }
+    .hero {
+      grid-column: 1 / span 2;
+      display: grid;
+      grid-template-columns: 1.18fr 0.82fr;
+      gap: 14px;
+    }
+    .eyebrow {
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    h1, h2, h3 {
+      margin: 0;
+      font-family: 'STZhongsong', 'Songti SC', 'Noto Serif SC', serif;
+      font-weight: 700;
+    }
+    h1 { margin-top: 8px; font-size: 41px; line-height: 1.06; max-width: 11ch; }
+    .lede { margin-top: 12px; max-width: 74ch; font-size: 16px; line-height: 1.58; color: var(--muted); }
+    .hero-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-radius: 18px;
+      padding: 16px 18px;
+      background: linear-gradient(180deg, rgba(157,65,45,0.08), rgba(31,107,97,0.08));
+    }
+    .hero-box strong { font-size: 18px; line-height: 1.35; }
+    .hero-box p { margin: 10px 0 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+    .metric-card, .type-card, .logic-card, .foot { border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,0.78); }
+    .metric-card { padding: 14px; }
+    .metric-card .num { font-size: 28px; font-weight: 800; color: var(--accent); }
+    .metric-card .label { margin-top: 6px; font-size: 13px; font-weight: 700; }
+    .metric-card .desc { margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.45; }
+    .section-title { margin-bottom: 10px; font-size: 20px; }
+    .task-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    .type-card { padding: 14px; }
+    .type-card .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(31,107,97,0.10); color: var(--accent-2); font-size: 12px; font-weight: 800; }
+    .type-card h3 { margin-top: 8px; font-size: 20px; }
+    .type-card p { margin: 8px 0 0; color: var(--muted); line-height: 1.5; font-size: 13px; }
+    .logic-list { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .logic-card { padding: 14px; }
+    .logic-card h3 { font-size: 18px; }
+    .logic-card p { margin: 8px 0 0; color: var(--muted); line-height: 1.52; font-size: 13px; }
+    .catalog { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .catalog-col { border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,0.78); padding: 14px; }
+    .catalog-col .head { font-size: 13px; font-weight: 800; color: var(--accent); letter-spacing: 0.04em; }
+    .catalog-col h3 { margin-top: 6px; font-size: 18px; }
+    .catalog-col p { margin: 8px 0 0; color: var(--muted); line-height: 1.46; font-size: 12px; }
+    .catalog-col .vars { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; color: #33423f; line-height: 1.44; }
+    .foot {
+      grid-column: 1 / span 2;
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .foot p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .foot strong { color: var(--ink); }
+  </style>
+</head>
+<body>
+  <div class='canvas'>
+    <div class='layout'>
+      <section class='hero'>
+        <div>
+          <div class='eyebrow'>PIPEFORMER DATASET</div>
+          <h1>面向管网预测与调度的单轮评测数据集设计</h1>
+          <p class='lede'>该数据集对应 <code>Pipeline_Full_Life_Cycle_Test_Dataset-v7.json</code>，核心目标不是做开放式聊天，而是把长流程管网决策压缩成可复现、可打分、可比较的单轮任务。数据集同时覆盖 prediction 与 dispatch 两类问题，并把每个场景锚定到明确的边界变量、扰动设定、工程偏好和输出格式。</p>
+        </div>
+        <div class='hero-box'>
+          <div>
+            <strong>设计主线：真实对象锚定、任务类型分层、边界变量唯一、评测器可直接解析。</strong>
+            <p>这样做的好处是，Agent 的结果既能被运行器消费，也能被 evaluator 拆成预测质量、约束一致性、调度正确性和报告可用性等维度。</p>
+          </div>
+          <p>适合在论文和组会中解释为：一个围绕“预测-校核-调度-报告”闭环构造的工程评测集，而不是普通问答数据集。</p>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>数据集指纹</h2>
+        <div class='metric-grid'>
+          <div class='metric-card'><div class='num'>40</div><div class='label'>总场景数</div><div class='desc'>固定为 40 个单轮 case，便于全量评测与复现实验。</div></div>
+          <div class='metric-card'><div class='num'>20 / 20</div><div class='label'>预测 / 调度</div><div class='desc'>两类任务严格对半，避免 benchmark 只偏向其中一侧。</div></div>
+          <div class='metric-card'><div class='num'>10 × 4</div><div class='label'>类别结构</div><div class='desc'>10 个类别，每类 4 个实例，既有广度也有可分析的重复结构。</div></div>
+          <div class='metric-card'><div class='num'>40</div><div class='label'>唯一目标变量</div><div class='desc'>每个场景绑定唯一 target boundary variable，保证评分和诊断可追踪。</div></div>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>任务结构</h2>
+        <div class='task-grid'>
+          <div class='type-card'>
+            <span class='tag'>Prediction</span>
+            <h3>给定扰动，预测目标边界变量</h3>
+            <p>模型需要根据输入描述识别扰动对象、扰动方向、时间范围与预测目标，并输出结构化预测值或趋势解释。它主要考察物理合理性、证据支撑和约束一致性。</p>
+          </div>
+          <div class='type-card'>
+            <span class='tag'>Dispatch</span>
+            <h3>给定工况，提出可执行调度建议</h3>
+            <p>模型不仅要识别当前风险或目标，还要比较候选动作、说明排序依据，并给出推荐操作与工程解释。它主要考察搜索能力、安全性、适应性与最终建议质量。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>为什么这样设计</h2>
+        <div class='logic-list'>
+          <div class='logic-card'>
+            <h3>真实对象锚定</h3>
+            <p>场景使用具体站点、压缩机、阀门、支路等对象名与边界变量名，而不是抽象占位符。这让错误分析可以直接回到工程对象层面。</p>
+          </div>
+          <div class='logic-card'>
+            <h3>单轮压缩</h3>
+            <p>把原本可能是多轮的人机交互压缩为单轮任务，便于控制输入长度、统一评测口径，也更适合大规模自动跑分。</p>
+          </div>
+          <div class='logic-card'>
+            <h3>预测 / 调度分离</h3>
+            <p>预测侧更关注数值趋势和物理一致性，调度侧更关注候选比较、约束规避与操作建议。分开设计后，论文展示会更清晰。</p>
+          </div>
+          <div class='logic-card'>
+            <h3>评测器友好</h3>
+            <p>输入模板和输出字段都围绕 evaluator 能读取的结构来组织，例如目标变量、扰动设定、偏好约束和报告工件，因此结果可自动审计。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>类别布局</h2>
+        <div class='catalog'>
+          <div class='catalog-col'><div class='head'>P1</div><h3>富余抬升与高压能耗</h3><p>关注富余侧高压、局部过压和能耗抬升，适合检验模型对高压与冗余传输的敏感性。</p><div class='vars'><strong>示例变量：</strong><br/>T_006:SNQ / E_109:SNQ / C_019:SP_out / T_005:SP</div></div>
+          <div class='catalog-col'><div class='head'>P2</div><h3>受限供给与需求缺口</h3><p>关注源头受限、下游缺供和不同站点需求不均衡，适合看预测是否捕捉短缺传播。</p><div class='vars'><strong>示例变量：</strong><br/>T_003:SNQ / E_119:SNQ / E_082:SNQ / T_007:SNQ</div></div>
+          <div class='catalog-col'><div class='head'>P3</div><h3>压缩机与工况切换</h3><p>关注压缩机出口压力、启停状态和工况切换，适合检验设备级响应推断。</p><div class='vars'><strong>示例变量：</strong><br/>C_014:SP_out / C_021:SP_out / C_008:ST / C_022:SP_out</div></div>
+          <div class='catalog-col'><div class='head'>P4</div><h3>调节阀与支路流量再分配</h3><p>关注支路流量和阀门速度变化引发的再分配，强调局部操作对全网边界的连锁影响。</p><div class='vars'><strong>示例变量：</strong><br/>B_233:FR / B_317:FR / R_004:SPD / R_006:ST</div></div>
+          <div class='catalog-col'><div class='head'>P5</div><h3>多元扰动叠加</h3><p>把支路、阀门与边界需求的变化叠加在一起，用于观察模型在复杂场景下是否还能维持稳定预测。</p><div class='vars'><strong>示例变量：</strong><br/>B_286:FR / R_001:SPD / B_341:FR / R_007:SPD</div></div>
+        </div>
+      </section>
+
+      <section class='foot'>
+        <p><strong>调度侧 D1-D5</strong> 与预测侧共享同一工程底座，但更强调“风险识别 - 候选比较 - 推荐动作 - 报告交付”。在汇报中可以把 D1-D5 概括为：供需平衡调度、压缩机方案切换、支路重分配、安全约束规避与组合干预五类问题。</p>
+        <p><strong>编码说明：</strong> 页面以 UTF-8 with BOM 重新生成，并显式声明 <code>&lt;meta charset="UTF-8"&gt;</code> 与中文字体栈，避免浏览器和编辑器误判编码。</p>
+      </section>
+    </div>
+  </div>
+</body>
+</html>

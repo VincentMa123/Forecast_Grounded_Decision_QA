@@ -1,0 +1,205 @@
+{
+  "generated_at_utc": "2026-04-02T11:56:34+00:00",
+  "hf_repo_id_placeholder": "zly7/pipeclaw-open-datasets",
+  "configs": [
+    {
+      "record_count": 80,
+      "top_level_fields": [
+        "params",
+        "question",
+        "question_id",
+        "template_id"
+      ],
+      "field_types": {
+        "template_id": "str",
+        "question_id": "str",
+        "params": "dict",
+        "question": "str"
+      },
+      "sample_ids": [
+        "basic_001_c_20190114",
+        "status_001_c_20190114",
+        "historical_001_c_20190101_20190114"
+      ],
+      "unique_template_count": 80,
+      "config_name": "llm-question-all",
+      "title": "LLM question instances",
+      "description": "Expanded LLM question instances with concrete parameters and final prompts.",
+      "source_json": "backend/llm_data/question_all.json",
+      "jsonl_path": "data/llm_data/question_all.jsonl",
+      "raw_path": "raw/llm_data/question_all.json"
+    },
+    {
+      "record_count": 80,
+      "top_level_fields": [
+        "category",
+        "template_id",
+        "template_question"
+      ],
+      "field_types": {
+        "template_id": "str",
+        "category": "str",
+        "template_question": "str"
+      },
+      "sample_ids": [
+        "basic_001",
+        "basic_002",
+        "basic_003"
+      ],
+      "unique_template_count": 80,
+      "config_name": "llm-question-template-80",
+      "title": "LLM question templates (80)",
+      "description": "The 80 public LLM prompt templates curated for the released package.",
+      "source_json": "backend/llm_data/question_template_80.json",
+      "jsonl_path": "data/llm_data/question_template_80.jsonl",
+      "raw_path": "raw/llm_data/question_template_80.json"
+    },
+    {
+      "record_count": 80,
+      "top_level_fields": [
+        "category",
+        "template_id",
+        "template_question"
+      ],
+      "field_types": {
+        "template_id": "str",
+        "category": "str",
+        "template_question": "str"
+      },
+      "sample_ids": [
+        "basic_001",
+        "status_001",
+        "historical_001"
+      ],
+      "unique_template_count": 80,
+      "config_name": "llm-question-template-all",
+      "title": "LLM question templates (all)",
+      "description": "Full public LLM template set bundled with the open-source package.",
+      "source_json": "backend/llm_data/question_template_all.json",
+      "jsonl_path": "data/llm_data/question_template_all.jsonl",
+      "raw_path": "raw/llm_data/question_template_all.json"
+    },
+    {
+      "record_count": 40,
+      "top_level_fields": [
+        "scenario_class_label",
+        "scenario_description",
+        "scenario_id",
+        "scenario_type",
+        "sessions"
+      ],
+      "field_types": {
+        "scenario_id": "str",
+        "scenario_type": "str",
+        "scenario_class_label": "str",
+        "scenario_description": "str",
+        "sessions": "list[dict]"
+      },
+      "sample_ids": [
+        "scenario_openclaw_001",
+        "scenario_openclaw_002",
+        "scenario_openclaw_003"
+      ],
+      "scenario_type_counts": {
+        "openclaw": 40
+      },
+      "scenario_class_label_counts": {
+        "class_10_contingency_dispatch_and_curtailment": 4,
+        "class_1_corridor_load_watch": 4,
+        "class_2_parallel_corridor_balance": 4,
+        "class_3_source_path_validation": 4,
+        "class_4_delivery_station_portrait": 4,
+        "class_5_metering_and_zero_value_review": 4,
+        "class_6_regional_demand_resilience": 4,
+        "class_7_multi_supply_customer_redundancy": 4,
+        "class_8_hub_identity_and_cross_division_mapping": 4,
+        "class_9_reconciliation_and_consistency_review": 4
+      },
+      "session_count": 200,
+      "dialogue_turn_count": 600,
+      "config_name": "pipeclaw-v2",
+      "title": "PipeClaw lifecycle scenarios v2",
+      "description": "Long-lifecycle PipeClaw evaluation scenarios with multi-session dialogues.",
+      "source_json": "backend/pipeclaw_data/pipeclaw_dataset_v2.json",
+      "jsonl_path": "data/pipeclaw_data/pipeclaw_dataset_v2.jsonl",
+      "raw_path": "raw/pipeclaw_data/pipeclaw_dataset_v2.json"
+    },
+    {
+      "record_count": 70,
+      "top_level_fields": [
+        "scenario_description",
+        "scenario_id",
+        "scenario_type",
+        "sessions"
+      ],
+      "field_types": {
+        "scenario_id": "str",
+        "scenario_type": "str",
+        "scenario_description": "str",
+        "sessions": "list[dict]"
+      },
+      "sample_ids": [
+        "scenario_pipeformer_prediction_001",
+        "scenario_pipeformer_prediction_002",
+        "scenario_pipeformer_prediction_003"
+      ],
+      "scenario_type_counts": {
+        "openclaw": 30,
+        "pipeformer": 40
+      },
+      "session_count": 200,
+      "dialogue_turn_count": 500,
+      "config_name": "pipeformer-v4",
+      "title": "Pipeline full life cycle test dataset v4",
+      "description": "Released PipeFormer/PipeClaw evaluation scenarios from the v4 dataset snapshot.",
+      "source_json": "backend/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "jsonl_path": "data/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v4.jsonl",
+      "raw_path": "raw/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+    },
+    {
+      "record_count": 40,
+      "top_level_fields": [
+        "scenario_class_label",
+        "scenario_description",
+        "scenario_id",
+        "scenario_type",
+        "sessions"
+      ],
+      "field_types": {
+        "scenario_id": "str",
+        "scenario_type": "str",
+        "scenario_class_label": "str",
+        "scenario_description": "str",
+        "sessions": "list[dict]"
+      },
+      "sample_ids": [
+        "scenario_pipeformer_prediction_001",
+        "scenario_pipeformer_prediction_002",
+        "scenario_pipeformer_prediction_003"
+      ],
+      "scenario_type_counts": {
+        "pipeformer": 40
+      },
+      "scenario_class_label_counts": {
+        "低负荷优化与越限消除": 4,
+        "压缩机工况边界": 4,
+        "富余抬升与高压能耗": 4,
+        "末端保压与关键供气": 4,
+        "波动抑制与单点失稳防控": 4,
+        "管存与系统余度保持": 4,
+        "紧平衡与低压消耗": 4,
+        "约束减违与安全回边界": 4,
+        "节流瓶颈与通道受限": 4,
+        "重分配与稳态重构": 4
+      },
+      "session_count": 40,
+      "dialogue_turn_count": 40,
+      "config_name": "pipeformer-v7",
+      "title": "Pipeline full life cycle test dataset v7",
+      "description": "Released PipeFormer/PipeClaw evaluation scenarios from the v7 dataset snapshot.",
+      "source_json": "backend/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "jsonl_path": "data/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v7.jsonl",
+      "raw_path": "raw/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+起点站名,终点站名,类型,管道划分,管道流量
+North Source,Central Hub,pipeline,Demo-West,1500.0
+Central Hub,East City Gate,pipeline,Demo-West,900.0
+Central Hub,South Industrial Gate,pipeline,Demo-West,600.0

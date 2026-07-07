@@ -1,0 +1,2 @@
+num_pipes,num_compressors,pipe_feature_dim,compressor_feature_dim,pipe_feature_columns
+1,1,9,1,"['pipe_length_km', 'outer_diameter_mm', 'wall_thickness_mm', 'heat_transfer_coefficient', 'wall_roughness_mm', 'outlet_elevation_m', 'inlet_elevation_m', 'outlet_soil_temp_c', 'inlet_soil_temp_c']"

@@ -1,0 +1,3692 @@
+[
+  {
+    "scenario_id": "scenario_pipeformer_prediction_001",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第001个算例中边界控制量 T_001:SNQ（气源流量设定）发生“上调 8%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 气源抬升后局部过压与压缩机负荷抬升。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_001_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第001个算例，保持其它边界控制量不变，只把 T_001:SNQ（气源流量设定）设为“上调 8%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_001_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 气源抬升后局部过压与压缩机负荷抬升 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_002",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第002个算例中边界控制量 T_003:SNQ（气源流量设定）发生“下调 12%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 4小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 上游收缩后的低压与管存消耗。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_002_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第002个算例，保持其它边界控制量不变，只把 T_003:SNQ（气源流量设定）设为“下调 12%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 4小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_002_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 上游收缩后的低压与管存消耗 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_003",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第003个算例中边界控制量 T_006:SNQ（气源流量设定）发生“上调 15%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 90分钟 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 高注入下的流量再分配与能耗变化。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_003_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第003个算例，保持其它边界控制量不变，只把 T_006:SNQ（气源流量设定）设为“上调 15%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 90分钟 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_003_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 高注入下的流量再分配与能耗变化 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_004",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第004个算例中边界控制量 E_001:SNQ（用户侧需求流量设定）发生“上调 10%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 末端需求抬升后的低压风险。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_004_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第004个算例，保持其它边界控制量不变，只把 E_001:SNQ（用户侧需求流量设定）设为“上调 10%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_004_session_002",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 末端需求抬升后的低压风险 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_005",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第005个算例中边界控制量 E_018:SNQ（用户侧需求流量设定）发生“下调 8%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 3小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 需求回落后的管存回补与高压风险。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_005_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第005个算例，保持其它边界控制量不变，只把 E_018:SNQ（用户侧需求流量设定）设为“下调 8%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 3小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_005_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 需求回落后的管存回补与高压风险 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_006",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第006个算例中边界控制量 E_045:SNQ（用户侧需求流量设定）发生“上调 12%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 6小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 持续升输下的压缩机负荷边界。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_006_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第006个算例，保持其它边界控制量不变，只把 E_045:SNQ（用户侧需求流量设定）设为“上调 12%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 6小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_006_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 持续升输下的压缩机负荷边界 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_007",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第007个算例中边界控制量 B_001:FR（球阀通流比例）发生“下调 20%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 阀门受限后的供流重分布。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_007_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第007个算例，保持其它边界控制量不变，只把 B_001:FR（球阀通流比例）设为“下调 20%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_007_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 阀门受限后的供流重分布 的迹象，但幅度还不算极端。请你说明：在这种情况下，阀门通流比例 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_008",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第008个算例中边界控制量 B_015:FR（球阀通流比例）发生“上调 10%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 4小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 阀门开度放大后的压力波传播。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_008_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第008个算例，保持其它边界控制量不变，只把 B_015:FR（球阀通流比例）设为“上调 10%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 4小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_008_session_002",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 阀门开度放大后的压力波传播 的迹象，但幅度还不算极端。请你说明：在这种情况下，阀门通流比例 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_009",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第009个算例中边界控制量 B_120:FR（球阀通流比例）发生“下调 15%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 3小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 局部关断后的旁路流量挤压。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_009_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第009个算例，保持其它边界控制量不变，只把 B_120:FR（球阀通流比例）设为“下调 15%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 3小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_009_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 局部关断后的旁路流量挤压 的迹象，但幅度还不算极端。请你说明：在这种情况下，阀门通流比例 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_010",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第010个算例中边界控制量 C_001:SP_（压缩机转速设定）发生“上调 5%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 压缩机提速后的能耗-压力权衡。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_010_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第010个算例，保持其它边界控制量不变，只把 C_001:SP_（压缩机转速设定）设为“上调 5%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_010_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 压缩机提速后的能耗-压力权衡 的迹象，但幅度还不算极端。请你说明：在这种情况下，压缩机转速设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_011",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第011个算例中边界控制量 C_005:SP_（压缩机转速设定）发生“下调 7%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 90分钟 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 压缩机降速后的末端保供余度。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_011_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第011个算例，保持其它边界控制量不变，只把 C_005:SP_（压缩机转速设定）设为“下调 7%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 90分钟 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_011_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 压缩机降速后的末端保供余度 的迹象，但幅度还不算极端。请你说明：在这种情况下，压缩机转速设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_012",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第012个算例中边界控制量 C_008:ST（压缩机启停状态）发生“切换为停机”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 压缩机停机后的替代路径与低压风险。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_012_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第012个算例，保持其它边界控制量不变，只把 C_008:ST（压缩机启停状态）设为“切换为停机”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_012_session_002",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 压缩机停机后的替代路径与低压风险 的迹象，但幅度还不算极端。请你说明：在这种情况下，启停状态 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_013",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第013个算例中边界控制量 R_001:SPD（调压阀开度设定）发生“上调 8%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 3小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 调压阀开大后的下游压力稳定性。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_013_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第013个算例，保持其它边界控制量不变，只把 R_001:SPD（调压阀开度设定）设为“上调 8%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 3小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_013_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 调压阀开大后的下游压力稳定性 的迹象，但幅度还不算极端。请你说明：在这种情况下，调压阀开度设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_014",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第014个算例中边界控制量 R_004:SPD（调压阀开度设定）发生“下调 10%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 4小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 调压阀收紧后的瓶颈暴露。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_014_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第014个算例，保持其它边界控制量不变，只把 R_004:SPD（调压阀开度设定）设为“下调 10%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 4小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_014_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 调压阀收紧后的瓶颈暴露 的迹象，但幅度还不算极端。请你说明：在这种情况下，调压阀开度设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_015",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第015个算例中边界控制量 R_006:ST（调压阀启停状态）发生“切换为关闭”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 调压阀停用后的供需再平衡。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_015_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第015个算例，保持其它边界控制量不变，只把 R_006:ST（调压阀启停状态）设为“切换为关闭”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_015_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 调压阀停用后的供需再平衡 的迹象，但幅度还不算极端。请你说明：在这种情况下，启停状态 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_016",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第016个算例中边界控制量 E_082:SNQ（用户侧需求流量设定）发生“上调 18%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 6小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 大幅增需后的管存消耗速度。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_016_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第016个算例，保持其它边界控制量不变，只把 E_082:SNQ（用户侧需求流量设定）设为“上调 18%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 6小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_016_session_002",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 大幅增需后的管存消耗速度 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_017",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第017个算例中边界控制量 E_101:SNQ（用户侧需求流量设定）发生“下调 12%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 4小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 需求回撤后的压缩机冗余与能耗浪费。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_017_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第017个算例，保持其它边界控制量不变，只把 E_101:SNQ（用户侧需求流量设定）设为“下调 12%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 4小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_017_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 需求回撤后的压缩机冗余与能耗浪费 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_018",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第018个算例中边界控制量 T_004:SNQ（气源流量设定）发生“上调 6%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 2小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 气源小幅升输下的可观测变化。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_018_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第018个算例，保持其它边界控制量不变，只把 T_004:SNQ（气源流量设定）设为“上调 6%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 2小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_018_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 气源小幅升输下的可观测变化 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_019",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第019个算例中边界控制量 T_005:SNQ（气源流量设定）发生“下调 9%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 3小时 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 气源轻度回撤后的低压先兆。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_019_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第019个算例，保持其它边界控制量不变，只把 T_005:SNQ（气源流量设定）设为“下调 9%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 3小时 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_019_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 气源轻度回撤后的低压先兆 的迹象，但幅度还不算极端。请你说明：在这种情况下，流量设定 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_020",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 预测类场景。模拟 mock_test 第020个算例中边界控制量 B_233:FR（球阀通流比例）发生“下调 25%”的扰动，重点测试 预测—校核—执行闭环中的“预测 + 校核”能力：系统是否能调用 PipeFormer 预测未来 90分钟 状态，并由规则校核器审计压力、流量、管存、压缩机负荷与能耗。该场景主要观察 阀门近关闭后的快速冲击。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_020_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第020个算例，保持其它边界控制量不变，只把 B_233:FR（球阀通流比例）设为“下调 25%”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请把这当成一个“预测+校核”测试：先调用 PipeFormer 预测未来 90分钟 的状态，再用规则检查压力、流量、管存、压缩机负荷和能耗是否异常。不要给调度动作，只回答最可能的运行后果、最该盯的 3 个指标，以及是否需要人工干预。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果规则校核发现安全侧和能耗侧结论不一致，请明确告诉我：首先触发审计的是哪一类约束，证据链里最关键的 2 个观测应该是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_prediction_020_session_002",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "假设第一轮预测显示 阀门近关闭后的快速冲击 的迹象，但幅度还不算极端。请你说明：在这种情况下，阀门通流比例 的这次改动更像是短时可接受波动，还是已经接近需要拒绝的边界？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后请给我一个简短的验证口径：如果我要把这道题写成自动评测，最应该保留哪几项关键输出字段作为判题依据？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_001",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第021个算例出现“需求突增”并伴随 T_001:SNQ（气源流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 未来 2 到 4 小时末端保压优先 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_001_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第021个算例，模拟 需求突增。你可以把它理解为 T_001:SNQ 相对基线发生了明显扰动，并且未来 2小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个只作用于边界控制量的候选动作。候选动作只能作用于边界控制量，且需要分别预测未来 2小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：未来 2 到 4 小时末端保压优先；另外一个现场约束是“暂时不允许停压缩机”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_001_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_002",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第022个算例出现“上游供给下降”并伴随 T_003:SNQ（气源流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先降低约束违反率，其次考虑能耗 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_002_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第022个算例，模拟 上游供给下降。你可以把它理解为 T_003:SNQ 相对基线发生了明显扰动，并且未来 3小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个候选动作并给出拒绝理由。候选动作只能作用于边界控制量，且需要分别预测未来 3小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先降低约束违反率，其次考虑能耗；另外一个现场约束是“不希望大幅改动主气源设定”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_002_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_003",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第023个算例出现“局部阀门受限”并伴随 T_006:SNQ（气源流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先保障关键下游节点压力 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_003_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第023个算例，模拟 局部阀门受限。你可以把它理解为 T_006:SNQ 相对基线发生了明显扰动，并且未来 4小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出动作排序与证据链。候选动作只能作用于边界控制量，且需要分别预测未来 4小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先保障关键下游节点压力；另外一个现场约束是“尽量少动阀门”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_003_session_002",
+        "offset_hours": 9,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_004",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第024个算例出现“压缩机负荷逼近上限”并伴随 E_001:SNQ（用户侧需求流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先把负荷拉回安全区 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_004_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第024个算例，模拟 压缩机负荷逼近上限。你可以把它理解为 E_001:SNQ 相对基线发生了明显扰动，并且未来 6小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少比较 3 个动作。候选动作只能作用于边界控制量，且需要分别预测未来 6小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先把负荷拉回安全区；另外一个现场约束是“不希望牺牲末端压力”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_004_session_002",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_005",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第025个算例出现“管存持续走低”并伴随 E_018:SNQ（用户侧需求流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先减缓管存下降速度 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_005_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第025个算例，模拟管存持续走低。你可以把它理解为 E_018:SNQ 相对基线发生了明显扰动，并且未来 2小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：比较 3 个动作并说明适用前提。候选动作只能作用于边界控制量，且需要分别预测未来 2小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先减缓管存下降速度；另外一个现场约束是“优先减少额外能耗”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_005_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_006",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第026个算例出现“下游需求波动放大”并伴随 E_045:SNQ（用户侧需求流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先控制末端压力波动 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_006_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第026个算例，模拟 下游需求波动放大。你可以把它理解为 E_045:SNQ 相对基线发生了明显扰动，并且未来 3小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出 3 个动作的排序与弃选理由。候选动作只能作用于边界控制量，且需要分别预测未来 3小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先控制末端压力波动；另外一个现场约束是“暂时不允许停压缩机”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_006_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_007",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第027个算例出现“调压阀疑似卡涩”并伴随 B_001:FR（球阀通流比例）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先避免单点失稳 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_007_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第027个算例，模拟 调压阀疑似卡涩。你可以把它理解为 B_001:FR 相对基线发生了明显扰动，并且未来 4小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：输出动作排序并标注人工复核点。候选动作只能作用于边界控制量，且需要分别预测未来 4小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先避免单点失稳；另外一个现场约束是“不希望大幅改动主气源设定”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_007_session_002",
+        "offset_hours": 9,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_008",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第028个算例出现“夜间低负荷回落”并伴随 B_015:FR（球阀通流比例）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先降低不必要能耗 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_008_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第028个算例，模拟 夜间低负荷回落。你可以把它理解为 B_015:FR 相对基线发生了明显扰动，并且未来 6小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：比较 3 个动作的收益与风险。候选动作只能作用于边界控制量，且需要分别预测未来 6小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先降低不必要能耗；另外一个现场约束是“尽量少动阀门”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_008_session_002",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_009",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第029个算例出现“局部流量倒换”并伴随 B_120:FR（球阀通流比例）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先消除高流速与潜在超限 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_009_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第029个算例，模拟 局部流量倒换。你可以把它理解为 B_120:FR 相对基线发生了明显扰动，并且未来 2小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出动作排序。候选动作只能作用于边界控制量，且需要分别预测未来 2小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先消除高流速与潜在超限；另外一个现场约束是“不希望牺牲末端压力”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_009_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_010",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第030个算例出现“边界条件冲击叠加”并伴随 C_001:SP_（压缩机转速设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先保持供需平衡余度 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_010_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第030个算例，模拟 边界条件冲击叠加。你可以把它理解为 C_001:SP_ 相对基线发生了明显扰动，并且未来 3小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个候选动作。候选动作只能作用于边界控制量，且需要分别预测未来 3小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先保持供需平衡余度；另外一个现场约束是“优先减少额外能耗”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_010_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_011",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第031个算例出现“需求突增”并伴随 C_005:SP_（压缩机转速设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 未来 2 到 4 小时末端保压优先 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_011_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第031个算例，模拟 需求突增。你可以把它理解为 C_005:SP_ 相对基线发生了明显扰动，并且未来 4小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个只作用于边界控制量的候选动作。候选动作只能作用于边界控制量，且需要分别预测未来 4小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：未来 2 到 4 小时末端保压优先；另外一个现场约束是“暂时不允许停压缩机”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_011_session_002",
+        "offset_hours": 9,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_012",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第032个算例出现“上游供给下降”并伴随 C_008:ST（压缩机启停状态）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先降低约束违反率，其次考虑能耗 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_012_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第032个算例，模拟 上游供给下降。你可以把它理解为 C_008:ST 相对基线发生了明显扰动，并且未来 6小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个候选动作并给出拒绝理由。候选动作只能作用于边界控制量，且需要分别预测未来 6小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先降低约束违反率，其次考虑能耗；另外一个现场约束是“不希望大幅改动主气源设定”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_012_session_002",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_013",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第033个算例出现“局部阀门受限”并伴随 R_001:SPD（调压阀开度设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先保障关键下游节点压力 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_013_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第033个算例，模拟 局部阀门受限。你可以把它理解为 R_001:SPD 相对基线发生了明显扰动，并且未来 2小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出动作排序与证据链。候选动作只能作用于边界控制量，且需要分别预测未来 2小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先保障关键下游节点压力；另外一个现场约束是“尽量少动阀门”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_013_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_014",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第034个算例出现“压缩机负荷逼近上限”并伴随 R_004:SPD（调压阀开度设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先把负荷拉回安全区 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_014_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第034个算例，模拟 压缩机负荷逼近上限。你可以把它理解为 R_004:SPD 相对基线发生了明显扰动，并且未来 3小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少比较 3 个动作。候选动作只能作用于边界控制量，且需要分别预测未来 3小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先把负荷拉回安全区；另外一个现场约束是“不希望牺牲末端压力”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_014_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_015",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第035个算例出现“管存持续走低”并伴随 R_006:ST（调压阀启停状态）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先减缓管存下降速度 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_015_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第035个算例，模拟管存持续走低。你可以把它理解为 R_006:ST 相对基线发生了明显扰动，并且未来 4小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：比较 3 个动作并说明适用前提。候选动作只能作用于边界控制量，且需要分别预测未来 4小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先减缓管存下降速度；另外一个现场约束是“优先减少额外能耗”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_015_session_002",
+        "offset_hours": 9,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_016",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第036个算例出现“下游需求波动放大”并伴随 E_082:SNQ（用户侧需求流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先控制末端压力波动 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_016_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第036个算例，模拟 下游需求波动放大。你可以把它理解为 E_082:SNQ 相对基线发生了明显扰动，并且未来 6小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出 3 个动作的排序与弃选理由。候选动作只能作用于边界控制量，且需要分别预测未来 6小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先控制末端压力波动；另外一个现场约束是“暂时不允许停压缩机”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_016_session_002",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_017",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第037个算例出现“调压阀疑似卡涩”并伴随 E_101:SNQ（用户侧需求流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先避免单点失稳 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_017_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第037个算例，模拟 调压阀疑似卡涩。你可以把它理解为 E_101:SNQ 相对基线发生了明显扰动，并且未来 2小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：输出动作排序并标注人工复核点。候选动作只能作用于边界控制量，且需要分别预测未来 2小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先避免单点失稳；另外一个现场约束是“不希望大幅改动主气源设定”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_017_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_018",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第038个算例出现“夜间低负荷回落”并伴随 T_004:SNQ（气源流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先降低不必要能耗 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_018_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第038个算例，模拟 夜间低负荷回落。你可以把它理解为 T_004:SNQ 相对基线发生了明显扰动，并且未来 3小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：比较 3 个动作的收益与风险。候选动作只能作用于边界控制量，且需要分别预测未来 3小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先降低不必要能耗；另外一个现场约束是“尽量少动阀门”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_018_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_019",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第039个算例出现“局部流量倒换”并伴随 T_005:SNQ（气源流量设定）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先消除高流速与潜在超限 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_019_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第039个算例，模拟 局部流量倒换。你可以把它理解为 T_005:SNQ 相对基线发生了明显扰动，并且未来 4小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：给出动作排序。候选动作只能作用于边界控制量，且需要分别预测未来 4小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先消除高流速与潜在超限；另外一个现场约束是“不希望牺牲末端压力”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_019_session_002",
+        "offset_hours": 9,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_020",
+    "scenario_type": "pipeformer",
+    "scenario_description": "PipeFormer 调度类场景。模拟 mock_test 第040个算例出现“边界条件冲击叠加”并伴随 B_233:FR（球阀通流比例）相对基线变化的场景，重点测试 预测—校核—执行闭环：系统需要先生成候选调度动作，再调用 PipeFormer 预测其后果，并用规则校核器审计压力、流量、管存、压缩机负荷和能耗，最终输出带证据链和拒绝理由的动作排序建议。该场景主要考察在 优先保持供需平衡余度 下的动作优选能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_020_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "背景：请基于 mock_test 的第040个算例，模拟 边界条件冲击叠加。你可以把它理解为 B_233:FR 相对基线发生了明显扰动，并且未来 6小时 还会继续波动。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "请完整执行 预测—校核—执行闭环：至少 3 个候选动作。候选动作只能作用于边界控制量，且需要分别预测未来 6小时 的状态，再审核压力、流量、管存、压缩机负荷和能耗。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这次的优化偏好是：优先保持供需平衡余度；另外一个现场约束是“优先减少额外能耗”。请把这个约束写进你的动作筛选逻辑里。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_pipeformer_dispatch_020_session_002",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果第一名动作能保住压力，但第二名动作更省能耗，你会怎样解释两者的取舍？请把 淘汰理由 也写清楚，尤其说明哪些动作是因为规则校核不过而被淘汰。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再补一个追问：若我希望后续做自动化验证，你建议把输出拆成哪几个层次——候选动作层、预测结果层、规则审计层、最终排序层——每层最少保留哪些字段？"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_001",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 中西气东输二线主干管段的高流量排序展开跨班对话。重点测试模型能否先用真实管段数据完成排序，再在后续班次中纠正错误记忆、主动索取当前快照之外的物理量，并把证据整理成可入 PDF 的交班材料。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_001_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "先用 20190114_pipeline.csv 只看西气东输二线，按管道流量从大到小列出前 3 段，给我起点、终点和流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把第 1 段和第 2 段先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我刚才把第 1 段记成了“昌吉站—乌鲁木齐站”，你直接纠正，不要顺着我说。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果夜班口头说乌鲁木齐入口压力在抖，但这份日级管段排序没变，你会主动补要哪两类物理量？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "基于现有快照，你更倾向主干真实受限，还是局部量测/短时波动？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "把这个判断的证据链先在脑子里挂住，后面我要让你写交接。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_003",
+        "offset_hours": 10,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能盯一个站和一段管段，你会怎么选？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_004",
+        "offset_hours": 30,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "有人说“只要主干前 3 段没变就不用看了”，这句话哪里最容易误导人？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果做成一页 PDF 附录，最少放哪三块证据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_002",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 中西气东输二线与西气东输三线并行主通道的负荷差异展开。重点测试模型能否记住双线对比结果，在后续对话中纠正错记，并主动指出日级快照无法替代的小时级物理校核信息。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_002_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先给你一个交接碎片：有人说 20190114 这天霍尔果斯到乌鲁木齐的主干负荷，二线和三线差得不大。你先记住这句话，不要判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去比一比西气东输二线和西气东输三线在“霍尔果斯站—精河站”和“精河站—乌苏站”这两段的流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "顺手说一句，这更像两条并行主通道分担明显，还是几乎等负荷？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把“哪条线更高”和“差值量级”记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_003",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在记混了，是不是三线比二线高？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人拿这个日级差值去解释小时级压力波动，你最想追问他缺了哪类数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_004",
+        "offset_hours": 36,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班又补了一句：乌鲁木齐站当时有短时波动，但没有说是二线还是三线。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "在这种情况下，你会先让他们回传哪两个站位或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "若要放进值班图里，你会选“双线对比表”、“主干链路图”，还是“站点摘要框”，为什么？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后帮我留一句交接提醒，别超过 25 个字。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_003",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 中西气东输一线的高流量主干链展开跨班核对。重点测试模型能否记住主干排序、识别错误回忆，并主动说明仅靠单日主干排名仍然无法回答的运行问题。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_003_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "在 20190114_pipeline.csv 里只看西气东输一线，按流量从大到小列出前 5 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "不要泛泛而谈，我要看到起终点顺序。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "尤其把前 3 段先记住，后面我要故意考你。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重新算，你还记得第 1 段是哪一段吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_003",
+        "offset_hours": 18,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我刚被人带偏了，他说“临汾站—沁水站应该是第 1 段，不是延川站—蒲县站”。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你只靠这一天的日级主干排名，能不能判断是上游供给变化还是中下游分流变化？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果不能，你会主动再要哪三项数据？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "要是把这件事送去做调度凸优化，你最少还缺哪两个边界条件？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_004",
+        "offset_hours": 48,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事要进日报 PDF，我最该留哪两个表、哪一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再给我一句你自己的主动见解。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_004",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 与 20190114_pipeline.csv 中陕京二线通向石家庄站的最短可达源路径展开。重点测试模型是否能把计算出的路径记住、纠正错记，并区分“拓扑可达”和“物理可供”之间的差别。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_004_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追一遍到石家庄站的可达气源，先告诉我最近的那个气源是谁、示例最短路径是什么。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "别给我全网长名单，我现在只要最短路径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把路径里的中间站也记住，后面我要问。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺手判断一下：这更像单源依赖，还是多源可达的末端？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_002",
+        "offset_hours": 1,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我记成了“榆林站是最近气源”，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把最近气源和路径再纠正一次。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_003",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果石家庄站夜里出现保供紧张，但这条最短路径本身没断，你会先问上游哪类约束？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再问一句：这种题只靠拓扑可达够不够，为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要接凸优化模型，你最想补哪三项输入。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_004",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一句交接口径，提醒下一班别把“可达”误当成“一定可供”。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_005",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 中俄东线到宝坻站的上游传递链展开。重点测试模型能否记住关键前几跳、纠正站间次序错误，并主动补问末端波动所需的时序与边界信息。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_005_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "在 20190114 这天，沿中俄东线看从黑河到宝坻站的主干传递，帮我抓出前几跳关键站名，至少说到明水站和大庆站那一段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把最上游气源和前 3 跳先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "不重算的话，最上游气源你还记得是谁吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_003",
+        "offset_hours": 16,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在有点混，把第 2 跳记成了“黑河—大庆”。你先纠正。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果宝坻站现场说末端波动大，你觉得单看这条主干链够不够？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "你会主动补问哪两类现场数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若要做成 PDF 里的“供源追踪小节”，最少放哪三项内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若后面要接物理校核模块，第一批边界条件你会给什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "下一班只看一个城市门站和一个上游节点，你选谁？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "再补一条你会记进值班日志的观察。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_006",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 与 20190114_node.csv 中川气东送到上海端的可达源追踪展开。重点测试模型能否将“多源可达”与“具备替代能力”区分开来，并在多班次对话中保持路径与未决问题的一致记忆。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_006_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先塞给你一句交班话：有人说 20190114 这天上海端的保供，不是只靠一条源头链，而是多源可达。先记住这句话。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_002",
+        "offset_hours": 5,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你现在去用 20190114_pipeline.csv 和 20190114_node.csv 反向追到上海站的可达气源，告诉我可达气源数，以及最短跳数最小的前 2 个源头。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "别把“可达”直接说成“一定能替代”。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把最短的那条示例路径先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺手判断一下，这句交班话是被数据支持、部分支持，还是明显夸大？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_003",
+        "offset_hours": 20,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在只记得一个源是宁波LNG站，另一个是不是忠县站？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你先帮我核对，别猜。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "夜班如果坚持说“多源可达就代表没有风险”，你认为还有哪两个未决问题？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_004",
+        "offset_hours": 60,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这个要放进一页 PDF，图上你会画什么，表里你会留什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后留一句给夜班的提醒，别超过 20 个字。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_007",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中通州南分输站的用户画像展开。重点测试模型能否在计算用户数、总量和头部用户后进行跨班回忆，并主动追问改供和现场口径信息，而不是只停留在静态排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_007_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "用 20190114_consumer.csv 看一下通州南分输站：它供了几个用户、总消耗量多少、第一大用户是谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只给结论，不要扩展。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把用户数、总量、第一大用户先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我刚才把总量记成 9165 了，你帮我纠正。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再告诉我，这个供气点更像“单一大户驱动”还是“分散负荷”。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果今晚这个站点量突然掉了，但北京全市总量没怎么变，你最先想问哪类改供信息？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "还有哪件事是这三张表本身回答不了、但现场一定要补的？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_003",
+        "offset_hours": 10,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能盯一个用户，你会盯谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若只能盯一个相邻站点，你会让他们去看哪里？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_004",
+        "offset_hours": 30,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一个能直接放日报标题的小句子。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_008",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中石家庄压气站的头部用户和零值条目展开。重点测试模型能否在记住大用户和零值用户规模后，进一步主动区分真实停用、代输占位和数据延迟，并把结果转成可审计的交接页。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_008_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "用 20190114_consumer.csv 看石家庄压气站，给我三个东西：总用户数、总消耗量、消耗量前 3 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再算一下这里零消耗用户有多少，占比多少。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把第一大用户和零消耗用户数先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "先别判断成异常，我后面再问。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以直接把这里写成“稳定站点，不必追零值”？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不能，你先说原因，再告诉我零值更可能指向真实停用、代输占位，还是数据延迟。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "若要做进一步校核，你最少还想要哪两类补充数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_003",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在只回答我：这里最该复核的是大户、零值，还是两者之间的口径关系？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_004",
+        "offset_hours": 36,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪两张表和一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句交班观察。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_009",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中王家沟末站与乌鲁木齐压气站的用户口径差异展开。重点测试模型能否比较两个供气点的相似与差异，在后续班次中记住零值分布，并主动追问是否存在分配规则或抄表口径问题。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_009_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请把 20190114_consumer.csv 里“王家沟末站”和“乌鲁木齐压气站”并排比一下：各自用户数、总消耗量、第一大用户，以及零消耗用户数。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "尤其把“哪一个站有零消耗用户、哪一个没有”先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在把这两个站记混了，是不是两个站的用户结构完全一样？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不一样，你直接把差别点说清楚。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "要是现场只报来“乌鲁木齐一带有波动”，你会优先回问哪个站、哪类口径差异？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "再补一个主动问题：你现在最缺哪条信息才能判断这是分配规则问题还是真实取气变化？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_003",
+        "offset_hours": 18,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班只跟一类用户，你会盯新疆燃气(西二线)还是新捷燃气？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_004",
+        "offset_hours": 48,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这事要进交班 PDF，你会把两个站做成对照表还是分开写？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "对照里最不能少的字段是什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "最后给我一句你真正想主动提醒下一班的话。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_010",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中上海白鹤末站“总量不低但夹杂零值用户”的现象展开。重点测试模型能否在跨班次中回忆零值名单、区分活跃与非活跃用户，并主动要求补充抄表时点或现场取气证据。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_010_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先记你一句碎片：有人说上海白鹤末站这天看起来量不小，但里面混着零消耗用户。先记住，不用判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_002",
+        "offset_hours": 1,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去 20190114_consumer.csv 把上海白鹤末站的用户名单、各自消耗量和零消耗个数查出来。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "顺便告诉我第一大用户是谁，和第二名差得大不大。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把零值用户名单先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_003",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以把“宝钢股份”算成当天活跃用户？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你先按数据口径纠正我。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_004",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果夜班说这更像抄表滞后，不像真实停用，你觉得还缺哪两类证据？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果明天要和上海末端保供一起写进 PDF，你会把这个站放在风险页还是备注页？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句：这里更值得追的是大户波动，还是零值口径。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后给我一句适合夜班复述的话。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_011",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中阳曲压气站的头部用户、代输标签与零值条目展开。重点测试模型能否在多班次对话中保持对重点用户和零值规模的记忆，并主动指出表内无法回答的原因解释问题。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_011_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "用 20190114_consumer.csv 看阳曲压气站：前 5 个用户、零消耗用户数、总消耗量分别是什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "我特别关心山西燃气和那些代输/零值条目。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把第一大用户和零值数量先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "不重算的话，第一大用户你还记得是谁吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_003",
+        "offset_hours": 16,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果有人直接把零值都当成异常停用，你同意吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先把哪些带“代输”或口径标签的用户单独拎出来复核？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这三张表能不能直接回答“为什么是零值”？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "如果不能，你会主动要哪三项补充信息？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成一页交班图表，你最想放哪一列排序？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句你自己的判断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_012",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中湘潭分输站的用户结构展开。重点测试模型能否在记住前两大用户后，对“单一大户”与“混合负荷”作出区分，并主动索取更高频的物理数据以支持后续校核。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_012_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请查 20190114_consumer.csv 里的湘潭分输站：总用户数、总消耗量、前 5 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再告诉我第一名和第二名之间差多少。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把前 2 名用户记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺带先打个标签：它更像单一大户还是混合负荷？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_002",
+        "offset_hours": 5,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我记成第一名是株洲新奥，第二名是衡阳天然气，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你直接按这一天的数据把顺序纠正回来。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_003",
+        "offset_hours": 20,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果湘潭一带晚高峰再起波动，你会先盯头部用户，还是盯更分散的小用户群？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要做物理校验，你最先缺的是站压、小时流量，还是阀位/压机状态？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "还剩哪一个未决问题没被这三张表回答？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_004",
+        "offset_hours": 60,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一句能放进交班摘要的结论。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_013",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中北京全市的供气点结构与头部用户展开。重点测试模型能否记住 头部供气点与头部用户，在后续对话中纠正错记，并主动讨论“多供气点”到底代表韧性还是只是表面分散。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_013_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "在 20190114_consumer.csv 里只看北京，算一下总消耗量、活跃用户数、前 3 供气点和 前 3 用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把第一供气点和第一用户先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得北京第一大用户是谁吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_003",
+        "offset_hours": 10,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我把第一供气点记成石景山分输站了，对不对？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果北京燃气来自很多供气点，你会把它理解成更稳，还是只是口径上看起来分散？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "要把这个判断做实，你还想补哪两类数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_004",
+        "offset_hours": 30,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果写成 PDF 的“北京保供页”，你最少会放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会不会单独给北京燃气做一个小框？为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "下一班最该盯的是供气点集中度、用户集中度，还是改供路径？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "再留一句主动追问给现场。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_014",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中河北省的头部用户与多供气点用户展开。重点测试模型能否在跨班次中记住重点用户名单和 多供气点状态，并主动指出名称标签、代输口径与真实保供路径之间的差异。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_014_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先给你个交班片段：河北这天不是“很多用户都差不多”，而是头部几个名字很关键。先记住这句话。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去 20190114_consumer.csv 只看河北，列出前 5 名用户、各自消耗量，以及供气点数。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "我还想知道其中谁是多供气点用户。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把前 2 名用户和那个 多供气点=是 的名字记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺便告诉我，河北华港<主> 这种名字更像需要额外做口径清洗，还是可以直接当普通用户看。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_003",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在记成“河北华港<主>不是多供气点用户”，这句话对不对？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要做风险判断，你会先盯第一大用户，还是先盯那个跨供气点用户？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "还有哪个未决问题需要我去补问现场或营销侧？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_004",
+        "offset_hours": 36,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "这件事如果进 PDF，你要放用户榜单，还是供气点映射表，还是两者都要？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句能抄进交班本的提醒。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_015",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中新疆用气大户与多供气点用户展开。重点测试模型能否在记住头部用户排序后，进一步区分“大用户波动”和“多供气点分配变化”这两类完全不同的问题来源。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_015_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "只看 20190114_consumer.csv 里的新疆，帮我列出前 5 名用户和各自供气点数。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "特别注意新疆燃气(西二线)和新捷燃气。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把前两名以及新捷燃气的供气点数先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在只记得新疆燃气(西二线)排第一，第二名是不是乌石化(西二线)？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你先别迎合我，直接按数据纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果乌鲁木齐一带出现波动，这份用户榜能不能直接解释？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "不能的话，你最想补哪三类运行数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_003",
+        "offset_hours": 18,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班优先看大用户，还是先看多供气点用户？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果只能追一个供气点，你会先让他们回看乌鲁木齐压气站还是王家沟末站？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_004",
+        "offset_hours": 48,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一句交班标题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_016",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中“贵州管网”这个多供气点用户展开。重点测试模型能否记住其总量与供气点数，并主动提醒“多供气点”不等于“高替代性”，还需要路径、合同和调度边界一起校验。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "按 20190114_consumer.csv 做一个用户级汇总，看看“贵州管网”这一个用户当天总消耗量是多少、涉及多少个供气点。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "顺手给我它出现过的前几个供气点名，别全列太长。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把总量和供气点数先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "先别把“多供气点”自动解读成“高弹性”。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "offset_hours": 1,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以直接说：贵州管网有 12 个供气点，所以任何单点波动都不怕？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你先反驳或修正这句话。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果后面真要评估替代能力，你最少还缺哪三项信息？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "只用一句话说：这里最值得警惕的是多源，还是多源背后的路径和合同限制？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，一张表你会放什么字段？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再给我一句主动追问。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_017",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 中永清站的跨划分属性展开。重点测试模型能否记住涉及划分数与关键划分名，在后续班次中纠正错记，并主动要求主数据字段来避免同名站误读。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_017_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "在 20190114_node.csv 里找永清站，帮我算它涉及多少个管道划分，并列出这些划分。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把“涉及划分数”和其中至少三个关键划分先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在把永清站记成只跨 4 个划分了，你先纠正。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再说一句：像永清站这种跨划分站，最容易在值班沟通里出什么错？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要避免把同名站误当成单一业务点，你会主动补要哪类主数据字段？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "这里更像拓扑枢纽问题，还是命名/口径问题先要命？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_003",
+        "offset_hours": 16,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只核对一件事，你会让他们先核对站名映射，还是先核对流量口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你要不要把涉及划分全写出来？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会不会加一张小型关系图？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "最后补一句你会怎么提醒下一班。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_018",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 中安平站的多划分、需求侧联络属性展开。重点测试模型能否在跨班次中保持对“划分数”和“供需方向”的稳定记忆，并主动提醒不要把跨线需求侧联络站误读成源端站。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_018_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "先记一句：安平站这天跨的划分很多，但它看起来更像需求侧联络点，不像源端站。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_002",
+        "offset_hours": 5,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去 20190114_node.csv 核一下安平站涉及多少个管道划分、总流量是供给还是需求。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再顺手列出其中至少 4 个划分名。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把“划分数”和“它是需求侧”先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_003",
+        "offset_hours": 20,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我刚把安平站记成了供给站，这对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你直接按 node 表把我纠正回来。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_004",
+        "offset_hours": 60,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "像这种跨多线的需求侧联络站，值班沟通里最容易漏掉什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要防止把同名站/跨线站误解成单一站点，你会主动补要哪类主数据字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "若夜班说某一线偏紧，你会不会立刻把安平站列进 重点关注名单？为什么？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后留一句你会怎么对下一班说。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_019",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 中榆林站与靖边站这两个源端枢纽的跨线属性和供给规模展开。重点测试模型能否在多班次中记住“谁更大、各跨几线”，并主动指出下游走廊联动与边界约束的重要性。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_019_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "用 20190114_node.csv 对比榆林站和靖边站：各自涉及多少个管道划分、总供给量谁更大。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "我只关心这两个源端，不要扯全网。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把“谁的供给更大”和各自划分数先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得这两个里谁更大吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_003",
+        "offset_hours": 10,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我把榆林站的划分数记成和靖边一样了，这句对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把正确的划分数和供给结论都补回来。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "若夜班说下游多线同时偏紧，你会先优先追榆林，还是先追靖边？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "你做这个优先级判断还缺什么数据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_004",
+        "offset_hours": 30,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果写进 PDF，你会做成对照表还是单站卡片？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后补一句你的主动判断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_020",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 中甪直站的三线联络属性展开。重点测试模型能否记住其跨线情况、纠正漏记的管道划分，并主动区分“联络枢纽风险”和“单线末端风险”两种不同监测思路。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_020_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请在 20190114_node.csv 里查甪直站，告诉我它跨了哪几个管道划分、总需求量大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再结合 20190114_pipeline.csv 想一想，它更像末端站还是联络枢纽。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把三个划分名先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺带给个风险标签：这里更像“联络站风险”还是“单线末端风险”。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我把它记成只跨西气东输一线和二线，没有中俄东线，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你把漏掉的那条管道划分补回来。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_003",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果白鹤站和上海站两头都有波动，甪直站值不值得优先盯？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "这三张表能不能直接说明它有没有切换能力？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果不能，你会主动要什么现场或工艺信息？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_004",
+        "offset_hours": 36,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后留一句给联络站值守人的提醒。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_021",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_pipeline.csv 与 20190114_node.csv 中通州南站的可达气源追踪展开。重点测试模型能否在记住“可达源数量”和“最近气源”后，继续追问支路约束与末端保供之间的差别。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_021_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190114_pipeline.csv 和 20190114_node.csv 反向追到通州南站的可达气源，给我可达气源数，以及最近那个气源的一条示例最短路径。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把“可达气源数”和“最近气源名字”先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在不重算的话，可达气源数你还记得吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_003",
+        "offset_hours": 18,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我记成通州南站只能追到大港站一个源，这句对不对？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "即使可达气源很多，为什么也不能直接等于“供气一定稳”？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "你会主动补哪两类约束或边界条件？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_004",
+        "offset_hours": 48,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成 PDF，你会把这页命名成“可达源追踪”还是“多源保供余度”？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "图里你会画完整长路径，还是只画最近两跳？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "下一班最该复核哪一个中间站？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后给我一句适合写在通州南站后面的交接口径。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_022",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 与 20190114_consumer.csv 的全网口径一致性展开。重点测试模型能否在计算两个口径的总需求/总消耗后稳定记住差值方向，并主动提出单位、覆盖范围和汇总逻辑方面的核对问题。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_022_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先给你个警报：20190114 这天，node 口径的总需求和 consumer 口径的总消耗看起来可能打架。先记住这个怀疑。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_002",
+        "offset_hours": 1,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去把这两个口径各自算一遍：node 口径总需求、consumer 口径总消耗、差值。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "别急着解释业务，只先把数和方向搞清楚。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把“谁更大”和差值方向先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺手说一句，这更像单位/口径差，还是更像真有未覆盖用户。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_003",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在记成是 node 口径更大，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你按这一天的两个口径把我拉正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "接下来你最想主动补问哪三件事？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_004",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若写入 PDF，这个问题该做成风险提示框还是方法说明框？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句交班口径。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_023",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 的全网用户集中度指标展开。重点测试模型能否在记住 HHI、基尼系数 和 前 10 占比后，继续主动区分“经营集中度风险”和“运行调度风险”之间并不等价的部分。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_023_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "按用户汇总 20190114_consumer.csv，帮我算全网用户消耗量集中度：HHI 指数、基尼系数、前 10 占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "我不需要你讲方法，只要结果和一句解释。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把 前 10 占比先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我把 前 10 占比记成不到一半了，这对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你直接纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "单看集中度高，能不能直接推出调度风险也高？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "如果不能，你现在最想补哪两类网络侧信息？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_003",
+        "offset_hours": 16,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班更该盯头部用户，还是头部供气点？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你为什么这么选？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一句能写进经营风险页的小结。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_024",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 的“大客户流失”假设展开。重点测试模型能否在记住前 3 大用户与 降幅占比 后，继续区分“客户集中风险”和“运行路径风险”，并主动要求后续校核所需的约束条件。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_024_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "以 20190114_consumer.csv 为基线，假设全网前 3 大用户当天全部流失，不做改供补偿。请算 基线总量、流失量、新总量和降幅占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "顺便把前 3 大用户名字列出来。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把 降幅占比 和第 1 大用户名字先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "先别展开成经营分析，我后面再问。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_002",
+        "offset_hours": 5,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以把这事简单写成“主要就是北京燃气单点风险”？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你先修正这句话，让它更准确。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果这要接运行侧或凸优化侧，你最少还想补哪三类约束？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_003",
+        "offset_hours": 20,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在只回答：这更像用户集中风险，还是供气路径风险？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_004",
+        "offset_hours": 60,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，一张图你会选条形图、瀑布图还是占比卡片？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后补一句你会主动追问管理层的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_025",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中甘肃省第一大供气点停供的假设展开。重点测试模型能否先计算省内单点依赖比例，再在后续对话里纠正错记，并主动索取改供能力与用户可中断性信息。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_025_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "只看 20190114_consumer.csv 里的甘肃，找出消耗量最大的供气点。假设它停供且不改供，受影响总量占甘肃全省的比例是多少？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把这个供气点名字和占比先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_002",
+        "offset_hours": 2,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在把甘肃第一大供气点记成河口站，对不对？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把真正的第一供气点和占比说回来。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果一个省里第一供气点占比这么高，你会先问改供能力，还是先问用户可中断性？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "再补一个你会主动追问的缺失信息。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_003",
+        "offset_hours": 10,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班最该盯省里哪个用户或站点？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_004",
+        "offset_hours": 30,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，最少要放哪三列字段？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会不会把“停供假设”单独标红？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "最后给我一句交班提示。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_026",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 的全网统一限供粗算展开。重点测试模型能否在记住统一满足率后，进一步主动说明这种算法为什么不能直接当成可执行调度方案。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_026_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先给你个假设：如果 20190114 这天全网总供给统一下调 8%，在不改需求的前提下，理论满足率应该跟着掉。先记住这个场景。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_002",
+        "offset_hours": 4,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 20190114_node.csv 口径把 总供给、总需求 算出来，再推一下 8% 下调后的统一满足率和统一限供比例。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只给结果，不要扯优先级。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把满足率先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_003",
+        "offset_hours": 12,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在把满足率记成 98%，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你按这次统一限供粗算把我纠正回来。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_004",
+        "offset_hours": 36,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果要把这件事真的拿去调度，你觉得“统一限供”哪里最不物理、最不业务？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先想补哪三项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "若要写进 PDF，你会把它放在“粗算假设”还是“可执行方案”下面？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后用一句话提醒大家别把粗算当成方案。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_027",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 的“多供气点用户”识别展开。重点测试模型能否记住供气点数最多的用户，并主动指出“供气点很多”并不自动等于“路径冗余充分”。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_027_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "按 20190114_consumer.csv 做一个按用户统计的供气点数榜，告诉我供气点数最多的前 5 个用户是谁。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "同时给我第一名的供气点数和总消耗量。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把第一名和它的供气点数先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在不重算，你还记得第一名是谁吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_003",
+        "offset_hours": 18,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以直接说北京燃气就是供气点数最多的用户？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把真正的第一名和供气点数说清楚。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "像这种“供气点很多”的用户，为什么不能直接当成“高冗余”？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "你最想补哪两类路径或合同信息？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_004",
+        "offset_hours": 48,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，你会用排行榜还是关系图？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句你对“多供气点用户”最想提醒大家的话。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_028",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 的全网需求重心展开。重点测试模型能否记住离重心最近的站点，并主动提醒“空间中心”只能提供巡检线索，不能直接替代流量与工况判断。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_028_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "基于 20190114_node.csv，按需求站点算全网需求重心，再给我离重心最近的前 3 个站点。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "我还想知道第一名站点是谁。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把重心附近前 2 名站点先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺手说一句：这个结果更适合做巡检线索，还是更适合做保供摘要。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_002",
+        "offset_hours": 1,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我是不是可以把石家庄站直接当成最接近需求重心的站？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你按数据纠正我。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_003",
+        "offset_hours": 8,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果夜班想拿“重心附近站”来解释全网波动，你觉得够不够？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会补哪类时序或边界数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "还有哪一个没被这三张表覆盖的问题必须提醒他们？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_004",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "最后给我一句交班摘要。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_029",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_node.csv 与 20190114_pipeline.csv 的“站点吞吐匹配度”检查展开。重点测试模型能否在过滤掉末端叶子站后记住高吞吐不匹配的枢纽站，并主动区分数据异常与拓扑属性本身的影响。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_029_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv 做个“站点吞吐匹配度”检查，但我不要末端叶子站，你先只看连接度 >= 3 的站点。按 吞吐不匹配比 降序给我前 5 名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "把前 2 名站名和大概 比值 先记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_002",
+        "offset_hours": 3,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "不重算的话，第一名你还记得是谁吗？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_003",
+        "offset_hours": 16,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我刚把第一名记成齐河站了，对不对？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把真正的第一名站点和原因说回来。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "像这种 吞吐不匹配比高的站，你会先怀疑拓扑、汇总口径，还是源端/枢纽属性本来就会这样？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你最想补哪两类原始数据来区分这几种可能？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果做成 PDF，标题你会写“异常站点”还是“重点解释站点”？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "下一班最该先复核哪一个站？"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "最后补一句主动追问。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_030",
+    "scenario_type": "openclaw",
+    "scenario_description": "OpenClaw 长程监测场景。围绕 20190114_consumer.csv 中西气东输二线的管线用户画像展开。重点测试模型能否记住头部用户与头部省份，并在后续班次中主动指出仅凭日级用户画像还缺哪些边界条件，才足以接入调度或物理校核流程。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_030_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我先给你个值班印象：西气东输二线这天看起来不是只服务一个省，也不是只有一个超大用户。先把这个印象记住。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_002",
+        "offset_hours": 5,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "你去 20190114_consumer.csv 只看管线=西气东输二线，给我总消耗量、活跃用户数、前 3 用户和 前 3 省份。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "别泛泛谈大网络，我只关心这条线。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "把第一大用户和第一大省份先记住。"
+          },
+          {
+            "turn_id": 4,
+            "user_input": "顺手判断一下，我刚才那个值班印象是被支持、部分支持，还是被推翻。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_003",
+        "offset_hours": 20,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "我现在把第一大省份记成河北，对吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果不对，你把正确的省份名称补回来。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果后面要把这条线拿去做调度或物理校核，你觉得最先缺哪三项边界条件？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_004",
+        "offset_hours": 60,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 的“管线画像页”，你最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "最后给我一句适合写在管线画像页末尾的话。"
+          }
+        ]
+      }
+    ]
+  }
+]

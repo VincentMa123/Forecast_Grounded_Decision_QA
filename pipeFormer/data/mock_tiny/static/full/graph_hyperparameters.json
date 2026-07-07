@@ -1,0 +1,23 @@
+{
+  "graph": {
+    "is_subgraph": false,
+    "center_node": null,
+    "total_nodes": 8,
+    "total_edges": 8,
+    "node_type_counts": {
+      "B": 1,
+      "C": 1,
+      "E": 1,
+      "N": 2,
+      "P": 1,
+      "R": 1,
+      "T": 1
+    }
+  },
+  "variables": {
+    "total_variables": 6712,
+    "boundary_variables": 538,
+    "equipment_variables": 6174
+  },
+  "tokenizer": {}
+}

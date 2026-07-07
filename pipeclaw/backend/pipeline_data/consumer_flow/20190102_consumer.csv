@@ -1,0 +1,5 @@
+管线,所属地,供气点,用户,消耗量
+Demo-West,East District,EAST_GATE_SP,East Hospital,420.0
+Demo-West,East District,EAST_GATE_SP,East Power Plant,520.0
+Demo-West,South District,SOUTH_GATE_SP,South Steel,360.0
+Demo-West,South District,SOUTH_GATE_SP,South Chemical,280.0

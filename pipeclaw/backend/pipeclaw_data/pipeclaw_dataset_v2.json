@@ -1,0 +1,3922 @@
+[
+  {
+    "scenario_id": "scenario_openclaw_001",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_1_corridor_load_watch",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-02。围绕 西气东输二线主干高负荷管段 的识别、记忆、纠错与交接展开。重点评测模型在日级主干负荷排序、跨 session 一致性、主动补要更高频物理量、保留未决问题、以及形成可审计交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_001_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请在 20190102_pipeline.csv 里只看 西气东输二线，按绝对流量从大到小列出前 5 段，给我起点、终点和绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像主干稳定承载，还是存在明显的负荷集中。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第 1 段、第 2 段和你的一句判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第 1 段是哪一段吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果我准备把第 1 段和第 2 段在交接里调换顺序，你要不要拦我？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，为什么这种顺序错误会误导夜班判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：乌鲁木齐站 附近有小时级压力波动。你先把这条新线索和前面的主干排序放在一起，用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "在这种情况下，你最先会主动补要哪两类更高频的物理量？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "基于现在这份日级排序，你更倾向主干真实受限，还是局部量测或短时波动？为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能盯一个站和一段管段，你会怎么选？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接瞬态校核或调度评估，你最少还缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在还有哪个未决问题不能靠这张日表回答？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_001_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成一页 PDF 交接页，最少放哪三块证据？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_002",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_1_corridor_load_watch",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-05。围绕 西气东输一线主干高负荷管段 的识别、记忆、纠错与交接展开。重点评测模型在日级主干负荷排序、跨 session 一致性、主动补要更高频物理量、保留未决问题、以及形成可审计交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_002_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请在 20190105_pipeline.csv 里只看 西气东输一线，按绝对流量从大到小列出前 5 段，给我起点、终点和绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像主干稳定承载，还是存在明显的负荷集中。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第 1 段、第 2 段和你的一句判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第 1 段是哪一段吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果我准备把第 1 段和第 2 段在交接里调换顺序，你要不要拦我？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，为什么这种顺序错误会误导夜班判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：延川站 附近有小时级压力波动。你先把这条新线索和前面的主干排序放在一起，用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "在这种情况下，你最先会主动补要哪两类更高频的物理量？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "基于现在这份日级排序，你更倾向主干真实受限，还是局部量测或短时波动？为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能盯一个站和一段管段，你会怎么选？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接瞬态校核或调度评估，你最少还缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在还有哪个未决问题不能靠这张日表回答？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_002_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成一页 PDF 交接页，最少放哪三块证据？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_003",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_1_corridor_load_watch",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-08。围绕 中俄东线主干高负荷管段 的识别、记忆、纠错与交接展开。重点评测模型在日级主干负荷排序、跨 session 一致性、主动补要更高频物理量、保留未决问题、以及形成可审计交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_003_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请在 20190108_pipeline.csv 里只看 中俄东线，按绝对流量从大到小列出前 5 段，给我起点、终点和绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像主干稳定承载，还是存在明显的负荷集中。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第 1 段、第 2 段和你的一句判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第 1 段是哪一段吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果我准备把第 1 段和第 2 段在交接里调换顺序，你要不要拦我？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，为什么这种顺序错误会误导夜班判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：宝坻站 附近有小时级压力波动。你先把这条新线索和前面的主干排序放在一起，用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "在这种情况下，你最先会主动补要哪两类更高频的物理量？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "基于现在这份日级排序，你更倾向主干真实受限，还是局部量测或短时波动？为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能盯一个站和一段管段，你会怎么选？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接瞬态校核或调度评估，你最少还缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在还有哪个未决问题不能靠这张日表回答？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_003_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成一页 PDF 交接页，最少放哪三块证据？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_004",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_1_corridor_load_watch",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-11。围绕 川气东送主干高负荷管段 的识别、记忆、纠错与交接展开。重点评测模型在日级主干负荷排序、跨 session 一致性、主动补要更高频物理量、保留未决问题、以及形成可审计交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_004_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请在 20190111_pipeline.csv 里只看 川气东送，按绝对流量从大到小列出前 5 段，给我起点、终点和绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像主干稳定承载，还是存在明显的负荷集中。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第 1 段、第 2 段和你的一句判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第 1 段是哪一段吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果我准备把第 1 段和第 2 段在交接里调换顺序，你要不要拦我？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，为什么这种顺序错误会误导夜班判断。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：上海站 附近有小时级压力波动。你先把这条新线索和前面的主干排序放在一起，用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "在这种情况下，你最先会主动补要哪两类更高频的物理量？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "基于现在这份日级排序，你更倾向主干真实受限，还是局部量测或短时波动？为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能盯一个站和一段管段，你会怎么选？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接瞬态校核或调度评估，你最少还缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在还有哪个未决问题不能靠这张日表回答？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_004_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成一页 PDF 交接页，最少放哪三块证据？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_005",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_2_parallel_corridor_balance",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-14 至 2019-01-16。围绕 西气东输二线、西气东输三线 在 乌鲁木齐至精河走廊 的并行负荷分担展开。重点评测模型在窗口级聚合比较、对错误简化的拦截、对小时级波动的审慎解释、以及形成对比式交接材料方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_005_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-14 至 2019-01-16 为窗口，只看 “乌鲁木齐站—昌吉站”和“乌苏站—精河站” 这两组并行区段，比较 西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把更高的线路、差值量级和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得哪条线更高吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这件事直接写成“两条线几乎等负荷”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这种写法为什么可能误导调度。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：乌鲁木齐至精河走廊 有小时级压力波动，但没有说明是哪条线。你先用一句话说明这条线索会不会改变你对并行负荷关系的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先让他们回传哪两类站位或工艺状态？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这份窗口级差值能不能直接解释小时级波动，为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先盯一个边界站，你会盯 乌鲁木齐站，还是换成别的站？请给结论和理由。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要做负荷重分配评估，你最少还缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最需要继续追问的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_005_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，你会优先放双线对比表、链路图，还是边界站摘要框？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的短问句。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_006",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_2_parallel_corridor_balance",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-19 至 2019-01-21。围绕 西气东输二线、西气东输三线 在 关中至潼关走廊 的并行负荷分担展开。重点评测模型在窗口级聚合比较、对错误简化的拦截、对小时级波动的审慎解释、以及形成对比式交接材料方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_006_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-19 至 2019-01-21 为窗口，只看 “临潼站—高陵站”和“华阴站—潼关站” 这两组并行区段，比较 西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把更高的线路、差值量级和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得哪条线更高吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这件事直接写成“两条线几乎等负荷”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这种写法为什么可能误导调度。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：关中至潼关走廊 有小时级压力波动，但没有说明是哪条线。你先用一句话说明这条线索会不会改变你对并行负荷关系的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先让他们回传哪两类站位或工艺状态？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这份窗口级差值能不能直接解释小时级波动，为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先盯一个边界站，你会盯 临潼站，还是换成别的站？请给结论和理由。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要做负荷重分配评估，你最少还缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最需要继续追问的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_006_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，你会优先放双线对比表、链路图，还是边界站摘要框？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的短问句。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_007",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_2_parallel_corridor_balance",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-01-24 至 2019-01-30。围绕 西气东输一线、西气东输二线、西气东输三线 在 中卫至河西走廊 的并行负荷分担展开。重点评测模型在窗口级聚合比较、对错误简化的拦截、对小时级波动的审慎解释、以及形成对比式交接材料方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_007_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-30 为窗口，只看 “中卫站—古浪站”和“古浪站—永昌站” 这两组并行区段，比较 西气东输一线、西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把更高的线路、差值量级和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得哪条线更高吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这件事直接写成“两条线几乎等负荷”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这种写法为什么可能误导调度。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：中卫至河西走廊 有小时级压力波动，但没有说明是哪条线。你先用一句话说明这条线索会不会改变你对并行负荷关系的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先让他们回传哪两类站位或工艺状态？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这份窗口级差值能不能直接解释小时级波动，为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先盯一个边界站，你会盯 中卫站，还是换成别的站？请给结论和理由。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要做负荷重分配评估，你最少还缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最需要继续追问的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_007_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，你会优先放双线对比表、链路图，还是边界站摘要框？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的短问句。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_008",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_2_parallel_corridor_balance",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-02-02 至 2019-02-08。围绕 中俄东线、冀宁线 在 苏中东向受端走廊 的并行负荷分担展开。重点评测模型在窗口级聚合比较、对错误简化的拦截、对小时级波动的审慎解释、以及形成对比式交接材料方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_008_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-02 至 2019-02-08 为窗口，只看 “南通站—如皋站”和“如皋站—海安站” 这两组并行区段，比较 中俄东线、冀宁线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把更高的线路、差值量级和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得哪条线更高吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这件事直接写成“两条线几乎等负荷”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这种写法为什么可能误导调度。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：苏中东向受端走廊 有小时级压力波动，但没有说明是哪条线。你先用一句话说明这条线索会不会改变你对并行负荷关系的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先让他们回传哪两类站位或工艺状态？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这份窗口级差值能不能直接解释小时级波动，为什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先盯一个边界站，你会盯 南通站，还是换成别的站？请给结论和理由。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要做负荷重分配评估，你最少还缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最需要继续追问的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_008_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果这件事进 PDF，你会优先放双线对比表、链路图，还是边界站摘要框？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的短问句。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_009",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_3_source_path_validation",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-02-11。围绕 石家庄受端供源追踪 展开。重点评测模型在可达气源与最短路径追踪、将拓扑可达与物理可供区分、主动补问边界条件、以及形成供源追踪交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_009_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190211_node.csv 和 20190211_pipeline.csv，反向追到 石家庄站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这里更像单源依赖，还是多源可达末端。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把最近气源、示例路径和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最近气源是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“可达”直接写成“一定可供”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，这两件事为什么不是一回事。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场说 石家庄站 夜里保供偏紧，但最短路径本身没有断。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补问哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要接调度优化或瞬态校核，你最少还缺哪两个输入？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先核一个中间站，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先追拓扑路径，还是先追物理余度？为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_009_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 的供源追踪页，图上和表里最少放什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问上游调度的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_010",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_3_source_path_validation",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-02-23。围绕 宝坻受端供源追踪 展开。重点评测模型在可达气源与最短路径追踪、将拓扑可达与物理可供区分、主动补问边界条件、以及形成供源追踪交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_010_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190223_node.csv 和 20190223_pipeline.csv，反向追到 宝坻站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这里更像单源依赖，还是多源可达末端。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把最近气源、示例路径和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最近气源是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“可达”直接写成“一定可供”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，这两件事为什么不是一回事。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场说 宝坻站 夜里保供偏紧，但最短路径本身没有断。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补问哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要接调度优化或瞬态校核，你最少还缺哪两个输入？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先核一个中间站，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先追拓扑路径，还是先追物理余度？为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_010_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 的供源追踪页，图上和表里最少放什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问上游调度的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_011",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_3_source_path_validation",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-03-07。围绕 上海受端供源追踪 展开。重点评测模型在可达气源与最短路径追踪、将拓扑可达与物理可供区分、主动补问边界条件、以及形成供源追踪交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_011_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190307_node.csv 和 20190307_pipeline.csv，反向追到 上海站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这里更像单源依赖，还是多源可达末端。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把最近气源、示例路径和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最近气源是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“可达”直接写成“一定可供”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，这两件事为什么不是一回事。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场说 上海站 夜里保供偏紧，但最短路径本身没有断。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补问哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要接调度优化或瞬态校核，你最少还缺哪两个输入？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先核一个中间站，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先追拓扑路径，还是先追物理余度？为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_011_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 的供源追踪页，图上和表里最少放什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问上游调度的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_012",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_3_source_path_validation",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-03-19。围绕 通州南受端供源追踪 展开。重点评测模型在可达气源与最短路径追踪、将拓扑可达与物理可供区分、主动补问边界条件、以及形成供源追踪交接页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_012_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 20190319_node.csv 和 20190319_pipeline.csv，反向追到 通州南站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这里更像单源依赖，还是多源可达末端。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把最近气源、示例路径和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最近气源是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“可达”直接写成“一定可供”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，这两件事为什么不是一回事。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场说 通州南站 夜里保供偏紧，但最短路径本身没有断。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补问哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果要接调度优化或瞬态校核，你最少还缺哪两个输入？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先核一个中间站，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你会先追拓扑路径，还是先追物理余度？为什么？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_012_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 的供源追踪页，图上和表里最少放什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问上游调度的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_013",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_4_delivery_station_portrait",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-04-01。围绕 通州南分输站 的用气结构画像与跨班监测展开。重点评测模型在用户结构归纳、头部负荷记忆、对运行波动的后续补问、以及将站点画像转为值班摘要方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_013_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190401_consumer.csv 看 通州南分输站，给我总用户数、总消耗量和前 5 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这句可能不完整？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：通州南分输站 附近晚高峰又起波动。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类更高频的运行数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能跟一个用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这张表现在还回答不了哪一个关键问题？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_013_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句适合写标题的小句子。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问营销侧或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_014",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_4_delivery_station_portrait",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-04-13。围绕 湘潭分输站 的用气结构画像与跨班监测展开。重点评测模型在用户结构归纳、头部负荷记忆、对运行波动的后续补问、以及将站点画像转为值班摘要方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_014_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190413_consumer.csv 看 湘潭分输站，给我总用户数、总消耗量和前 5 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这句可能不完整？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：湘潭分输站 附近晚高峰又起波动。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类更高频的运行数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能跟一个用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这张表现在还回答不了哪一个关键问题？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_014_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句适合写标题的小句子。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问营销侧或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_015",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_4_delivery_station_portrait",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-04-25。围绕 阳曲压气站 的用气结构画像与跨班监测展开。重点评测模型在用户结构归纳、头部负荷记忆、对运行波动的后续补问、以及将站点画像转为值班摘要方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_015_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190425_consumer.csv 看 阳曲压气站，给我总用户数、总消耗量和前 5 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这句可能不完整？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：阳曲压气站 附近晚高峰又起波动。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类更高频的运行数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能跟一个用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这张表现在还回答不了哪一个关键问题？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_015_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句适合写标题的小句子。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问营销侧或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_016",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_4_delivery_station_portrait",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-05-10。围绕 乌鲁木齐压气站 的用气结构画像与跨班监测展开。重点评测模型在用户结构归纳、头部负荷记忆、对运行波动的后续补问、以及将站点画像转为值班摘要方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这句可能不完整？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类更高频的运行数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能跟一个用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这张表现在还回答不了哪一个关键问题？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句适合写标题的小句子。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问营销侧或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_017",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_5_metering_and_zero_value_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-05-22。围绕 石家庄压气站 的零值、代输标签或口径异常复核展开。重点评测模型在零值规模统计、误判拦截、计量证据追问、以及形成可审计备注页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_017_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190522_consumer.csv 看 石家庄压气站，给我总用户数、总消耗量、前 3 名用户，以及零消耗用户数和占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话说，这更像稳定用气点，还是需要复核口径的对象。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、零值规模和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得零消耗用户数大概在什么量级吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把零值都直接写成真实停用，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这里更可能混着哪几类解释。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班说这更像抄表滞后，不像真实停用。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类证据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查大户状态，还是先查零值口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先复核一类对象，你会先复核谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核或调度分析，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这件事现在最大的未决点是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_017_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪两张表和一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班观察。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场或计量侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_018",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_5_metering_and_zero_value_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-06-03。围绕 上海白鹤末站 的零值、代输标签或口径异常复核展开。重点评测模型在零值规模统计、误判拦截、计量证据追问、以及形成可审计备注页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_018_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190603_consumer.csv 看 上海白鹤末站，给我总用户数、总消耗量、前 3 名用户，以及零消耗用户数和占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话说，这更像稳定用气点，还是需要复核口径的对象。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、零值规模和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得零消耗用户数大概在什么量级吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把零值都直接写成真实停用，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这里更可能混着哪几类解释。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班说这更像抄表滞后，不像真实停用。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类证据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查大户状态，还是先查零值口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先复核一类对象，你会先复核谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核或调度分析，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这件事现在最大的未决点是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_018_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪两张表和一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班观察。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场或计量侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_019",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_5_metering_and_zero_value_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-06-15。围绕 王家沟末站与乌鲁木齐压气站的对照口径 的零值、代输标签或口径异常复核展开。重点评测模型在零值规模统计、误判拦截、计量证据追问、以及形成可审计备注页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_019_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20190615_consumer.csv 看 王家沟末站与乌鲁木齐压气站的对照口径，给我总用户数、总消耗量、前 3 名用户，以及零消耗用户数和占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话说，这更像稳定用气点，还是需要复核口径的对象。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、零值规模和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得零消耗用户数大概在什么量级吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把零值都直接写成真实停用，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这里更可能混着哪几类解释。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班说这更像抄表滞后，不像真实停用。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类证据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查大户状态，还是先查零值口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先复核一类对象，你会先复核谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核或调度分析，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这件事现在最大的未决点是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_019_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪两张表和一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班观察。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场或计量侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_020",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_5_metering_and_zero_value_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-06-27 至 2019-06-30。围绕 阳曲压气站带代输标签与零值条目的窗口复核 的零值、代输标签或口径异常复核展开。重点评测模型在零值规模统计、误判拦截、计量证据追问、以及形成可审计备注页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_020_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 2019-06-27 至 2019-06-30 的 consumer 数据看 阳曲压气站带代输标签与零值条目的窗口复核，给我窗口内总用户数、总消耗量、前 3 名用户，以及零消耗用户数和占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话说，这更像稳定用气点，还是需要复核口径的对象。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一大用户、零值规模和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得零消耗用户数大概在什么量级吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把零值都直接写成真实停用，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说一句，这里更可能混着哪几类解释。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班说这更像抄表滞后，不像真实停用。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类证据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查大户状态，还是先查零值口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若下一班只能先复核一类对象，你会先复核谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核或调度分析，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "这件事现在最大的未决点是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_020_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪两张表和一条备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班观察。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场或计量侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_021",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_6_regional_demand_resilience",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-07-04 至 2019-07-10。围绕 北京 的区域保供韧性展开。重点评测模型在区域级聚合、供气点与用户集中暴露识别、对“多点供气即稳”的纠错、以及形成区域保供页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_021_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请只看 2019-07-04 至 2019-07-10 的 consumer 数据中的 北京，算总消耗量、活跃用户数、前 3 供气点和前 3 用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像多点分散保供，还是存在明显集中暴露。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一供气点、第一用户和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把“供气点多”直接写成“保供稳”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法还差一步验证？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：北京 一带寒潮将到，负荷可能再上行。你先用一句话更新当前风险判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类网络侧或合同侧信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在更该盯供气点集中度、用户集中度，还是改供路径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接入调度评估，你最先缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_021_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成 PDF 的区域保供页，最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问省公司或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_022",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_6_regional_demand_resilience",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-07-13 至 2019-07-19。围绕 河北 的区域保供韧性展开。重点评测模型在区域级聚合、供气点与用户集中暴露识别、对“多点供气即稳”的纠错、以及形成区域保供页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_022_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请只看 2019-07-13 至 2019-07-19 的 consumer 数据中的 河北，算总消耗量、活跃用户数、前 3 供气点和前 3 用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像多点分散保供，还是存在明显集中暴露。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一供气点、第一用户和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把“供气点多”直接写成“保供稳”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法还差一步验证？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：河北 一带寒潮将到，负荷可能再上行。你先用一句话更新当前风险判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类网络侧或合同侧信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在更该盯供气点集中度、用户集中度，还是改供路径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接入调度评估，你最先缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_022_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成 PDF 的区域保供页，最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问省公司或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_023",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_6_regional_demand_resilience",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-07-22 至 2019-07-28。围绕 新疆 的区域保供韧性展开。重点评测模型在区域级聚合、供气点与用户集中暴露识别、对“多点供气即稳”的纠错、以及形成区域保供页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_023_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请只看 2019-07-22 至 2019-07-28 的 consumer 数据中的 新疆，算总消耗量、活跃用户数、前 3 供气点和前 3 用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像多点分散保供，还是存在明显集中暴露。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一供气点、第一用户和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把“供气点多”直接写成“保供稳”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法还差一步验证？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：新疆 一带寒潮将到，负荷可能再上行。你先用一句话更新当前风险判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类网络侧或合同侧信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在更该盯供气点集中度、用户集中度，还是改供路径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接入调度评估，你最先缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_023_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成 PDF 的区域保供页，最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问省公司或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_024",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_6_regional_demand_resilience",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-08-01 至 2019-08-07。围绕 甘肃 的区域保供韧性展开。重点评测模型在区域级聚合、供气点与用户集中暴露识别、对“多点供气即稳”的纠错、以及形成区域保供页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_024_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请只看 2019-08-01 至 2019-08-07 的 consumer 数据中的 甘肃，算总消耗量、活跃用户数、前 3 供气点和前 3 用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像多点分散保供，还是存在明显集中暴露。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一供气点、第一用户和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一大用户是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把“供气点多”直接写成“保供稳”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法还差一步验证？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：甘肃 一带寒潮将到，负荷可能再上行。你先用一句话更新当前风险判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类网络侧或合同侧信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在更该盯供气点集中度、用户集中度，还是改供路径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接入调度评估，你最先缺哪两项约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_024_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "如果做成 PDF 的区域保供页，最少放哪三块内容？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问省公司或现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_025",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_7_multi_supply_customer_redundancy",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-08-12。围绕多供气点用户 贵州管网 的替代能力展开。重点评测模型在用户级多源统计、对“多供气点等于高冗余”的拦截、对路径与合同约束的追问、以及形成冗余评估页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_025_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 20190812_consumer.csv 做一个用户级汇总，围绕 贵州管网 告诉我总消耗量、涉及多少个供气点，以及前几个供气点名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像表面多源，还是初看具备一定替代空间。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把总量、供气点数和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它涉及多少个供气点吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“多供气点”直接写成“高冗余”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，真正的替代能力还要看什么。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：其中一个供气点夜里可能受限。你先用一句话更新对替代能力的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类路径、工艺或合同信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查路径可达，还是先查合同与压力边界？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_025_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页最少放一张什么表和一条什么备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问市场侧或调度侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_026",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_7_multi_supply_customer_redundancy",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-08-24。围绕多供气点用户 广西管网 的替代能力展开。重点评测模型在用户级多源统计、对“多供气点等于高冗余”的拦截、对路径与合同约束的追问、以及形成冗余评估页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_026_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 20190824_consumer.csv 做一个用户级汇总，围绕 广西管网 告诉我总消耗量、涉及多少个供气点，以及前几个供气点名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像表面多源，还是初看具备一定替代空间。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把总量、供气点数和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它涉及多少个供气点吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“多供气点”直接写成“高冗余”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，真正的替代能力还要看什么。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：其中一个供气点夜里可能受限。你先用一句话更新对替代能力的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类路径、工艺或合同信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查路径可达，还是先查合同与压力边界？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_026_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页最少放一张什么表和一条什么备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问市场侧或调度侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_027",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_7_multi_supply_customer_redundancy",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-09-05。围绕多供气点用户 北京燃气 的替代能力展开。重点评测模型在用户级多源统计、对“多供气点等于高冗余”的拦截、对路径与合同约束的追问、以及形成冗余评估页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_027_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 20190905_consumer.csv 做一个用户级汇总，围绕 北京燃气 告诉我总消耗量、涉及多少个供气点，以及前几个供气点名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像表面多源，还是初看具备一定替代空间。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把总量、供气点数和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它涉及多少个供气点吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“多供气点”直接写成“高冗余”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，真正的替代能力还要看什么。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：其中一个供气点夜里可能受限。你先用一句话更新对替代能力的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类路径、工艺或合同信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查路径可达，还是先查合同与压力边界？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_027_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页最少放一张什么表和一条什么备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问市场侧或调度侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_028",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_7_multi_supply_customer_redundancy",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-09-17。围绕多供气点用户 上海管网 的替代能力展开。重点评测模型在用户级多源统计、对“多供气点等于高冗余”的拦截、对路径与合同约束的追问、以及形成冗余评估页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_028_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 20190917_consumer.csv 做一个用户级汇总，围绕 上海管网 告诉我总消耗量、涉及多少个供气点，以及前几个供气点名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像表面多源，还是初看具备一定替代空间。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把总量、供气点数和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它涉及多少个供气点吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“多供气点”直接写成“高冗余”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再说明一下，真正的替代能力还要看什么。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现场补了一句：其中一个供气点夜里可能受限。你先用一句话更新对替代能力的判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类路径、工艺或合同信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查路径可达，还是先查合同与压力边界？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个供气点，你会选哪一个？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两个边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最关键的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_028_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页最少放一张什么表和一条什么备注？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问市场侧或调度侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_029",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_8_hub_identity_and_cross_division_mapping",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-10-01。围绕跨划分枢纽 永清站 的主数据、角色和交接口径展开。重点评测模型在划分识别、枢纽角色判断、主数据追问、以及形成跨线站附页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_029_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20191001_node.csv 看 永清站，告诉我它涉及多少个管道划分，并列出这些划分，同时判断它更偏供给侧、需求侧，还是联络枢纽。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话说，这里更像拓扑枢纽风险，还是命名与口径风险先更大。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把划分数、站点角色和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它跨了几个划分吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这种跨线站按单一业务点去写，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法会在值班里出错？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：这类站在交接里经常同名混读。你先用一句话说明最可能出错的地方。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类主数据字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先核一件事，你会先核站名映射，还是先核流量口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先画一张小图，你会画关系图还是清单表？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接调度分析，你最先缺哪两个与工艺角色有关的字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_029_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪三项信息？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问主数据管理侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_030",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_8_hub_identity_and_cross_division_mapping",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-10-13。围绕跨划分枢纽 安平站 的主数据、角色和交接口径展开。重点评测模型在划分识别、枢纽角色判断、主数据追问、以及形成跨线站附页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_030_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20191013_node.csv 看 安平站，告诉我它涉及多少个管道划分，并列出这些划分，同时判断它更偏供给侧、需求侧，还是联络枢纽。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话说，这里更像拓扑枢纽风险，还是命名与口径风险先更大。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把划分数、站点角色和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它跨了几个划分吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这种跨线站按单一业务点去写，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法会在值班里出错？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：这类站在交接里经常同名混读。你先用一句话说明最可能出错的地方。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类主数据字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先核一件事，你会先核站名映射，还是先核流量口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先画一张小图，你会画关系图还是清单表？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接调度分析，你最先缺哪两个与工艺角色有关的字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_030_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪三项信息？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问主数据管理侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_031",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_8_hub_identity_and_cross_division_mapping",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-10-25。围绕跨划分枢纽 榆林站 与 靖边站 的主数据、角色和交接口径展开。重点评测模型在划分识别、枢纽角色判断、主数据追问、以及形成跨线站附页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_031_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20191025_node.csv 对比 榆林站 和 靖边站：各自涉及多少个管道划分、总供给规模谁更大，以及谁更像上游源端枢纽。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话说，这里更像多源枢纽识别问题，还是命名口径问题。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把谁更大、各自划分数和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_031_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得谁的供给规模更大吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这两个站写成‘角色差不多’，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法会误导下游联动判断？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_031_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：下游多线同时偏紧。你先用一句话说明你会更先追哪一个枢纽。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类上游边界或走廊约束？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先核一件事，你会先核源端供给余度，还是先核下游分流路径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_031_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先看一张对照表，你最想放哪几个字段？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要接调度分析，你最先缺哪两个与工况有关的输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_031_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页更适合做对照表还是双站卡片？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问调度长的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_032",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_8_hub_identity_and_cross_division_mapping",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-10-29。围绕跨划分枢纽 甪直站 的主数据、角色和交接口径展开。重点评测模型在划分识别、枢纽角色判断、主数据追问、以及形成跨线站附页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_032_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请用 20191029_node.csv 看 甪直站，告诉我它涉及多少个管道划分，并列出这些划分，同时判断它更偏供给侧、需求侧，还是联络枢纽。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话说，这里更像拓扑枢纽风险，还是命名与口径风险先更大。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把划分数、站点角色和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_032_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得它跨了几个划分吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人想把这种跨线站按单一业务点去写，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这种写法会在值班里出错？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_032_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：这类站在交接里经常同名混读。你先用一句话说明最可能出错的地方。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类主数据字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先核一件事，你会先核站名映射，还是先核流量口径？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_032_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先画一张小图，你会画关系图还是清单表？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接调度分析，你最先缺哪两个与工艺角色有关的字段？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_032_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF 附页，你最少放哪三项信息？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问主数据管理侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_033",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_9_reconciliation_and_consistency_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-11-18。围绕 node 与 consumer 口径的一致性 展开。重点评测模型在跨表核算、对过度结论的拦截、对数据范围与单位的追问、以及形成风险说明框方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_033_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请围绕 2019-11-18 的 node 与 consumer 口径做一次一致性检查，给我 node 口径总需求、consumer 口径总消耗和两者差值。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这更像真实运行风险，还是数据口径与覆盖范围差异。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把差值方向和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_033_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得差值方向吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把这件事直接写成“已经定位到真实瓶颈”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接下这个结论？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_033_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：现场确实感觉有波动。你先用一句话更新判断，说明你更偏向真实运行风险还是口径差。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类单位、覆盖范围或原始测量信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查量测口径，还是先查网络边界？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_033_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先复核一个站或一类对象，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两项边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_033_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若写进 PDF，你会把它放进风险提示框，还是方法说明框？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问数据管理或现场计量的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_034",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_9_reconciliation_and_consistency_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-11-21 至 2019-11-27。围绕 全网用户集中度与网络风险分离 展开。重点评测模型在跨表核算、对过度结论的拦截、对数据范围与单位的追问、以及形成风险说明框方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_034_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 2019-11-21 至 2019-11-27 的 consumer 数据计算全网用户消耗集中度，给我 HHI、基尼系数和前 10 用户占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像经营集中暴露，还是已经足以说明运行调度风险。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把前 10 用户占比和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_034_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得前 10 用户占比大概在哪个量级吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“集中度高”直接写成“调度风险必然高”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还缺网络侧证据？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_034_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：现场更担心的是某条走廊，不是某几个用户。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类网络侧信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先盯一个方向，你会先盯头部用户，还是先盯头部供气点？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_034_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先做一个清单，你会做用户榜单还是供气点榜单？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两项边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_034_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若写进 PDF，这件事更适合放经营风险页还是运行风险页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问管理层的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_035",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_9_reconciliation_and_consistency_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-11-28 至 2019-11-30。围绕 需求重心与巡检线索 展开。重点评测模型在跨表核算、对过度结论的拦截、对数据范围与单位的追问、以及形成风险说明框方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_035_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 2019-11-28 至 2019-11-30 的 node 数据按需求站点计算需求重心，再给我离重心最近的前 3 个站点。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这个结果更适合做巡检线索，还是更适合做保供结论。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把最接近重心的站点和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_035_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一名站点是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把“最接近重心的站”直接写成“全网瓶颈站”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么空间中心不能直接替代工况判断？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_035_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：现场确实觉得局部有波动。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类时序或边界数据？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查重心附近站，还是先查高负荷走廊？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_035_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先去核一个站，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接瞬态校核，你最先缺哪两项工况输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_035_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若写进 PDF，这件事更适合放地图页还是风险页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_036",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_9_reconciliation_and_consistency_review",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-12-01 至 2019-12-07。围绕 站点吞吐匹配度 展开。重点评测模型在跨表核算、对过度结论的拦截、对数据范围与单位的追问、以及形成风险说明框方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_036_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请基于 2019-12-01 至 2019-12-07 的 node 与 pipeline 数据做一次站点吞吐匹配度检查，只看连接度不低于 3 的站点，按吞吐不匹配比降序给我前 5 名。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这里更像异常站点，还是重点解释站点。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把第一名站点和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_036_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得第一名是谁吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把第一名直接写成“真实异常”，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接把它当成设备或运行异常？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_036_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "夜班补了一句：现场确实觉得其中一个枢纽吞吐怪。你先用一句话更新判断。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪两类原始流量或网络结构信息？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先查一个方向，你会先查汇总口径，还是先查枢纽角色与分流结构？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_036_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先复核一个站，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果后面要接物理校核，你最先缺哪两项边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_036_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若写进 PDF，标题你会写“异常站点”还是“重点解释站点”？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交接口径。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问现场或数据侧的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_037",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_10_contingency_dispatch_and_curtailment",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-09-01。围绕 头部用户流失冲击 的粗算、约束追问与交接展开。重点评测模型在影响量化、对粗算与方案的边界区分、对替代来源与可中断用户的追问、以及形成风险页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_037_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "以 2019-09-01 的 consumer 数据为基线，假设全网前 3 大用户全部流失且不做改供补偿。请给我基线总量、流失量、新总量和降幅占比。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这更像粗算告警，还是已经足以形成可执行调度方案。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把降幅占比和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_037_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最关键的影响指标大概是多少吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把这份粗算直接当成调度方案，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接执行？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_037_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班席补了一句：现场已经开始问优先级和替代来源。你先用一句话说明最先该往哪个方向推进。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先给一个动作方向，你会先查替代气源，还是先查可中断用户？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_037_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个省、站或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接到瞬态预测或优化模块，你最先缺哪两项工况输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_037_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页更适合放在风险页还是方案页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问调度长或管理层的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_038",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_10_contingency_dispatch_and_curtailment",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-10-18。围绕 省内第一供气点停供冲击 的粗算、约束追问与交接展开。重点评测模型在影响量化、对粗算与方案的边界区分、对替代来源与可中断用户的追问、以及形成风险页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_038_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "只看 2019-10-18 的 consumer 数据中的甘肃，找出消耗量最大的供气点。假设它停供且不改供，请给我受影响总量和占全省的比例。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这更像单点依赖告警，还是已经足以形成可执行调度方案。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把受影响比例和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_038_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最关键的影响指标大概是多少吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把这份粗算直接当成调度方案，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接执行？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_038_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班席补了一句：现场已经开始问优先级和替代来源。你先用一句话说明最先该往哪个方向推进。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先给一个动作方向，你会先查替代气源，还是先查可中断用户？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_038_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个省、站或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接到瞬态预测或优化模块，你最先缺哪两项工况输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_038_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页更适合放在风险页还是方案页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问调度长或管理层的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_039",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_10_contingency_dispatch_and_curtailment",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-11-01 至 2019-11-07。围绕 全网统一限供粗算 的粗算、约束追问与交接展开。重点评测模型在影响量化、对粗算与方案的边界区分、对替代来源与可中断用户的追问、以及形成风险页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_039_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请按 2019-11-01 至 2019-11-07 的 node 数据粗算：若全网总供给统一下调 8%，在不改需求的前提下，统一满足率和统一限供比例各是多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这更像粗算告警，还是已经足以形成可执行调度方案。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把满足率和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_039_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最关键的影响指标大概是多少吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把这份粗算直接当成调度方案，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接执行？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_039_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班席补了一句：现场已经开始问优先级和替代来源。你先用一句话说明最先该往哪个方向推进。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先给一个动作方向，你会先查替代气源，还是先查可中断用户？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_039_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个省、站或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接到瞬态预测或优化模块，你最先缺哪两项工况输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_039_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页更适合放在风险页还是方案页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问调度长或管理层的问题。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_040",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_10_contingency_dispatch_and_curtailment",
+    "scenario_description": "OpenClaw 长周期监测场景。主评测窗口为 2019-12-10 至 2019-12-31。围绕 寒潮需求抬升下的区域负荷预警 的粗算、约束追问与交接展开。重点评测模型在影响量化、对粗算与方案的边界区分、对替代来源与可中断用户的追问、以及形成风险页方面的能力。",
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_040_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-10 至 2019-12-31 的 consumer 数据为基线，只看江苏。假设窗口内总需求在寒潮下整体上升 12%，请给我基线总量、新增需求量和前 5 大用户。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "再用一句话判断这更像区域负荷预警，还是已经足以形成可执行调度方案。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "请把新增需求量和你的判断复述成一条交接记忆。"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_040_session_002",
+        "offset_hours": 6,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "现在先不重算，你还记得最关键的影响指标大概是多少吗？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果有人准备把这份粗算直接当成调度方案，你要不要拦他？先给结论，再给一句纠正。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "为什么这一步还不能直接执行？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_040_session_003",
+        "offset_hours": 24,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班席补了一句：现场已经开始问优先级和替代来源。你先用一句话说明最先该往哪个方向推进。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "你最先会主动补要哪三类约束或边界条件？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "如果只能先给一个动作方向，你会先查替代气源，还是先查可中断用户？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_040_session_004",
+        "offset_hours": 72,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "下一班如果只能先盯一个省、站或用户，你会选谁？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "如果要把这件事接到瞬态预测或优化模块，你最先缺哪两项工况输入？"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "现在最大的未决问题是什么？"
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_040_session_005",
+        "offset_hours": 168,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "若做成 PDF，这一页更适合放在风险页还是方案页？为什么？"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "给我一句不超过 25 个字的交班提醒。"
+          },
+          {
+            "turn_id": 3,
+            "user_input": "再补一句你会主动追问调度长或管理层的问题。"
+          }
+        ]
+      }
+    ]
+  }
+]

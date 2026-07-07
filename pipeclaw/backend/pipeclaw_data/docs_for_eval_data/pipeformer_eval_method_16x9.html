@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html>
+<html lang='zh-CN'>
+<head>
+  <meta charset='UTF-8' />
+  <meta name='viewport' content='width=device-width, initial-scale=1.0' />
+  <title>PipeFormer 评测方法总览</title>
+  <style>
+    :root {
+      --bg-1: #f3ead8;
+      --bg-2: #edf3ef;
+      --panel: rgba(255,255,255,0.80);
+      --ink: #162220;
+      --muted: #556965;
+      --accent: #9f3f2b;
+      --accent-2: #1d6b61;
+      --line: rgba(22,34,32,0.12);
+      --shadow: 0 24px 70px rgba(48, 38, 30, 0.14);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body {
+      display: grid;
+      place-items: center;
+      padding: 18px;
+      color: var(--ink);
+      font-family: 'Microsoft YaHei', 'PingFang SC', 'Noto Sans SC', sans-serif;
+      background:
+        radial-gradient(circle at 16% 18%, rgba(159,63,43,0.18), transparent 24%),
+        radial-gradient(circle at 84% 16%, rgba(29,107,97,0.18), transparent 22%),
+        linear-gradient(135deg, var(--bg-1) 0%, #fbf7ef 44%, var(--bg-2) 100%);
+    }
+    .canvas {
+      width: min(1600px, 96vw);
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,0.65);
+      box-shadow: var(--shadow);
+      background: rgba(255,255,255,0.42);
+      backdrop-filter: blur(10px);
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 1.16fr 0.84fr;
+      grid-template-rows: auto auto 1fr;
+      gap: 14px;
+      height: 100%;
+      padding: 22px;
+    }
+    .hero, .panel {
+      background: var(--panel);
+      border-radius: 22px;
+      border: 1px solid var(--line);
+      padding: 18px 20px;
+      overflow: hidden;
+    }
+    .hero {
+      grid-column: 1 / span 2;
+      display: grid;
+      grid-template-columns: 1.18fr 0.82fr;
+      gap: 14px;
+    }
+    .eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); }
+    h1, h2, h3 { margin: 0; font-family: 'STZhongsong', 'Songti SC', 'Noto Serif SC', serif; font-weight: 700; }
+    h1 { margin-top: 6px; font-size: 40px; line-height: 1.06; max-width: 11ch; }
+    .lede { margin-top: 12px; max-width: 74ch; font-size: 16px; line-height: 1.56; color: var(--muted); }
+    .hero-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      border-radius: 18px;
+      padding: 16px 18px;
+      background: linear-gradient(180deg, rgba(159,63,43,0.08), rgba(29,107,97,0.08));
+    }
+    .hero-box strong { font-size: 18px; line-height: 1.35; }
+    .hero-box p { margin: 10px 0 0; color: var(--muted); line-height: 1.5; font-size: 14px; }
+    .score-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .score-card, .flow-card, .truth-card, .foot { border-radius: 18px; border: 1px solid var(--line); background: rgba(255,255,255,0.78); }
+    .score-card { padding: 14px; }
+    .score-card .tag { display: inline-block; padding: 4px 8px; border-radius: 999px; background: rgba(29,107,97,0.10); color: var(--accent-2); font-size: 12px; font-weight: 800; }
+    .score-card h3 { margin-top: 10px; font-size: 18px; line-height: 1.2; min-height: 2.4em; }
+    .score-card p { margin: 8px 0 0; font-size: 12px; line-height: 1.45; color: var(--muted); }
+    .score-card strong { display: block; margin-top: 10px; color: var(--accent); font-size: 12px; }
+    .section-title { margin-bottom: 10px; font-size: 20px; }
+    .flow { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    .flow-card { padding: 14px; }
+    .flow-card .idx { font-size: 12px; font-weight: 800; color: var(--accent); letter-spacing: 0.08em; }
+    .flow-card h3 { margin-top: 8px; font-size: 18px; }
+    .flow-card p { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.48; }
+    .truth-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .truth-card { padding: 14px; }
+    .truth-card h3 { font-size: 18px; }
+    .truth-card p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.52; }
+  </style>
+</head>
+<body>
+  <div class='canvas'>
+    <div class='layout'>
+      <section class='hero'>
+        <div>
+          <div class='eyebrow'>PIPEFORMER EVALUATION</div>
+          <h1>PipeFormer 评测方法：从运行轨迹到论文指标</h1>
+          <p class='lede'>评测器的目标不是只看最终一句答案，而是把 Agent 在管网场景中的完整工作拆成可核验的五组分数。它既读取结构化结果，也读取 trace、候选仿真、报告工件和 LLM judge 反馈，因此更接近工程评审而不是单点问答打分。</p>
+        </div>
+        <div class='hero-box'>
+          <div>
+            <strong>评测闭环：读取场景真值与运行产物，执行 G1-G5 评分，再输出总分、分组分和可回溯 artifact。</strong>
+            <p>在论文里可以把它解释为：一个把工程正确性、约束一致性、证据支撑、调度建议和报告可用性统一起来的 evaluator。</p>
+          </div>
+          <p>对外展示时不必执着于 G1-G5 名字本身，更建议映射成预测准确性、工程可行性、证据质量、调度质量和报告可用性。</p>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>五组评分</h2>
+        <div class='score-grid'>
+          <div class='score-card'><span class='tag'>G1</span><h3>目标识别与任务完成</h3><p>检查模型是否抓住正确任务、正确目标变量和场景要求，避免答非所问。</p><strong>面向论文：任务完成度</strong></div>
+          <div class='score-card'><span class='tag'>G2</span><h3>数值或候选结果正确性</h3><p>预测侧看数值接近程度，调度侧看候选排序与推荐动作是否贴近 evaluator 参考。</p><strong>面向论文：预测 / 调度正确性</strong></div>
+          <div class='score-card'><span class='tag'>G3</span><h3>工程约束与证据支撑</h3><p>检查边界约束、正值约束、设备包络以及解释中是否引用了足够的工程证据。</p><strong>面向论文：可行性与证据链</strong></div>
+          <div class='score-card'><span class='tag'>G4</span><h3>最终建议与诊断质量</h3><p>检查最终回答是否把候选比较、排序理由、风险规避和推荐方案表达清楚。</p><strong>面向论文：决策质量</strong></div>
+          <div class='score-card'><span class='tag'>G5</span><h3>报告与交付物可用性</h3><p>检查关键工件是否存在，并结合 rubric judge 评估报告的完整性、清晰度和可审计性。</p><strong>面向论文：报告可用性</strong></div>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>执行流程</h2>
+        <div class='flow'>
+          <div class='flow-card'><div class='idx'>STEP 1</div><h3>读取数据集场景</h3><p>从数据集里解析任务类型、目标变量、扰动对象、时间范围和工程偏好，形成 evaluator 输入骨架。</p></div>
+          <div class='flow-card'><div class='idx'>STEP 2</div><h3>收集运行产物</h3><p>读取 normalized answer、trace manifest、候选仿真目录、report 及运行期 token/cost 指标。</p></div>
+          <div class='flow-card'><div class='idx'>STEP 3</div><h3>构造参考信息</h3><p>预测任务读取目标边界真值；调度任务则基于候选仿真结果和工程偏好构造 evaluator 侧参考排序。</p></div>
+          <div class='flow-card'><div class='idx'>STEP 4</div><h3>执行 G1-G5</h3><p>规则检查与 LLM judge 混合打分，既保证结构化审计，也保留对解释质量与报告质量的弹性判断。</p></div>
+          <div class='flow-card'><div class='idx'>STEP 5</div><h3>写出论文产物</h3><p>最终生成每 case 明细、分组统计、总分汇总和可视化输入，便于论文表格与 badcase 分析。</p></div>
+        </div>
+      </section>
+
+      <section class='panel'>
+        <h2 class='section-title'>真值来源与口径</h2>
+        <div class='truth-grid'>
+          <div class='truth-card'>
+            <h3>Prediction：真值来自目标边界变量</h3>
+            <p>预测类场景的主要真值来自数据集与仿真结果中对应的 target boundary variable。评测器围绕该变量比较数值误差、趋势方向和解释中的物理一致性。</p>
+          </div>
+          <div class='truth-card'>
+            <h3>Dispatch：真值来自候选仿真与工程偏好</h3>
+            <p>调度类场景不依赖单个人工金标动作，而是根据候选方案仿真输出、约束满足情况和工程偏好，在 evaluator 侧形成参考排序，再检查模型建议是否匹配。</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</body>
+</html>

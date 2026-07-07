@@ -1,0 +1,12 @@
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+.env
+backend/.env
+backend/.openclaw/
+backend/backend.log
+backend/eval_second_paper_pipeclaw/real_runs/
+frontend/node_modules/
+frontend/dist/

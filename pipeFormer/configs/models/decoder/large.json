@@ -1,0 +1,23 @@
+{
+  "model_name": "FluidDecoder",
+  "model_version": "1.0",
+  "input_dim": 6712,
+  "output_dim": 6712,
+  "sequence_length": 3,
+  "boundary_dims": 538,
+  "equipment_dims": 6174,
+  "d_model": 768,
+  "n_heads": 12,
+  "n_layers": 8,
+  "d_ff": 3072,
+  "attention_dropout": 0.1,
+  "dropout_rate": 0.1,
+  "time_position_encoding": "learnable",
+  "variable_position_encoding": "learnable",
+  "max_time_positions": 10,
+  "max_variable_positions": 6712,
+  "projection_hidden_dim": 384,
+  "input_projection_type": "value_projection",
+  "use_layer_norm": true,
+  "activation": "gelu"
+}

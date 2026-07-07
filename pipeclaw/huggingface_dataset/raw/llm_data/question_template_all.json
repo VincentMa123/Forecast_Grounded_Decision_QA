@@ -1,0 +1,402 @@
+[
+  {
+    "template_id": "basic_001",
+    "category": "基础问题",
+    "template_question": "你现在在做管网主数据盘点，需要把 {date} 这一天系统里每条“管道划分”的规模说清楚，用于后续做拓扑和资产统计的口径统一。请你按以下定义给出结果：\n- station_count：该划分在 node 表里覆盖的站点数（以“站名”唯一计数）。\n- edge_count：该划分在 pipeline 表里覆盖的管段数（以“起点站名-终点站名”唯一计数）。\n请输出 divisions 列表（每项包含 pipeline_division, station_count, edge_count），并按 station_count 降序、edge_count 降序排序。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "status_001",
+    "category": "当前运行情况",
+    "template_question": "我在核对 {date} 的交班记录，需要确认当天全网供需是否平衡，并把关键数字抄进运行台账。请按 node 表按站名汇总得到的 total_flow=sum(计算流量) 作为口径：total_flow<0 视为供给(取绝对值累计)，total_flow>0 视为需求累计。请输出 total_supply、total_demand、gap=total_supply-total_demand、以及 balance_judgement（你认为是否平衡的简短判断，必须包含你采用的平衡阈值）。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "historical_001",
+    "category": "历史情况分析",
+    "template_question": "我在做一份运行强度回顾，需要看 {pipeline_division} 在 {start_date} 到 {end_date}（含首尾）期间的日总输气量是否出现明显变化。日总输气量定义为：当天 pipeline 表中过滤该管道划分后，对同一对(起点站名,终点站名)的管段汇总 flow=sum(管道流量)，再对每条管段取 abs_flow=|flow|，最后把该日所有管段的 abs_flow 加总得到 daily_total_abs_flow。\n请输出：start_value（起始日值）、end_value（结束日值）、mean_value（区间均值）、peak_date/peak_value（区间峰值日期与数值）、change_pct（(end-start)/max(start,eps)）。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "dispatch_001",
+    "category": "特殊变化与靶向调度",
+    "template_question": "【情景】从 {date} 起，{province} 受到持续 {days} 天的低温影响，多个城市燃气负荷上行。业务侧只给了一个粗口径：预计全省总需求相对“基线水平”上升 {pct}%。你需要在不做跨省改输改供的前提下，先给出一份“影响量化+风险暴露”摘要，方便调度会快速决策。\n\n【口径】以 consumer 表为准：同一供气点-用户的多条记录视为同一关系，消耗量以聚合求和为准；省份过滤以 consumer 表的“所属地=={province}”。\n\n【你需要输出的内容】\n1) baseline_total：{province} 在这 {days} 天窗口内的基线总消耗量（所有用户合计）。\n2) added_demand：新增需求量（baseline_total * {pct}/100）。\n3) top_users：窗口内省内消耗量 Top{K_users} 的用户清单（含 consumption、share_of_province）。\n4) top_supply_points：窗口内省内供气点 Top{K_points}（含 consumption、share_of_province）。\n5) exposure：用 150~300 字写一段“暴露与风险提示”，必须提到：集中度（top_users 的 top_share）、以及你认为最脆弱的供气点或用户类型（不需要写操作步骤）。\n仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "topo_001",
+    "category": "网络拓扑与连通性",
+    "template_question": "我在做 {date} 的网络连通性巡检，想先把网架的“结构性风险”量化出来。请用 pipeline 表构建无向图：同一对站点之间的多条记录视为同一条边（以站点对去重），边的权重使用 |sum(管道流量)| 作为参考但连通性计算不依赖权重。\n请输出：component_count（连通分量数量）、top_components（节点数最大的 Top{K} 个连通分量，每个分量给出 node_count、edge_count、example_stations(最多5个)）、articulation_points_top（按“割点影响度”排序的 Top{K_ap} 个割点及其 impact_components_delta），以及 connectivity_insight（一段不超过200字的连通性解读，不能写成操作步骤，只写结论与担忧点）。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "spatial_001",
+    "category": "空间与区域分析",
+    "template_question": "为了把 {date} 的站点分布画到地图上，我需要确定一个不会把站点裁掉的初始视图范围。请基于 node 表（按站名去重）计算经纬度覆盖范围：min_lon、max_lon、min_lat、max_lat，以及跨度 span_lon=max_lon-min_lon、span_lat=max_lat-min_lat。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "profile_001",
+    "category": "用户结构与画像",
+    "template_question": "【业务背景】我们准备在下季度对下游客户做一次合同条款与服务等级的重谈：一方面要识别“真正影响系统负荷的关键客户”，另一方面也要提前暴露风险——如果某一类客户或某几个大客户的需求波动，会不会造成调度侧的压力或供气点的局部瓶颈。你现在拿到的是 {date} 这一天的用气明细（consumer 表），我希望你帮我把这一天的用户结构画像做成一页可放进内部汇报的摘要。\n\n【口径约束】同一供气点-用户的多条记录视为同一关系，消耗量以聚合求和为准；用户粒度以“用户”字段为准。如果某些消耗量为缺失/异常值，你可以忽略缺失并在文字里提示。\n\n【输出要求】请输出 JSON（ResultModel），至少包含：\n- total_consumption（全网总消耗量）；\n- top_users：Top{K} 用户及其 consumption、share_of_total、dominant_supply_point（该用户消耗占比最高的供气点）与 dominant_share；\n- concentration：包含 top_share（Top{K}用户合计占比）、HHI、Gini 三个指标；\n- segments：把所有用户按 consumption 的分位数分成 low/mid/high 三档（阈值为 Q25/Q75），输出每档用户数与消耗量占比；\n- narrative：200~350 字的业务解读（要像真实分析师写给业务负责人那样，提到集中度、结构性风险、以及你会优先跟进的 2 个验证问题，但不要写“先做什么后做什么”的步骤）。"
+  },
+  {
+    "template_id": "asset_001",
+    "category": "资产效能与经济价值",
+    "template_question": "【业务背景】我们在编制明年的检修与改造计划，需要先回答一个看似简单但经常争议的问题：哪些管段在日常运行中承担了最关键的输气任务、如果它们发生故障对业务的影响可能最大？你现在只能使用 {date} 这一天的管段数据（pipeline 表）与站点/用户数据做一个“以运行事实为依据的初筛”，结果会被用作后续现场核查与投资测算的候选清单。\n\n【口径约束】同一(起点站名,终点站名,管道划分)的多条记录视为同一条管段，管道流量以聚合求和为准；价值强度使用 abs_flow=|sum(管道流量)| 作为代理指标。你可以基于无向图做一些拓扑指标（例如边介数）来辅助解释，但输出必须可核算、可复现。\n\n【输出要求】请输出 JSON（ResultModel），至少包含：\n- total_abs_flow（全网 abs_flow 总量）；\n- top_edges：abs_flow Top{K} 的管段清单（含 start_station,end_station,pipeline_division,abs_flow,share_of_total,edge_betweenness）；\n- value_concentration：Top{K} 管段 abs_flow 合计占比；\n- redundancy_flags：对 Top{K} 管段逐条判断“是否可能存在替代路径”(has_alternative_path)，并给出一句 explanation（不需要写步骤，写结论依据即可）；\n- business_note：200~350 字的资产效能解读（要像资产经理写给领导的摘要，提到为什么这些管段更“值钱”、潜在停输损失如何粗略估计、以及下一步你最需要补充的 2 类数据）。"
+  },
+  {
+    "template_id": "basic_002",
+    "category": "基础问题（元数据查询）",
+    "template_question": "{date} 在 {pipeline_division} 内需要一个站点清单视图：按站名聚合后的 |计算流量| Top{K}，并给出站点类型构成(type_counts)。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "status_002",
+    "category": "当前运行情况（实时物理状态）",
+    "template_question": "{date} 针对 {pipeline_division} 输出运行概览：total_supply、total_demand、gap，以及 |管道流量| Top{K} 管段列表。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "historical_002",
+    "category": "历史情况分析（时间维度趋势）",
+    "template_question": "以 {end_date} 为最后一天回看过去 {N} 天，站点 {station_name} 的需求(demand=max(sum(计算流量),0))的均值/峰谷与异常日期(z-score>{z})。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "dispatch_002",
+    "category": "特殊变化与靶向调度（仿真与模拟）",
+    "template_question": "{date} 假设供气点 {supply_point} 突发停供，在 {province} 范围内估算用户侧影响：受影响用户数、受影响总消耗量、Top{K} 受影响用户及风险信号，并输出面向调度的文字说明(situation_summary, mitigation_actions)。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "topo_002",
+    "category": "网络拓扑与连通性（结构诊断）",
+    "template_question": "{date} 在 {pipeline_division} 的拓扑体检：连通分量、Top{K} 枢纽站(度/加权度)、关键割点与桥，并给出文字解读(narrative, recommendations)。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "spatial_002",
+    "category": "空间与区域分析（空间覆盖）",
+    "template_question": "{date} {pipeline_division} 的空间覆盖范围：去重站点后的 lon/lat 范围、跨度、四极站点。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "profile_002",
+    "category": "用户结构与画像（用户侧洞察）",
+    "template_question": "{date} {province} 用户结构画像：用户分层、集中度、multi-source 占比、Top{top_k} 用户卡片、类型推断分布，并给出业务总结(business_summary)。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "asset_002",
+    "category": "资产效能与经济价值分析（闲置资产预警）",
+    "template_question": "{date} {pipeline_division} 资产闲置预警：当日零流量管段数量、最长Top{top_k} 闲置管段、机会损失估计(基于近{history_days}日历史)与巡检优先级，并输出 inspection_plan 文本。请仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "basic_003",
+    "category": "基础问题",
+    "template_question": "{date} 我在准备{pipeline_division}的检修与运行交接材料，需要一份“当日主干输送段”清单对照巡检记录。口径：pipeline 表中过滤管道划分=={pipeline_division}；同一对(起点站名,终点站名)视为同一条管段并聚合求和得到 pipeline_flow；Top{K} 按 |pipeline_flow| 降序。输出 edge_count(去重后管段数)、top_edges(含rank/start_station/end_station/pipeline_flow/abs_flow)、以及 topk_abs_share=TopK abs_flow 之和 / 全部 abs_flow 之和(0-1)。严格只输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "status_003",
+    "category": "当前运行情况",
+    "template_question": "{date} 值班交接需要快速定位全网“最重载”管段以做风险复核。口径：pipeline 表按(起点站名,终点站名,管道划分)聚合求和得到 pipeline_flow，按 |pipeline_flow| 降序取 Top{K}。除 TopK 明细外，还需 total_abs_flow(全网去重管段 |pipeline_flow| 之和)、topk_abs_flow_sum、topk_share=topk_abs_flow_sum/total_abs_flow(0-1)。并给 ops_note(<=120字)提醒值班关注点（不要描述计算过程/字段）。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "historical_003",
+    "category": "历史情况分析",
+    "template_question": "复盘两天之间的需求跃迁，关注哪些站点的用气需求增长最剧烈以便解释原因并做预警。口径：对 {date_a} 与 {date_b}，node 表按站名聚合 total_flow=sum(计算流量)，需求 demand=max(total_flow,0)。对每站计算 demand_a/demand_b/delta=demand_b-demand_a，并按 delta 降序输出 Top{K}。同时输出 total_demand_a/total_demand_b/delta_total，并给 explanation_hypotheses(<=160字)提出可验证假设（不要写计算步骤）。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "dispatch_003",
+    "category": "特殊变化与靶向调度",
+    "template_question": "{date} 针对单条管段做限输应急推演：假设({start_station}→{end_station})可用容量降到 {pct}%（0=完全中断，100=不下降）。口径：pipeline 表按(起点站名,终点站名)聚合求和得到 baseline_flow；lost_capacity=|baseline_flow|*(1-pct/100)。全网每条去重管段同口径计算 lost_capacity 并给该管段 rank(从1开始)与 edge_count。context 需包含：该管段可能涉及的管道划分列表、端点所在连通分量规模 component_size(基于无向去重图)、以及 end_station_demand(需求口径同 historical)。并给 recommendation(<=180字，业务表达，避免描述计算步骤)。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "topo_003",
+    "category": "网络拓扑与连通性",
+    "template_question": "{date} 进行末梢站点风险排查。口径：pipeline 表构成无向图（站点=节点，管段=边，按无向去重）；末梢站 degree==1。输出 leaf_count、type_counts(末梢站点在 node 表匹配类型：单一类型/混合/未知)。并给 Top{K} 样例 samples：station_name/station_type/degree/neighbor_station/neighbor_degree/component_size/leaf_edge_abs_flow(|聚合管道流量|)/incident_abs_flow_sum(相邻边|流量|之和)。再给 note(<=160字)说明末梢对调度与抢修含义（不要写计算步骤）。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "spatial_003",
+    "category": "空间与区域分析",
+    "template_question": "{date} 给定现场坐标({lon},{lat})，需要判断附近可联动站点资源。口径：node 表按站名去重后，用 haversine(公里)计算距离；nearest 为距离最近 Top{K} 站点（含station_type/pipeline_divisions/total_flow/is_demand）。within_radius 输出 50/100/200km 半径内站点数及其中需求站数(需求判定：node 按站名聚合 total_flow=sum(计算流量) 且 >0)。并给 planning_note(<=160字，直觉/业务表达，不写计算步骤)。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "profile_003",
+    "category": "用户结构与画像",
+    "template_question": "{date} 针对管线{pipeline_name}做客户结构复盘，关注客户集中度、地域结构与关键客户风险。口径：consumer 表过滤管线=={pipeline_name}；消耗量按(供气点,用户)聚合后汇总到用户维度得到用户总消耗。输出 total_consumption、total_user_count、active_user_count(消耗>0)、top3_share、top10_share、HHI、Gini，并列出 Top{K} 用户及其 consumption/share_of_total(0-1)。同时按所属地汇总省份 consumption/share_of_total 输出 Top{K}。并给 narrative(<=220字)：像真实经营汇报，点出集中度风险/结构脆弱点，并列出需要补充核对的3类信息（只写类型，不写步骤）。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "asset_003",
+    "category": "资产效能与经济价值",
+    "template_question": "{date} 进行站点与管段的吞吐匹配度体检，用于识别映射、口径或数据落点异常，也可能是调峰/分输的真实特征。口径：node 按站名聚合 net_flow=|sum(计算流量)|；pipeline 按(起点站名,终点站名)聚合求和得到 abs_flow=|sum(管道流量)|；incident_abs_flow_sum 为站点作为起点或终点参与的 abs_flow 之和；mismatch_ratio=net_flow/max(incident_abs_flow_sum,1e-6)。输出 mismatch_ratio 最大 Top{K} 站点 top_stations(含station_type/pipeline_divisions/flags)，并给 mismatch_ratio 的 p50/p90/p95/p99。并给 governance_note(<=220字)：明确更像数据问题还是运行特征，并提出后续需要核对的3类信息（只写类型，不写步骤）。仅输出符合 ResultModel 的 JSON。"
+  },
+  {
+    "category": "基础问题",
+    "template_id": "basic_004",
+    "template_question": "你将收到一个具体日期与管网范围的用户需求场景，以及参数（如管道划分与质量阈值）。请仅输出**一个JSON对象**，其结构必须严格符合该模板目录 schema.py 中的 ResultModel。结果需包含数据完整性、拓扑一致性、供需平衡与风险摘要等字段，不要输出除JSON以外的任何文字。"
+  },
+  {
+    "category": "当前运行情况",
+    "template_id": "status_004",
+    "template_question": "你将收到一个调度值班场景与当天日期/管道划分等参数。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，用于反映当日运行概况（供给/需求、异常站点/管段、关键站点等）。不要输出额外解释。"
+  },
+  {
+    "category": "历史情况分析",
+    "template_id": "historical_004",
+    "template_question": "你将收到一段历史时间窗与管道划分等参数。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，用于描述该时间窗内的供需趋势、波动、异常日与关键站点贡献。不要输出额外解释。"
+  },
+  {
+    "category": "特殊变化与靶向调度",
+    "template_id": "dispatch_004",
+    "template_question": "你将收到一个靶向调度/突发变化的业务场景以及参数（日期、管道划分、目标站点、调整幅度等）。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，用于给出影响评估与风险提示；不要输出除JSON以外的任何文字。"
+  },
+  {
+    "category": "网络拓扑与连通性",
+    "template_id": "topo_004",
+    "template_question": "你将收到一个网络连通性/拓扑评估场景与参数（日期、管道划分、top_k等）。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，结果需包含连通分量、关键节点/桥与整体拓扑风险评分等。不要输出额外解释。"
+  },
+  {
+    "category": "空间与区域分析",
+    "template_id": "spatial_004",
+    "template_question": "你将收到一个空间聚类与区域风险分析场景及参数（日期、管道划分、聚类数、离群点数量等）。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，输出需包含聚类摘要、热点簇、离群站点与区域风险简报。不要输出额外解释。"
+  },
+  {
+    "category": "用户结构与画像",
+    "template_id": "profile_004",
+    "template_question": "你将收到一个省域用户画像/经营调度联动的业务场景及参数（截止日期、回看天数、省份、分群数等）。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，结果需包含集中度、行业结构、用户分群、关键客户清单以及洞察与行动建议文本。不要输出额外解释。"
+  },
+  {
+    "category": "资产效能与经济价值",
+    "template_id": "asset_004",
+    "template_question": "你将收到一个资产效能与经济价值评估的业务场景及参数（截止日期、回看天数、管道划分、价值系数、风险阈值等）。请仅输出**一个JSON对象**，结构严格符合 schema.py 的 ResultModel，结果需包含组合KPI、Top价值/瓶颈管段、投资情景以及管理层备忘录。不要输出额外解释。"
+  },
+  {
+    "template_id": "basic_005",
+    "category": "基础问题",
+    "template_question": "我们在做站点台账和大屏侧边栏的“站点画像”卡片校对：我现在选中的是 {date} 这一天，站点名称是「{station_name}」。为了让运行人员不用翻三张表也能快速判断这个站在管网里的位置和角色，请你基于当日 node/pipeline 数据，给出它的基础画像：它更偏向气源、用户还是混合（同名站点如果在数据里出现多种类型就算混合；如果根本找不到记录就按未知处理），它当天的计算流量合计（同名记录汇总即可，正负号保持原始口径），它涉及到的管道划分有哪些（去重后给列表），在拓扑上它和多少条管段直接相连（只按起点站名/终点站名这对站名去重即可，不需要区分方向），以及可用于地图定位的经纬度（如果同名多条记录，给平均值；缺失则返回 null）。另外，如果你在数据里发现明显的缺失或异常（例如经纬度缺失、类型冲突等），请把提示写在 quality_warnings 里，便于我们后续补数。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "status_005",
+    "category": "当前运行情况",
+    "template_question": "我在值班监控里看 {date} 的「{station_name}」时，发现界面只显示一个“计算流量合计”，但这个数字正负混在一起不好解释：运行同事更关心这个站当天到底是供给端还是需求端，供给和需求各占多少。请你基于当日 node 数据，把该站点同名记录的计算流量汇总后，拆成三块信息返回：1) total_flow（总的计算流量合计，保留正负号）；2) supply_part（把所有负的计算流量当作供给，取绝对值后求和，确保是非负数）；3) demand_part（把所有正的计算流量当作需求，直接求和，确保是非负数）。同时把它在 node 表里出现过的管道划分去重列出来，供我们做筛选。如果站点不存在或数据全为空，也请在 quality_warnings 里说明。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "historical_005",
+    "category": "历史情况分析",
+    "template_question": "我们最近在管道划分「{pipeline_division}」这段线上频繁收到压降/波动告警，但告警点分散，靠人工翻日报很难判断哪些管段属于“长期高负荷、值得优先盯防”的对象。现在我需要你帮我做一个偏运营视角的巡检清单：时间窗口是 {start_date} 到 {end_date}（包含两端日期），请从这个窗口内每天的 pipeline 运行数据里，找出综合高负荷程度最高的 Top{top_k} 条管段。我不希望得到泛泛而谈的建议，而是希望清单里每条管段都给出能支撑排序的量化指标，例如：窗口内平均绝对流量、峰值绝对流量、波动程度（比如标准差或变异系数）、净流向是否稳定（大多数天是否同一个方向），以及一个你认为可用于排序的综合 high_load_score。最后，请用一段简短的话总结这些高负荷管段在窗口内的共同特征，并给出几条面向值班长/巡检班组的监测提示（例如优先关注哪些站间通道、哪些指标一旦变化就值得排查）。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "dispatch_005",
+    "category": "特殊变化与靶向调度",
+    "template_question": "我们在做应急演练：假设 {date} 这一天全网的上游供给能力突然按比例下降 pct={pct}%（需求侧不做任何主动削减），领导想先快速知道一个“统一限供”口径下的大致结果：全网总体还能满足多少需求（满足率），需要按比例压减多少（限供比例），以及大概缺口是多少。请你只基于当日 node 的计算流量口径估算：把所有站点同名记录汇总后，负值视为供给、正值视为需求。请返回你计算得到的 total_supply、total_demand、new_supply、uniform_satisfaction_ratio、uniform_curtail_ratio、unmet_demand 等字段，并在 quality_warnings 里提示是否存在 total_demand 为 0 或数据异常导致的特殊情况。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "topo_005",
+    "category": "网络拓扑与连通性",
+    "template_question": "今天（{date}）我们接到一个大用户的波动投诉：对方反映“上游来气不稳定”，但现场又说不清到底来自哪个气源、是不是通道切换导致。为了让调度和巡检先有个抓手，我希望你基于当日数据做一次快速的供气追溯：先在 node 表里找出当天需求量最大的那个用气站（按站名汇总计算流量，取正值需求最大的站作为目标站），然后在 pipeline 表按净流向构建有向图（同一对起终点多条记录需要先聚合），判断有哪些气源站在拓扑上能够把气送到这个目标站。我不需要你解释算法过程，但需要你把结果说清楚：目标站是谁、需求量多大、可达气源一共有多少个；并列出距离目标站最近的一些气源（给出最短跳数和一条可复现的站点路径）。另外，请你指出在这些最短路径里被反复经过、可能形成瓶颈的关键管段（例如出现在多条路径里的边），并用一句话给出风险提示，方便我们后续做‘断点演练’。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "spatial_005",
+    "category": "空间与区域分析",
+    "template_question": "我们在做跨区域应急物资布点和巡检路线评估，不是看行政区划，而是看站点之间的真实地理跨度。请你基于 {date} 当天 node 数据里各站点的经纬度（同名站点多条记录取平均坐标，缺失坐标的站点忽略），计算任意两站之间的球面距离（Haversine），找出距离最远的一对站点。输出里请给出 station_a/station_b 的站名、各自坐标，以及 distance_km。如果因为坐标缺失导致可用站点很少，也请在 quality_warnings 里说明。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "profile_005",
+    "category": "用户结构与画像",
+    "template_question": "我在做一个面向经营和风控的“客户结构日报”，但希望它看起来像真实业务在用：{date} 这天我们从 consumer 明细里能看到每个供气点把气分配给了哪些下游用户以及各自消耗量。现在我想回答几个实际会被追问的问题：这一天的用气是不是过度集中在少数几个大客户身上？如果某一个头部客户出问题（停产/欠费/突发限供），对全网需求曲线会有多大影响？另外，客户类型上是不是某一类（例如城市燃气、化工、发电等）占比异常偏高，意味着需求波动更敏感？请你基于当日 consumer 数据输出一份结构化的客户画像：给出总体的集中度指标（HHI、Gini、Top10 占比），列出消耗量最高的前 10 个用户（包括其消耗量、占比、覆盖的供气点数量、主要分布省份），并按照你能从用户名称中识别出的粗粒度类型做分组统计（每组用户数、消耗量、占比）。最后请用一段话写出你对这一天客户结构的解读：主要风险点在哪里、哪些现象值得后续跟踪。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "asset_005",
+    "category": "资产效能与经济价值",
+    "template_question": "我们资产管理部门在做年度检修与增输改造的预算排布，希望把有限的钱花在“价值贡献最大、同时风险暴露也最高”的管段上。先不讨论真实财务口径，我想用 {date} 这一天的运行数据做一个可落地的价值代理：对每条管段，用管道流量的绝对值 abs_flow 代表业务吞吐，再用两端站点的地理距离估算管段长度 len_km（Haversine）。我们定义 revenue_proxy = abs_flow * len_km，作为这条管段当天的收益代理。请你输出全网 revenue_proxy 的总和，并列出 Top{top_k} 条最“值钱”的管段（起点/终点/管道划分、abs_flow、len_km、revenue_proxy、以及单位长度价值等）。同时请按管道划分汇总每条管线的总价值、平均利用水平和最关键的一条管段，便于我们做投资对比。最后请用几句话说明：如果只能优先安排 3 条管段做检修或增输，你会优先哪几条、理由是什么（只需基于你算出的指标和你对价值/风险的理解，不要写成步骤）。请只返回符合 ResultModel 的 JSON。"
+  },
+  {
+    "template_id": "basic_006",
+    "category": "basic",
+    "template_question": "我在做{date}这一天的日终对账时，{supply_point}站反馈说下游几家重点客户申报的用气量与平台记录对不上，但现场又说没有明显的调压/切换操作。为了判断是数据回传口径、用户合并拆分，还是确实存在用气异常，我需要你把这个供气点当天的用户用气分配情况做一个结构化概览：包括该供气点关联的唯一用户数、总消耗量、以及按“单用户汇总消耗量 ≤ {zero_user_threshold}”判定的零/极低用气用户数量与占比。另外请给出用气量排名前{top_k}的用户清单（含各自消耗量、占比、是否被判为零消耗）。注意同名用户可能在同一供气点出现多行记录，需要按用户汇总后再排名。请只输出JSON。"
+  },
+  {
+    "template_id": "status_006",
+    "category": "status",
+    "template_question": "调度值班复盘时我发现从{prev_date}到{date}，{pipeline_division}相关的运行数据波动非常不寻常：一方面站点的计算流量出现了大幅跳变，另一方面部分管段流量似乎“换向”或突然接近0，这会直接影响我对当日平衡与压缩机工况的判断。为了先把“最值得人工排查”的点抓出来，请你在限定范围（若{pipeline_division}为空则按全网）内，分别找出站点与管段里满足以下任一条件的记录：相对变化率 ≥ {pct_threshold}，或出现正负翻转。然后按相对变化率优先、绝对变化量次之排序，各自截取前{top_n}条，输出每条的前一日值、当日值、变化量、相对变化率、是否翻转等信息。请只输出JSON。"
+  },
+  {
+    "template_id": "historical_006",
+    "category": "historical",
+    "template_question": "我们准备做一次保供能力的阶段性复盘：在{start_date}到{end_date}这个窗口内，我更关心“供给侧是否跟得上需求侧”，以及缺口是不是连续发生。请你在{pipeline_division}限定范围内（若为空则按全网）按天计算供给总量与需求总量，并据此得到每日缺口 gap = demand - supply。我需要看到窗口内缺口最大的那一天（给出该日的供给、需求、gap），并列出缺口Top3的日期清单。同时请给出：窗口内参与统计的天数（成功读到数据的天数）、跳过的天数（缺文件或读失败）、缺供天数占比（gap>0的天数/参与统计天数）以及平均缺口。这个结果会用于向领导解释“问题是否偶发还是持续”。请只输出JSON。"
+  },
+  {
+    "template_id": "dispatch_006",
+    "category": "dispatch",
+    "template_question": "我们计划在{date}对{pipeline_division}相关的某段线路做检修隔离，检修窗口内可能需要把这部分管网视为相对独立的“岛”来运行。在不讨论具体操作细节的前提下，我需要你给出一个量化判断：在该范围内，当天供给总量、需求总量分别是多少，缺口是多少（gap=demand-supply）。如果缺口为正，意味着必须通过限供/错峰来兜底，请给出一个平均意义上的削减比例估计（gap/demand）。同时我还想知道当天供给侧与需求侧分别最“重”的站点是谁：按|flow|列出供给Top{top_k}站点，按flow列出需求Top{top_k}站点，便于我快速锁定应该优先联络的气源单位和重点用户。请只输出JSON。"
+  },
+  {
+    "template_id": "topo_006",
+    "category": "topo",
+    "template_question": "我们在做{date}这一天的运行风险评估，担心某些关键管段一旦临时停输或发生故障，会把网络“切断”成两个互不连通的部分，从而让一部分用户侧在短时间内失去来自其他气源的补给。请你基于{pipeline_division}限定范围内的管段连接关系，识别出所有这样的“关键切断管段”，并评估每一条管段如果失效后，对被隔离出来的那一侧会造成多大的供需缺口（供给、需求、gap）。我希望你按综合风险从高到低给出Top{top_k}条，并在结果里同时保留该管段的流量大小、以及被切断后两侧（较小侧与较大侧）的供需统计。最后请给一段面向运维/调度的风险说明与建议（recommendation），用于我写检修评审意见。请只输出JSON。"
+  },
+  {
+    "template_id": "spatial_006",
+    "category": "spatial",
+    "template_question": "为了给{date}的应急保障做准备，我想从空间角度理解需求侧的“重心”在哪里、分布有多分散。请在{pipeline_division}限定范围内（若为空则全网），对所有有需求（flow>0且坐标有效）的站点，按需求量做加权，计算需求重心的经纬度（center_lon/center_lat）。然后统计这些需求站点到重心的球面距离分布：平均距离、标准差、80/95分位距离、最大距离。同时我还关心需求点在地图上的覆盖范围到底有多大：请给出需求站点凸包的近似面积与周长，并用一个0~1的分散度指标刻画需求是否被少数区域“吃掉”（例如基于网格的空间熵、以及最集中网格的占比）。为了方便我安排巡检与应急物资布点，请分别列出距离重心最近的Top{top_k}个需求站点、以及最远的Top{top_k}个需求站点，并给一段 narrative，解释当前需求分布是否“集中在一团”还是“拉得很长”，以及可能带来的保障难点。请只输出JSON。"
+  },
+  {
+    "template_id": "profile_006",
+    "category": "profile",
+    "template_question": "我现在要给省公司做一份客户结构复盘材料，窗口期选在{start_date}到{end_date}。这次不是简单报个总量就结束：领导更关心的是“哪些客户对保供最敏感、哪些客户可能在关键时段形成风险”。请你以所属地=“{province}”为范围（如果指定了管线{pipeline_name}则只看该管线，否则看省内全部管线），把窗口内用气量最高的Top{top_k}个用户做成画像：每个用户需要有总消耗、日均、单日最大/最小、波动程度（标准差与变异系数）、有消耗的天数/为0的天数、涉及的供气点数量、主供气点及占比、供气点集中度HHI，并给出“波动等级”“供气依赖程度”以及一个综合风险标签。最后请你写一段面向调度/市场/保供汇报的 memo：像真实业务人员一样把重点客户的共同特征、最需要提前沟通的风险点（例如单点依赖或高波动）讲清楚，避免空话套话。请只输出JSON。"
+  },
+  {
+    "template_id": "asset_006",
+    "category": "asset",
+    "template_question": "我负责一条主干管线的经营分析，最近在讨论年度合同与检修计划，管理层问得很细：“这条管线到底创造了多大价值？价值是不是过度集中在少数供气点上？一旦关键节点出问题会影响多少客户？另外，日维度的经营波动和价值在险到底有多大，是否需要在合同与保供资源里体现风险溢价？”请以管线“{pipeline_name}”为对象，在{start_date}到{end_date}窗口内，按单价{price_per_unit}元/单位消耗量折算经济价值，给出总消耗量与总价值（RMB）。同时计算窗口内“日总消耗”的波动系数CV，用于衡量经营波动风险。然后把供气点按价值从高到低列出Top{top_k}，每个供气点要包含：总消耗、价值、占比、涉及的用户数。并计算供气点价值集中度HHI及其风险评分（0-100），再补充一个价值分布不均衡程度指标（如基尼系数）。另外请基于Top供气点构造关键停供情景评估（scenarios），说明若某供气点停供将影响多少价值与用户；并基于简化随机停供模拟给出价值在险（CVaR95）的大致量级，便于我做应急资源和合同条款的量化讨论。最后结合基准日均消耗量{benchmark_daily_consumption}给出价值指数（0-100）与资产效能综合评分（0-100），并写一段 analysis_memo：从经营与保供角度给出结论、风险点和可执行建议（例如冗余建设、应急气源、合同条款、客户沟通等）。请只输出JSON。"
+  },
+  {
+    "template_id": "basic_007",
+    "category": "基础问题",
+    "template_question": "你现在是智慧管道运营中台的值班分析助手。我在做{date}这一天的省级用气快照，但我不想看一堆原始表格：我需要一份可以直接放进日报的结构化结论。场景是这样的：我们今天要和{province}省的属地公司对齐“哪里需求最集中、是谁在用气、是否存在单一用户过度依赖”。请基于当日2019MMDD_consumer.csv中“所属地={province}”的数据，给出：（1）消耗量最高的供气点Top{K}及其消耗量；（2）消耗量最高的用户Top{K}及其消耗量；（3）该省当日总消耗量。我会把你的输出直接喂给后续评测程序，所以请严格只输出一个JSON对象，字段必须符合ResultModel，不要输出任何额外解释文字。系统会在问题末尾附上schema.py里的JSON schema供你对齐。"
+  },
+  {
+    "template_id": "status_007",
+    "category": "当前运行情况",
+    "template_question": "我是调度中心的夜班交接人员，准备做{date}当天的运行异常回顾。我们最近在排查一些“看起来像倒灌/反向输气”的情况：现场同事说可能是站控切换、临时检修旁路，也可能是数据方向定义被搞反了。为了把问题范围缩小，我希望你从当日2019MMDD_pipeline.csv里，把流量为负的管段（按照数据里的起点→终点方向，流量为负代表反向）找出来，并统计当日反向管段数量，同时列出反向绝对值最大的Top{K}条管段，包含起点站名、终点站名、管道划分与流量。输出必须是可机器解析的JSON，严格符合ResultModel结构，只输出JSON本体，不要夹带解释。"
+  },
+  {
+    "template_id": "historical_007",
+    "category": "历史情况分析",
+    "template_question": "我是某重点客户的客户经理，最近接到投诉说“最近几天气量忽高忽低”，我们内部需要先用数据把情况说清楚再去和客户沟通。请帮我把用户“{user_name}”在{start_date}到{end_date}之间的每日用气总量做一个历史序列，并在这个窗口里找出用气最高的一天、最低的一天以及对应的日期。另外，我还想知道这段时间整体是上升还是下降（给出一个趋势结论即可）。我需要把结果直接交给风控同事做留痕，所以请严格输出符合ResultModel的JSON对象（只输出JSON，不要额外说明）。"
+  },
+  {
+    "template_id": "dispatch_007",
+    "category": "特殊变化与靶向调度",
+    "template_question": "我是管网调度的应急预案编写人。{date}这天我们假设出现了“下游需求突然抬升+部分气源出力受限”的组合情景，我不需要你教我怎么做调度，而是需要一份可以直接放进应急预案附件的结构化调度建议。请你基于当日node表（计算流量）识别需求侧最突出的用户站点Top{K}（计算流量为正且值最大），并在供给侧找出最有能力支撑的气源站点（计算流量为负且绝对值最大）作为候选支撑点。在此基础上给出一份调度动作清单：每条动作要说明动作类型、目标对象、优先级与预期效果描述，同时补充一段简短的约束说明（例如检修、压缩机能力、跨管线联络限制等用自然语言表达即可）。输出只允许为JSON对象，必须符合ResultModel字段。"
+  },
+  {
+    "template_id": "topo_007",
+    "category": "网络拓扑与连通性",
+    "template_question": "我是网络可靠性专项的负责人，准备评估{date}这天的管网“单点故障风险”。我们不是要做学术图论报告，而是要回答一个很实际的问题：哪些站点一旦退出（检修、故障、误操作），会把网络切割成多个互不连通的片区，从而影响供气恢复和跨区调配？请你基于当日pipeline连接关系构建无向拓扑，识别割点（articulation points），并按“影响范围优先、其次看该站点关联流量规模”的原则，输出Top{K}个最关键的割点站名及其连通性影响信息。为了避免把非常小的噪声当成风险，请仅把incident绝对流量和>= {min_incident_flow} 的割点纳入TopK排序候选。结果我会直接进入自动化测评，所以请严格输出符合ResultModel的JSON对象（只输出JSON），并在risk_report里给出一段面向运维/调度的解释性结论。"
+  },
+  {
+    "template_id": "spatial_007",
+    "category": "空间与区域分析",
+    "template_question": "我是管网运行的区域负责人，要把{date}当天的运行态势用“空间视角”讲给非技术管理层听。他们关心的不是每条管段的细节，而是：哪些管道划分覆盖范围大、距离长，哪些划分虽然不长但承担了更高的流量密度，以及我们对数据质量有没有把握（坐标缺失会让空间估算失真）。请基于当日node与pipeline数据，估算每个管道划分的总长度、总吞吐(|flow|)与单位长度流量(flow_per_km)，并按flow_per_km从高到低输出Top{K}个划分的空间KPI。为了避免误判，若全网坐标覆盖率低于{min_coord_coverage}请在data_quality_warnings中给出明确提示。输出必须为严格的JSON对象，字段符合ResultModel，不能包含额外文字。"
+  },
+  {
+    "template_id": "profile_007",
+    "category": "用户结构与画像",
+    "template_question": "我是属地公司负责“客户结构与画像”的业务负责人，正在准备一次对外的经营复盘会。会上会被问到非常具体的问题：过去一段时间里，我们哪些供气点背后的客户结构最“单一”，一旦最大客户波动就会把站点负荷拉崩？哪些供气点虽然用户多但需求不稳定，波动大，容易导致调度端频繁补偿？还有哪些供气点呈现出持续下滑的迹象，可能意味着客户流失或产业停产？这些都需要用数据支撑，不允许只给空话。请以{end_date}为窗口期结束日，回溯{window_days}天（如遇缺失日期要在结果中标注），并在{province}（若为空则不做省份过滤）范围内，对供气点做用户画像：输出消耗量最高的Top{K}个供气点，给出每个供气点的总量、日均、用户数、活跃用户占比、集中度指标(top_user_share/top3_share/HHI/Gini)、波动(CV)、趋势斜率，以及风险标签。同时列出每个供气点消耗量最高的Top{K_users}个用户及其占比，最后给一段面向经营管理的总结与不少于3条可执行建议。请注意：我不是在让你描述“应该怎么做”，我只要你基于数据给出结论。输出必须严格为ResultModel的JSON对象，只输出JSON。"
+  },
+  {
+    "template_id": "asset_007",
+    "category": "资产效能与经济价值",
+    "template_question": "我是管网公司负责资产经营的负责人，最近在做年度预算与中长期投资计划。我们内部经常出现两种争论：一派认为应该优先把钱投到“最忙、最关键”的通道扩容，另一派认为应该先把“长距离低负荷”的资产降本整合，否则再怎么增收也被运维成本吃掉。管理层要求我们用一套可复用的口径，把不同管道划分的资产效能与经济价值做成可量化的对比，并且要能回答“价格变动时毛利有多敏感、哪些划分最先扛不住、投资回收期大概多久”。请基于{date}当天pipeline流量（用|flow|作为吞吐代理）与node坐标长度估算，结合以下假设：price_per_unit={price_per_unit}，opex_per_km={opex_per_km}，opex_per_segment={opex_per_segment}，capex_per_km={capex_per_km}，upgrade_uplift_pct={upgrade_uplift_pct}，scenario_price_delta_pct={scenario_price_delta_pct}，输出按毛利(gross_margin)排序的Top{top_k}个管道划分KPI、全网汇总、价格敏感性情景(base/price_up/price_down)，以及不少于3条扩容投资候选的回收期/ROI估算。最后写一段面向经营决策的总结并给出不少于3条建议。我会把你的输出直接用于自动评测和后续汇总，所以请严格只输出符合ResultModel的JSON对象，不要输出任何额外文本。"
+  },
+  {
+    "template_id": "basic_008",
+    "category": "基础问题（元数据查询）",
+    "template_question": "我们在做管网数据治理和资产台账对账，最近发现有些场站在不同的“管道划分”里出现同名记录，会导致后续的计量对账、运行统计、以及跨系统主数据映射出现混乱。请基于 {date} 当天的 node 数据，找出“同一站名”同时出现在不少于两个管道划分中的情况，并优先关注跨越管道划分数量更多、且当日整体负荷更高的站点。请把结果整理成系统要求的 JSON（字段以ResultModel为准），并给出前 {K} 个站点的明细。"
+  },
+  {
+    "template_id": "status_008",
+    "category": "当前运行情况（实时物理状态）",
+    "template_question": "我今天负责运行值班，需要快速锁定“当日已经处于高负荷、最可能成为瓶颈或需要重点盯防”的管段，以便提前协调压缩机、阀室和巡检力量。请基于 {date} 当天的 pipeline 数据，使用 |管道流量| 的第 {P} 分位值作为高负荷阈值，统计达到/超过该阈值的管段数量，并列出其中 |流量| 最大的前 {K} 条（要包含起点、终点、管道划分与abs_flow）。请只输出符合ResultModel约束的 JSON。"
+  },
+  {
+    "template_id": "historical_008",
+    "category": "历史情况分析（时间维度趋势）",
+    "template_question": "我们正在做一次历史复盘：关注在一段时间内，下游需求在“供气点”层面的集中程度是否过高，因为集中度过高意味着一旦某个供气点受限，会对全网造成更强冲击。请基于 {start_date} 到 {end_date} 区间内每天的 consumer 数据，按天计算供气点层面的需求占比，并得到每天的 HHI 指标。请输出区间统计天数、平均 HHI、峰值 HHI 以及峰值出现的日期，并按 ResultModel 的 JSON 结构返回（不要输出额外文字）。"
+  },
+  {
+    "template_id": "dispatch_008",
+    "category": "特殊变化与靶向调度（仿真与模拟）",
+    "template_question": "我们计划在 {date} 临时安排“对外支援/外输”任务：希望从 {pipeline_division} 这条划分中净外输 {export_amount} 的气量。目前没有新增气源的条件，只能通过对部分非关键用户做错峰/靶向限供来释放需求，预计最多可释放 {demand_reduction} 的需求量。请基于当天该划分内的计算流量平衡，判断在上述释放需求后是否具备足够余量完成外输，并给出供给总量、原始需求总量、调整后需求、margin 以及是否可外输。请只输出符合ResultModel的 JSON。"
+  },
+  {
+    "template_id": "topo_008",
+    "category": "网络拓扑与连通性（Network Topology & Connectivity）",
+    "template_question": "我在安排管段检修和应急预案时，最担心的是“某条关键连接一旦停运就把网络分成两块”，这种情况会让调度手段骤然受限，甚至出现局部断供。请基于 {date} 当天的 pipeline 拓扑，判断网络中是否存在会导致网络分裂的关键连接（桥边）。如果存在，请从这些关键连接里挑出当日 |流量| 强度最大的那一条作为重点风险对象，并给出：停运后两端是否仍然连通；若仍可连通，提供一条跳数最少的替代路径；同时输出关键连接数量、最大桥边的abs_flow等信息。最后用不少于150字写一段风险解读，并给出可执行的缓解动作清单。请只输出ResultModel JSON。"
+  },
+  {
+    "template_id": "spatial_008",
+    "category": "空间与区域分析（Spatial & Regional Analysis）",
+    "template_question": "我们在优化巡线与应急资源配置，需要先定位“空间距离特别长、跨区响应成本高”的管段，这些管段一旦出现异常，往往需要更长的到场时间、更复杂的跨单位协调，也更容易放大影响面。请基于 {date} 当天的 node 与 pipeline 数据，用两端经纬度计算每条管段的直线距离(km)，并以距离的第 {P} 分位作为“长距离管段”的阈值。请输出该阈值、长距离管段数量，以及距离最长的前 {K} 条管段明细（起点、终点、管道划分、距离、abs_flow、坐标是否有效）。同时给出数据质量统计，并用不少于150字写出结论摘要和建议清单。请只输出ResultModel JSON。"
+  },
+  {
+    "template_id": "profile_008",
+    "category": "用户结构与画像（User Structure & Profiling）",
+    "template_question": "我们准备做一次“重点供气点的客户画像与保供策略”内部评审。背景是：供暖季临近，市场侧希望把有限的资源优先保障高价值且社会影响大的客户，但调度侧担心需求过度集中会带来单点风险（例如某个大用户波动、欠费停气、或突然检修），而且不同类型客户对波动的容忍度与可替代燃料能力也不一样。请聚焦 {region} 区域内以下供气点：{supply_points_text}，统计 {start_date} 到 {end_date} 期间的下游用气结构：需要给出用户类型结构(占比/量/数量)、Top {K} 用户清单及其占比、集中度指标(Top3占比、HHI、Gini)和基于这些指标的风险提示。同时请写一段不少于200字的画像解读（要像真实业务评审材料，包含你对需求结构、客户管理与保供优先级的判断），并列出可执行的动作建议清单。请只输出符合ResultModel的 JSON。"
+  },
+  {
+    "template_id": "asset_008",
+    "category": "资产效能与经济价值分析（Asset Efficiency & Economic Value）",
+    "template_question": "资产管理部在编制年度预算时遇到一个现实矛盾：一方面，高负荷主干资产一旦出问题会造成巨大保供风险，需要提前投入做增容、改造或预防性检修；另一方面，也存在一些管段“里程长、维护投入高，但流量长期偏低”，如果继续按同样标准维护，经济性会越来越差。现在请你针对 {pipeline_division}（若为空则视为全网）在 {start_date} 到 {end_date} 期间的运行情况，基于以下口径做一次可落地的资产效能与价值代理评估：维护成本参数为每公里每日 {cost_per_km}，气量价值参数为每单位每日 {price_per_unit}，并以利用率≥{high_util_threshold} 视为高利用(潜在瓶颈/风险)、利用率≤{low_util_threshold} 视为低利用(潜在低效)。请输出组合KPI、Top {K} 高利用资产清单、以及Top {K} 低利用且成本高的资产清单，并写一段不少于200字的价值解读（要能说明你如何看待价值-成本-风险的权衡），最后给出投资/检修/增容的优先级建议清单。请只输出符合ResultModel的 JSON。"
+  },
+  {
+    "template_id": "basic_009",
+    "category": "基础问题",
+    "template_question": "你现在扮演我们公司智慧管道系统的现场值班/地图标绘助手。今天是{date}，我们准备把当天所有场站在GIS大屏上做“边界框”标注，用来给巡检车队规划路线，也给领导汇报这一天管网覆盖范围的最外沿在哪里。请你直接基于{date}当天的节点数据，在全网站点里找出最北、最南、最东、最西四个站点，并给出它们的站名、经纬度、站点类型以及所属管道划分，便于我一键复制到标绘系统里。请只输出可被程序解析的JSON，字段结构严格符合后面附加的ResultModel schema，不要输出额外说明文字。"
+  },
+  {
+    "template_id": "status_009",
+    "category": "当前运行情况",
+    "template_question": "我今天{date}在值班，领导临时让我对“{pipeline_division}”这条管线做一个运行快照：这条管线当天总体到底是供大于求还是需求大于供，缺口/富余量大概有多少，是否需要联络相邻管线借气或调整站场运行。请你基于{date}当天的数据，给出该管道划分的总供给量、总需求量以及两者差值，并列出对差值贡献最大的{top_k}个站点（可能是气源点也可能是分输用户点），包括站名、供给/需求、净差值。我需要能直接用于群里通报的结构化结果：请按ResultModel schema 输出JSON，不要写操作步骤。"
+  },
+  {
+    "template_id": "historical_009",
+    "category": "历史情况分析",
+    "template_question": "我们在做“{pipeline_division}”的运行回顾，时间窗口是{start_date}到{end_date}。最近下游城市和重点工业用户投诉说有几天压力波动、调峰不到位，但值班记录里很难一下复盘清楚。我需要你把这段时间的供需表现做成一页内部分析：总体需求的均值、波动、P95等指标；每天的供给-需求摘要；缺供最严重的日期和缺口大小；以及在这段时间里压力指标最高、最像瓶颈的Top {top_k}条管段（按起点-终点站名给出均值/P95/最大值和综合得分）。另外还要写一段分析摘要和几条可执行的行动建议，解释“为什么会缺、瓶颈在哪里、如何提前预警和调度”。请严格按ResultModel JSON结构输出，不要告诉我你是如何计算的过程。"
+  },
+  {
+    "template_id": "dispatch_009",
+    "category": "特殊变化与靶向调度",
+    "template_question": "今天{date}我们在“{pipeline_division}”调度群里收到报警：站点“{station_name}”的分输量看起来突然异常，可能是下游用户临时抢量，也可能是计量/报数问题。因为要决定是否启动靶向调度（例如临时限供、切换供气点、让相邻站点分担、或提前启动备用气源），我需要一个尽量客观的判断：它相对于最近一周的常态到底算不算异常、异常程度有多大，以及如果确实异常，哪些直接相关的管段和上下游站点最可能被牵连。请你基于{date}及之前7天的数据，给出该站当天值、历史均值与波动、是否超过{threshold_multiplier}倍标准差阈值、z-score，以及与该站相连且流量较大的{top_k}条管段清单。最后给出几条具体的调度建议（不要空话）。按ResultModel JSON输出。"
+  },
+  {
+    "template_id": "topo_009",
+    "category": "网络拓扑与连通性",
+    "template_question": "我们计划在{date}对“{pipeline_division}”做一次应急演练：假设某一个关键场站突发停运（检修或事故隔离），我们想提前知道哪些节点一旦停运就可能把大量下游需求点变成“无法被任何气源覆盖”的孤岛，这样才能把它们列入重点保障清单、准备旁路方案和备件。请基于{date}当天该管道划分的拓扑（管段连接关系）与节点供需属性，评估网络的关键割点并挑出影响最大的Top {top_k}个关键节点：对每个节点给出停运后无法被气源覆盖的需求总量、受影响需求站点数量、受影响最大的几个站点，以及受影响范围的大致经纬度边界（如有坐标）。另外请用一段整体摘要解释这条管线的脆弱性与建议。按ResultModel JSON输出。"
+  },
+  {
+    "template_id": "spatial_009",
+    "category": "空间与区域分析",
+    "template_question": "我们准备把{date}当天的需求站点按空间分布做分区，给巡检/抢修队伍排班：希望每个区内部站点尽量靠近，且每个区至少有一定数量的需求站点，避免出现“一个区只剩一个点”的情况，影响值守安排。请基于{date}当天节点数据里需求侧（计算流量>0）的站点经纬度，按k={k}把站点划分为若干空间簇，并要求每个簇的站点数不少于{min_cluster_size}；若有孤立站点无法满足约束，也请在结果里标出来。输出每个簇的成员站点、簇中心（经纬度均值）、边界框，以及该簇需求总量（计算流量求和）。最后给出一段简短说明提示哪些簇可能需要额外关注。请按ResultModel JSON输出。"
+  },
+  {
+    "template_id": "profile_009",
+    "category": "用户结构与画像",
+    "template_question": "我负责我们公司大客户与城市燃气的合同管理。最近在{date}前后，几个重点城市在谈年度量价协议，领导担心“用气结构过度集中”会导致一旦某个大用户波动就把管网调峰打乱；同时也担心部分用户过度依赖单一供气点（例如长期只从一个首站拿气），一旦该供气点检修就会引发连锁风险。请你以{date}为截止日，回看最近{lookback_days}天的用户消耗与供气点分配，做一份像真实经营分析报告一样的用户画像：给出当日用户消耗集中度（Gini/HHI/Top占比）、用户分层（超大/大/中/小/长尾）的结构、Top {top_k_users}用户的供气点依赖构成，并标出“单一供气点依赖度≥{dependency_threshold}且当日消耗≥{big_user_threshold}”的风险用户清单；同时从窗口内找出波动最大的{volatility_top_k}个用户（用CV衡量）以便排查抢量或计量异常。最后请用一段分析摘要说明这些现象对合同策略、调峰预案与风险监控指标的影响，并给出若干条可执行建议。请严格按ResultModel JSON输出，不要写成教程步骤。"
+  },
+  {
+    "template_id": "asset_009",
+    "category": "资产效能与经济价值",
+    "template_question": "我们正在做“{pipeline_division}”这条管线的年度经营复盘，同时要把碳成本纳入资产价值评估。财务给了统一的核算口径：气量边际售价按{price_per_unit}计，运营成本按“每单位气量每公里{opex_per_km_per_unit}”估算，碳排放因子按“每单位气量每公里{carbon_factor_per_km_per_unit}吨CO₂”，碳价按{carbon_price_per_ton}元/吨。请你基于{date}当天该管道划分的管段流量与站点经纬度（用直线距离近似运距），算出每条管段的净价值=收入-运营成本-碳成本，并给出：全网总净价值/总收入/总成本，以及净价值最高的Top {top_k}条管段与净价值最低的Bottom {bottom_k}条管段（同时列出流量、运距、各项成本、利用率）。更重要的是请像真实资产经营分析一样写一段洞察：哪些管段是“高价值但碳成本也高”需要优先做节能降碳，哪些管段可能存在“长距离低流量导致亏损”需要优化调度或检修策略，并给出具体的定价/合同/投资/调度建议。按ResultModel JSON输出。"
+  },
+  {
+    "template_id": "basic_010",
+    "category": "基础问题",
+    "template_question": "【交班口径确认】我需要把 {date} 的“全网供需是否平衡”写进交班记录。请你直接给出结论所依赖的关键口径说明（不用写成操作步骤，写成可复核的定义），并给出当天的 total_supply、total_demand、gap=total_supply-total_demand，以及你采用的平衡阈值 tol。除此之外，我还希望你列出一份 plan（至少5条），说明如果要把这套结论做成自动化日报，你会关注哪些数据质量检查点与异常兜底逻辑。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "status_010",
+    "category": "当前运行情况",
+    "template_question": "【运行日报生成】请为 {date} 自动生成一份“运行日报”(面向调度员/值长)，要求既能快速扫一眼抓住重点，也能让复盘的人知道你引用了哪些关键数字。日报只允许输出 JSON（ResultModel），至少包含：\n- headline：一句话标题（不超过30字）；\n- kpi：3~6 个关键指标（每个指标给出 name,value,unit,comment）；\n- ranks：至少包含 Top{K_station} 需求站点、Top{K_supply} 供给站点、Top{K_user} 用气用户 三类排行；\n- risks：2~5 条风险提示（每条要给出 evidence 指向某个可核算的数字或排名）；\n- appendix：你认为最需要被追问的 3 个“下一步数据问题”（只写问题句子）。"
+  },
+  {
+    "template_id": "historical_010",
+    "category": "历史情况分析",
+    "template_question": "【趋势复盘】领导要我在周会上解释：从 {start_date} 到 {end_date} 这段时间，全网运行有没有出现值得警惕的趋势。我不希望你泛泛而谈，而是希望你选一个“可以用数据核算”的时间序列来讲清楚，并给出最少 3 个统计刻画(例如均值、趋势斜率、峰谷、异常日等)以及 3 条可验证假设。请输出 JSON（ResultModel），包含 chosen_series（你选择的序列名称）、stats（至少3项）、hypotheses（3条，必须带可验证的后续问题）。"
+  },
+  {
+    "template_id": "dispatch_010",
+    "category": "特殊变化与靶向调度",
+    "template_question": "【突发供气点退出评估】在 {date} 的 {province}，请找出当日消耗量最大的供气点。现在假设该供气点因设备故障在当天剩余时段完全退出，我需要快速评估“最多会缺多少量”以及“可能从哪些备选供气点兜底”。\n请按 consumer 表口径计算并输出 JSON（ResultModel）：top_supply_point（名称与消耗量）、lost_consumption、backup_supply_points Top{K}（排除 top_supply_point 后按消耗量降序），以及 coverage_ratio=backup_supply_points_consumption_sum/max(lost_consumption,eps)。"
+  },
+  {
+    "template_id": "topo_010",
+    "category": "网络拓扑与连通性",
+    "template_question": "【韧性提升建议】我们准备在月度评审会上讨论网架韧性提升，你需要基于 {date} 的拓扑与流量给出一个“可复核、可落地讨论”的建议清单。输出必须是 JSON（ResultModel），至少包含：\n- critical_nodes：你认为最关键的 3 个站点（给出 station_name、importance_score、reason）；\n- critical_edges：你认为最关键的 3 条管段（给出 start_station,end_station,pipeline_division,importance_score,reason）；\n- reinforcement_actions：针对每个关键对象给出 1 条冗余/旁路/分担建议（不要求真实工程参数，但要讲清楚目标）；\n- validation_questions：至少 4 个后续可验证的数据问题模板（只写问题句子）。"
+  },
+  {
+    "template_id": "spatial_010",
+    "category": "空间与区域分析",
+    "template_question": "基于 {date} 的 node 表，请比较不同管道划分的“东西跨度”和“南北跨度”，我想用它来决定地图展示的默认缩放层级。对每个管道划分（按站名去重）计算：station_count、span_lon=max(lon)-min(lon)、span_lat=max(lat)-min(lat)。请输出 span_lon 最大的 Top{K} 个划分及其指标。仅输出 JSON（ResultModel）。"
+  },
+  {
+    "template_id": "profile_010",
+    "category": "用户结构与画像",
+    "template_question": "【业务背景】市场部准备把用户服务做分层运营：希望用一套可解释的规则，把用户按用气规模分成三档，用于差异化的价格条款、保供承诺与客户经理资源配置。我们决定先用 {date} 这一天的真实用气行为做一个试算，看看分层后各层的用户数量与用气占比是否符合预期（例如：少数大客户贡献了多少用气）。\n\n【口径约束】以 consumer 表为准：同一供气点-用户的多条记录视为同一关系，消耗量以聚合求和为准；用户粒度以“用户”字段为准。\n\n【输出要求】请输出 JSON（ResultModel），包含：\n- quantiles：Q25/Q50/Q75（基于用户消耗量分布）；\n- tiers：low(<=Q25)、mid(Q25~Q75]、high(>Q75) 三档，各自 user_count、consumption_share；\n- top_examples：每档给出 3 个代表性用户（用户名称+消耗量）；\n- narrative：200~350 字的业务解读（要像你在评审会上解释“这套分层是否合理、是否过于集中、可能带来什么运营风险/机会”那样写，不要写成步骤说明）。"
+  },
+  {
+    "template_id": "asset_010",
+    "category": "资产效能与经济价值",
+    "template_question": "【长期闲置资产预警】资产管理部怀疑部分管段长期处于“名义上在网、实际上几乎不用”的状态，这会影响运维投入的优先级与资本效率。请你基于 {start_date} 到 {end_date}（含首尾）的 pipeline 数据做一次筛查：同一(起点站名,终点站名,管道划分)视为同一管段，日流量取聚合和后再取绝对值 abs_flow。我们把 abs_flow==0 记为 zero day。\n\n【输出要求】请输出 JSON（ResultModel），至少包含：\n- total_days（窗口天数）、zero_ratio_threshold（你用于判定“长期闲置”的阈值解释）；\n- idle_edges：筛出 zero_ratio 最高的 Top{K} 管段，每条输出 zero_days,zero_ratio,mean_abs_flow,median_abs_flow,trend_slope；\n- value_note：200~350 字的经济价值解读（要像资产经理写给领导的摘要：哪些管段可能是“闲置但仍要维护”的负担，哪些可能是“战略冗余”不能简单下结论，并给出你最想补充的 2 个数据维度来判断）。"
+  }
+]
