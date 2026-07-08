@@ -1,1 +1,8 @@
-pipeclaw/backend/workspace-templates/AGENTS.md
+context.txt
+AGENTS.md
+__pycache__/
+.pytest_cache/
+*.pyc
+*.pyo
+*.pyd
+pipeFormer/data/mock_tiny/static/mock_tiny/tokenizer_save/tokenizer_output.txt

@@ -1,138 +1,237 @@
-"""
-Build a PDF-format PipeFormer teacher trace for the public mock data.
-
-This file is intentionally only the CLI coordinator. The pipeline stages live in
-backend/pipeline so parsing, checkpoint inference, rule checks, evidence
-extraction, and trace formatting can evolve independently.
-
-Example:
-    python generate_teacher_trace.py --force
-"""
 from __future__ import annotations
 
 import argparse
 import json
+import os
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 from pipeline.io_utils import write_json, write_jsonl
-from pipeline.pipeformer_inference import find_default_checkpoint_dir, find_default_forecast_csv
 from pipeline.scenario_loader import find_scenario, load_scenarios
-from pipeline.teacher_trace_pipeline import build_trace_record
 
 
-def repo_root_from_here() -> Path:
-    return Path(__file__).resolve().parents[2]
+def backend_root() -> Path:
+    return Path(__file__).resolve().parent
+
+
+def load_backend_env() -> None:
+    env_path = backend_root() / ".env"
+    if not env_path.exists():
+        return
+    try:
+        from dotenv import load_dotenv
+    except ModuleNotFoundError:
+        for line in env_path.read_text(encoding="utf-8").splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.removeprefix("export ").strip()
+            os.environ.setdefault(key, value.strip().strip("'\""))
+    else:
+        load_dotenv(env_path, override=False)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    root = repo_root_from_here()
-    backend_root = Path(__file__).resolve().parent
-    pipeformer_root = root / "pipeFormer"
-    parser = argparse.ArgumentParser(description="Build PDF-format mock PipeFormer teacher traces for PipeClaw.")
+    root = backend_root()
+    parser = argparse.ArgumentParser(description="Run PipeClaw and export teacher_trace records.")
     parser.add_argument(
         "--scenario-file",
         type=Path,
-        default=backend_root / "pipeclaw_data" / "mock_pipeformer_tiny_scenarios.json",
-        help="Scenario JSON file to read.",
+        default=root / "pipeclaw_data" / "mock_pipeformer_tiny_scenarios.json",
     )
-    parser.add_argument(
-        "--scenario-id",
-        default="mock_pipeformer_prediction_tiny_001",
-        help="Scenario id to build into a trace.",
-    )
-    parser.add_argument(
-        "--pipeformer-root",
-        type=Path,
-        default=pipeformer_root,
-        help="Local pipeFormer repository root.",
-    )
-    parser.add_argument(
-        "--checkpoint-dir",
-        type=Path,
-        default=find_default_checkpoint_dir(root),
-        help="PipeFormer checkpoint directory to use for inference.",
-    )
-    parser.add_argument(
-        "--device",
-        default="cpu",
-        help="Torch device for checkpoint inference, for example cpu or cuda.",
-    )
-    parser.add_argument(
-        "--data-dir",
-        type=Path,
-        default=None,
-        help="Optional PipeFormer data directory override. Defaults to checkpoint training_config.json.",
-    )
-    parser.add_argument(
-        "--static-dir",
-        type=Path,
-        default=None,
-        help="Optional PipeFormer static directory override. Defaults to checkpoint training_config.json.",
-    )
-    parser.add_argument(
-        "--forecast-csv",
-        type=Path,
-        default=find_default_forecast_csv(root),
-        help="Existing PipeFormer sample prediction CSV, used only with --use-sample-csv.",
-    )
-    parser.add_argument(
-        "--use-sample-csv",
-        action="store_true",
-        help="Use the existing sample prediction CSV instead of running checkpoint inference.",
-    )
-    parser.add_argument(
-        "--mapping-csv",
-        type=Path,
-        default=root / "pipeFormer" / "data" / "mock_tiny" / "static" / "mock_tiny" / "index_variable_mapping.csv",
-        help="PipeFormer variable mapping CSV.",
-    )
+    parser.add_argument("--scenario-id", default=None, help="Generate one scenario. Omit to generate all scenarios.")
+    parser.add_argument("--agent-id", default="teacher_trace")
+    parser.add_argument("--session-id", default=None, help="Only valid with --scenario-id.")
+    parser.add_argument("--device", default=os.getenv("PIPEFORMER_DEVICE", "cpu"))
     parser.add_argument(
         "--output-jsonl",
         type=Path,
-        default=backend_root / "generated_teacher_traces" / "mock_pipeformer_teacher_trace_format.jsonl",
-        help="PDF section 1.7 teacher-trace JSONL output.",
+        default=root / "generated_teacher_traces" / "teacher_trace.jsonl",
     )
     parser.add_argument(
         "--output-json",
         type=Path,
-        default=backend_root / "generated_teacher_traces" / "mock_pipeformer_teacher_trace_format.pretty.json",
-        help="Pretty JSON copy of the PDF section 1.7 record.",
+        default=root / "generated_teacher_traces" / "teacher_trace.pretty.json",
     )
-    parser.add_argument("--force", action="store_true", help="Overwrite outputs if they already exist.")
+    parser.add_argument("--force", action="store_true")
     return parser
 
 
-def main() -> int:
-    parser = build_parser()
-    args = parser.parse_args()
+def first_user_input(scenario: Dict[str, Any]) -> str:
+    for session in scenario.get("sessions", []):
+        for turn in session.get("dialogue", []):
+            text = str(turn.get("user_input") or "").strip()
+            if text:
+                return text
+    raise ValueError(f"Scenario {scenario.get('scenario_id')} has no non-empty user_input.")
 
-    scenarios = load_scenarios(args.scenario_file)
-    scenario = find_scenario(scenarios, args.scenario_id)
-    record = build_trace_record(
-        scenario=scenario,
-        scenario_path=args.scenario_file.resolve(),
-        forecast_csv=args.forecast_csv.resolve(),
-        mapping_path=args.mapping_csv.resolve(),
-        checkpoint_dir=args.checkpoint_dir.resolve(),
-        pipeformer_root=args.pipeformer_root.resolve(),
-        data_dir=args.data_dir.resolve() if args.data_dir else None,
-        static_dir=args.static_dir.resolve() if args.static_dir else None,
-        device=args.device,
-        use_sample_csv=args.use_sample_csv,
+
+def parse_tool_output(tool_call: Dict[str, Any]) -> Any:
+    if "result" in tool_call:
+        return tool_call["result"]
+    raw = tool_call.get("result_summary")
+    if not isinstance(raw, str):
+        return raw
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
+def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
+    return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
+
+
+def trace_tool_calls(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "call_id": tool_call_id(item, index),
+            "tool_name": item.get("tool_name"),
+            "arguments": item.get("args", {}),
+            "timestamp": item.get("timestamp"),
+        }
+        for index, item in enumerate(trace.get("tool_calls", []), start=1)
+    ]
+
+
+def trace_tool_outputs(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
+    return [
+        {
+            "call_id": tool_call_id(item, index),
+            "output": parse_tool_output(item),
+            "timestamp": item.get("timestamp"),
+        }
+        for index, item in enumerate(trace.get("tool_calls", []), start=1)
+    ]
+
+
+def final_answer(trace: Dict[str, Any]) -> str:
+    for message in reversed(trace.get("messages", [])):
+        if message.get("role") == "assistant" and message.get("content"):
+            return str(message["content"])
+    return ""
+
+
+def successful_pipeformer_output(trace: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    for item in trace.get("tool_calls", []):
+        if item.get("tool_name") != "run_pipeformer_forecast":
+            continue
+        output = parse_tool_output(item)
+        if isinstance(output, dict) and output.get("success"):
+            return output
+    return None
+
+
+def generic_evidence(trace: Dict[str, Any]) -> Dict[str, Any]:
+    calls = trace.get("tool_calls", [])
+    return {
+        "tool_names": [item.get("tool_name") for item in calls],
+        "tool_call_count": len(calls),
+        "artifacts": trace.get("artifacts", []),
+    }
+
+
+def build_teacher_record(scenario: Dict[str, Any], question: str, trace: Dict[str, Any]) -> Dict[str, Any]:
+    pipeformer = successful_pipeformer_output(trace)
+    answer = final_answer(trace)
+    quality_flag = "pass" if trace.get("status") == "completed" else "needs_review"
+    if pipeformer:
+        parsed_task = pipeformer.get("parsed_task")
+        prediction_summary = pipeformer.get("prediction_summary")
+        constraint_check = pipeformer.get("constraint_check")
+        evidence = pipeformer.get("evidence")
+        risk_level = pipeformer.get("risk_level")
+        manual_intervention_label = pipeformer.get("manual_intervention_label")
+        dispatch_recommendation = pipeformer.get("dispatch_recommendation")
+        answer = answer or pipeformer.get("final_answer", "")
+        quality_flag = pipeformer.get("quality_flag", quality_flag)
+    else:
+        parsed_task = {"task_type": "data_query", "question": question}
+        prediction_summary = None
+        constraint_check = None
+        evidence = generic_evidence(trace)
+        risk_level = "low"
+        manual_intervention_label = "not_required"
+        dispatch_recommendation = "N/A - not a dispatch or PipeFormer prediction task."
+
+    return {
+        "sample_id": f"sample_{scenario.get('scenario_id')}",
+        "scenario_id": scenario.get("scenario_id"),
+        "scenario_type": scenario.get("scenario_type"),
+        "user_input": question,
+        "parsed_task": parsed_task,
+        "tool_calls": trace_tool_calls(trace),
+        "tool_outputs": trace_tool_outputs(trace),
+        "prediction_summary": prediction_summary,
+        "constraint_check": constraint_check,
+        "evidence": evidence,
+        "risk_level": risk_level,
+        "manual_intervention_label": manual_intervention_label,
+        "dispatch_recommendation": dispatch_recommendation,
+        "final_answer": answer,
+        "quality_flag": quality_flag,
+    }
+
+
+def run_backend_trace(scenario: Dict[str, Any], args: argparse.Namespace, index: int, run_stamp: str) -> tuple[str, Dict[str, Any]]:
+    from agent.orchestrator import AgentOrchestrator
+    from agent.schemas import AgentChatRequest
+
+    question = first_user_input(scenario)
+    scenario_id = str(scenario.get("scenario_id") or f"scenario_{index:06d}")
+    session_id = args.session_id or f"teacher_{index:06d}_{scenario_id}_{run_stamp}"
+    os.environ["PIPEFORMER_DEVICE"] = str(args.device)
+
+    orchestrator = AgentOrchestrator(
+        data_loader=None,
+        agent_id=args.agent_id,
+        session_id=session_id,
+        enable_skills=False,
+        workspace_root_base=backend_root() / ".openclaw",
     )
+    result = orchestrator.run_agent(AgentChatRequest(agent_id=args.agent_id, session_id=session_id, message=question))
+    trace_path = Path(result.trace_summary.trace_path)
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    trace["_trace_path"] = trace_path.as_posix()
+    return question, trace
 
-    write_jsonl(args.output_jsonl, [record], force=args.force)
-    write_json(args.output_json, record, force=args.force)
 
-    print(json.dumps({
-        "status": "ok",
-        "scenario_id": record["scenario_id"],
-        "forecast_mode": record["prediction_summary"]["forecast_mode"],
-        "overall_status": record["constraint_check"]["overall_status"],
-        "risk_level": record["risk_level"],
-        "output_jsonl": args.output_jsonl.as_posix(),
-        "output_json": args.output_json.as_posix(),
-    }, ensure_ascii=False, indent=2))
+def selected_scenarios(args: argparse.Namespace) -> List[Dict[str, Any]]:
+    scenarios = load_scenarios(args.scenario_file)
+    if args.scenario_id:
+        return [find_scenario(scenarios, args.scenario_id)]
+    return scenarios
+
+
+def main() -> int:
+    load_backend_env()
+    args = build_parser().parse_args()
+    scenarios = selected_scenarios(args)
+    if args.session_id and len(scenarios) != 1:
+        raise ValueError("--session-id can only be used with --scenario-id.")
+
+    run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    records = []
+    for index, scenario in enumerate(scenarios, start=1):
+        question, trace = run_backend_trace(scenario, args, index, run_stamp)
+        records.append(build_teacher_record(scenario, question, trace))
+
+    write_jsonl(args.output_jsonl, records, force=args.force)
+    write_json(args.output_json, records[0] if len(records) == 1 else records, force=args.force)
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "records": len(records),
+                "output_jsonl": args.output_jsonl.as_posix(),
+                "output_json": args.output_json.as_posix(),
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 

@@ -63,7 +63,9 @@ class AgentOrchestrator:
 
     def _init_tools(self) -> None:
         from .tools.workspace_tools import WorkspaceTools
+        from .tools.pipeformer_tools import register_pipeformer_tools
         WorkspaceTools(self.session_id)
+        register_pipeformer_tools(self.backend_root)
 
     def _build_history_block(self, trace_messages: List[Dict[str, Any]]) -> str:
         lines: List[str] = []
@@ -271,7 +273,7 @@ class AgentOrchestrator:
                             result = {"success": False, "error": str(exc), "tool": call.function.name, "params": args}
 
                     result_summary = json.dumps(result, ensure_ascii=False)[:4000]
-                    trace_extra = {"tool_call_id": call.id}
+                    trace_extra = {"tool_call_id": call.id, "result": result}
                     if isinstance(result, dict) and result.get("error"):
                         trace_extra["failure_context"] = {
                             "finish_reason": finish_reason,
@@ -398,5 +400,3 @@ def init_orchestrator(data_loader, session_id: str = "default", enable_skills: O
     global orchestrator
     orchestrator = AgentOrchestrator(data_loader, agent_id=agent_id, session_id=session_id, enable_skills=enable_skills)
     return orchestrator
-
-

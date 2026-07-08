@@ -25,6 +25,14 @@ class PromptBuilder:
             "- If you are unsure about tool arguments, make a smaller valid tool call first instead of emitting a large risky one.",
         ])
         sections.append(tool_calling_contract)
+        pipeformer_routing = "\n".join([
+            "## PipeFormer Routing",
+            "- For forecast, what-if, risk, dispatch, or transient-operation questions about future pipeline states, call `run_pipeformer_forecast` before answering.",
+            "- This includes requests that mention PipeFormer, future prediction, boundary/control perturbations, mock_test cases, pressure/flow/linepack checks, compressor load, or energy checks.",
+            "- For historical lookup, current-state retrieval, ranking, aggregation, or visualization questions that do not ask for future prediction, use the workspace/data workflow instead of PipeFormer.",
+            "- Do not simulate PipeFormer tool calls in text; use the registered tool and base the final answer on its returned evidence.",
+        ])
+        sections.append(pipeformer_routing)
         control_files = memory_payload.get("control_files", [])
         if control_files:
             sections.append("## Control Plane Files\n" + "\n\n".join(

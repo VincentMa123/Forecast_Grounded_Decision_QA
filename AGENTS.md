@@ -1,29 +1,32 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-This repository currently contains source documents only. Keep project PDFs at the repository root unless a category grows enough to justify a subdirectory. Existing files are:
 
-- `Forecast-Grounded_Decision_QA_for_Gas_Pipeline_Transient_Operation_EN.pdf` for the main gas-pipeline decision QA reference.
-- `PipeFormer_PipeClaw_Schedule.pdf` for schedule and planning material.
-
-Add future derived assets under descriptive folders such as `notes/`, `figures/`, or `scripts/` rather than mixing generated outputs with source PDFs.
+This repository contains two related packages. `pipeFormer/` holds the forecasting model, data preprocessing, sparse decoder implementation, configs, mock data, and decoder tests. Important subtrees include `pipeFormer/data/`, `pipeFormer/models/decoder/`, `pipeFormer/training/`, and `pipeFormer/configs/`. `pipeclaw/` is the runnable QA and visualization stack: `backend/` contains the FastAPI service, agent runtime, execution pipeline, mock `pipeline_data/`, and released task data; `frontend/` contains the Vite React app; `huggingface_dataset/` contains dataset publishing helpers; `docs/images/` stores paper and UI figures.
 
 ## Build, Test, and Development Commands
-No build system, package manager, or test runner is configured. Useful local checks are:
 
-- `rg --files` lists repository files quickly.
-- `Get-ChildItem` shows file sizes and modified dates in Windows PowerShell.
-
-If scripts are added later, document their exact invocation here and keep generated outputs out of the root.
+- `cd pipeclaw && pip install -r backend/requirements.txt`: install backend dependencies.
+- `cd pipeclaw && python backend/main.py`: start the FastAPI backend on `http://localhost:8003`.
+- `cd pipeclaw/frontend && npm install`: install frontend dependencies from `package-lock.json`.
+- `cd pipeclaw/frontend && npm run dev`: start the Vite dev server on port `3000`; `/api` and `/assets` proxy to the backend.
+- `cd pipeclaw/frontend && npm run build`: run TypeScript checking and build the frontend.
+- `cd pipeclaw/frontend && npm run lint`: run the declared ESLint check.
+- `cd pipeFormer && pip install -r requirements.txt`: install model and preprocessing dependencies.
+- `cd pipeFormer && python train.py --config configs/quick_test_decoder.json`: run a small decoder training configuration.
 
 ## Coding Style & Naming Conventions
-There is no code style configuration yet. For documents, prefer descriptive filenames with project/topic, artifact type, and language when applicable, for example `Forecast-Grounded_Decision_QA_for_Gas_Pipeline_Transient_Operation_EN.pdf`. Avoid vague names like `final.pdf` or `new_version.pdf`. Keep file extensions lowercase.
+
+Python code uses 4-space indentation, `snake_case` modules/functions, and `PascalCase` classes. Keep model configs as JSON under `pipeFormer/configs/`. Frontend code is TypeScript + React with `strict`, `noUnusedLocals`, and `noUnusedParameters` enabled in `frontend/tsconfig.json`; use `.tsx` for components and colocated `.css` files for component/page styling.
 
 ## Testing Guidelines
-No automated tests exist. For document updates, verify that PDFs open locally, page counts look expected, and filenames still match their contents. If code is introduced, add a colocated test directory and include the test command in this guide.
+
+The Python test surface currently lives under `pipeFormer/models/tests/` and uses pytest-style `test_*.py` files and `Test*` classes. Run a focused decoder test with `cd pipeFormer && python -m pytest models/tests/test_decoder_functions.py` after installing pytest if it is not already available. No frontend `test` script is declared in `package.json`; use `npm run lint` and `npm run build` for the checked frontend workflow.
 
 ## Commit & Pull Request Guidelines
-This folder is not currently initialized as a Git repository, so no local commit-message convention is available. If Git is introduced, use short imperative commits, for example `Add pipeline QA reference paper`, and keep PR descriptions focused on what changed, why, and any document version/date details.
 
-## Agent-Specific Instructions
-Before editing, inspect the current file list and avoid deleting or replacing source PDFs unless explicitly requested. Generated notes, OCR text, or converted images should be added as separate files with clear provenance.
+Recent commits are short, imperative summaries such as `Test run the pipeFormer and the pipeclaw` and `Add project source files`. Keep commit subjects concise and task-focused. Pull requests should describe which package changed, list commands run, call out data/config changes, and include screenshots when frontend views or `docs/images/` assets change.
+
+## Security & Configuration Tips
+
+`pipeclaw/backend/main.py` loads `backend/.env` for `OPENAI_API_KEY`, `OPENAI_API_BASE`, and `OPENAI_MODEL`. Do not expose private credentials or internal operational data; replace `backend/pipeline_data/` with private data only in local or controlled environments.

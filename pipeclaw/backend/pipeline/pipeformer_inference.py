@@ -152,6 +152,10 @@ def add_pipeformer_import_paths(pipeformer_root: Path) -> None:
         path_str = str(path.resolve())
         if path_str not in sys.path:
             sys.path.insert(0, path_str)
+    loaded_models = sys.modules.get("models")
+    loaded_models_path = Path(getattr(loaded_models, "__file__", "") or "")
+    if loaded_models is not None and loaded_models_path.name == "models.py":
+        sys.modules.pop("models", None)
 
 
 def ensure_optional_matplotlib() -> None:

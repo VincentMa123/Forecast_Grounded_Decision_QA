@@ -114,11 +114,15 @@ class DataTokenizer:
             for handler in logger.handlers
         )
         if not has_handler:
-            file_handler = logging.FileHandler(self.log_path, mode="a", encoding="utf-8")
-            file_handler.setLevel(logging.INFO)
-            formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
-            file_handler.setFormatter(formatter)
-            logger.addHandler(file_handler)
+            try:
+                file_handler = logging.FileHandler(self.log_path, mode="a", encoding="utf-8")
+            except OSError as exc:
+                logger.debug("Tokenizer log file is unavailable (%s); continuing without file logging.", exc)
+            else:
+                file_handler.setLevel(logging.INFO)
+                formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+                file_handler.setFormatter(formatter)
+                logger.addHandler(file_handler)
 
         if load_config:
             self._load_config_from_file()
@@ -1079,7 +1083,8 @@ class DataTokenizer:
             lambda idx: get_variable_group(idx, self.boundary_dims, self.equipment_dims),
         )
         self.fitted = True
-        self._save_config_to_file()
+        if not self.config_path.exists():
+            self._save_config_to_file()
         logger.info("Tokenizer stats loaded from %s", stats_path)
         return True
 

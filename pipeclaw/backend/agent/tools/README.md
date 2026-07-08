@@ -6,6 +6,7 @@ Minimal toolset for the agent:
 - `edit_file`: exact string replacement in a workspace file
 - `run_command`: run approved commands (python/pip/node, powershell/cmd/bash, FS ops like mkdir/cp/copy/xcopy/robocopy) inside the workspace
 - `read_file`: read workspace files (JSON auto-parse supported)
+- `run_pipeformer_forecast`: run PipeFormer checkpoint inference for forecast, what-if, risk, dispatch, or transient-operation questions.
 
 ### Workflow
 1. Create or update `plan.md` first.
@@ -40,3 +41,15 @@ output_dir.mkdir(parents=True, exist_ok=True)
 ## Deprecated tools
 `data_tools.py` and `analytics_tools.py` are no longer registered as tools.
 If needed, import them inside your scripts instead of calling them directly.
+
+## PipeFormer tool configuration
+`run_pipeformer_forecast` uses the mock-tiny checkpoint by default. Override paths with environment variables when running another checkpoint or a separate PipeFormer environment:
+
+- `PIPEFORMER_ROOT`
+- `PIPEFORMER_CHECKPOINT_DIR`
+- `PIPEFORMER_DATA_DIR`
+- `PIPEFORMER_STATIC_DIR`
+- `PIPEFORMER_MAPPING_CSV`
+- `PIPEFORMER_DEVICE`
+
+For DeepSeek, keep using the OpenAI-compatible settings consumed by the orchestrator: `OPENAI_API_KEY`, `OPENAI_API_BASE`, and `OPENAI_MODEL`.
