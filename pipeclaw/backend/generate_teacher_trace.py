@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 from datetime import datetime
 from pathlib import Path
@@ -11,8 +12,29 @@ from pipeline.io_utils import write_json, write_jsonl
 from pipeline.scenario_loader import find_scenario, load_scenarios
 
 
+logger = logging.getLogger("teacher_trace")
+
+
 def backend_root() -> Path:
     return Path(__file__).resolve().parent
+
+
+def configure_logging(level_name: str) -> None:
+    level = getattr(logging, level_name.upper(), logging.INFO)
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        force=True,
+    )
+
+
+def short_text(value: Any, limit: int = 700) -> str:
+    if isinstance(value, (dict, list)):
+        text = json.dumps(value, ensure_ascii=False, default=str)
+    else:
+        text = str(value)
+    text = " ".join(text.split())
+    return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
 def load_backend_env() -> None:
@@ -56,6 +78,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=root / "generated_teacher_traces" / "teacher_trace.pretty.json",
     )
     parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--log-level",
+        default=os.getenv("TEACHER_TRACE_LOG_LEVEL", "INFO"),
+        choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+        help="Terminal logging verbosity for teacher trace generation.",
+    )
     return parser
 
 
@@ -184,6 +212,9 @@ def run_backend_trace(scenario: Dict[str, Any], args: argparse.Namespace, index:
     session_id = args.session_id or f"teacher_{index:06d}_{scenario_id}_{run_stamp}"
     os.environ["PIPEFORMER_DEVICE"] = str(args.device)
 
+    logger.info("Scenario %s started (%d): session_id=%s", scenario_id, index, session_id)
+    logger.info("User question: %s", short_text(question, limit=500))
+
     orchestrator = AgentOrchestrator(
         data_loader=None,
         agent_id=args.agent_id,
@@ -193,7 +224,9 @@ def run_backend_trace(scenario: Dict[str, Any], args: argparse.Namespace, index:
     )
     result = orchestrator.run_agent(AgentChatRequest(agent_id=args.agent_id, session_id=session_id, message=question))
     trace_path = Path(result.trace_summary.trace_path)
+    logger.info("Scenario %s finished: status=%s trace=%s", scenario_id, result.trace_summary.status, trace_path)
     trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    logger.info("Loaded trace: messages=%d tool_calls=%d", len(trace.get("messages", [])), len(trace.get("tool_calls", [])))
     trace["_trace_path"] = trace_path.as_posix()
     return question, trace
 
@@ -208,18 +241,29 @@ def selected_scenarios(args: argparse.Namespace) -> List[Dict[str, Any]]:
 def main() -> int:
     load_backend_env()
     args = build_parser().parse_args()
+    configure_logging(args.log_level)
     scenarios = selected_scenarios(args)
     if args.session_id and len(scenarios) != 1:
         raise ValueError("--session-id can only be used with --scenario-id.")
 
+    logger.info(
+        "Teacher trace generation started: scenarios=%d device=%s scenario_file=%s",
+        len(scenarios),
+        args.device,
+        args.scenario_file,
+    )
     run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     records = []
     for index, scenario in enumerate(scenarios, start=1):
         question, trace = run_backend_trace(scenario, args, index, run_stamp)
+        logger.info("Building teacher record for scenario=%s", scenario.get("scenario_id"))
         records.append(build_teacher_record(scenario, question, trace))
 
+    logger.info("Writing JSONL output: %s", args.output_jsonl)
     write_jsonl(args.output_jsonl, records, force=args.force)
+    logger.info("Writing pretty JSON output: %s", args.output_json)
     write_json(args.output_json, records[0] if len(records) == 1 else records, force=args.force)
+    logger.info("Teacher trace generation complete: records=%d", len(records))
     print(
         json.dumps(
             {

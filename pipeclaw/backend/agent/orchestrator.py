@@ -117,6 +117,7 @@ class AgentOrchestrator:
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_context}]
         tools_schema = tool_registry.openai_tools_schema()
         last_request_snapshot: Optional[Dict[str, Any]] = None
+        logger.info("Agent tool loop ready: session_id=%s model=%s tools=%d", self.session_id, self.model, len(tools_schema))
 
         try:
             for step_index in range(self.max_steps):
@@ -127,6 +128,7 @@ class AgentOrchestrator:
                     "tool_choice": "auto",
                     "temperature": 0.2,
                 }
+                logger.info("LLM request started: session_id=%s step=%d model=%s", self.session_id, step_index + 1, self.model)
                 last_request_snapshot = self.trace_writer.append_llm_call(
                     self.session_id,
                     step=step_index + 1,
@@ -147,6 +149,14 @@ class AgentOrchestrator:
                 finish_reason = choice.finish_reason
                 tool_calls = message.tool_calls or []
                 content = (message.content or "").strip()
+                logger.info(
+                    "LLM response received: session_id=%s step=%d finish_reason=%s tool_calls=%d content_chars=%d",
+                    self.session_id,
+                    step_index + 1,
+                    finish_reason,
+                    len(tool_calls),
+                    len(content),
+                )
                 try:
                     response_trace = response.model_dump(mode="json")
                 except Exception as exc:
@@ -248,6 +258,13 @@ class AgentOrchestrator:
                 for call in tool_calls:
                     args = self._safe_parse_args(call.function.arguments)
                     tool_input: Dict[str, Any] = args if args is not None else {"_raw_arguments": call.function.arguments}
+                    logger.info(
+                        "Tool call started: session_id=%s tool=%s call_id=%s args=%s",
+                        self.session_id,
+                        call.function.name,
+                        call.id,
+                        json.dumps(tool_input, ensure_ascii=False, default=str)[:1200],
+                    )
                     tool_timestamp = event_time or datetime.now().isoformat()
                     yield {
                         "event": "tool_start",
@@ -272,6 +289,14 @@ class AgentOrchestrator:
                         except Exception as exc:
                             result = {"success": False, "error": str(exc), "tool": call.function.name, "params": args}
 
+                    result_success = not isinstance(result, dict) or not bool(result.get("error"))
+                    logger.info(
+                        "Tool call finished: session_id=%s tool=%s call_id=%s success=%s",
+                        self.session_id,
+                        call.function.name,
+                        call.id,
+                        result_success,
+                    )
                     result_summary = json.dumps(result, ensure_ascii=False)[:4000]
                     trace_extra = {"tool_call_id": call.id, "result": result}
                     if isinstance(result, dict) and result.get("error"):
@@ -299,7 +324,7 @@ class AgentOrchestrator:
                             "tool": call.function.name,
                             "output": result_summary,
                             "timestamp": tool_end_timestamp,
-                            "success": not isinstance(result, dict) or not bool(result.get("error")),
+                            "success": result_success,
                         },
                     }
                     messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)})
@@ -337,6 +362,7 @@ class AgentOrchestrator:
     def run_agent_stream(self, request: AgentChatRequest):
         event_time = request.event_time
         event_timestamp = event_time or datetime.now().isoformat()
+        logger.info("Agent run started: agent_id=%s session_id=%s", self.agent_id, self.session_id)
         self.trace_writer.reset_turn()
         self.trace_writer.ensure_trace(self.session_id, created_at=event_time)
         self.trace_writer.set_status(self.session_id, "running", timestamp=event_time)
@@ -378,6 +404,14 @@ class AgentOrchestrator:
         self.trace_writer.set_status(self.session_id, final_status, timestamp=event_time)
         trace_summary = TraceSummary(**self.trace_writer.summarize(self.session_id))
         result = OneTurnAfterRunAgent(return_message=assistant_message, memory_updates=memory_updates, generated_artifacts=[], trace_summary=trace_summary)
+        logger.info(
+            "Agent run finished: agent_id=%s session_id=%s status=%s tool_calls=%d trace=%s",
+            self.agent_id,
+            self.session_id,
+            final_status,
+            trace_summary.tool_calls_count,
+            trace_summary.trace_path,
+        )
         yield {
             "event": "done",
             "data": AgentChatResponse(

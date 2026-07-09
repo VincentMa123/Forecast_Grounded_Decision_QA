@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -17,6 +18,7 @@ from .trace_formatter import final_answer_text, risk_level_from_status, row_labe
 
 
 DEFAULT_REQUESTED_CHECKS = ["pressure", "flow", "linepack", "compressor_load", "energy"]
+logger = logging.getLogger(__name__)
 
 
 def _repo_root_from_backend_root(backend_root: Path) -> Path:
@@ -129,6 +131,7 @@ def run_pipeformer_forecast_analysis(
     device: Optional[str] = None,
     use_sample_csv: Optional[bool] = None,
 ) -> Dict[str, Any]:
+    logger.info("PipeFormer forecast tool started")
     repo_root = _repo_root_from_backend_root(backend_root)
     resolved_pipeformer_root = _optional_path(pipeformer_root) or _env_path("PIPEFORMER_ROOT", repo_root / "pipeFormer")
     resolved_checkpoint_dir = _first_path(
@@ -155,6 +158,14 @@ def run_pipeformer_forecast_analysis(
     resolved_data_dir = _optional_path(data_dir) or _env_optional_path("PIPEFORMER_DATA_DIR")
     resolved_static_dir = _optional_path(static_dir) or _env_optional_path("PIPEFORMER_STATIC_DIR")
     resolved_device = device or os.getenv("PIPEFORMER_DEVICE", "cpu")
+    logger.info(
+        "PipeFormer paths resolved: root=%s checkpoint=%s mapping=%s device=%s use_sample_csv=%s",
+        resolved_pipeformer_root,
+        resolved_checkpoint_dir,
+        resolved_mapping_csv,
+        resolved_device,
+        resolved_use_sample_csv,
+    )
 
     parsed_task = build_pipeformer_task(
         question=question,
@@ -166,6 +177,7 @@ def run_pipeformer_forecast_analysis(
         keep_other_boundary_controls=keep_other_boundary_controls,
         requested_checks=requested_checks,
     )
+    logger.info("PipeFormer parsed task: %s", parsed_task)
     forecast_context = load_pipeformer_forecast_context(
         parsed_task=parsed_task,
         forecast_csv=resolved_forecast_csv,
@@ -177,10 +189,18 @@ def run_pipeformer_forecast_analysis(
         device=resolved_device,
         use_sample_csv=resolved_use_sample_csv,
     )
+    logger.info("PipeFormer forecast context ready: mode=%s", forecast_context.get("mode"))
     variable_summaries = summarize_variables(forecast_context["real_rows"], forecast_context["predict_rows"])
+    logger.info("PipeFormer variable summaries built: variables=%d", len(variable_summaries))
     verification = run_constraint_checks(variable_summaries)
+    logger.info("PipeFormer constraint checks finished: overall_status=%s", verification.get("overall_status"))
     evidence_variables = top_variables(variable_summaries, limit=3)
     answer = build_teacher_answer(parsed_task, verification, evidence_variables)
+    logger.info(
+        "PipeFormer teacher answer assembled: manual_intervention=%s top_variables=%s",
+        answer.get("requires_manual_intervention"),
+        [item.get("variable") for item in evidence_variables],
+    )
 
     prediction_summary = {
         "forecast_mode": forecast_context["mode"],

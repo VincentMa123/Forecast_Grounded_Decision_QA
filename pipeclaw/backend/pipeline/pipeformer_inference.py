@@ -2,12 +2,17 @@ from __future__ import annotations
 
 import csv
 import json
+import logging
 import math
 import sys
+import time
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 from .schemas import ForecastRow
+
+
+logger = logging.getLogger(__name__)
 
 
 SOURCE_FILES = {
@@ -104,6 +109,7 @@ def load_sample_csv_forecast_context(
 ) -> Dict[str, Any]:
     variable_mapping = load_variable_mapping(mapping_path)
     changed_variable = parsed_task["changed_variable"]
+    logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
     if changed_variable not in variable_mapping:
         raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
 
@@ -140,6 +146,7 @@ def load_training_config(checkpoint_dir: Path, pipeformer_root: Path) -> Dict[st
     candidates = [checkpoint_dir / "training_config.json", checkpoint_dir.parent / "training_config.json"]
     for candidate in candidates:
         if candidate.exists():
+            logger.info("Loading PipeFormer training config: %s", candidate)
             with candidate.open("r", encoding="utf-8") as fh:
                 config = json.load(fh)
             config["_training_config_path"] = candidate.as_posix()
@@ -175,6 +182,7 @@ def ensure_optional_matplotlib() -> None:
     sys.modules.setdefault("matplotlib.pyplot", pyplot_stub)
 
 def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: str):
+    logger.info("Loading PipeFormer checkpoint: checkpoint_dir=%s device=%s", checkpoint_dir, device)
     add_pipeformer_import_paths(pipeformer_root)
     ensure_optional_matplotlib()
     import torch
@@ -187,6 +195,7 @@ def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: s
     if not config_path.exists():
         raise FileNotFoundError(f"PipeFormer model config not found near {checkpoint_dir}")
 
+    logger.info("Loading PipeFormer model config: %s", config_path)
     with config_path.open("r", encoding="utf-8") as fh:
         model_config = json.load(fh)
 
@@ -199,6 +208,7 @@ def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: s
     if not weights_path.exists():
         raise FileNotFoundError(f"PipeFormer weights not found near {checkpoint_dir}")
 
+    logger.info("Loading PipeFormer weights: %s", weights_path)
     load_kwargs = {"map_location": device}
     try:
         state_dict = torch.load(weights_path, weights_only=True, **load_kwargs)
@@ -207,6 +217,7 @@ def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: s
     model.load_state_dict(state_dict, strict=False)
     model.to(device)
     model.eval()
+    logger.info("PipeFormer checkpoint loaded successfully")
     return model, model_config, weights_path, config_path
 
 
@@ -215,6 +226,7 @@ def load_tokenizer(static_dir: Path, vocab_size: Optional[int] = None):
     # which pulls optional training dependencies such as tensordict.
     from tokenizer_save import load_tokenizer as load_tokenizer_from_stats
 
+    logger.info("Loading PipeFormer tokenizer: static_dir=%s vocab_size=%s", static_dir, vocab_size)
     tokenizer = load_tokenizer_from_stats(static_dir, vocab_size=vocab_size)
     if tokenizer is None:
         raise RuntimeError(f"Tokenizer statistics not found under {static_dir / 'tokenizer_save'}")
@@ -362,11 +374,14 @@ def run_checkpoint_inference(
     import numpy as np
     import torch
 
+    started_at = time.perf_counter()
+    logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     checkpoint_dir = checkpoint_dir.resolve()
     pipeformer_root = pipeformer_root.resolve()
     training_config = load_training_config(checkpoint_dir, pipeformer_root)
     data_dir = (data_dir or resolve_relative(training_config.get("data_dir"), pipeformer_root))
     static_dir = (static_dir or resolve_relative(training_config.get("static_dir"), pipeformer_root))
+    logger.info("PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s", data_dir, static_dir, mapping_path)
     if data_dir is None or static_dir is None:
         raise ValueError("Could not resolve PipeFormer data_dir/static_dir for checkpoint inference.")
 
@@ -374,14 +389,23 @@ def run_checkpoint_inference(
     variable_mapping = load_variable_mapping(mapping_path)
     variable_names = load_variable_names(mapping_path)
     changed_variable = parsed_task["changed_variable"]
+    logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
     if changed_variable not in variable_mapping:
         raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
 
     sequence_length = int(training_config.get("sequence_length", 3))
     time_step_offset = int(training_config.get("time_step_offset", 1))
     case_dir = resolve_case_dir(data_dir, parsed_task)
+    logger.info("Loading PipeFormer case CSVs: case_dir=%s", case_dir)
     base_matrix, time_labels = load_case_matrix(case_dir, variable_names)
+    logger.info("Loaded PipeFormer case matrix: shape=%s time_steps=%d", base_matrix.shape, len(time_labels))
     scenario_matrix = apply_condition_to_matrix(base_matrix, parsed_task, variable_mapping)
+    logger.info(
+        "Applied parsed condition: variable=%s direction=%s percent=%s",
+        changed_variable,
+        parsed_task.get("change_direction"),
+        parsed_task.get("change_percent"),
+    )
     if len(base_matrix) < sequence_length + time_step_offset:
         raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
 
@@ -395,7 +419,15 @@ def run_checkpoint_inference(
     model, model_config, weights_path, model_config_path = load_pipeformer_model(checkpoint_dir, pipeformer_root, device)
     attention_indices = load_attention_indices(static_dir)
     prediction_mask = load_prediction_mask(static_dir, variable_names)
+    logger.info(
+        "PipeFormer tensors prepared: input_values=%s input_tokens=%s attention=%s prediction_mask=%s",
+        input_values.shape,
+        input_tokens.shape,
+        attention_indices.shape,
+        prediction_mask.shape,
+    )
 
+    logger.info("PipeFormer forward pass started")
     with torch.no_grad():
         input_tensor = torch.as_tensor(input_values, dtype=torch.float32, device=device).unsqueeze(0)
         token_tensor = torch.as_tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(0)
@@ -416,6 +448,7 @@ def run_checkpoint_inference(
             predictions = decoded.squeeze(0).detach().cpu().numpy()
         else:
             predictions = np.asarray(decoded, dtype=np.float32).squeeze(0)
+    logger.info("PipeFormer forward pass finished: predictions_shape=%s elapsed_s=%.3f", predictions.shape, time.perf_counter() - started_at)
 
     return {
         "mode": "checkpoint_inference",
