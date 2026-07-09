@@ -108,6 +108,81 @@ def parse_tool_output(tool_call: Dict[str, Any]) -> Any:
         return raw
 
 
+def _strip_row_suffix(label: str) -> str:
+    for suffix in ("_real", "_predict"):
+        if label.endswith(suffix):
+            return label[: -len(suffix)]
+    return label
+
+
+def _compact_source_name(path_value: Any) -> Optional[str]:
+    if not path_value:
+        return None
+    return Path(str(path_value)).name
+
+
+def _forecast_window_from_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    if isinstance(metadata.get("forecast_window"), dict):
+        return dict(metadata["forecast_window"])
+
+    real_rows = metadata.get("real_rows") if isinstance(metadata.get("real_rows"), list) else []
+    predict_rows = metadata.get("predict_rows") if isinstance(metadata.get("predict_rows"), list) else []
+    labels = metadata.get("forecast_time_labels") if isinstance(metadata.get("forecast_time_labels"), list) else []
+    if not labels:
+        labels = [_strip_row_suffix(str(label)) for label in (predict_rows or real_rows)]
+
+    window = {
+        "start_time": labels[0] if labels else None,
+        "end_time": labels[-1] if labels else None,
+        "time_step_minutes": metadata.get("time_step_minutes"),
+        "real_row_count": len(real_rows),
+        "predict_row_count": len(predict_rows),
+    }
+    return {key: value for key, value in window.items() if value is not None}
+
+
+def sanitize_forecast_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
+    bulky_keys = {"real_rows", "predict_rows", "time_labels", "forecast_time_labels"}
+    path_keys = {
+        "checkpoint_dir",
+        "weights_path",
+        "model_config_path",
+        "training_config_path",
+        "data_dir",
+        "static_dir",
+        "data_case_dir",
+        "forecast_csv",
+        "mapping_csv",
+    }
+    cleaned = {
+        key: sanitize_tool_output(value)
+        for key, value in metadata.items()
+        if key not in bulky_keys and key not in path_keys
+    }
+    cleaned["forecast_window"] = _forecast_window_from_metadata(metadata)
+
+    compact_source_keys = {
+        "checkpoint_dir": "checkpoint_id",
+        "data_case_dir": "data_case_id",
+        "forecast_csv": "forecast_csv_name",
+    }
+    for source_key, metadata_key in compact_source_keys.items():
+        compact_name = _compact_source_name(metadata.get(source_key))
+        if compact_name:
+            cleaned.setdefault(metadata_key, compact_name)
+    return cleaned
+
+
+def sanitize_tool_output(value: Any) -> Any:
+    if isinstance(value, dict):
+        if isinstance(value.get("forecast_metadata"), dict):
+            value = dict(value)
+            value["forecast_metadata"] = sanitize_forecast_metadata(value["forecast_metadata"])
+        return {key: sanitize_tool_output(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_tool_output(item) for item in value]
+    return value
+
 def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
     return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
 
@@ -128,7 +203,7 @@ def trace_tool_outputs(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
     return [
         {
             "call_id": tool_call_id(item, index),
-            "output": parse_tool_output(item),
+            "output": sanitize_tool_output(parse_tool_output(item)),
             "timestamp": item.get("timestamp"),
         }
         for index, item in enumerate(trace.get("tool_calls", []), start=1)
@@ -181,7 +256,7 @@ def build_teacher_record(scenario: Dict[str, Any], question: str, trace: Dict[st
         constraint_check = None
         evidence = generic_evidence(trace)
         risk_level = "low"
-        manual_intervention_label = "not_required"
+        manual_intervention_label = "no_intervention"
         dispatch_recommendation = "N/A - not a dispatch or PipeFormer prediction task."
 
     return {

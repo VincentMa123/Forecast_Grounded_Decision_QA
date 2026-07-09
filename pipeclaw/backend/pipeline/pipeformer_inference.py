@@ -6,6 +6,7 @@ import logging
 import math
 import sys
 import time
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -23,6 +24,8 @@ SOURCE_FILES = {
     "R": "R.csv",
     "TE": "T&E.csv",
 }
+
+EQUIPMENT_MISSING_FILL = -1.0
 
 
 def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
@@ -108,7 +111,7 @@ def load_sample_csv_forecast_context(
     mapping_path: Path,
 ) -> Dict[str, Any]:
     variable_mapping = load_variable_mapping(mapping_path)
-    changed_variable = parsed_task["changed_variable"]
+    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
     logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
     if changed_variable not in variable_mapping:
         raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
@@ -246,7 +249,7 @@ def candidate_case_dirs(data_dir: Path, parsed_task: Dict[str, Any]) -> Iterable
     case_id = parsed_task.get("case_id") or "mock_test_001"
     digits = "".join(ch for ch in case_id if ch.isdigit()) or "001"
     case_name = f"case_{int(digits):03d}"
-    cn_name = f"第{int(digits):03d}个算例"
+    cn_name = f"\u7b2c{int(digits):03d}\u4e2a\u7b97\u4f8b"
     dataset_dir = data_dir / "dataset"
     yield dataset_dir / "train" / case_name
     yield dataset_dir / "train" / cn_name
@@ -260,6 +263,20 @@ def resolve_case_dir(data_dir: Path, parsed_task: Dict[str, Any]) -> Path:
             return candidate
     candidates = ", ".join(path.as_posix() for path in candidate_case_dirs(data_dir, parsed_task))
     raise FileNotFoundError(f"Could not find mock PipeFormer case directory. Tried: {candidates}")
+
+
+def align_frame_to_master_index(frame, master_index, source_name: str):
+    if frame.index.equals(master_index):
+        return frame
+
+    if source_name == "Boundary.csv":
+        # Boundary controls are sparse operator setpoints. Match PipeFormer preprocessing by
+        # holding the latest control value until the next boundary update arrives.
+        return frame.reindex(frame.index.union(master_index)).sort_index().ffill().bfill().reindex(master_index)
+
+    # Equipment/state files are expected on the model timeline. Missing measurements are
+    # treated as unavailable, matching PipeFormer's sentinel-fill behavior.
+    return frame.reindex(master_index).fillna(EQUIPMENT_MISSING_FILL)
 
 
 def load_case_matrix(case_dir: Path, variable_names: List[str]):
@@ -278,20 +295,32 @@ def load_case_matrix(case_dir: Path, variable_names: List[str]):
         frame["TIME"] = pd.to_datetime(frame["TIME"])
         frames[source_name] = frame.set_index("TIME")
 
-    master_source = max(frames.values(), key=lambda frame: len(frame.index))
+    master_source_name, master_source = max(frames.items(), key=lambda item: len(item[1].index))
     master_index = master_source.index
+    logger.info("PipeFormer case master timeline selected: source=%s rows=%d", master_source_name, len(master_index))
+
+    aligned_frames: Dict[str, Any] = {}
+    for source_name, source_frame in frames.items():
+        aligned_frame = align_frame_to_master_index(source_frame, master_index, source_name)
+        if not source_frame.index.equals(master_index):
+            strategy = "forward_fill_boundary_controls" if source_name == "Boundary.csv" else "sentinel_fill_equipment_state"
+            logger.info(
+                "Aligned %s to master timeline: source_rows=%d target_rows=%d strategy=%s",
+                source_name,
+                len(source_frame.index),
+                len(master_index),
+                strategy,
+            )
+        aligned_frames[source_name] = aligned_frame
+
     matrix = np.zeros((len(master_index), len(variable_names)), dtype=np.float32)
 
     for variable_idx, variable_name in enumerate(variable_names):
         source_name = source_file_for_variable(variable_name)
-        source_frame = frames[source_name]
+        source_frame = aligned_frames[source_name]
         if variable_name not in source_frame.columns:
             raise ValueError(f"Variable {variable_name} not found in {case_dir / source_name}")
-        series = source_frame[variable_name].astype(float)
-        if not series.index.equals(master_index):
-            series = series.reindex(series.index.union(master_index)).sort_index().interpolate(method="time").reindex(master_index)
-            series = series.ffill().bfill()
-        matrix[:, variable_idx] = series.to_numpy(dtype=np.float32)
+        matrix[:, variable_idx] = source_frame[variable_name].astype(float).to_numpy(dtype=np.float32)
 
     return matrix, [str(item) for item in master_index]
 
@@ -299,16 +328,18 @@ def load_case_matrix(case_dir: Path, variable_names: List[str]):
 def apply_condition_to_matrix(matrix, parsed_task: Dict[str, Any], variable_mapping: Dict[str, Dict[str, Any]]):
     import numpy as np
 
-    changed_variable = parsed_task["changed_variable"]
+    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
     if changed_variable not in variable_mapping:
         raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping")
 
     scenario_matrix = np.array(matrix, copy=True)
-    percent = parsed_task.get("change_percent")
+    percent = parsed_task.get("disturbance_magnitude_percent")
+    if percent is None:
+        percent = parsed_task.get("change_percent")
     if percent is None:
         return scenario_matrix
 
-    direction = parsed_task.get("change_direction")
+    direction = parsed_task.get("disturbance_direction") or parsed_task.get("change_direction")
     factor = 1.0 + float(percent) / 100.0 if direction == "up" else 1.0 - float(percent) / 100.0
     variable_idx = variable_mapping[changed_variable]["index"]
     scenario_matrix[:, variable_idx] *= factor
@@ -350,12 +381,72 @@ def load_prediction_mask(static_dir: Path, variable_names: List[str]):
     return np.asarray([mask_by_name.get(name, 0) for name in variable_names], dtype=np.int32)
 
 
-def rows_from_arrays(label_prefix: str, values, variable_names: List[str]) -> List[ForecastRow]:
+def parse_time_label(value: str) -> Optional[datetime]:
+    try:
+        return datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+
+
+def infer_time_step_minutes(time_labels: List[str]) -> Optional[float]:
+    if len(time_labels) < 2:
+        return None
+    first = parse_time_label(time_labels[0])
+    second = parse_time_label(time_labels[1])
+    if first is None or second is None:
+        return None
+    minutes = (second - first).total_seconds() / 60.0
+    return minutes if minutes > 0 else None
+
+
+def requested_forecast_steps(
+    parsed_task: Dict[str, Any],
+    time_step_minutes: Optional[float],
+    default_steps: int,
+) -> int:
+    horizon_minutes = parsed_task.get("forecast_horizon_minutes")
+    if horizon_minutes is None or time_step_minutes is None:
+        return max(1, default_steps)
+    return max(1, int(math.ceil(float(horizon_minutes) / float(time_step_minutes))))
+
+
+def future_time_labels(
+    time_labels: List[str],
+    start_index: int,
+    steps: int,
+    time_step_minutes: Optional[float],
+) -> List[str]:
+    labels = list(time_labels[start_index:start_index + steps])
+    if len(labels) >= steps:
+        return labels
+
+    anchor_label = labels[-1] if labels else (time_labels[-1] if time_labels else "")
+    anchor_time = parse_time_label(anchor_label)
+    if anchor_time is None or time_step_minutes is None:
+        labels.extend([f"future_step_{idx + 1}" for idx in range(len(labels), steps)])
+        return labels
+
+    while len(labels) < steps:
+        anchor_time = anchor_time + timedelta(minutes=float(time_step_minutes))
+        labels.append(anchor_time.isoformat(sep=" "))
+    return labels
+
+
+def rows_from_arrays(
+    label_prefix: str,
+    values,
+    variable_names: List[str],
+    row_labels: Optional[List[str]] = None,
+) -> List[ForecastRow]:
     rows = []
     for idx, row_values in enumerate(values):
+        if row_labels and idx < len(row_labels):
+            label = f"{row_labels[idx]}_{label_prefix}"
+        else:
+            label = f"data_line_{idx + 1}_{label_prefix}"
         rows.append(
             ForecastRow(
-                label=f"data_line_{idx + 1}_{label_prefix}",
+                label=label,
                 values={name: round(float(row_values[var_idx]), 6) for var_idx, name in enumerate(variable_names)},
             )
         )
@@ -371,11 +462,11 @@ def run_checkpoint_inference(
     mapping_path: Path,
     device: str = "cpu",
 ) -> Dict[str, Any]:
+    started_at = time.perf_counter()
+    logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     import numpy as np
     import torch
 
-    started_at = time.perf_counter()
-    logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     checkpoint_dir = checkpoint_dir.resolve()
     pipeformer_root = pipeformer_root.resolve()
     training_config = load_training_config(checkpoint_dir, pipeformer_root)
@@ -388,7 +479,7 @@ def run_checkpoint_inference(
     add_pipeformer_import_paths(pipeformer_root)
     variable_mapping = load_variable_mapping(mapping_path)
     variable_names = load_variable_names(mapping_path)
-    changed_variable = parsed_task["changed_variable"]
+    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
     logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
     if changed_variable not in variable_mapping:
         raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
@@ -403,53 +494,91 @@ def run_checkpoint_inference(
     logger.info(
         "Applied parsed condition: variable=%s direction=%s percent=%s",
         changed_variable,
-        parsed_task.get("change_direction"),
-        parsed_task.get("change_percent"),
+        parsed_task.get("disturbance_direction") or parsed_task.get("change_direction"),
+        parsed_task.get("disturbance_magnitude_percent") if parsed_task.get("disturbance_magnitude_percent") is not None else parsed_task.get("change_percent"),
     )
     if len(base_matrix) < sequence_length + time_step_offset:
         raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
 
     input_values = scenario_matrix[:sequence_length]
-    target_values = base_matrix[time_step_offset:time_step_offset + sequence_length]
+    time_step_minutes = infer_time_step_minutes(time_labels)
+    steps_requested = requested_forecast_steps(parsed_task, time_step_minutes, sequence_length)
 
     tokenizer = load_tokenizer(static_dir, vocab_size=training_config.get("tokenizer_vocab_size"))
-    input_tokens = tokenizer.transform_to_tokens(input_values)
-    input_tokens = np.asarray(input_tokens, dtype=np.int64)
-
     model, model_config, weights_path, model_config_path = load_pipeformer_model(checkpoint_dir, pipeformer_root, device)
     attention_indices = load_attention_indices(static_dir)
     prediction_mask = load_prediction_mask(static_dir, variable_names)
     logger.info(
-        "PipeFormer tensors prepared: input_values=%s input_tokens=%s attention=%s prediction_mask=%s",
+        "PipeFormer tensors prepared: input_values=%s attention=%s prediction_mask=%s requested_steps=%d time_step_minutes=%s",
         input_values.shape,
-        input_tokens.shape,
         attention_indices.shape,
         prediction_mask.shape,
+        steps_requested,
+        time_step_minutes,
     )
 
-    logger.info("PipeFormer forward pass started")
-    with torch.no_grad():
-        input_tensor = torch.as_tensor(input_values, dtype=torch.float32, device=device).unsqueeze(0)
-        token_tensor = torch.as_tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(0)
-        attention_tensor = torch.as_tensor(attention_indices, dtype=torch.long, device=device).unsqueeze(0)
-        mask_tensor = torch.as_tensor(prediction_mask, dtype=torch.float32, device=device).unsqueeze(0)
-        outputs = model(
-            input_ids=input_tensor,
-            input_tokens=token_tensor,
-            prediction_mask=mask_tensor,
-            attention_indices=attention_tensor,
-        )
-        token_logits = outputs.get("token_logits") if isinstance(outputs, dict) else None
-        if token_logits is None:
-            raise RuntimeError("PipeFormer checkpoint inference did not return token_logits.")
-        predicted_tokens = torch.argmax(token_logits, dim=-1)
-        decoded = tokenizer.tokens_to_values(predicted_tokens)
-        if isinstance(decoded, torch.Tensor):
-            predictions = decoded.squeeze(0).detach().cpu().numpy()
-        else:
-            predictions = np.asarray(decoded, dtype=np.float32).squeeze(0)
-    logger.info("PipeFormer forward pass finished: predictions_shape=%s elapsed_s=%.3f", predictions.shape, time.perf_counter() - started_at)
+    future_rows_per_pass = max(1, min(time_step_offset, sequence_length))
+    generated_chunks = []
+    generated_steps = 0
+    rollout_window = np.array(input_values, copy=True)
+    logger.info(
+        "PipeFormer autoregressive rollout started: requested_horizon_minutes=%s requested_steps=%d rows_per_pass=%d",
+        parsed_task.get("forecast_horizon_minutes"),
+        steps_requested,
+        future_rows_per_pass,
+    )
 
+    while generated_steps < steps_requested:
+        input_tokens = tokenizer.transform_to_tokens(rollout_window)
+        input_tokens = np.asarray(input_tokens, dtype=np.int64)
+        logger.info(
+            "PipeFormer forward pass started: rollout_start_step=%d input_values=%s input_tokens=%s",
+            generated_steps,
+            rollout_window.shape,
+            input_tokens.shape,
+        )
+        with torch.no_grad():
+            input_tensor = torch.as_tensor(rollout_window, dtype=torch.float32, device=device).unsqueeze(0)
+            token_tensor = torch.as_tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(0)
+            attention_tensor = torch.as_tensor(attention_indices, dtype=torch.long, device=device).unsqueeze(0)
+            mask_tensor = torch.as_tensor(prediction_mask, dtype=torch.float32, device=device).unsqueeze(0)
+            outputs = model(
+                input_ids=input_tensor,
+                input_tokens=token_tensor,
+                prediction_mask=mask_tensor,
+                attention_indices=attention_tensor,
+            )
+            token_logits = outputs.get("token_logits") if isinstance(outputs, dict) else None
+            if token_logits is None:
+                raise RuntimeError("PipeFormer checkpoint inference did not return token_logits.")
+            predicted_tokens = torch.argmax(token_logits, dim=-1)
+            decoded = tokenizer.tokens_to_values(predicted_tokens)
+            if isinstance(decoded, torch.Tensor):
+                window_predictions = decoded.squeeze(0).detach().cpu().numpy()
+            else:
+                window_predictions = np.asarray(decoded, dtype=np.float32).squeeze(0)
+
+        new_predictions = window_predictions[-future_rows_per_pass:]
+        remaining_steps = steps_requested - generated_steps
+        new_predictions = new_predictions[:remaining_steps]
+        generated_chunks.append(new_predictions)
+        generated_steps += int(new_predictions.shape[0])
+        rollout_window = np.concatenate([rollout_window[new_predictions.shape[0]:], new_predictions], axis=0)
+        logger.info("PipeFormer forward pass finished: generated_steps=%d/%d", generated_steps, steps_requested)
+
+    predictions = np.concatenate(generated_chunks, axis=0)
+    target_values = base_matrix[sequence_length:sequence_length + predictions.shape[0]]
+    forecast_time_labels = future_time_labels(time_labels, sequence_length, int(predictions.shape[0]), time_step_minutes)
+    observed_future_labels = forecast_time_labels[:len(target_values)]
+    actual_horizon_minutes = None
+    if time_step_minutes is not None:
+        actual_horizon_minutes = round(float(time_step_minutes) * int(predictions.shape[0]), 6)
+    logger.info(
+        "PipeFormer autoregressive rollout finished: predictions_shape=%s actual_horizon_minutes=%s elapsed_s=%.3f",
+        predictions.shape,
+        actual_horizon_minutes,
+        time.perf_counter() - started_at,
+    )
     return {
         "mode": "checkpoint_inference",
         "checkpoint_dir": checkpoint_dir.as_posix(),
@@ -460,14 +589,21 @@ def run_checkpoint_inference(
         "static_dir": static_dir.as_posix(),
         "mapping_csv": mapping_path.as_posix(),
         "data_case_dir": case_dir.as_posix(),
-        "time_labels": time_labels[:sequence_length + time_step_offset],
+        "time_labels": time_labels[:sequence_length] + forecast_time_labels,
         "sequence_length": sequence_length,
         "time_step_offset": time_step_offset,
+        "requested_forecast_horizon_minutes": parsed_task.get("forecast_horizon_minutes"),
+        "time_step_minutes": time_step_minutes,
+        "requested_forecast_steps": steps_requested,
+        "actual_forecast_steps": int(predictions.shape[0]),
+        "actual_forecast_horizon_minutes": actual_horizon_minutes,
+        "actual_forecast_horizon_source": "autoregressive_rollout_from_checkpoint_window",
+        "forecast_time_labels": forecast_time_labels,
         "device": device,
         "model_input_projection_type": model_config.get("input_projection_type"),
         "changed_variable_mapping": variable_mapping[changed_variable],
-        "real_rows": rows_from_arrays("real", target_values, variable_names),
-        "predict_rows": rows_from_arrays("predict", predictions, variable_names),
+        "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
+        "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),
     }
 
 
