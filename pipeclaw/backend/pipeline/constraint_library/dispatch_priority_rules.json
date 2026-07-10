@@ -1,0 +1,56 @@
+{
+  "category": "dispatch_priority",
+  "rules": [
+    {
+      "rule_id": "boundary_control_adjustment_magnitude",
+      "evaluator": "boundary_change_percent",
+      "description": "Boundary-control adjustment should stay within the allowable equipment magnitude.",
+      "priority": 50,
+      "limits": {"warning_threshold": 10.0, "fail_threshold": 20.0},
+      "flags": {"pass": "equipment_adjustment_normal", "warning": "equipment_boundary_warning", "fail": "equipment_boundary_violation"}
+    },
+    {
+      "rule_id": "energy_consumption_cost",
+      "evaluator": "mean_abs_delta_vs_observed",
+      "description": "Energy and cost are considered only after the safety and equipment priorities.",
+      "priority": 70,
+      "selector": {"prefixes": ["TE_", "C_"], "suffixes": ["_v000", "_v001"]},
+      "limits": {"warning_threshold": 0.6, "fail_threshold": 1.5},
+      "flags": {"pass": "energy_cost_normal", "warning": "energy_cost_warning", "fail": "energy_cost_violation"}
+    }
+  ],
+  "policy_rule": {
+    "rule_id": "dispatch_priority_rules",
+    "priority": 90,
+    "flag": "dispatch_priority_applied",
+    "message": "Dispatch priorities are pressure safety and supply assurance; compressor and equipment protection; linepack margin; flow stability; then energy and cost."
+  },
+  "priority_order": [
+    {
+      "id": "pressure_safety_and_supply_assurance",
+      "trigger_flags": ["pressure_violation", "pressure_warning", "balance_violation", "balance_warning"],
+      "recommendation": "Priority 1: protect pressure safety and end-user supply assurance."
+    },
+    {
+      "id": "compressor_and_equipment_protection",
+      "trigger_flags": ["compressor_overload", "compressor_ratio_violation", "compressor_ratio_warning", "equipment_boundary_violation", "equipment_boundary_warning"],
+      "recommendation": "Priority 2: protect compressor and equipment operating boundaries; use remaining compressor regulation margin first when available."
+    },
+    {
+      "id": "linepack_safety_margin",
+      "trigger_flags": ["linepack_violation", "linepack_warning"],
+      "recommendation": "Priority 3: restore linepack safety margin; review upstream injection or compressor strategy."
+    },
+    {
+      "id": "flow_stability",
+      "trigger_flags": ["flow_capacity_violation", "flow_capacity_warning", "flow_ramp_violation", "flow_ramp_warning"],
+      "recommendation": "Priority 4: reduce flow fluctuation and return segments within capacity."
+    },
+    {
+      "id": "energy_consumption_and_cost",
+      "trigger_flags": ["energy_cost_violation", "energy_cost_warning"],
+      "recommendation": "Priority 5: optimize energy consumption and operating cost after safety constraints are satisfied."
+    }
+  ],
+  "default_recommendation": "No intervention is required; continue routine monitoring."
+}

@@ -1,0 +1,33 @@
+{
+  "category": "flow",
+  "rules": [
+    {
+      "rule_id": "flow_ramp_check",
+      "evaluator": "max_abs_step_change",
+      "description": "Segment-flow variables should not change beyond the short-time ramp threshold.",
+      "priority": 20,
+      "selector": {"prefixes": ["B_", "P_"], "suffixes": ["_v001"]},
+      "limits": {"warning_threshold": 0.35, "fail_threshold": 0.8},
+      "flags": {"pass": "flow_ramp_normal", "warning": "flow_ramp_warning", "fail": "flow_ramp_violation"}
+    },
+    {
+      "rule_id": "flow_capacity_check",
+      "evaluator": "max_abs_prediction",
+      "description": "Flow-like variables are checked against a normalized transmission-capacity limit.",
+      "priority": 21,
+      "selector": {"prefixes": ["B_", "P_"], "suffixes": ["_v001"]},
+      "limits": {"warning_threshold": 2.2, "fail_threshold": 3.0},
+      "flags": {"pass": "flow_capacity_normal", "warning": "flow_capacity_warning", "fail": "flow_capacity_violation"}
+    },
+    {
+      "rule_id": "supply_demand_balance",
+      "evaluator": "supply_demand_balance",
+      "description": "Detect a widening normalized gap between supply-side and demand-side flow proxies.",
+      "priority": 22,
+      "supply_selector": {"prefixes": ["B_"], "suffixes": ["_v001"]},
+      "demand_selector": {"prefixes": ["P_"], "suffixes": ["_v001"]},
+      "limits": {"warning_threshold": 0.25, "fail_threshold": 0.75},
+      "flags": {"pass": "balance_normal", "warning": "balance_warning", "fail": "balance_violation"}
+    }
+  ]
+}

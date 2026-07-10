@@ -1,0 +1,20 @@
+{
+  "category": "human_intervention",
+  "labels": [
+    "no_intervention",
+    "monitoring_only",
+    "operator_attention_required",
+    "immediate_intervention_required"
+  ],
+  "safety_categories": ["pressure", "flow"],
+  "no_intervention_status": "pass",
+  "immediate_intervention_status": "fail",
+  "operator_attention_statuses": ["warning", "fail"],
+  "default_nonpass_label": "monitoring_only",
+  "reasons": {
+    "no_intervention": "No manual intervention is required by the configured engineering rules.",
+    "monitoring_only": "Continue monitoring because a non-safety rule returned a warning.",
+    "operator_attention_required": "Operator attention is required by a safety warning or a non-safety failure.",
+    "immediate_intervention_required": "Immediate intervention is required because a safety rule failed."
+  }
+}

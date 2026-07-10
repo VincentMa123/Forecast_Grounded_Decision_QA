@@ -48,17 +48,6 @@ def load_variable_names(path: Path) -> List[str]:
     return [name for name, _ in sorted(mapping.items(), key=lambda item: item[1]["index"])]
 
 
-def find_default_forecast_csv(repo_root: Path) -> Path:
-    sample_dir = repo_root / "pipeFormer" / "outputs" / "mock_tiny_decoder" / "sample_predictions"
-    preferred = sample_dir / "eval_16.csv"
-    if preferred.exists():
-        return preferred
-    candidates = sorted(sample_dir.glob("eval_*.csv"), key=lambda item: item.stat().st_mtime, reverse=True)
-    if not candidates:
-        raise FileNotFoundError(f"No mock PipeFormer sample prediction CSV found under {sample_dir}")
-    return candidates[0]
-
-
 def find_default_checkpoint_dir(repo_root: Path) -> Path:
     preferred = repo_root / "pipeFormer" / "outputs" / "mock_tiny_decoder" / "checkpoint-16"
     if preferred.exists():
@@ -72,68 +61,6 @@ def find_default_checkpoint_dir(repo_root: Path) -> Path:
     if not checkpoints:
         raise FileNotFoundError(f"No PipeFormer checkpoint directory found under {output_dir}")
     return checkpoints[0]
-
-
-def load_forecast_rows(path: Path) -> List[ForecastRow]:
-    with path.open("r", encoding="utf-8-sig", newline="") as fh:
-        reader = csv.DictReader(fh)
-        label_key = reader.fieldnames[0] if reader.fieldnames else ""
-        rows: List[ForecastRow] = []
-        for row in reader:
-            label = str(row.get(label_key) or "").strip()
-            values: Dict[str, float] = {}
-            for key, value in row.items():
-                if key == label_key or value in (None, ""):
-                    continue
-                try:
-                    parsed = float(value)
-                except ValueError:
-                    continue
-                if math.isfinite(parsed):
-                    values[key] = parsed
-            rows.append(ForecastRow(label=label, values=values))
-    if not rows:
-        raise ValueError(f"No forecast rows found in {path}")
-    return rows
-
-
-def split_real_predict_rows(rows: List[ForecastRow]) -> Tuple[List[ForecastRow], List[ForecastRow]]:
-    real_rows = [row for row in rows if row.label.endswith("_real")]
-    predict_rows = [row for row in rows if row.label.endswith("_predict")]
-    if not predict_rows:
-        raise ValueError("Forecast CSV does not contain *_predict rows.")
-    return real_rows, predict_rows
-
-
-def load_sample_csv_forecast_context(
-    parsed_task: Dict[str, Any],
-    forecast_csv: Path,
-    mapping_path: Path,
-) -> Dict[str, Any]:
-    variable_mapping = load_variable_mapping(mapping_path)
-    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
-    logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
-    if changed_variable not in variable_mapping:
-        raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
-
-    rows = load_forecast_rows(forecast_csv)
-    real_rows, predict_rows = split_real_predict_rows(rows)
-    return {
-        "mode": "read_existing_mock_forecast_csv",
-        "forecast_csv": forecast_csv.as_posix(),
-        "mapping_csv": mapping_path.as_posix(),
-        "changed_variable_mapping": variable_mapping[changed_variable],
-        "real_rows": real_rows,
-        "predict_rows": predict_rows,
-    }
-
-
-def load_mock_forecast_context(
-    parsed_task: Dict[str, Any],
-    forecast_csv: Path,
-    mapping_path: Path,
-) -> Dict[str, Any]:
-    return load_sample_csv_forecast_context(parsed_task, forecast_csv, mapping_path)
 
 
 def resolve_relative(path_value: Optional[str], base_dir: Path) -> Optional[Path]:
@@ -247,9 +174,13 @@ def source_file_for_variable(variable_name: str) -> str:
 
 def candidate_case_dirs(data_dir: Path, parsed_task: Dict[str, Any]) -> Iterable[Path]:
     case_id = parsed_task.get("case_id") or "mock_test_001"
-    digits = "".join(ch for ch in case_id if ch.isdigit()) or "001"
-    case_name = f"case_{int(digits):03d}"
-    cn_name = f"\u7b2c{int(digits):03d}\u4e2a\u7b97\u4f8b"
+    case_digits = "".join(ch for ch in case_id if ch.isdigit()) or "001"
+    operating_condition_number = parsed_task.get("current_operating_condition_number")
+    condition_number = int(operating_condition_number) if operating_condition_number is not None else int(case_digits)
+    if condition_number < 1:
+        raise ValueError("current_operating_condition_number must be a positive integer.")
+    case_name = f"case_{condition_number:03d}"
+    cn_name = f"\u7b2c{condition_number:03d}\u4e2a\u7b97\u4f8b"
     dataset_dir = data_dir / "dataset"
     yield dataset_dir / "train" / case_name
     yield dataset_dir / "train" / cn_name
@@ -325,24 +256,76 @@ def load_case_matrix(case_dir: Path, variable_names: List[str]):
     return matrix, [str(item) for item in master_index]
 
 
-def apply_condition_to_matrix(matrix, parsed_task: Dict[str, Any], variable_mapping: Dict[str, Dict[str, Any]]):
-    import numpy as np
+def resolve_boundary_adjustments(
+    parsed_task: Dict[str, Any],
+    variable_mapping: Dict[str, Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    boundary_conditions = dict(parsed_task.get("boundary_conditions") or {})
+    adjustments: Dict[str, Dict[str, Any]] = {}
 
-    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
-    if changed_variable not in variable_mapping:
-        raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping")
-
-    scenario_matrix = np.array(matrix, copy=True)
+    changed_variable = parsed_task.get("disturbance_variable") or parsed_task.get("changed_variable")
     percent = parsed_task.get("disturbance_magnitude_percent")
     if percent is None:
         percent = parsed_task.get("change_percent")
-    if percent is None:
-        return scenario_matrix
-
     direction = parsed_task.get("disturbance_direction") or parsed_task.get("change_direction")
-    factor = 1.0 + float(percent) / 100.0 if direction == "up" else 1.0 - float(percent) / 100.0
-    variable_idx = variable_mapping[changed_variable]["index"]
-    scenario_matrix[:, variable_idx] *= factor
+    if changed_variable and percent is not None:
+        signed_percent = abs(float(percent)) if direction == "up" else -abs(float(percent))
+        adjustments[changed_variable] = {
+            "variable": changed_variable,
+            "mode": "percent_change",
+            "value": signed_percent,
+            "source": "disturbance",
+        }
+
+    percentage_changes = boundary_conditions.get("percentage_changes") or boundary_conditions.get("changes_percent") or {}
+    for variable, value in dict(percentage_changes).items():
+        adjustments[str(variable)] = {
+            "variable": str(variable),
+            "mode": "percent_change",
+            "value": float(value),
+            "source": "boundary_conditions.percentage_changes",
+        }
+
+    setpoints = boundary_conditions.get("setpoints") or boundary_conditions.get("values") or {}
+    for variable, value in dict(setpoints).items():
+        adjustments[str(variable)] = {
+            "variable": str(variable),
+            "mode": "setpoint",
+            "value": float(value),
+            "source": "boundary_conditions.setpoints",
+        }
+
+    unknown = sorted(variable for variable in adjustments if variable not in variable_mapping)
+    if unknown:
+        raise ValueError(f"Boundary-condition variables are not in the PipeFormer mapping: {unknown}")
+
+    keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", parsed_task.get("keep_other_boundary_controls", True)))
+    if not keep_other:
+        boundary_variables = {name for name in variable_mapping if ":BC" in name}
+        missing = sorted(boundary_variables - set(adjustments))
+        if missing:
+            raise ValueError(
+                "keep_other_boundary_controls=false requires explicit setpoints or percentage changes "
+                f"for every boundary control; missing: {missing}"
+            )
+    return list(adjustments.values())
+
+
+def apply_condition_to_matrix(
+    matrix,
+    parsed_task: Dict[str, Any],
+    variable_mapping: Dict[str, Dict[str, Any]],
+    adjustments: Optional[List[Dict[str, Any]]] = None,
+):
+    import numpy as np
+
+    scenario_matrix = np.array(matrix, copy=True)
+    for adjustment in adjustments or resolve_boundary_adjustments(parsed_task, variable_mapping):
+        variable_idx = variable_mapping[adjustment["variable"]]["index"]
+        if adjustment["mode"] == "setpoint":
+            scenario_matrix[:, variable_idx] = float(adjustment["value"])
+        else:
+            scenario_matrix[:, variable_idx] *= 1.0 + float(adjustment["value"]) / 100.0
     return scenario_matrix
 
 
@@ -490,7 +473,8 @@ def run_checkpoint_inference(
     logger.info("Loading PipeFormer case CSVs: case_dir=%s", case_dir)
     base_matrix, time_labels = load_case_matrix(case_dir, variable_names)
     logger.info("Loaded PipeFormer case matrix: shape=%s time_steps=%d", base_matrix.shape, len(time_labels))
-    scenario_matrix = apply_condition_to_matrix(base_matrix, parsed_task, variable_mapping)
+    boundary_adjustments = resolve_boundary_adjustments(parsed_task, variable_mapping)
+    scenario_matrix = apply_condition_to_matrix(base_matrix, parsed_task, variable_mapping, boundary_adjustments)
     logger.info(
         "Applied parsed condition: variable=%s direction=%s percent=%s",
         changed_variable,
@@ -602,6 +586,8 @@ def run_checkpoint_inference(
         "device": device,
         "model_input_projection_type": model_config.get("input_projection_type"),
         "changed_variable_mapping": variable_mapping[changed_variable],
+        "operating_condition_number_used": parsed_task.get("current_operating_condition_number"),
+        "applied_boundary_conditions": boundary_adjustments,
         "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
         "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),
     }
@@ -609,20 +595,14 @@ def run_checkpoint_inference(
 
 def load_pipeformer_forecast_context(
     parsed_task: Dict[str, Any],
-    forecast_csv: Path,
     mapping_path: Path,
     *,
-    checkpoint_dir: Optional[Path] = None,
-    pipeformer_root: Optional[Path] = None,
+    checkpoint_dir: Path,
+    pipeformer_root: Path,
     data_dir: Optional[Path] = None,
     static_dir: Optional[Path] = None,
     device: str = "cpu",
-    use_sample_csv: bool = False,
 ) -> Dict[str, Any]:
-    if use_sample_csv:
-        return load_sample_csv_forecast_context(parsed_task, forecast_csv, mapping_path)
-    if checkpoint_dir is None or pipeformer_root is None:
-        raise ValueError("checkpoint_dir and pipeformer_root are required unless use_sample_csv=True.")
     return run_checkpoint_inference(
         parsed_task=parsed_task,
         checkpoint_dir=checkpoint_dir,

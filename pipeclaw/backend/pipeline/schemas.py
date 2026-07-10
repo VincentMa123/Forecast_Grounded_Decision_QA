@@ -25,3 +25,6 @@ class ConstraintSpec:
     fail_high: Optional[float] = None
     warning_threshold: Optional[float] = None
     fail_threshold: Optional[float] = None
+    pass_flag: Optional[str] = None
+    warning_flag: Optional[str] = None
+    fail_flag: Optional[str] = None

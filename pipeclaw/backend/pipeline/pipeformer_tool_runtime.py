@@ -5,25 +5,21 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .condition_parser import parse_condition
+from .condition_parser import PIPEFORMER_TASK_SCHEMA_VERSION, parse_condition
+from .engineering_constraints import run_engineering_constraint_checks
 from .evidence_extractor import summarize_variables, top_variables
 from .pipeformer_inference import (
     find_default_checkpoint_dir,
-    find_default_forecast_csv,
     load_pipeformer_forecast_context,
 )
-from .rule_verifier import run_constraint_checks
-from .teacher_answer import build_teacher_answer, final_answer_text, risk_level_from_status
 
 
-DEFAULT_REQUESTED_CHECKS = ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"]
+DEFAULT_REQUESTED_CHECKS = ["pressure", "flow", "linepack", "compressor", "dispatch_priority"]
 CHECK_TO_ATTENTION_TARGETS = {
     "pressure": ["nodes"],
     "flow": ["segments"],
     "linepack": ["linepack"],
     "compressor": ["compressors"],
-    "equipment_regulation": ["valves", "pressure_regulators", "boundary_controls"],
-    "abnormality_warning": ["abnormal_pressure_drops", "sudden_flow_changes", "leak_or_equipment_anomaly_signals"],
     "dispatch_priority": ["dispatch_priority_audit"],
 }
 CHECK_TO_OUTPUT_STATE_VARIABLES = {
@@ -31,10 +27,47 @@ CHECK_TO_OUTPUT_STATE_VARIABLES = {
     "flow": ["flow"],
     "linepack": ["linepack"],
     "compressor": ["compressor_load", "compression_ratio", "compressor_power"],
-    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
-    "abnormality_warning": ["pressure_drop", "flow_ramp", "leak_or_equipment_anomaly_score"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
+VARIABLE_GROUP_RULES = {
+    "nodes": (("N_",), ()),
+    "segments": (("P_", "B_"), ()),
+    "linepack": (("R_",), ()),
+    "compressors": (("C_", "TE_"), ()),
+    "pressure": (("N_", "P_"), ("_v000",)),
+    "flow": (("B_", "P_"), ("_v001",)),
+    "compressor_load": (("C_",), ("_v000",)),
+    "compressor": (("C_", "TE_"), ()),
+    "compression_ratio": (("C_",), ("_v001",)),
+    "compressor_power": (("TE_",), ("_v000",)),
+    "power": (("TE_",), ("_v000",)),
+    "energy": (("TE_",), ("_v000",)),
+    "energy_consumption": (("TE_",), ("_v000",)),
+    "energy_cost": (("TE_",), ("_v000",)),
+    "operating_cost": (("TE_",), ("_v000",)),
+    "valves": (("T_",), ()),
+    "pressure_regulators": (("T_",), ()),
+    "boundary_controls": (("T_",), ()),
+    "valve_opening": (("T_",), ()),
+    "regulator_range": (("T_",), ()),
+    "boundary_control_adjustment": (("T_",), ()),
+    "dispatch_priority_audit": (("N_", "P_", "B_", "C_", "R_", "TE_"), ()),
+}
+COMPACT_OUTPUT_KEYS = (
+    "mean_prediction",
+    "minimum_prediction",
+    "minimum_step_index",
+    "maximum_prediction",
+    "maximum_step_index",
+    "max_abs_prediction",
+    "peak_value",
+    "peak_step_index",
+    "prediction_change",
+    "max_abs_step_change",
+    "max_abs_step_change_index",
+    "max_decline_from_start",
+    "recovery_from_minimum",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -99,13 +132,6 @@ def _first_path(*candidates: Optional[Path]) -> Optional[Path]:
     return None
 
 
-def _env_bool(name: str, default: bool = False) -> bool:
-    value = os.getenv(name)
-    if value is None:
-        return default
-    return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
 def _clean_checks(requested_checks: Optional[List[str]]) -> List[str]:
     allowed = set(DEFAULT_REQUESTED_CHECKS)
     checks = []
@@ -123,6 +149,50 @@ def _unique_targets(checks: List[str], mapping: Dict[str, List[str]]) -> List[st
             if value not in result:
                 result.append(value)
     return result
+
+
+def _resolve_requested_variables(requested: List[str], variable_names: List[str]) -> tuple[List[str], List[str]]:
+    resolved = []
+    unresolved = []
+    for raw in requested:
+        target = str(raw).strip()
+        matches: List[str] = []
+        if target in variable_names:
+            matches = [target]
+        elif target in VARIABLE_GROUP_RULES:
+            prefixes, suffixes = VARIABLE_GROUP_RULES[target]
+            matches = [
+                name
+                for name in variable_names
+                if (not prefixes or name.startswith(prefixes)) and (not suffixes or name.endswith(suffixes))
+            ]
+        else:
+            matches = [
+                name
+                for name in variable_names
+                if name.startswith(f"{target}_") or name.startswith(f"{target}:")
+            ]
+        if not matches:
+            unresolved.append(target)
+        for name in matches:
+            if name not in resolved:
+                resolved.append(name)
+    return resolved, unresolved
+
+
+def _compact_output_summaries(
+    summaries: Dict[str, Dict[str, Any]],
+    variables: List[str],
+) -> Dict[str, Dict[str, Any]]:
+    return {
+        variable: {
+            key: summaries[variable].get(key)
+            for key in COMPACT_OUTPUT_KEYS
+            if summaries[variable].get(key) is not None
+        }
+        for variable in variables
+        if variable in summaries
+    }
 
 
 def _condition_number_from_case_id(case_id: Optional[str]) -> Optional[int]:
@@ -166,7 +236,7 @@ def _sync_pipeformer_task_aliases(parsed: Dict[str, Any]) -> Dict[str, Any]:
     boundary_conditions = dict(parsed.get("boundary_conditions") or {})
     keep_other = parsed.get("keep_other_boundary_controls")
     if keep_other is None:
-        keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", False))
+        keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", True))
     parsed["keep_other_boundary_controls"] = bool(keep_other)
     boundary_conditions.setdefault("keep_other_boundary_controls", parsed["keep_other_boundary_controls"])
     boundary_conditions.setdefault("disturbance_variable", parsed.get("disturbance_variable"))
@@ -175,7 +245,7 @@ def _sync_pipeformer_task_aliases(parsed: Dict[str, Any]) -> Dict[str, Any]:
     parsed["boundary_conditions"] = boundary_conditions
 
     parsed.setdefault("task_type", "prediction_and_verification")
-    parsed.setdefault("parse_schema_version", "pipeformer_task_v2_pdf_terms")
+    parsed.setdefault("parse_schema_version", PIPEFORMER_TASK_SCHEMA_VERSION)
     return parsed
 
 
@@ -269,9 +339,7 @@ def run_pipeformer_forecast_analysis(
     data_dir: Optional[str] = None,
     static_dir: Optional[str] = None,
     mapping_csv: Optional[str] = None,
-    forecast_csv: Optional[str] = None,
     device: Optional[str] = None,
-    use_sample_csv: Optional[bool] = None,
 ) -> Dict[str, Any]:
     logger.info("PipeFormer forecast tool started")
     repo_root = _repo_root_from_backend_root(backend_root)
@@ -286,27 +354,15 @@ def run_pipeformer_forecast_analysis(
         "PIPEFORMER_MAPPING_CSV",
         resolved_pipeformer_root / "data" / "mock_tiny" / "static" / "mock_tiny" / "index_variable_mapping.csv",
     )
-    resolved_use_sample_csv = _env_bool("PIPEFORMER_USE_SAMPLE_CSV", False) if use_sample_csv is None else bool(use_sample_csv)
-    resolved_forecast_csv = _first_path(
-        _optional_path(forecast_csv),
-        _env_optional_path("PIPEFORMER_FORECAST_CSV"),
-    )
-    if resolved_forecast_csv is None:
-        resolved_forecast_csv = (
-            find_default_forecast_csv(repo_root).resolve()
-            if resolved_use_sample_csv
-            else resolved_pipeformer_root / "outputs" / "mock_tiny_decoder" / "sample_predictions" / "eval_16.csv"
-        )
     resolved_data_dir = _optional_path(data_dir) or _env_optional_path("PIPEFORMER_DATA_DIR")
     resolved_static_dir = _optional_path(static_dir) or _env_optional_path("PIPEFORMER_STATIC_DIR")
     resolved_device = device or os.getenv("PIPEFORMER_DEVICE", "cpu")
     logger.info(
-        "PipeFormer paths resolved: root=%s checkpoint=%s mapping=%s device=%s use_sample_csv=%s",
+        "PipeFormer paths resolved: root=%s checkpoint=%s mapping=%s device=%s",
         resolved_pipeformer_root,
         resolved_checkpoint_dir,
         resolved_mapping_csv,
         resolved_device,
-        resolved_use_sample_csv,
     )
 
     parsed_task = build_pipeformer_task(
@@ -330,25 +386,51 @@ def run_pipeformer_forecast_analysis(
     logger.info("PipeFormer parsed task: %s", parsed_task)
     forecast_context = load_pipeformer_forecast_context(
         parsed_task=parsed_task,
-        forecast_csv=resolved_forecast_csv,
         mapping_path=resolved_mapping_csv,
         checkpoint_dir=resolved_checkpoint_dir,
         pipeformer_root=resolved_pipeformer_root,
         data_dir=resolved_data_dir,
         static_dir=resolved_static_dir,
         device=resolved_device,
-        use_sample_csv=resolved_use_sample_csv,
     )
     logger.info("PipeFormer forecast context ready: mode=%s", forecast_context.get("mode"))
+    parsed_task["forecast_time_step_minutes"] = forecast_context.get("time_step_minutes")
     variable_summaries = summarize_variables(forecast_context["real_rows"], forecast_context["predict_rows"])
     logger.info("PipeFormer variable summaries built: variables=%d", len(variable_summaries))
-    verification = run_constraint_checks(variable_summaries, parsed_task=parsed_task)
+    variable_names = list(variable_summaries)
+    resolved_attention, unresolved_attention = _resolve_requested_variables(
+        parsed_task.get("attention_targets") or [],
+        variable_names,
+    )
+    resolved_outputs, unresolved_outputs = _resolve_requested_variables(
+        parsed_task.get("output_state_variables") or [],
+        variable_names,
+    )
+    parsed_task["resolved_attention_variables"] = resolved_attention
+    parsed_task["resolved_output_variables"] = resolved_outputs
+    parsed_task["unresolved_attention_targets"] = unresolved_attention
+    parsed_task["unresolved_output_state_variables"] = unresolved_outputs
+    verification = run_engineering_constraint_checks(variable_summaries, parsed_task=parsed_task)
     logger.info("PipeFormer constraint checks finished: overall_status=%s", verification.get("overall_status"))
-    evidence_variables = top_variables(variable_summaries, limit=3)
-    answer = build_teacher_answer(parsed_task, verification, evidence_variables)
+    priority_evidence_variables = []
+    for finding in verification.get("priority_findings", []):
+        for value in finding.get("offending_values", []):
+            variable = value.get("variable")
+            if variable and variable not in priority_evidence_variables:
+                priority_evidence_variables.append(variable)
+    evidence_variables = top_variables(
+        variable_summaries,
+        limit=3,
+        preferred_variables=resolved_attention,
+        priority_variables=priority_evidence_variables,
+    )
+    disturbance_variable = parsed_task.get("disturbance_variable")
+    observation_variables = [
+        item for item in evidence_variables if item.get("variable") != disturbance_variable
+    ][:2]
     logger.info(
-        "PipeFormer teacher answer assembled: manual_intervention=%s top_variables=%s",
-        answer.get("requires_manual_intervention"),
+        "PipeFormer evidence assembled: manual_intervention=%s top_variables=%s",
+        verification.get("human_intervention_label"),
         [item.get("variable") for item in evidence_variables],
     )
 
@@ -363,6 +445,9 @@ def run_pipeformer_forecast_analysis(
         "attention_targets": parsed_task["attention_targets"],
         "output_state_variables": parsed_task["output_state_variables"],
         "constraint_verification_types": parsed_task["constraint_verification_types"],
+        "resolved_attention_variables": resolved_attention,
+        "resolved_output_variables": resolved_outputs,
+        "output_forecast_summary": _compact_output_summaries(variable_summaries, resolved_outputs),
         "top_watch_variables": evidence_variables,
     }
     forecast_metadata = {
@@ -381,6 +466,8 @@ def run_pipeformer_forecast_analysis(
         "actual_forecast_horizon_source",
         "device",
         "model_input_projection_type",
+        "operating_condition_number_used",
+        "applied_boundary_conditions",
     ):
         if key in forecast_context:
             forecast_metadata[key] = forecast_context[key]
@@ -388,7 +475,6 @@ def run_pipeformer_forecast_analysis(
     compact_source_keys = {
         "checkpoint_dir": "checkpoint_id",
         "data_case_dir": "data_case_id",
-        "forecast_csv": "forecast_csv_name",
     }
     for source_key, metadata_key in compact_source_keys.items():
         if source_key in forecast_context:
@@ -401,12 +487,11 @@ def run_pipeformer_forecast_analysis(
         "constraint_check": verification,
         "evidence": {
             "top_watch_variables": evidence_variables,
-            "key_observation_variables": answer["key_observation_variables"],
+            "key_observation_variables": observation_variables,
         },
-        "risk_level": risk_level_from_status(verification["overall_status"]),
-        "manual_intervention_label": answer.get("manual_intervention_label", "no_intervention"),
-        "dispatch_recommendation": "N/A - prediction-only scenario; no dispatch action was requested.",
-        "final_answer": final_answer_text(answer),
-        "quality_flag": "pass",
+        "risk_level": verification["risk_level"],
+        "manual_intervention_label": verification["human_intervention_label"],
+        "dispatch_recommendation": verification.get("dispatch_recommendation"),
+        "quality_flag": "needs_review" if unresolved_attention or unresolved_outputs else "pass",
         "forecast_metadata": forecast_metadata,
     }

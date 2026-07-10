@@ -1,0 +1,23 @@
+{
+  "category": "pressure",
+  "rules": [
+    {
+      "rule_id": "node_pressure_operating_window",
+      "evaluator": "predicted_range",
+      "description": "Pressure-like node variables must stay inside the configured operating window.",
+      "priority": 10,
+      "selector": {"prefixes": ["N_", "P_"], "suffixes": ["_v000"]},
+      "limits": {"warning_low": -2.5, "warning_high": 2.5, "fail_low": -3.0, "fail_high": 3.0},
+      "flags": {"pass": "pressure_normal", "warning": "pressure_warning", "fail": "pressure_violation"}
+    },
+    {
+      "rule_id": "key_node_pressure_margin",
+      "evaluator": "max_abs_prediction",
+      "description": "Key pressure variables should keep normalized margin from the alarm boundary.",
+      "priority": 11,
+      "selector": {"prefixes": ["N_", "P_"], "suffixes": ["_v000"]},
+      "limits": {"warning_threshold": 2.5, "fail_threshold": 3.0},
+      "flags": {"pass": "pressure_margin_normal", "warning": "pressure_warning", "fail": "pressure_violation"}
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "category": "linepack",
+  "rules": [
+    {
+      "rule_id": "linepack_decline_and_recovery",
+      "evaluator": "max_decline_from_start",
+      "description": "Linepack should not decline beyond the warning limit and should recover sufficiently.",
+      "priority": 30,
+      "selector": {"prefixes": ["R_"], "suffixes": ["_v000"]},
+      "limits": {"warning_threshold": 0.45, "fail_threshold": 1.0},
+      "flags": {"pass": "linepack_normal", "warning": "linepack_warning", "fail": "linepack_violation"},
+      "minimum_recovery_ratio": 0.5
+    },
+    {
+      "rule_id": "linepack_change_rate",
+      "evaluator": "max_abs_step_change",
+      "description": "Linepack change rate should remain within the normalized short-time limit.",
+      "priority": 31,
+      "selector": {"prefixes": ["R_"], "suffixes": ["_v000"]},
+      "limits": {"warning_threshold": 0.2, "fail_threshold": 0.5},
+      "flags": {"pass": "linepack_rate_normal", "warning": "linepack_warning", "fail": "linepack_violation"}
+    }
+  ]
+}

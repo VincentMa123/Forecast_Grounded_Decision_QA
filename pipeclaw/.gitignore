@@ -10,3 +10,4 @@ backend/backend.log
 backend/eval_second_paper_pipeclaw/real_runs/
 frontend/node_modules/
 frontend/dist/
+backend/tests/

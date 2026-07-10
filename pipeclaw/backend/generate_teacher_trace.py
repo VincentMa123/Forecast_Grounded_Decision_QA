@@ -4,6 +4,7 @@ import argparse
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -75,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output-json",
         type=Path,
-        default=root / "generated_teacher_traces" / "teacher_trace.pretty.json",
+        default=root / "generated_teacher_traces" / "teacher_trace.json",
     )
     parser.add_argument("--force", action="store_true")
     parser.add_argument(
@@ -151,7 +152,6 @@ def sanitize_forecast_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
         "data_dir",
         "static_dir",
         "data_case_dir",
-        "forecast_csv",
         "mapping_csv",
     }
     cleaned = {
@@ -164,7 +164,6 @@ def sanitize_forecast_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     compact_source_keys = {
         "checkpoint_dir": "checkpoint_id",
         "data_case_dir": "data_case_id",
-        "forecast_csv": "forecast_csv_name",
     }
     for source_key, metadata_key in compact_source_keys.items():
         compact_name = _compact_source_name(metadata.get(source_key))
@@ -183,31 +182,85 @@ def sanitize_tool_output(value: Any) -> Any:
         return [sanitize_tool_output(item) for item in value]
     return value
 
+
 def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
     return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
 
 
-def trace_tool_calls(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [
-        {
-            "call_id": tool_call_id(item, index),
-            "tool_name": item.get("tool_name"),
-            "arguments": item.get("args", {}),
-            "timestamp": item.get("timestamp"),
-        }
-        for index, item in enumerate(trace.get("tool_calls", []), start=1)
-    ]
+def compact_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
+    parsed_task = dict(output.get("parsed_task") or {})
+    prediction = dict(output.get("prediction_summary") or {})
+    metadata = dict(output.get("forecast_metadata") or {})
+    task_resolution = {
+        "resolved_attention_variables": parsed_task.get("resolved_attention_variables", []),
+        "resolved_output_variables": parsed_task.get("resolved_output_variables", []),
+        "unresolved_attention_targets": parsed_task.get("unresolved_attention_targets", []),
+        "unresolved_output_state_variables": parsed_task.get("unresolved_output_state_variables", []),
+        "applied_boundary_conditions": metadata.get("applied_boundary_conditions", []),
+    }
+    forecast = {
+        "mode": prediction.get("forecast_mode"),
+        "forecast_window": metadata.get("forecast_window", {}),
+        "requested_forecast_horizon_minutes": metadata.get("requested_forecast_horizon_minutes"),
+        "actual_forecast_steps": metadata.get("actual_forecast_steps"),
+        "actual_forecast_horizon_minutes": metadata.get("actual_forecast_horizon_minutes"),
+        "output_forecast_summary": prediction.get("output_forecast_summary", {}),
+    }
+    provenance = {
+        "checkpoint_id": metadata.get("checkpoint_id"),
+        "data_case_id": metadata.get("data_case_id"),
+        "device": metadata.get("device"),
+        "model_input_projection_type": metadata.get("model_input_projection_type"),
+    }
+    return {
+        "success": True,
+        "task_resolution": _without_empty_values(task_resolution),
+        "prediction": _without_empty_values(forecast),
+        "verification": output.get("constraint_check"),
+        "evidence": output.get("evidence"),
+        "provenance": _without_empty_values(provenance),
+    }
 
 
-def trace_tool_outputs(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
-    return [
-        {
-            "call_id": tool_call_id(item, index),
-            "output": sanitize_tool_output(parse_tool_output(item)),
-            "timestamp": item.get("timestamp"),
-        }
-        for index, item in enumerate(trace.get("tool_calls", []), start=1)
-    ]
+def _without_empty_values(value: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: item
+        for key, item in value.items()
+        if item is not None and item != {} and item != []
+    }
+
+
+def exported_tool_calls(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
+    calls: List[Dict[str, Any]] = []
+    for index, item in enumerate(trace.get("tool_calls", []), start=1):
+        call_id = tool_call_id(item, index)
+        tool_name = str(item.get("tool_name") or "")
+        calls.append(
+            {
+                "tool_call_id": call_id,
+                "name": tool_name,
+                "arguments": item.get("args", {}),
+            }
+        )
+    return calls
+
+
+def exported_tool_outputs(trace: Dict[str, Any]) -> List[Dict[str, Any]]:
+    outputs: List[Dict[str, Any]] = []
+    for index, item in enumerate(trace.get("tool_calls", []), start=1):
+        call_id = tool_call_id(item, index)
+        tool_name = str(item.get("tool_name") or "")
+        output = sanitize_tool_output(parse_tool_output(item))
+        if tool_name == "run_pipeformer_forecast" and isinstance(output, dict) and output.get("success"):
+            output = compact_pipeformer_output(output)
+        outputs.append(
+            {
+                "tool_call_id": call_id,
+                "name": tool_name,
+                "output": output,
+            }
+        )
+    return outputs
 
 
 def final_answer(trace: Dict[str, Any]) -> str:
@@ -227,49 +280,114 @@ def successful_pipeformer_output(trace: Dict[str, Any]) -> Optional[Dict[str, An
     return None
 
 
-def generic_evidence(trace: Dict[str, Any]) -> Dict[str, Any]:
-    calls = trace.get("tool_calls", [])
-    return {
-        "tool_names": [item.get("tool_name") for item in calls],
-        "tool_call_count": len(calls),
-        "artifacts": trace.get("artifacts", []),
-    }
+UNSUPPORTED_HISTORY_CLAIM = re.compile(
+    r"\b(?:reproduc(?:ed|ible|ibility|tion)?|previous runs?|prior runs?|stable across runs?|times stable)\b"
+    r"|\u590d\u73b0|\u6b64\u524d.*(?:\u7ed3\u679c|\u8fd0\u884c)|\u524d(?:\u51e0|[\u4e00-\u5341\d]+)\u6b21.*\u4e00\u81f4|\u7a33\u5b9a.*(?:\u590d\u73b0|\u8fd0\u884c)",
+    re.IGNORECASE,
+)
+NO_DISPATCH_REQUEST = re.compile(
+    r"\u4e0d\u8981.{0,12}\u8c03\u5ea6(?:\u52a8\u4f5c|\u5efa\u8bae)"
+    r"|(?:do\s+not|don't)\s+(?:give|provide|include).{0,30}dispatch",
+    re.IGNORECASE,
+)
+DISPATCH_ADVICE = re.compile(
+    r"\s*(?:\u8c03\u5ea6\u5efa\u8bae|dispatch\s+recommendation)\s*[:\uff1a][^\n]*",
+    re.IGNORECASE,
+)
+SAFETY_ENERGY_INCONSISTENCY_CLAIM = re.compile(
+    r"\u5b89\u5168\u4fa7\u4e0e\u80fd\u8017(?:/\u8bbe\u5907)?\u4fa7\u7ed3\u8bba\u4e0d\u4e00\u81f4",
+    re.IGNORECASE,
+)
+
+
+def llm_answer_quality_issues(answer: str, *, check_history_claims: bool) -> List[str]:
+    issues = []
+    if not answer.strip():
+        issues.append("missing_llm_final_answer")
+    if check_history_claims and UNSUPPORTED_HISTORY_CLAIM.search(answer):
+        issues.append("unsupported_execution_history_or_repeatability_claim")
+    return issues
+
+
+def remove_unsupported_history_claims(answer: str) -> str:
+    """Remove unsupported repeatability claims before exporting an SFT target."""
+    kept_lines = [line for line in answer.splitlines() if not UNSUPPORTED_HISTORY_CLAIM.search(line)]
+    cleaned = "\n".join(kept_lines).strip()
+    cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+    return cleaned
+
+
+def _safety_and_energy_checks_pass(pipeformer: Optional[Dict[str, Any]]) -> bool:
+    checks = ((pipeformer or {}).get("constraint_check") or {}).get("checks") or []
+    safety_checks = [item for item in checks if item.get("category") in {"pressure", "flow", "linepack"}]
+    energy_checks = [item for item in checks if item.get("name") == "energy_consumption_cost"]
+    return (
+        bool(safety_checks)
+        and all(item.get("status") == "pass" for item in safety_checks)
+        and bool(energy_checks)
+        and all(item.get("status") == "pass" for item in energy_checks)
+    )
+
+
+def enforce_requested_answer_scope(
+    answer: str,
+    question: str,
+    pipeformer: Optional[Dict[str, Any]],
+) -> str:
+    if NO_DISPATCH_REQUEST.search(question):
+        answer = DISPATCH_ADVICE.sub("", answer)
+    if _safety_and_energy_checks_pass(pipeformer):
+        answer = SAFETY_ENERGY_INCONSISTENCY_CLAIM.sub(
+            "\u5b89\u5168\u4fa7\u4e0e\u80fd\u8017\u6210\u672c\u5747\u901a\u8fc7\uff1b\u538b\u7f29\u673a/\u8bbe\u5907\u4fa7\u53e6\u6709\u544a\u8b66",
+            answer,
+        )
+    return answer.strip()
 
 
 def build_teacher_record(scenario: Dict[str, Any], question: str, trace: Dict[str, Any]) -> Dict[str, Any]:
     pipeformer = successful_pipeformer_output(trace)
-    answer = final_answer(trace)
+    raw_answer = final_answer(trace)
+    raw_answer_issues = llm_answer_quality_issues(raw_answer, check_history_claims=pipeformer is not None)
+    answer = remove_unsupported_history_claims(raw_answer) if pipeformer else raw_answer
+    answer = enforce_requested_answer_scope(answer, question, pipeformer)
+    quality_issues = llm_answer_quality_issues(answer, check_history_claims=pipeformer is not None)
     quality_flag = "pass" if trace.get("status") == "completed" else "needs_review"
+    parsed_task: Dict[str, Any] = {}
+    prediction_summary: Dict[str, Any] = {}
+    constraint_check: Dict[str, Any] = {}
+    evidence: Dict[str, Any] = {}
+    risk_level = "low"
+    manual_intervention_label = "no_intervention"
+    dispatch_recommendation = ""
     if pipeformer:
-        parsed_task = pipeformer.get("parsed_task")
-        prediction_summary = pipeformer.get("prediction_summary")
-        constraint_check = pipeformer.get("constraint_check")
-        evidence = pipeformer.get("evidence")
+        parsed_task = dict(pipeformer.get("parsed_task") or {})
+        prediction_summary = dict(pipeformer.get("prediction_summary") or {})
+        constraint_check = dict(pipeformer.get("constraint_check") or {})
+        evidence = dict(pipeformer.get("evidence") or {})
         risk_level = pipeformer.get("risk_level")
         manual_intervention_label = pipeformer.get("manual_intervention_label")
         dispatch_recommendation = pipeformer.get("dispatch_recommendation")
-        answer = answer or pipeformer.get("final_answer", "")
         quality_flag = pipeformer.get("quality_flag", quality_flag)
-    else:
-        parsed_task = {"task_type": "data_query", "question": question}
-        prediction_summary = None
-        constraint_check = None
-        evidence = generic_evidence(trace)
-        risk_level = "low"
-        manual_intervention_label = "no_intervention"
-        dispatch_recommendation = "N/A - not a dispatch or PipeFormer prediction task."
+
+    if quality_issues:
+        quality_flag = "needs_review"
+    if raw_answer_issues and not quality_issues:
+        logger.warning(
+            "Removed unsupported claims from exported final_answer: %s",
+            ", ".join(raw_answer_issues),
+        )
 
     return {
         "sample_id": f"sample_{scenario.get('scenario_id')}",
         "scenario_id": scenario.get("scenario_id"),
         "scenario_type": scenario.get("scenario_type"),
         "user_input": question,
-        "parsed_task": parsed_task,
-        "tool_calls": trace_tool_calls(trace),
-        "tool_outputs": trace_tool_outputs(trace),
-        "prediction_summary": prediction_summary,
-        "constraint_check": constraint_check,
-        "evidence": evidence,
+        "parsed_task": sanitize_tool_output(parsed_task),
+        "tool_calls": exported_tool_calls(trace),
+        "tool_outputs": exported_tool_outputs(trace),
+        "prediction_summary": sanitize_tool_output(prediction_summary),
+        "constraint_check": sanitize_tool_output(constraint_check),
+        "evidence": sanitize_tool_output(evidence),
         "risk_level": risk_level,
         "manual_intervention_label": manual_intervention_label,
         "dispatch_recommendation": dispatch_recommendation,

@@ -1,0 +1,95 @@
+from __future__ import annotations
+
+import json
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, Tuple
+
+from .schemas import ConstraintSpec
+
+
+RULE_LIBRARY_ROOT = Path(__file__).resolve().parent / "constraint_library"
+GENERIC_EVALUATORS = {
+    "predicted_range",
+    "max_abs_prediction",
+    "mean_abs_delta_vs_observed",
+    "max_abs_step_change",
+    "max_decline_from_start",
+    "boundary_change_percent",
+}
+
+
+@lru_cache(maxsize=None)
+def load_json_document(filename: str) -> Dict[str, Any]:
+    path = RULE_LIBRARY_ROOT / filename
+    if not path.is_file():
+        raise FileNotFoundError(f"Constraint rule file not found: {path}")
+    document = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        raise ValueError(f"Constraint rule file must contain a JSON object: {path}")
+    return document
+
+
+def load_pipeline_constraints() -> Dict[str, Any]:
+    document = load_json_document("pipeline_constraints.json")
+    required = {"library_name", "library_version", "rule_files", "category_order"}
+    missing = sorted(required - set(document))
+    if missing:
+        raise ValueError(f"pipeline_constraints.json is missing required fields: {missing}")
+    return document
+
+
+def load_rule_document(category: str) -> Dict[str, Any]:
+    manifest = load_pipeline_constraints()
+    filename = manifest["rule_files"].get(category)
+    if not filename:
+        raise KeyError(f"No rule file is configured for category {category!r}")
+    document = load_json_document(str(filename))
+    if document.get("category") != category:
+        raise ValueError(f"{filename} declares category {document.get('category')!r}, expected {category!r}")
+    return document
+
+
+def load_constraint_specs(category: str) -> Tuple[ConstraintSpec, ...]:
+    rules = load_rule_document(category).get("rules", [])
+    specs = []
+    seen = set()
+    for rule in rules:
+        rule_id = str(rule.get("rule_id") or "").strip()
+        if not rule_id or rule_id in seen:
+            raise ValueError(f"Rule ids must be non-empty and unique in category {category!r}: {rule_id!r}")
+        seen.add(rule_id)
+        evaluator = str(rule.get("evaluator") or "").strip()
+        if evaluator not in GENERIC_EVALUATORS:
+            continue
+        selector = dict(rule.get("selector") or {})
+        limits = dict(rule.get("limits") or {})
+        flags = dict(rule.get("flags") or {})
+        specs.append(
+            ConstraintSpec(
+                name=rule_id,
+                category=category,
+                description=str(rule.get("description") or ""),
+                priority=int(rule.get("priority", 999)),
+                metric=evaluator,
+                prefixes=tuple(selector.get("prefixes") or ()),
+                suffixes=tuple(selector.get("suffixes") or ()),
+                warning_low=limits.get("warning_low"),
+                warning_high=limits.get("warning_high"),
+                fail_low=limits.get("fail_low"),
+                fail_high=limits.get("fail_high"),
+                warning_threshold=limits.get("warning_threshold"),
+                fail_threshold=limits.get("fail_threshold"),
+                pass_flag=flags.get("pass"),
+                warning_flag=flags.get("warning"),
+                fail_flag=flags.get("fail"),
+            )
+        )
+    return tuple(specs)
+
+
+def load_rule_definition(category: str, rule_id: str) -> Dict[str, Any]:
+    for rule in load_rule_document(category).get("rules", []):
+        if rule.get("rule_id") == rule_id:
+            return dict(rule)
+    raise KeyError(f"Rule {rule_id!r} is not defined for category {category!r}")

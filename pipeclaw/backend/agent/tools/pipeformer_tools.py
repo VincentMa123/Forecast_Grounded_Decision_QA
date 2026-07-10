@@ -39,7 +39,21 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                 },
                 "boundary_conditions": {
                     "type": "object",
-                    "description": "Boundary-condition assumptions, such as keeping other boundary controls unchanged.",
+                    "description": "Boundary-control assumptions and explicit setpoints or signed percentage changes.",
+                    "properties": {
+                        "keep_other_boundary_controls": {"type": "boolean"},
+                        "setpoints": {
+                            "type": "object",
+                            "additionalProperties": {"type": "number"},
+                            "description": "Absolute boundary-control setpoints keyed by mapped PipeFormer variable.",
+                        },
+                        "percentage_changes": {
+                            "type": "object",
+                            "additionalProperties": {"type": "number"},
+                            "description": "Signed percentage changes keyed by mapped PipeFormer variable.",
+                        },
+                    },
+                    "additionalProperties": False,
                 },
                 "disturbance_variable": {
                     "type": "string",
@@ -65,7 +79,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"],
+                        "enum": ["pressure", "flow", "linepack", "compressor", "dispatch_priority"],
                     },
                     "description": "Engineering constraint categories to execute, using the PDF names.",
                 },
@@ -80,20 +94,16 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"],
+                        "enum": ["pressure", "flow", "linepack", "compressor", "dispatch_priority"],
                     },
                     "description": "Legacy alias for constraint_verification_types.",
                 },
                 "device": {"type": "string", "description": "Optional Torch device override, for example cpu or cuda."},
-                "use_sample_csv": {
-                    "type": "boolean",
-                    "description": "Use only for debugging; reads existing sample forecast CSV instead of checkpoint inference.",
-                },
             },
             "required": ["question"],
             "additionalProperties": False,
         },
-        returns="PipeFormer prediction summary, constraint checks, evidence variables, and final answer text.",
+        returns="PipeFormer prediction summary, constraint checks, and evidence variables.",
     )
     def run_pipeformer_forecast(
         question: str,
@@ -113,13 +123,11 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         keep_other_boundary_controls: Optional[bool] = None,
         requested_checks: Optional[List[str]] = None,
         device: Optional[str] = None,
-        use_sample_csv: Optional[bool] = None,
         pipeformer_root: Optional[str] = None,
         checkpoint_dir: Optional[str] = None,
         data_dir: Optional[str] = None,
         static_dir: Optional[str] = None,
         mapping_csv: Optional[str] = None,
-        forecast_csv: Optional[str] = None,
         session_id: str = "",
         agent_id: str = "default",
     ) -> Dict[str, Any]:
@@ -146,7 +154,5 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
             data_dir=data_dir,
             static_dir=static_dir,
             mapping_csv=mapping_csv,
-            forecast_csv=forecast_csv,
             device=device,
-            use_sample_csv=use_sample_csv,
         )

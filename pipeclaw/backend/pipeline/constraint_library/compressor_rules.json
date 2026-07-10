@@ -1,0 +1,32 @@
+{
+  "category": "compressor",
+  "rules": [
+    {
+      "rule_id": "compressor_load_limit",
+      "evaluator": "max_abs_prediction",
+      "description": "Compressor load should remain below the normalized upper operating limit.",
+      "priority": 40,
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v000"]},
+      "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
+      "flags": {"pass": "compressor_load_normal", "warning": "compressor_load_warning", "fail": "compressor_overload"}
+    },
+    {
+      "rule_id": "compressor_ratio_boundary",
+      "evaluator": "max_abs_prediction",
+      "description": "Compression ratio should keep margin from the normalized operating-envelope boundary.",
+      "priority": 41,
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v001"]},
+      "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
+      "flags": {"pass": "compressor_ratio_normal", "warning": "compressor_ratio_warning", "fail": "compressor_ratio_violation"}
+    },
+    {
+      "rule_id": "compressor_power_change",
+      "evaluator": "mean_abs_delta_vs_observed",
+      "description": "Compressor power should not change sharply from the observed baseline.",
+      "priority": 42,
+      "selector": {"prefixes": ["TE_"], "suffixes": ["_v000"]},
+      "limits": {"warning_threshold": 0.5, "fail_threshold": 1.2},
+      "flags": {"pass": "compressor_power_normal", "warning": "compressor_power_warning", "fail": "compressor_power_violation"}
+    }
+  ]
+}

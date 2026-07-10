@@ -1,0 +1,38 @@
+{
+  "library_name": "engineering_constraint_library_pdf_1_5",
+  "library_version": "pdf_1_5_v1",
+  "rule_source": "Forecast-Grounded Decision QA Section 1.5 engineering design rules",
+  "value_space": "normalized PipeFormer forecast variables; replace proxy limits with real station and segment limits",
+  "category_order": [
+    "pressure",
+    "flow",
+    "linepack",
+    "compressor",
+    "human_intervention",
+    "dispatch_priority"
+  ],
+  "always_run_categories": [
+    "human_intervention",
+    "dispatch_priority"
+  ],
+  "category_details": {
+    "pressure": "Minimum and maximum pressure, violation nodes, violation duration, pressure margin, and recovery time.",
+    "flow": "Flow-change magnitude, segment capacity, abnormal-flow segments, and supply-demand balance.",
+    "linepack": "Linepack change rate, minimum linepack time, recovery capability, and warning status.",
+    "compressor": "Compressor load, compression ratio, power, operating envelope, and regulation margin.",
+    "human_intervention": "no_intervention, monitoring_only, operator_attention_required, immediate_intervention_required.",
+    "dispatch_priority": "Pressure safety and supply assurance; compressor and equipment protection; linepack margin; flow stability; then energy and cost."
+  },
+  "rule_files": {
+    "pressure": "pressure_rules.json",
+    "flow": "flow_rules.json",
+    "linepack": "linepack_rules.json",
+    "compressor": "compressor_rules.json",
+    "human_intervention": "intervention_rules.json",
+    "dispatch_priority": "dispatch_priority_rules.json"
+  },
+  "risk_escalation": {
+    "simultaneous_end_user_warning_nodes": 2,
+    "pressure_recovery_warning_minutes": 30.0
+  }
+}

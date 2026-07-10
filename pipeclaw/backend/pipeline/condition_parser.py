@@ -4,13 +4,14 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 
+PIPEFORMER_TASK_SCHEMA_VERSION = "pipeformer_task"
+
+
 CATEGORY_MARKERS: Dict[str, List[str]] = {
     "pressure": ["\u538b\u529b", "pressure"],
     "flow": ["\u6d41\u91cf", "flow"],
     "linepack": ["\u7ba1\u5b58", "linepack"],
     "compressor": ["\u538b\u7f29\u673a", "compressor"],
-    "equipment_regulation": ["\u9600\u95e8", "\u8c03\u538b", "\u8fb9\u754c\u63a7\u5236", "equipment", "regulation", "valve"],
-    "abnormality_warning": ["\u5f02\u5e38", "\u6cc4\u6f0f", "\u7a81\u53d8", "abnormal", "leak", "anomaly"],
     "dispatch_priority": ["\u80fd\u8017", "\u6210\u672c", "\u4f18\u5148", "energy", "cost", "priority"],
 }
 
@@ -19,8 +20,6 @@ CATEGORY_ATTENTION_TARGETS: Dict[str, List[str]] = {
     "flow": ["segments"],
     "linepack": ["linepack"],
     "compressor": ["compressors"],
-    "equipment_regulation": ["valves", "pressure_regulators", "boundary_controls"],
-    "abnormality_warning": ["abnormal_pressure_drops", "sudden_flow_changes", "leak_or_equipment_anomaly_signals"],
     "dispatch_priority": ["dispatch_priority_audit"],
 }
 
@@ -29,8 +28,6 @@ CATEGORY_OUTPUT_STATE_VARIABLES: Dict[str, List[str]] = {
     "flow": ["flow"],
     "linepack": ["linepack"],
     "compressor": ["compressor_load", "compression_ratio", "compressor_power"],
-    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
-    "abnormality_warning": ["pressure_drop", "flow_ramp", "leak_or_equipment_anomaly_score"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
 
@@ -94,7 +91,7 @@ def parse_condition(question: str) -> Dict[str, Any]:
         "output_state_variables": _targets_for_checks(constraint_verification_types, CATEGORY_OUTPUT_STATE_VARIABLES),
         "constraint_verification_types": constraint_verification_types,
         "task_type": _parse_task_type(question),
-        "parse_schema_version": "pipeformer_task_v2_pdf_terms",
+        "parse_schema_version": PIPEFORMER_TASK_SCHEMA_VERSION,
     }
     task.update(_legacy_aliases(task))
     return task

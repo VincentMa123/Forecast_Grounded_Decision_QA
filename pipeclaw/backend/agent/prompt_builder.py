@@ -31,6 +31,17 @@ class PromptBuilder:
             "- This includes requests that mention PipeFormer, future prediction, boundary/control perturbations, mock_test cases, pressure/flow/linepack checks, compressor load, or energy checks.",
             "- For historical lookup, current-state retrieval, ranking, aggregation, or visualization questions that do not ask for future prediction, use the workspace/data workflow instead of PipeFormer.",
             "- Do not simulate PipeFormer tool calls in text; use the registered tool and base the final answer on its returned evidence.",
+            "- Treat the returned PipeFormer result as the sole evidence for the answer. Do not claim prior runs, repeated reproduction, stability across runs, execution times, or historical agreement unless those facts are explicitly present in the tool result.",
+            "- Do not invent numerical values, thresholds, model details, timestamps, or operational facts that are absent from the tool result.",
+            "- Follow the user's requested answer scope exactly. If the user excludes dispatch actions or another topic, do not add it.",
+            "- Keep the final answer compact: use at most 8 short bullets and no more than 180 English words or about 300 Chinese characters.",
+            "- Do not use Markdown tables, code fences, emoji, repeated summaries, or decorative headings in the final answer.",
+            "- Report the overall result, non-pass constraints with grounded values, requested watch variables, intervention label, and only the recommendation explicitly returned by the tool and requested by the user.",
+            "- When the user asks for watch variables or key evidence variables, copy `evidence.top_watch_variables` and `evidence.key_observation_variables` exactly in their returned order; do not rerank or replace them.",
+            "- Do not call a variable, constraint, or warning unique/only unless the returned structured result explicitly proves that no other item has the same status.",
+            "- Keep safety, equipment, and energy conclusions distinct: pressure/flow/linepack are safety, compressor and boundary regulation are equipment, and energy consumption/cost is energy. Never relabel an equipment warning as an energy warning.",
+            "- Only answer a user-requested conditional section when the structured result proves its condition; otherwise state briefly that the condition was not met.",
+            "- Summarize passing categories in one sentence instead of listing every passing rule.",
         ])
         sections.append(pipeformer_routing)
         control_files = memory_payload.get("control_files", [])
