@@ -27,8 +27,8 @@
   "model_ema_decay": 0.999,
   "compile_model": false,
   "output_dir": "./outputs/mock_tiny_decoder",
-  "logging_dir": "./outputs/mock_tiny_decoder/logs",
-  "run_name": "FluidDecoder_mock_tiny_decoder_20260707_151254",
+  "logging_dir": "./outputs/mock_tiny_decoder\\logs",
+  "run_name": "FluidDecoder_mock_tiny_decoder_20260711_161950",
   "logging_steps": null,
   "eval_strategy": "steps",
   "eval_steps": 5,
@@ -45,8 +45,8 @@
   "compute_normalization_stats": false,
   "use_graph_cache": true,
   "adjacency_cache_dir": "./cache/adjacency",
-  "tokenizer_vocab_size": 60,
-  "tokenizer_stats_path": "data/mock_tiny/static/mock_tiny/tokenizer_save",
+  "tokenizer_vocab_size": 70,
+  "tokenizer_stats_path": "data\\mock_tiny\\static\\mock_tiny\\tokenizer_save",
   "device": "cpu",
   "num_workers": 0,
   "dataloader_num_workers": 0,
@@ -60,5 +60,5 @@
   "use_swanlab": false,
   "swanlab_project": "fluid-dynamics",
   "swanlab_entity": null,
-  "swanlab_run_name": "FluidDecoder_mock_tiny_decoder_20260707_151254"
+  "swanlab_run_name": "FluidDecoder_mock_tiny_decoder_20260711_161950"
 }

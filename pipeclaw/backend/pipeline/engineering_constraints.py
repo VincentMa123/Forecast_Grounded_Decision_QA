@@ -12,7 +12,9 @@ from .constraints.common import (
     variables_matching,
 )
 from .constraints.compressor import run_compressor_checks
+from .constraints.abnormality_warning import run_abnormality_warning_checks
 from .constraints.dispatch_priority import run_dispatch_priority_checks, run_dispatch_priority_policy_checks
+from .constraints.equipment_regulation import run_equipment_regulation_checks
 from .constraints.flow import run_flow_checks
 from .constraints.human_intervention import intervention_label_from_checks, run_human_intervention_checks
 from .constraints.linepack import run_linepack_checks
@@ -27,6 +29,8 @@ CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "flow": run_flow_checks,
     "linepack": run_linepack_checks,
     "compressor": run_compressor_checks,
+    "equipment_regulation": run_equipment_regulation_checks,
+    "abnormality_warning": run_abnormality_warning_checks,
     "dispatch_priority": run_dispatch_priority_checks,
 }
 PIPELINE_CONSTRAINTS = load_pipeline_constraints()
@@ -48,11 +52,21 @@ def run_engineering_constraint_checks(
             checks.extend(runner(summaries, parsed_task))
 
     overall = max_status(check["status"] for check in checks)
+    not_evaluated_rules = [
+        check["name"]
+        for check in checks
+        if check.get("status") == "not_evaluated"
+    ]
+    verification_complete = not not_evaluated_rules
     risk_escalations = _risk_escalations(checks)
     risk_level = {"pass": "low", "warning": "medium", "fail": "high"}.get(overall, "unknown")
+    if not verification_complete and overall in {"pass", "not_evaluated"}:
+        risk_level = "unknown"
     if risk_escalations:
         risk_level = "high"
     label = intervention_label_from_checks(overall, checks)
+    if not verification_complete and label == "no_intervention":
+        label = "monitoring_only"
     if risk_escalations and label in {"no_intervention", "monitoring_only"}:
         label = "operator_attention_required"
     checks.extend(run_human_intervention_checks(label))
@@ -60,7 +74,11 @@ def run_engineering_constraint_checks(
     if "dispatch_priority" in selected:
         checks.extend(run_dispatch_priority_policy_checks())
 
-    non_pass = [check for check in checks if check["status"] != "pass" and check["category"] != "human_intervention"]
+    non_pass = [
+        check
+        for check in checks
+        if check["status"] in {"warning", "fail"} and check["category"] != "human_intervention"
+    ]
     non_pass.sort(key=lambda check: (STATUS_RANK.get(check["status"], 0), -check["priority"]), reverse=True)
     dispatch_recommendation = _dispatch_recommendation(checks)
 
@@ -69,6 +87,8 @@ def run_engineering_constraint_checks(
         "category_status": category_status(checks),
         "dispatch_priority_order": DISPATCH_PRIORITY_ORDER,
         "overall_status": overall,
+        "verification_complete": verification_complete,
+        "not_evaluated_rules": not_evaluated_rules,
         "risk_level": risk_level,
         "risk_escalations": risk_escalations,
         "rule_flags": list(dict.fromkeys(check.get("flag") for check in checks if check.get("flag"))),
@@ -92,9 +112,13 @@ def _risk_escalations(checks: List[Dict[str, Any]]) -> List[str]:
         check.get("flag") in {"pressure_warning", "pressure_violation"}
         for check in checks
     )
-    linepack_declining = any(
-        check.get("flag") in {"linepack_warning", "linepack_violation"}
-        for check in checks
+    linepack_decline_check = next(
+        (check for check in checks if check.get("name") == "linepack_decline_and_recovery"),
+        None,
+    )
+    linepack_declining = bool(
+        linepack_decline_check
+        and linepack_decline_check.get("status") in {"warning", "fail"}
     )
     if pressure_at_risk and linepack_declining:
         escalations.append("linepack_decline_with_pressure_near_lower_bound")

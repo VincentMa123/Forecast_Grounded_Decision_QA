@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..rule_library import load_constraint_specs
-from .common import run_specs
+from .common import longest_episode_minutes, run_specs, threshold_episodes, total_episode_minutes
 
 
 PRESSURE_SPECS = load_constraint_specs("pressure")
+PRESSURE_WINDOW_SPEC = next(spec for spec in PRESSURE_SPECS if spec.name == "node_pressure_operating_window")
 
 
 def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -17,9 +18,13 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
     maximum_items = []
     violation_nodes = []
     warning_nodes = []
+    violation_episodes: Dict[str, List[Dict[str, Any]]] = {}
+    warning_episodes: Dict[str, List[Dict[str, Any]]] = {}
     violation_duration_steps: Dict[str, int] = {}
     recovery_time_steps: Dict[str, int] = {}
+    pressure_margins: Dict[str, Dict[str, float]] = {}
     simultaneous_warning_node_count = 0
+    time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
 
     end_user_variables = [name for name in pressure_variables if name.startswith("N_")]
     end_user_series = [summaries.get(name, {}).get("predicted_values", []) for name in end_user_variables]
@@ -27,7 +32,8 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         near_lower_bound = sum(
             1
             for values in end_user_series
-            if step_index < len(values) and PRESSURE_SPECS[0].fail_low <= values[step_index] < PRESSURE_SPECS[0].warning_low
+            if step_index < len(values)
+            and PRESSURE_WINDOW_SPEC.fail_low <= values[step_index] < PRESSURE_WINDOW_SPEC.warning_low
         )
         simultaneous_warning_node_count = max(simultaneous_warning_node_count, near_lower_bound)
 
@@ -42,26 +48,52 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         minimum_items.append((values[minimum_index], variable, minimum_index, labels[minimum_index] if minimum_index < len(labels) else None))
         maximum_items.append((values[maximum_index], variable, maximum_index, labels[maximum_index] if maximum_index < len(labels) else None))
 
+        minimum = float(values[minimum_index])
+        maximum = float(values[maximum_index])
+        pressure_margins[variable] = {
+            "warning_lower_margin": round(minimum - float(PRESSURE_WINDOW_SPEC.warning_low), 6),
+            "warning_upper_margin": round(float(PRESSURE_WINDOW_SPEC.warning_high) - maximum, 6),
+            "fail_lower_margin": round(minimum - float(PRESSURE_WINDOW_SPEC.fail_low), 6),
+            "fail_upper_margin": round(float(PRESSURE_WINDOW_SPEC.fail_high) - maximum, 6),
+        }
+
         violation_indices = [
             index
             for index, value in enumerate(values)
-            if value < PRESSURE_SPECS[0].fail_low or value > PRESSURE_SPECS[0].fail_high
+            if value < PRESSURE_WINDOW_SPEC.fail_low or value > PRESSURE_WINDOW_SPEC.fail_high
         ]
         warning_indices = [
             index
             for index, value in enumerate(values)
             if index not in violation_indices
-            and (value < PRESSURE_SPECS[0].warning_low or value > PRESSURE_SPECS[0].warning_high)
+            and (value < PRESSURE_WINDOW_SPEC.warning_low or value > PRESSURE_WINDOW_SPEC.warning_high)
         ]
+        variable_violation_episodes = threshold_episodes(
+            values,
+            lambda value: value < PRESSURE_WINDOW_SPEC.fail_low or value > PRESSURE_WINDOW_SPEC.fail_high,
+            labels,
+            time_step_minutes,
+        )
+        variable_warning_episodes = threshold_episodes(
+            values,
+            lambda value: (
+                PRESSURE_WINDOW_SPEC.fail_low <= value < PRESSURE_WINDOW_SPEC.warning_low
+                or PRESSURE_WINDOW_SPEC.warning_high < value <= PRESSURE_WINDOW_SPEC.fail_high
+            ),
+            labels,
+            time_step_minutes,
+        )
+        violation_episodes[variable] = variable_violation_episodes
+        warning_episodes[variable] = variable_warning_episodes
+        violation_duration_steps[variable] = len(violation_indices)
         if violation_indices:
             violation_nodes.append(variable)
-            violation_duration_steps[variable] = len(violation_indices)
             last_violation = violation_indices[-1]
             recovered = next(
                 (
                     index
                     for index in range(last_violation + 1, len(values))
-                    if PRESSURE_SPECS[0].warning_low <= values[index] <= PRESSURE_SPECS[0].warning_high
+                    if PRESSURE_WINDOW_SPEC.warning_low <= values[index] <= PRESSURE_WINDOW_SPEC.warning_high
                 ),
                 None,
             )
@@ -71,18 +103,26 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
 
     minimum_pressure = min(minimum_items, default=None)
     maximum_pressure = max(maximum_items, default=None)
-    time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
+    violation_duration_minutes = {
+        variable: total_episode_minutes(episodes)
+        for variable, episodes in violation_episodes.items()
+    }
+    maximum_violation_duration_minutes = max(
+        (longest_episode_minutes(episodes) for episodes in violation_episodes.values()),
+        default=0.0,
+    )
     operating_window.update(
         {
             "minimum_pressure": _extreme_record(minimum_pressure),
             "maximum_pressure": _extreme_record(maximum_pressure),
             "pressure_violation_nodes": violation_nodes,
             "pressure_warning_nodes": warning_nodes,
+            "pressure_margins": pressure_margins,
+            "pressure_violation_episodes": violation_episodes,
+            "pressure_warning_episodes": warning_episodes,
             "pressure_violation_duration_steps": violation_duration_steps,
-            "pressure_violation_duration_minutes": {
-                variable: round(steps * time_step_minutes, 6)
-                for variable, steps in violation_duration_steps.items()
-            },
+            "pressure_violation_duration_minutes": violation_duration_minutes,
+            "maximum_continuous_pressure_violation_minutes": round(maximum_violation_duration_minutes, 6),
             "pressure_recovery_time_steps": recovery_time_steps,
             "pressure_recovery_time_minutes": {
                 variable: round(steps * time_step_minutes, 6)

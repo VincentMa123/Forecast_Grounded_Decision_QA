@@ -187,9 +187,197 @@ def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
     return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
 
 
-def compact_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
-    parsed_task = dict(output.get("parsed_task") or {})
+def _without_empty_values(value: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        key: item
+        for key, item in value.items()
+        if item is not None and item != {} and item != []
+    }
+
+
+def compact_parsed_task(output: Dict[str, Any]) -> Dict[str, Any]:
+    parsed = dict(output.get("parsed_task") or {})
+    boundary = dict(parsed.get("boundary_conditions") or {})
+    compact_boundary = {
+        key: boundary.get(key)
+        for key in ("keep_other_boundary_controls", "setpoints", "percentage_changes")
+        if key in boundary
+    }
+    keys = (
+        "case_id",
+        "current_operating_condition_number",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "forecast_horizon_minutes",
+        "attention_targets",
+        "output_state_variables",
+        "constraint_verification_types",
+        "task_type",
+        "forecast_time_step_minutes",
+        "resolved_attention_variables",
+        "resolved_output_variables",
+        "unresolved_attention_targets",
+        "unresolved_output_state_variables",
+    )
+    compact = {key: parsed.get(key) for key in keys}
+    compact["boundary_conditions"] = compact_boundary
+    return _without_empty_values(compact)
+
+
+def compact_prediction_summary(output: Dict[str, Any]) -> Dict[str, Any]:
     prediction = dict(output.get("prediction_summary") or {})
+    metadata = dict(output.get("forecast_metadata") or {})
+    keys = (
+        "forecast_mode",
+        "case_id",
+        "current_operating_condition_number",
+        "forecast_horizon_minutes",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "output_forecast_summary",
+    )
+    compact = {key: prediction.get(key) for key in keys}
+    compact.update(
+        {
+            "forecast_window": metadata.get("forecast_window"),
+            "actual_forecast_steps": metadata.get("actual_forecast_steps"),
+            "actual_forecast_horizon_minutes": metadata.get("actual_forecast_horizon_minutes"),
+        }
+    )
+    return _without_empty_values(compact)
+
+
+def _compact_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
+    evaluated = [
+        item
+        for item in finding.get("evaluated_values", [])
+        if item.get("status") in {"warning", "fail"}
+    ]
+    values = evaluated or list(finding.get("offending_values", []))
+    compact = {
+        key: finding.get(key)
+        for key in ("name", "category", "status", "evaluation_status", "flag", "priority", "variables", "message")
+    }
+    compact["evaluated_values"] = values[:12]
+    if finding.get("operating_envelope_status"):
+        compact["operating_envelope_status"] = finding["operating_envelope_status"]
+    return _without_empty_values(compact)
+
+
+def _engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
+    by_name = {check.get("name"): check for check in checks}
+    pressure = by_name.get("node_pressure_operating_window", {})
+    flow = by_name.get("flow_ramp_check", {})
+    balance = by_name.get("supply_demand_balance", {})
+    linepack = by_name.get("linepack_decline_and_recovery", {})
+    compressor = by_name.get("compressor_load_limit", {})
+    equipment = by_name.get("valve_opening_range", {})
+    abnormal_pressure = by_name.get("abnormal_pressure_drop", {})
+    sudden_flow = by_name.get("sudden_flow_change", {})
+    potential_leak = by_name.get("potential_leak_signal", {})
+    equipment_anomaly = by_name.get("equipment_anomaly", {})
+
+    evidence = {
+        "pressure": _without_empty_values(
+            {
+                key: pressure.get(key)
+                for key in (
+                    "minimum_pressure",
+                    "maximum_pressure",
+                    "pressure_violation_nodes",
+                    "pressure_warning_nodes",
+                    "pressure_margins",
+                    "pressure_violation_episodes",
+                    "pressure_warning_episodes",
+                    "pressure_violation_duration_minutes",
+                    "maximum_continuous_pressure_violation_minutes",
+                    "pressure_recovery_time_minutes",
+                    "simultaneous_end_user_warning_node_count",
+                )
+            }
+        ),
+        "flow": _without_empty_values(
+            {
+                "flow_change_magnitude": flow.get("flow_change_magnitude"),
+                "boundary_flow_change_rate": flow.get("boundary_flow_change_rate"),
+                "flow_ramp_events": flow.get("flow_ramp_events"),
+                "abnormal_flow_segments": flow.get("abnormal_flow_segments"),
+                "flow_capacity_excursion_episodes": by_name.get("flow_capacity_check", {}).get("flow_capacity_excursion_episodes"),
+                "supply_demand_balance_status": flow.get("supply_demand_balance_status"),
+                "supply_demand_balance": (balance.get("evaluated_values") or [None])[0],
+            }
+        ),
+        "linepack": _without_empty_values(
+            {
+                key: linepack.get(key)
+                for key in (
+                    "minimum_linepack",
+                    "linepack_change_rate",
+                    "linepack_decline_episodes",
+                    "linepack_recovery",
+                    "short_term_peak_shaving_capacity",
+                    "linepack_warning_status",
+                )
+            }
+        ),
+        "compressor": _without_empty_values(
+            {
+                "compressor_state": compressor.get("compressor_state"),
+                "operating_envelope_status": compressor.get("operating_envelope_status"),
+                "regulation_margin_to_fail": compressor.get("regulation_margin_to_fail"),
+            }
+        ),
+        "equipment_regulation": _without_empty_values(
+            {
+                "equipment_regulation_state": equipment.get("equipment_regulation_state"),
+                "valve_opening_status": by_name.get("valve_opening_range", {}).get("status"),
+                "pressure_regulator_status": by_name.get("pressure_regulator_range", {}).get("status"),
+                "boundary_adjustment_status": by_name.get("boundary_control_adjustment_magnitude", {}).get("status"),
+            }
+        ),
+        "abnormality_warning": _without_empty_values(
+            {
+                "abnormal_pressure_drop": (abnormal_pressure.get("evaluated_values") or [None])[0],
+                "sudden_flow_change": (sudden_flow.get("evaluated_values") or [None])[0],
+                "potential_leak_signal": potential_leak.get("signal_evidence"),
+                "equipment_anomaly": (equipment_anomaly.get("evaluated_values") or [None])[0],
+            }
+        ),
+    }
+    return _without_empty_values(evidence)
+
+
+def compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
+    verification = dict(output.get("constraint_check") or {})
+    checks = list(verification.get("checks") or [])
+    findings = [_compact_finding(item) for item in verification.get("priority_findings", [])]
+    rule_status = {
+        str(check.get("name")): check.get("status")
+        for check in checks
+        if check.get("name")
+    }
+    compact = {
+        "requested_categories": verification.get("requested_categories"),
+        "category_status": verification.get("category_status"),
+        "rule_status": rule_status,
+        "overall_status": verification.get("overall_status"),
+        "verification_complete": verification.get("verification_complete"),
+        "not_evaluated_rules": verification.get("not_evaluated_rules"),
+        "risk_level": verification.get("risk_level"),
+        "risk_escalations": verification.get("risk_escalations"),
+        "triggered_flags": [item.get("flag") for item in findings if item.get("flag")],
+        "human_intervention_label": verification.get("human_intervention_label"),
+        "dispatch_recommendation": verification.get("dispatch_recommendation"),
+        "priority_findings": findings,
+        "engineering_evidence": _engineering_evidence(checks),
+    }
+    return _without_empty_values(compact)
+
+
+def compact_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
+    parsed_task = compact_parsed_task(output)
     metadata = dict(output.get("forecast_metadata") or {})
     task_resolution = {
         "resolved_attention_variables": parsed_task.get("resolved_attention_variables", []),
@@ -197,14 +385,6 @@ def compact_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
         "unresolved_attention_targets": parsed_task.get("unresolved_attention_targets", []),
         "unresolved_output_state_variables": parsed_task.get("unresolved_output_state_variables", []),
         "applied_boundary_conditions": metadata.get("applied_boundary_conditions", []),
-    }
-    forecast = {
-        "mode": prediction.get("forecast_mode"),
-        "forecast_window": metadata.get("forecast_window", {}),
-        "requested_forecast_horizon_minutes": metadata.get("requested_forecast_horizon_minutes"),
-        "actual_forecast_steps": metadata.get("actual_forecast_steps"),
-        "actual_forecast_horizon_minutes": metadata.get("actual_forecast_horizon_minutes"),
-        "output_forecast_summary": prediction.get("output_forecast_summary", {}),
     }
     provenance = {
         "checkpoint_id": metadata.get("checkpoint_id"),
@@ -215,18 +395,10 @@ def compact_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "success": True,
         "task_resolution": _without_empty_values(task_resolution),
-        "prediction": _without_empty_values(forecast),
-        "verification": output.get("constraint_check"),
+        "prediction": compact_prediction_summary(output),
+        "verification": compact_constraint_check(output),
         "evidence": output.get("evidence"),
         "provenance": _without_empty_values(provenance),
-    }
-
-
-def _without_empty_values(value: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        key: item
-        for key, item in value.items()
-        if item is not None and item != {} and item != []
     }
 
 
@@ -298,6 +470,10 @@ SAFETY_ENERGY_INCONSISTENCY_CLAIM = re.compile(
     r"\u5b89\u5168\u4fa7\u4e0e\u80fd\u8017(?:/\u8bbe\u5907)?\u4fa7\u7ed3\u8bba\u4e0d\u4e00\u81f4",
     re.IGNORECASE,
 )
+UNSUPPORTED_UNIQUENESS_CLAIM = re.compile(
+    r"(?:\s*[,，]\s*)?(?:\u552f\u4e00(?:\u8d8a\u9650|\u544a\u8b66|\u5f02\u5e38)?\u53d8\u91cf|the\s+only\s+(?:violating|warning|abnormal)\s+variable)",
+    re.IGNORECASE,
+)
 
 
 def llm_answer_quality_issues(answer: str, *, check_history_claims: bool) -> List[str]:
@@ -319,7 +495,11 @@ def remove_unsupported_history_claims(answer: str) -> str:
 
 def _safety_and_energy_checks_pass(pipeformer: Optional[Dict[str, Any]]) -> bool:
     checks = ((pipeformer or {}).get("constraint_check") or {}).get("checks") or []
-    safety_checks = [item for item in checks if item.get("category") in {"pressure", "flow", "linepack"}]
+    safety_checks = [
+        item
+        for item in checks
+        if item.get("category") in {"pressure", "flow", "linepack", "abnormality_warning"}
+    ]
     energy_checks = [item for item in checks if item.get("name") == "energy_consumption_cost"]
     return (
         bool(safety_checks)
@@ -344,12 +524,52 @@ def enforce_requested_answer_scope(
     return answer.strip()
 
 
+def enforce_grounded_variable_descriptions(answer: str, pipeformer: Optional[Dict[str, Any]]) -> str:
+    if not pipeformer:
+        return answer
+
+    constraint_check = dict(pipeformer.get("constraint_check") or {})
+    findings = list(constraint_check.get("priority_findings") or [])
+    finding_variables = {
+        str(value.get("variable"))
+        for finding in findings
+        for value in list(finding.get("evaluated_values") or []) + list(finding.get("offending_values") or [])
+        if value.get("variable")
+    }
+    distinct_nonpass_variables = set(finding_variables)
+    if len(findings) != 1 or len(distinct_nonpass_variables) != 1:
+        answer = UNSUPPORTED_UNIQUENESS_CLAIM.sub("", answer)
+
+    evidence = dict(pipeformer.get("evidence") or {})
+    evidence_items: Dict[str, Dict[str, Any]] = {}
+    for key in ("top_watch_variables", "key_observation_variables"):
+        for item in evidence.get(key) or []:
+            variable = item.get("variable")
+            if variable:
+                evidence_items[str(variable)] = dict(item)
+
+    for variable, item in evidence_items.items():
+        if variable in finding_variables:
+            continue
+        facts = []
+        for key in ("mean_prediction", "mean_abs_delta_vs_observed"):
+            value = item.get(key)
+            if value is not None:
+                facts.append(f"{key}={float(value):.3f}")
+        escaped = re.escape(variable)
+        pattern = re.compile(rf"(?P<token>`?{escaped}`?)\s*[（(][^（）()\n]*[）)]")
+        replacement_suffix = f"（{', '.join(facts)}）" if facts else ""
+        answer = pattern.sub(lambda match: f"{match.group('token')}{replacement_suffix}", answer)
+    return answer.strip()
+
+
 def build_teacher_record(scenario: Dict[str, Any], question: str, trace: Dict[str, Any]) -> Dict[str, Any]:
     pipeformer = successful_pipeformer_output(trace)
     raw_answer = final_answer(trace)
     raw_answer_issues = llm_answer_quality_issues(raw_answer, check_history_claims=pipeformer is not None)
     answer = remove_unsupported_history_claims(raw_answer) if pipeformer else raw_answer
     answer = enforce_requested_answer_scope(answer, question, pipeformer)
+    answer = enforce_grounded_variable_descriptions(answer, pipeformer)
     quality_issues = llm_answer_quality_issues(answer, check_history_claims=pipeformer is not None)
     quality_flag = "pass" if trace.get("status") == "completed" else "needs_review"
     parsed_task: Dict[str, Any] = {}
@@ -360,9 +580,9 @@ def build_teacher_record(scenario: Dict[str, Any], question: str, trace: Dict[st
     manual_intervention_label = "no_intervention"
     dispatch_recommendation = ""
     if pipeformer:
-        parsed_task = dict(pipeformer.get("parsed_task") or {})
-        prediction_summary = dict(pipeformer.get("prediction_summary") or {})
-        constraint_check = dict(pipeformer.get("constraint_check") or {})
+        parsed_task = compact_parsed_task(pipeformer)
+        prediction_summary = compact_prediction_summary(pipeformer)
+        constraint_check = compact_constraint_check(pipeformer)
         evidence = dict(pipeformer.get("evidence") or {})
         risk_level = pipeformer.get("risk_level")
         manual_intervention_label = pipeformer.get("manual_intervention_label")

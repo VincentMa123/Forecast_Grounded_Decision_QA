@@ -1,6 +1,6 @@
 {
   "library_name": "engineering_constraint_library_pdf_1_5",
-  "library_version": "pdf_1_5_v1",
+  "library_version": "pdf_1_5_v2",
   "rule_source": "Forecast-Grounded Decision QA Section 1.5 engineering design rules",
   "value_space": "normalized PipeFormer forecast variables; replace proxy limits with real station and segment limits",
   "category_order": [
@@ -8,6 +8,8 @@
     "flow",
     "linepack",
     "compressor",
+    "equipment_regulation",
+    "abnormality_warning",
     "human_intervention",
     "dispatch_priority"
   ],
@@ -16,10 +18,12 @@
     "dispatch_priority"
   ],
   "category_details": {
-    "pressure": "Minimum and maximum pressure, violation nodes, violation duration, pressure margin, and recovery time.",
-    "flow": "Flow-change magnitude, segment capacity, abnormal-flow segments, and supply-demand balance.",
-    "linepack": "Linepack change rate, minimum linepack time, recovery capability, and warning status.",
-    "compressor": "Compressor load, compression ratio, power, operating envelope, and regulation margin.",
+    "pressure": "Node pressure lower and upper bounds, key-node pressure margin, continuous out-of-limit duration, and recovery time.",
+    "flow": "Segment flow change, maximum transmission capacity, boundary flow change rate, abnormal-flow segments, and supply-demand balance.",
+    "linepack": "Linepack decline magnitude, recovery capability and time, short-term peak-shaving reserve, change rate, and warning status.",
+    "compressor": "Compressor load, compression ratio, rotational speed, power, operating envelope, and regulation margin.",
+    "equipment_regulation": "Valve opening, pressure-regulating equipment range, and allowable boundary-control adjustment magnitude.",
+    "abnormality_warning": "Abnormal pressure drops, sudden flow changes, potential leaks, and equipment anomalies.",
     "human_intervention": "no_intervention, monitoring_only, operator_attention_required, immediate_intervention_required.",
     "dispatch_priority": "Pressure safety and supply assurance; compressor and equipment protection; linepack margin; flow stability; then energy and cost."
   },
@@ -28,6 +32,8 @@
     "flow": "flow_rules.json",
     "linepack": "linepack_rules.json",
     "compressor": "compressor_rules.json",
+    "equipment_regulation": "compressor_rules.json",
+    "abnormality_warning": "flow_rules.json",
     "human_intervention": "intervention_rules.json",
     "dispatch_priority": "dispatch_priority_rules.json"
   },

@@ -14,20 +14,33 @@ def run_compressor_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dic
     state = {
         "load": _state_values(summaries, ("C_",), ("_v000",)),
         "compression_ratio": _state_values(summaries, ("C_",), ("_v001",)),
+        "rotational_speed": _state_values(summaries, ("C_",), ("_v002", "_speed")),
         "power": _state_values(summaries, ("TE_",), ("_v000",)),
     }
-    envelope_checks = checks[:2]
+    envelope_rule_names = {
+        "compressor_load_limit",
+        "compressor_ratio_boundary",
+        "compressor_rotational_speed_limit",
+    }
+    envelope_checks = [check for check in checks if check["name"] in envelope_rule_names]
     if any(check["status"] == "fail" for check in envelope_checks):
         envelope_status = "outside_operating_envelope"
     elif any(check["status"] == "warning" for check in envelope_checks):
         envelope_status = "approaching_operating_envelope"
+    elif any(check["status"] == "not_evaluated" for check in envelope_checks):
+        envelope_status = "incomplete_operating_envelope"
     else:
         envelope_status = "inside_operating_envelope"
+    regulation_margin = {}
     for check in checks:
         check["compressor_state"] = state
         check["operating_envelope_status"] = envelope_status
         for item in check["evaluated_values"]:
             item["regulation_margin_to_fail"] = item.get("fail_margin")
+            variable = item.get("variable")
+            if variable:
+                regulation_margin[variable] = item.get("fail_margin")
+        check["regulation_margin_to_fail"] = regulation_margin
     return checks
 
 

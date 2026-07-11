@@ -20,13 +20,50 @@
       "flags": {"pass": "compressor_ratio_normal", "warning": "compressor_ratio_warning", "fail": "compressor_ratio_violation"}
     },
     {
+      "rule_id": "compressor_rotational_speed_limit",
+      "evaluator": "max_abs_prediction",
+      "description": "Compressor rotational speed should remain inside the configured operating-envelope limit.",
+      "priority": 42,
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v002", "_speed"]},
+      "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
+      "flags": {"pass": "compressor_speed_normal", "warning": "compressor_speed_warning", "fail": "compressor_speed_violation"}
+    },
+    {
       "rule_id": "compressor_power_change",
       "evaluator": "mean_abs_delta_vs_observed",
       "description": "Compressor power should not change sharply from the observed baseline.",
-      "priority": 42,
+      "priority": 43,
       "selector": {"prefixes": ["TE_"], "suffixes": ["_v000"]},
       "limits": {"warning_threshold": 0.5, "fail_threshold": 1.2},
       "flags": {"pass": "compressor_power_normal", "warning": "compressor_power_warning", "fail": "compressor_power_violation"}
+    }
+  ],
+  "equipment_regulation_rules": [
+    {
+      "rule_id": "valve_opening_range",
+      "evaluator": "predicted_range",
+      "description": "Valve-opening proxies should remain inside the configured normalized operating range.",
+      "priority": 50,
+      "selector": {"prefixes": ["B_"], "suffixes": ["_v000", "_opening"]},
+      "limits": {"warning_low": -2.5, "warning_high": 2.5, "fail_low": -3.0, "fail_high": 3.0},
+      "flags": {"pass": "valve_opening_normal", "warning": "valve_opening_warning", "fail": "valve_opening_violation"}
+    },
+    {
+      "rule_id": "pressure_regulator_range",
+      "evaluator": "predicted_range",
+      "description": "Pressure-regulating equipment proxies should remain inside the configured normalized range.",
+      "priority": 51,
+      "selector": {"prefixes": ["R_"], "suffixes": ["_v000", "_range"]},
+      "limits": {"warning_low": -2.5, "warning_high": 2.5, "fail_low": -3.0, "fail_high": 3.0},
+      "flags": {"pass": "regulator_range_normal", "warning": "regulator_range_warning", "fail": "regulator_range_violation"}
+    },
+    {
+      "rule_id": "boundary_control_adjustment_magnitude",
+      "evaluator": "boundary_change_percent",
+      "description": "Boundary-control adjustment should stay within the allowable equipment magnitude.",
+      "priority": 52,
+      "limits": {"warning_threshold": 10.0, "fail_threshold": 20.0},
+      "flags": {"pass": "equipment_adjustment_normal", "warning": "equipment_boundary_warning", "fail": "equipment_boundary_violation"}
     }
   ]
 }

@@ -3,11 +3,19 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..rule_library import load_constraint_specs, load_rule_definition
-from .common import max_status, run_specs
+from .common import (
+    CATEGORY_DETAILS,
+    contiguous_episodes,
+    longest_episode_minutes,
+    max_status,
+    run_specs,
+    variables_matching,
+)
 
 
 LINEPACK_SPECS = load_constraint_specs("linepack")
 LINEPACK_RECOVERY_RULE = load_rule_definition("linepack", "linepack_decline_and_recovery")
+LINEPACK_RESERVE_RULE = load_rule_definition("linepack", "linepack_peak_shaving_reserve")
 
 
 def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -17,6 +25,8 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
     minimum_items = []
     change_rates = {}
     recovery = {}
+    decline_episodes = {}
+    time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
     for variable in linepack_variables:
         summary = summaries.get(variable, {})
         values = summary.get("predicted_values", [])
@@ -29,11 +39,41 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         )
         decline = float(summary.get("max_decline_from_start") or 0.0)
         recovered = float(summary.get("recovery_from_minimum") or 0.0)
+        recovery_target = float(values[minimum_index]) + decline * minimum_recovery_ratio
+        recovered_index = (
+            minimum_index
+            if decline == 0
+            else next(
+                (
+                    index
+                    for index in range(minimum_index + 1, len(values))
+                    if float(values[index]) >= recovery_target
+                ),
+                None,
+            )
+        )
+        recovery_steps = (
+            recovered_index - minimum_index
+            if recovered_index is not None
+            else max(0, len(values) - 1 - minimum_index)
+        )
+        decreasing_indices = [
+            index
+            for index in range(1, len(values))
+            if float(values[index]) < float(values[index - 1])
+        ]
+        variable_decline_episodes = contiguous_episodes(decreasing_indices, labels, time_step_minutes)
+        decline_episodes[variable] = variable_decline_episodes
         recovery[variable] = {
             "decline_from_start": round(decline, 6),
             "recovery_from_minimum": round(recovered, 6),
             "recovery_ratio": round(recovered / decline, 6) if decline > 0 else 1.0,
             "recovery_sufficient": decline == 0 or recovered / decline >= minimum_recovery_ratio,
+            "recovery_target": round(recovery_target, 6),
+            "recovery_time_steps": recovery_steps,
+            "recovery_time_minutes": round(recovery_steps * time_step_minutes, 6),
+            "recovered_within_horizon": decline == 0 or recovered_index is not None,
+            "maximum_continuous_decline_minutes": longest_episode_minutes(variable_decline_episodes),
         }
         change_rates[variable] = summary.get("max_abs_step_change")
 
@@ -71,9 +111,81 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         )
         recovery_check["offending_values"].extend(insufficient_recovery)
 
+    reserve_check = _peak_shaving_reserve_check(summaries)
+    checks.append(reserve_check)
+
+    overall_linepack_status = max_status(check["status"] for check in checks)
+    overall_linepack_flag = {
+        "pass": "linepack_normal",
+        "warning": "linepack_warning",
+        "fail": "linepack_violation",
+    }.get(overall_linepack_status)
+
     for check in checks:
         check["minimum_linepack"] = minimum_record
         check["linepack_change_rate"] = change_rates
+        check["linepack_decline_episodes"] = decline_episodes
         check["linepack_recovery"] = recovery
-        check["linepack_warning_status"] = check["flag"]
+        check["short_term_peak_shaving_capacity"] = reserve_check.get("peak_shaving_capacity", {})
+        check["linepack_warning_status"] = overall_linepack_flag
     return checks
+
+
+def _peak_shaving_reserve_check(summaries: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+    selector = LINEPACK_RESERVE_RULE.get("selector") or {}
+    variables = variables_matching(
+        summaries,
+        tuple(selector.get("prefixes") or ()),
+        tuple(selector.get("suffixes") or ()),
+    )
+    limits = LINEPACK_RESERVE_RULE["limits"]
+    lower_bound = float(limits["safe_lower_bound"])
+    warning_reserve = float(limits["warning_reserve"])
+    fail_reserve = float(limits["fail_reserve"])
+    evaluated = []
+    capacity = {}
+    statuses = []
+    for variable in variables:
+        values = summaries.get(variable, {}).get("predicted_values", [])
+        if not values:
+            continue
+        minimum = min(float(value) for value in values)
+        reserve = minimum - lower_bound
+        status = "fail" if reserve <= fail_reserve else "warning" if reserve <= warning_reserve else "pass"
+        statuses.append(status)
+        item = {
+            "variable": variable,
+            "metric": "minimum_linepack_reserve",
+            "minimum_prediction": round(minimum, 6),
+            "safe_lower_bound": lower_bound,
+            "reserve": round(reserve, 6),
+            "warning_reserve": warning_reserve,
+            "fail_reserve": fail_reserve,
+            "status": status,
+        }
+        evaluated.append(item)
+        capacity[variable] = item
+
+    status = max_status(statuses)
+    flags = LINEPACK_RESERVE_RULE["flags"]
+    return {
+        "name": LINEPACK_RESERVE_RULE["rule_id"],
+        "category": "linepack",
+        "status": status,
+        "evaluation_status": "evaluated" if statuses else "not_evaluated",
+        "flag": flags.get(status),
+        "priority": int(LINEPACK_RESERVE_RULE["priority"]),
+        "variables": variables,
+        "description": LINEPACK_RESERVE_RULE["description"],
+        "main_content": CATEGORY_DETAILS["linepack"],
+        "message": (
+            "Linepack peak-shaving reserve could not be evaluated."
+            if status == "not_evaluated"
+            else "Linepack keeps the configured short-term peak-shaving reserve."
+            if status == "pass"
+            else "Linepack short-term peak-shaving reserve requires review."
+        ),
+        "evaluated_values": evaluated,
+        "offending_values": [item for item in evaluated if item["status"] != "pass"],
+        "peak_shaving_capacity": capacity,
+    }

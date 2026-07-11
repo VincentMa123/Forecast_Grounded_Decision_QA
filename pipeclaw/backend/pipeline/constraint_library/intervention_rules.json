@@ -6,7 +6,7 @@
     "operator_attention_required",
     "immediate_intervention_required"
   ],
-  "safety_categories": ["pressure", "flow"],
+  "safety_categories": ["pressure", "flow", "abnormality_warning"],
   "no_intervention_status": "pass",
   "immediate_intervention_status": "fail",
   "operator_attention_statuses": ["warning", "fail"],

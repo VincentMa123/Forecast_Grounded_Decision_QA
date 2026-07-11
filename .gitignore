@@ -6,6 +6,7 @@ __pycache__/
 *.pyo
 *.pyd
 pipeFormer/data/mock_tiny/static/mock_tiny/tokenizer_save/tokenizer_output.txt
+pipeFormer/build_cache.log
 pipeclaw/backend/generated_teacher_traces/teacher_trace.jsonl
 pipeclaw/backend/generated_teacher_traces/teacher_trace.pretty.json
 pipeclaw/backend/generated_teacher_traces/teacher_trace.json

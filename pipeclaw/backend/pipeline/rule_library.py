@@ -14,6 +14,7 @@ GENERIC_EVALUATORS = {
     "max_abs_prediction",
     "mean_abs_delta_vs_observed",
     "max_abs_step_change",
+    "max_step_decline",
     "max_decline_from_start",
     "boundary_change_percent",
 }
@@ -45,9 +46,12 @@ def load_rule_document(category: str) -> Dict[str, Any]:
     if not filename:
         raise KeyError(f"No rule file is configured for category {category!r}")
     document = load_json_document(str(filename))
-    if document.get("category") != category:
-        raise ValueError(f"{filename} declares category {document.get('category')!r}, expected {category!r}")
-    return document
+    if document.get("category") == category:
+        return document
+    nested_rules = document.get(f"{category}_rules")
+    if isinstance(nested_rules, list):
+        return {"category": category, "rules": nested_rules}
+    raise ValueError(f"{filename} does not define rules for category {category!r}")
 
 
 def load_constraint_specs(category: str) -> Tuple[ConstraintSpec, ...]:

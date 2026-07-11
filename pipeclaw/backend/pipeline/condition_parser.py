@@ -12,6 +12,8 @@ CATEGORY_MARKERS: Dict[str, List[str]] = {
     "flow": ["\u6d41\u91cf", "flow"],
     "linepack": ["\u7ba1\u5b58", "linepack"],
     "compressor": ["\u538b\u7f29\u673a", "compressor"],
+    "equipment_regulation": ["\u8bbe\u5907", "\u9600\u95e8", "\u8c03\u538b", "\u8fb9\u754c\u63a7\u5236", "equipment", "valve", "regulator", "boundary control"],
+    "abnormality_warning": ["\u5f02\u5e38", "\u6cc4\u6f0f", "\u7a81\u53d8", "abnormal", "leak", "sudden"],
     "dispatch_priority": ["\u80fd\u8017", "\u6210\u672c", "\u4f18\u5148", "energy", "cost", "priority"],
 }
 
@@ -20,6 +22,8 @@ CATEGORY_ATTENTION_TARGETS: Dict[str, List[str]] = {
     "flow": ["segments"],
     "linepack": ["linepack"],
     "compressor": ["compressors"],
+    "equipment_regulation": ["valves", "pressure_regulators", "boundary_controls"],
+    "abnormality_warning": ["nodes", "segments", "compressors"],
     "dispatch_priority": ["dispatch_priority_audit"],
 }
 
@@ -27,7 +31,9 @@ CATEGORY_OUTPUT_STATE_VARIABLES: Dict[str, List[str]] = {
     "pressure": ["pressure"],
     "flow": ["flow"],
     "linepack": ["linepack"],
-    "compressor": ["compressor_load", "compression_ratio", "compressor_power"],
+    "compressor": ["compressor_load", "compression_ratio", "compressor_speed", "compressor_power"],
+    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
+    "abnormality_warning": ["pressure", "flow", "compressor"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
 

@@ -79,7 +79,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["pressure", "flow", "linepack", "compressor", "dispatch_priority"],
+                        "enum": ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"],
                     },
                     "description": "Engineering constraint categories to execute, using the PDF names.",
                 },
@@ -94,7 +94,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                     "type": "array",
                     "items": {
                         "type": "string",
-                        "enum": ["pressure", "flow", "linepack", "compressor", "dispatch_priority"],
+                        "enum": ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"],
                     },
                     "description": "Legacy alias for constraint_verification_types.",
                 },

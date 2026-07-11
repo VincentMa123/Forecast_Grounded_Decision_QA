@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from ..rule_library import load_pipeline_constraints, load_rule_document
 from ..schemas import ConstraintSpec
 
 
-STATUS_RANK = {"pass": 0, "warning": 1, "fail": 2}
+STATUS_RANK = {"not_evaluated": -1, "pass": 0, "warning": 1, "fail": 2}
 PIPELINE_CONSTRAINTS = load_pipeline_constraints()
 DISPATCH_RULES = load_rule_document("dispatch_priority")
 CATEGORY_ORDER = list(PIPELINE_CONSTRAINTS["category_order"])
@@ -44,7 +44,7 @@ def variables_matching(names: Iterable[str], prefixes: Tuple[str, ...], suffixes
 
 
 def max_status(statuses: Iterable[str]) -> str:
-    return max(statuses, key=lambda status: STATUS_RANK.get(status, 0), default="pass")
+    return max(statuses, key=lambda status: STATUS_RANK.get(status, -1), default="not_evaluated")
 
 
 def status_from_threshold(value: float, warning: Optional[float], fail: Optional[float]) -> str:
@@ -57,10 +57,10 @@ def status_from_threshold(value: float, warning: Optional[float], fail: Optional
 
 
 def category_status(checks: Sequence[Dict[str, Any]]) -> Dict[str, str]:
-    result = {category: "pass" for category in CATEGORY_ORDER}
+    result = {category: "not_evaluated" for category in CATEGORY_ORDER}
     for check in checks:
         category = check["category"]
-        result[category] = max_status([result.get(category, "pass"), check["status"]])
+        result[category] = max_status([result.get(category, "not_evaluated"), check["status"]])
     return result
 
 
@@ -68,13 +68,14 @@ def base_check(spec: ConstraintSpec, variables: Sequence[str]) -> Dict[str, Any]
     return {
         "name": spec.name,
         "category": spec.category,
-        "status": "pass",
-        "flag": _flag_for_status(spec, "pass"),
+        "status": "not_evaluated",
+        "evaluation_status": "not_evaluated",
+        "flag": None,
         "priority": spec.priority,
         "variables": list(variables),
         "description": spec.description,
         "main_content": CATEGORY_DETAILS[spec.category],
-        "message": "No violation detected.",
+        "message": "The rule was not evaluated because required input values were unavailable.",
         "evaluated_values": [],
         "offending_values": [],
     }
@@ -130,8 +131,11 @@ def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], v
             )
 
     check["status"] = max_status(statuses)
+    check["evaluation_status"] = "evaluated" if statuses else "not_evaluated"
     check["flag"] = _flag_for_status(spec, check["status"])
-    if check["status"] == "pass":
+    if check["status"] == "not_evaluated":
+        check["message"] = "Matching variables did not contain forecast values for this rule."
+    elif check["status"] == "pass":
         check["message"] = "All selected variables are inside the configured operating window."
     else:
         check["message"] = f"{len(check['offending_values'])} value(s) crossed the configured operating window."
@@ -182,8 +186,11 @@ def evaluate_summary_metric(spec: ConstraintSpec, summaries: Dict[str, Dict[str,
             )
 
     check["status"] = max_status(statuses)
+    check["evaluation_status"] = "evaluated" if statuses else "not_evaluated"
     check["flag"] = _flag_for_status(spec, check["status"])
-    if check["status"] == "pass":
+    if check["status"] == "not_evaluated":
+        check["message"] = f"Matching variables did not provide the {spec.metric} metric."
+    elif check["status"] == "pass":
         check["message"] = f"All selected variables pass {spec.metric}."
     else:
         check["message"] = f"{len(check['offending_values'])} variable(s) crossed {spec.metric} threshold."
@@ -204,6 +211,7 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
     magnitude = abs(float(change_percent))
     status = status_from_threshold(magnitude, spec.warning_threshold, spec.fail_threshold)
     check["status"] = status
+    check["evaluation_status"] = "evaluated"
     check["flag"] = _flag_for_status(spec, status)
     check["evaluated_values"].append(
         {
@@ -257,11 +265,67 @@ def run_specs(
     return [evaluate_spec(spec, summaries, parsed_task) for spec in specs]
 
 
+def contiguous_episodes(
+    matching_indices: Iterable[int],
+    labels: Sequence[Any],
+    time_step_minutes: float,
+) -> List[Dict[str, Any]]:
+    indices = sorted(set(int(index) for index in matching_indices))
+    if not indices:
+        return []
+
+    groups: List[List[int]] = [[indices[0]]]
+    for index in indices[1:]:
+        if index == groups[-1][-1] + 1:
+            groups[-1].append(index)
+        else:
+            groups.append([index])
+
+    episodes = []
+    for group in groups:
+        start_index = group[0]
+        end_index = group[-1]
+        episodes.append(
+            {
+                "start_step_index": start_index,
+                "end_step_index": end_index,
+                "start_timestamp": labels[start_index] if start_index < len(labels) else None,
+                "end_timestamp": labels[end_index] if end_index < len(labels) else None,
+                "duration_steps": len(group),
+                "duration_minutes": round(len(group) * time_step_minutes, 6),
+            }
+        )
+    return episodes
+
+
+def threshold_episodes(
+    values: Sequence[float],
+    predicate: Callable[[float], bool],
+    labels: Sequence[Any],
+    time_step_minutes: float,
+) -> List[Dict[str, Any]]:
+    return contiguous_episodes(
+        (index for index, value in enumerate(values) if predicate(float(value))),
+        labels,
+        time_step_minutes,
+    )
+
+
+def longest_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
+    return max((float(item.get("duration_minutes") or 0.0) for item in episodes), default=0.0)
+
+
+def total_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
+    return round(sum(float(item.get("duration_minutes") or 0.0) for item in episodes), 6)
+
+
 def _outside_range(value: float, low: Optional[float], high: Optional[float]) -> bool:
     return (low is not None and value < low) or (high is not None and value > high)
 
 
-def _flag_for_status(spec: ConstraintSpec, status: str) -> str:
+def _flag_for_status(spec: ConstraintSpec, status: str) -> Optional[str]:
+    if status == "not_evaluated":
+        return None
     configured = {
         "pass": spec.pass_flag,
         "warning": spec.warning_flag,

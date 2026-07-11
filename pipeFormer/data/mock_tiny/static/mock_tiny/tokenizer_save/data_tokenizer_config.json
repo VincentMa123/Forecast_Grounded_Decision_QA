@@ -2,7 +2,7 @@
   "boundary_dims": 4,
   "constant_freq_threshold": 0.995,
   "constant_variable_threshold": 0.995,
-  "equipment_dims": 10,
+  "equipment_dims": 11,
   "quantile_method": "linear",
   "quantile_step": 0.1,
   "range_gap_epsilon": 1e-09,

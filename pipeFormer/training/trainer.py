@@ -883,7 +883,7 @@ class FluidTrainer(Trainer):
 
         # 生成时间戳和eval步骤信息 - 增加秒数避免重复
         current_time = datetime.datetime.now()
-        time_str = current_time.strftime("%Y年%m月%d日_%H时%M分%S秒")
+        time_str = current_time.strftime("%Y%m%d_%H%M%S")
         # 添加global_step确保唯一性
         global_step = self.state.global_step if hasattr(self, 'state') else 0
         step_info = f"eval步骤_{self.eval_step_counter}_step{global_step}_{time_str}"

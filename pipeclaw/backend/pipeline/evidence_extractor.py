@@ -22,6 +22,16 @@ def summarize_variables(real_rows: List[ForecastRow], predict_rows: List[Forecas
             if step_changes
             else None
         )
+        decline_indices = [
+            index
+            for index, change in enumerate(step_changes)
+            if change < 0
+        ]
+        decline_peak_index = (
+            min(decline_indices, key=lambda index: step_changes[index]) + 1
+            if decline_indices
+            else None
+        )
         summaries[variable] = {
             "predicted_values": [round(value, 6) for value in predicted],
             "prediction_labels": [row.label for row in predicted_rows],
@@ -37,6 +47,8 @@ def summarize_variables(real_rows: List[ForecastRow], predict_rows: List[Forecas
             "prediction_change": round(predicted[-1] - predicted[0], 6) if predicted else None,
             "max_abs_step_change": round(max((abs(value) for value in step_changes), default=0.0), 6),
             "max_abs_step_change_index": change_peak_index,
+            "max_step_decline": round(max((max(0.0, -value) for value in step_changes), default=0.0), 6),
+            "max_step_decline_index": decline_peak_index,
             "max_decline_from_start": round(max(0.0, predicted[0] - minimum), 6) if predicted else None,
             "recovery_from_minimum": round(predicted[-1] - minimum, 6) if predicted else None,
             "mean_delta_vs_observed": round(sum(deltas) / len(deltas), 6) if deltas else None,

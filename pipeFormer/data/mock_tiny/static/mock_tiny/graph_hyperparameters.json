@@ -2,7 +2,7 @@
   "graph": {
     "is_subgraph": true,
     "center_node": "P_001",
-    "neighbor_count": 13,
+    "neighbor_count": 14,
     "total_nodes": 8,
     "total_edges": 8,
     "node_type_counts": {
@@ -17,21 +17,21 @@
     "mock_data": true
   },
   "variables": {
-    "total_variables": 14,
+    "total_variables": 15,
     "boundary_variables": 4,
-    "equipment_variables": 10
+    "equipment_variables": 11
   },
   "tokenizer": {
     "quantile_step": 0.1,
     "constant_freq_threshold": 0.995,
     "constant_variable_threshold": 0.995,
-    "vocab_size": 60,
+    "vocab_size": 70,
     "boundary_dims": 4,
-    "equipment_dims": 10,
+    "equipment_dims": 11,
     "quantile_method": "linear",
     "range_gap_epsilon": 1e-09,
     "round_gap": 0.3,
-    "stats_dir": "/data2/cse12310948/project2/Forecast_Grounded_Decision_QA/pipeFormer/data/mock_tiny/static/mock_tiny/tokenizer_save",
+    "stats_dir": "C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeFormer\\data\\mock_tiny\\static\\mock_tiny\\tokenizer_save",
     "stats_file": "token_stats.csv"
   }
 }

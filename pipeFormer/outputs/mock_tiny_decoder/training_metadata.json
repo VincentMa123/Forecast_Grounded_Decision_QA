@@ -2,17 +2,17 @@
   "training_completed": true,
   "total_steps": 16,
   "epochs_completed": 1.0,
-  "best_metric": 2.2152981758117676,
+  "best_metric": 2.4359922409057617,
   "model_info": {
     "model_name": "FluidDecoder",
-    "input_dim": 14,
-    "output_dim": 14,
-    "total_parameters": 19840,
-    "trainable_parameters": 19840,
+    "input_dim": 15,
+    "output_dim": 15,
+    "total_parameters": 20192,
+    "trainable_parameters": 20192,
     "config": {
       "sequence_length": 3,
       "boundary_dims": 4,
-      "equipment_dims": 10,
+      "equipment_dims": 11,
       "learning_rate": 0.0001,
       "weight_decay": 1e-05,
       "dropout_rate": 0.1,
@@ -29,9 +29,9 @@
       "time_position_encoding": "learnable",
       "variable_position_encoding": "learnable",
       "max_time_positions": 10,
-      "max_variable_positions": 14,
+      "max_variable_positions": 15,
       "projection_hidden_dim": 32,
-      "tokenizer_vocab_size": 60,
+      "tokenizer_vocab_size": 70,
       "input_projection_type": "token_embedding",
       "use_layer_norm": true,
       "activation": "gelu"
@@ -42,7 +42,7 @@
     "d_ff": 64,
     "time_position_encoding": "learnable",
     "variable_position_encoding": "learnable",
-    "tokenizer_vocab_size": 60,
+    "tokenizer_vocab_size": 70,
     "input_projection_type": "token_embedding"
   }
 }

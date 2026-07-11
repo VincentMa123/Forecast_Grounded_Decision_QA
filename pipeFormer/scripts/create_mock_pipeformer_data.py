@@ -103,6 +103,7 @@ def choose_tiny_variables(names: list[str]) -> tuple[list[str], list[int]]:
         "B_001_v001",
         "C_001_v000",
         "C_001_v001",
+        "C_001_v002",
         "P_001_v000",
         "P_001_v001",
         "R_001_v000",

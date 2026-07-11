@@ -19,6 +19,15 @@
       "selector": {"prefixes": ["R_"], "suffixes": ["_v000"]},
       "limits": {"warning_threshold": 0.2, "fail_threshold": 0.5},
       "flags": {"pass": "linepack_rate_normal", "warning": "linepack_warning", "fail": "linepack_violation"}
+    },
+    {
+      "rule_id": "linepack_peak_shaving_reserve",
+      "evaluator": "minimum_reserve",
+      "description": "Linepack should retain configured normalized reserve above the lower safety bound for short-term peak shaving.",
+      "priority": 32,
+      "selector": {"prefixes": ["R_"], "suffixes": ["_v000"]},
+      "limits": {"safe_lower_bound": -3.0, "warning_reserve": 0.5, "fail_reserve": 0.0},
+      "flags": {"pass": "linepack_reserve_normal", "warning": "linepack_warning", "fail": "linepack_violation"}
     }
   ]
 }

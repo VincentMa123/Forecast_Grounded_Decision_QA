@@ -14,19 +14,31 @@ from .pipeformer_inference import (
 )
 
 
-DEFAULT_REQUESTED_CHECKS = ["pressure", "flow", "linepack", "compressor", "dispatch_priority"]
+DEFAULT_REQUESTED_CHECKS = [
+    "pressure",
+    "flow",
+    "linepack",
+    "compressor",
+    "equipment_regulation",
+    "abnormality_warning",
+    "dispatch_priority",
+]
 CHECK_TO_ATTENTION_TARGETS = {
     "pressure": ["nodes"],
     "flow": ["segments"],
     "linepack": ["linepack"],
     "compressor": ["compressors"],
+    "equipment_regulation": ["valves", "pressure_regulators", "boundary_controls"],
+    "abnormality_warning": ["nodes", "segments", "compressors"],
     "dispatch_priority": ["dispatch_priority_audit"],
 }
 CHECK_TO_OUTPUT_STATE_VARIABLES = {
     "pressure": ["pressure"],
     "flow": ["flow"],
     "linepack": ["linepack"],
-    "compressor": ["compressor_load", "compression_ratio", "compressor_power"],
+    "compressor": ["compressor_load", "compression_ratio", "compressor_speed", "compressor_power"],
+    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
+    "abnormality_warning": ["pressure", "flow", "compressor"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
 VARIABLE_GROUP_RULES = {
@@ -39,17 +51,18 @@ VARIABLE_GROUP_RULES = {
     "compressor_load": (("C_",), ("_v000",)),
     "compressor": (("C_", "TE_"), ()),
     "compression_ratio": (("C_",), ("_v001",)),
+    "compressor_speed": (("C_",), ("_v002", "_speed")),
     "compressor_power": (("TE_",), ("_v000",)),
     "power": (("TE_",), ("_v000",)),
     "energy": (("TE_",), ("_v000",)),
     "energy_consumption": (("TE_",), ("_v000",)),
     "energy_cost": (("TE_",), ("_v000",)),
     "operating_cost": (("TE_",), ("_v000",)),
-    "valves": (("T_",), ()),
-    "pressure_regulators": (("T_",), ()),
+    "valves": (("B_",), ()),
+    "pressure_regulators": (("R_",), ()),
     "boundary_controls": (("T_",), ()),
-    "valve_opening": (("T_",), ()),
-    "regulator_range": (("T_",), ()),
+    "valve_opening": (("B_",), ("_v000", "_opening")),
+    "regulator_range": (("R_",), ("_v000", "_range")),
     "boundary_control_adjustment": (("T_",), ()),
     "dispatch_priority_audit": (("N_", "P_", "B_", "C_", "R_", "TE_"), ()),
 }
@@ -65,6 +78,8 @@ COMPACT_OUTPUT_KEYS = (
     "prediction_change",
     "max_abs_step_change",
     "max_abs_step_change_index",
+    "max_step_decline",
+    "max_step_decline_index",
     "max_decline_from_start",
     "recovery_from_minimum",
 )
@@ -492,6 +507,12 @@ def run_pipeformer_forecast_analysis(
         "risk_level": verification["risk_level"],
         "manual_intervention_label": verification["human_intervention_label"],
         "dispatch_recommendation": verification.get("dispatch_recommendation"),
-        "quality_flag": "needs_review" if unresolved_attention or unresolved_outputs else "pass",
+        "quality_flag": (
+            "needs_review"
+            if unresolved_attention
+            or unresolved_outputs
+            or not verification.get("verification_complete", True)
+            else "pass"
+        ),
         "forecast_metadata": forecast_metadata,
     }
