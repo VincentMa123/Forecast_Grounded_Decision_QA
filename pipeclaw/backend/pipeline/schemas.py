@@ -19,6 +19,10 @@ class ConstraintSpec:
     metric: str
     prefixes: Tuple[str, ...] = ()
     suffixes: Tuple[str, ...] = ()
+    physical_quantities: Tuple[str, ...] = ()
+    equipment_types: Tuple[str, ...] = ()
+    roles: Tuple[str, ...] = ()
+    use_registry_limits: bool = False
     warning_low: Optional[float] = None
     warning_high: Optional[float] = None
     fail_low: Optional[float] = None

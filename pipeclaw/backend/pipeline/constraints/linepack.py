@@ -8,8 +8,9 @@ from .common import (
     contiguous_episodes,
     longest_episode_minutes,
     max_status,
+    registry_index,
     run_specs,
-    variables_matching,
+    variables_for_selector,
 )
 
 
@@ -111,7 +112,7 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         )
         recovery_check["offending_values"].extend(insufficient_recovery)
 
-    reserve_check = _peak_shaving_reserve_check(summaries)
+    reserve_check = _peak_shaving_reserve_check(summaries, parsed_task)
     checks.append(reserve_check)
 
     overall_linepack_status = max_status(check["status"] for check in checks)
@@ -131,21 +132,22 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
     return checks
 
 
-def _peak_shaving_reserve_check(summaries: Dict[str, Dict[str, Any]]) -> Dict[str, Any]:
+def _peak_shaving_reserve_check(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> Dict[str, Any]:
     selector = LINEPACK_RESERVE_RULE.get("selector") or {}
-    variables = variables_matching(
-        summaries,
-        tuple(selector.get("prefixes") or ()),
-        tuple(selector.get("suffixes") or ()),
-    )
+    variables = variables_for_selector(summaries, selector, parsed_task)
     limits = LINEPACK_RESERVE_RULE["limits"]
-    lower_bound = float(limits["safe_lower_bound"])
     warning_reserve = float(limits["warning_reserve"])
     fail_reserve = float(limits["fail_reserve"])
+    registry = registry_index(parsed_task)
     evaluated = []
     capacity = {}
     statuses = []
     for variable in variables:
+        metadata = registry.get(variable, {})
+        lower_bound = float(metadata.get("lower_limit", limits["safe_lower_bound"]))
+        limit_source = "variable_registry" if metadata.get("lower_limit") is not None else "rule_library"
         values = summaries.get(variable, {}).get("predicted_values", [])
         if not values:
             continue
@@ -161,6 +163,7 @@ def _peak_shaving_reserve_check(summaries: Dict[str, Dict[str, Any]]) -> Dict[st
             "reserve": round(reserve, 6),
             "warning_reserve": warning_reserve,
             "fail_reserve": fail_reserve,
+            "limit_source": limit_source,
             "status": status,
         }
         evaluated.append(item)

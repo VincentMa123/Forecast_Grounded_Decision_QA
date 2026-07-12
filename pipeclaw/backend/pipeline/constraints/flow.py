@@ -9,9 +9,11 @@ from .common import (
     longest_episode_minutes,
     run_specs,
     status_from_threshold,
+    threshold_limits_for_variable,
     threshold_episodes,
     total_episode_minutes,
-    variables_matching,
+    variables_for_selector,
+    variables_for_spec,
 )
 
 
@@ -25,11 +27,11 @@ BOUNDARY_FLOW_SPEC = next(spec for spec in FLOW_SPECS if spec.name == "boundary_
 def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
     checks = run_specs(FLOW_SPECS, summaries, parsed_task)
     segment_variables = sorted(
-        set(variables_matching(summaries, FLOW_RAMP_SPEC.prefixes, FLOW_RAMP_SPEC.suffixes))
-        | set(variables_matching(summaries, FLOW_CAPACITY_SPEC.prefixes, FLOW_CAPACITY_SPEC.suffixes))
+        set(variables_for_spec(FLOW_RAMP_SPEC, summaries, parsed_task))
+        | set(variables_for_spec(FLOW_CAPACITY_SPEC, summaries, parsed_task))
     )
-    boundary_variables = variables_matching(summaries, BOUNDARY_FLOW_SPEC.prefixes, BOUNDARY_FLOW_SPEC.suffixes)
-    abnormal_segments = _abnormal_flow_segments(summaries)
+    boundary_variables = variables_for_spec(BOUNDARY_FLOW_SPEC, summaries, parsed_task)
+    abnormal_segments = _abnormal_flow_segments(summaries, parsed_task)
     flow_change_magnitude = {
         variable: summaries.get(variable, {}).get("max_abs_step_change")
         for variable in segment_variables
@@ -39,9 +41,9 @@ def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str,
         for variable in boundary_variables
     }
     time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
-    capacity_episodes = _capacity_excursion_episodes(summaries, time_step_minutes)
-    ramp_events = _flow_ramp_events(summaries)
-    balance_check = _supply_demand_balance_check(summaries, time_step_minutes)
+    capacity_episodes = _capacity_excursion_episodes(summaries, time_step_minutes, parsed_task)
+    ramp_events = _flow_ramp_events(summaries, parsed_task)
+    balance_check = _supply_demand_balance_check(summaries, time_step_minutes, parsed_task)
     for check in checks:
         check["flow_change_magnitude"] = flow_change_magnitude
         check["boundary_flow_change_rate"] = boundary_flow_change_rate
@@ -55,10 +57,10 @@ def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str,
     return checks
 
 
-def _abnormal_flow_segments(summaries: Dict[str, Dict[str, Any]]) -> List[str]:
+def _abnormal_flow_segments(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[str]:
     abnormal = set()
     for spec in (FLOW_RAMP_SPEC, FLOW_CAPACITY_SPEC):
-        variables = variables_matching(summaries, spec.prefixes, spec.suffixes)
+        variables = variables_for_spec(spec, summaries, parsed_task)
         for variable in variables:
             value = summaries.get(variable, {}).get(spec.metric)
             if value is None:
@@ -71,22 +73,26 @@ def _abnormal_flow_segments(summaries: Dict[str, Dict[str, Any]]) -> List[str]:
 def _capacity_excursion_episodes(
     summaries: Dict[str, Dict[str, Any]],
     time_step_minutes: float,
+    parsed_task: Dict[str, Any],
 ) -> Dict[str, Dict[str, Any]]:
     result = {}
-    variables = variables_matching(summaries, FLOW_CAPACITY_SPEC.prefixes, FLOW_CAPACITY_SPEC.suffixes)
+    variables = variables_for_spec(FLOW_CAPACITY_SPEC, summaries, parsed_task)
     for variable in variables:
+        warning_threshold, fail_threshold, _ = threshold_limits_for_variable(
+            FLOW_CAPACITY_SPEC, variable, parsed_task
+        )
         values = summaries.get(variable, {}).get("predicted_values", [])
         labels = summaries.get(variable, {}).get("prediction_labels", [])
         warning = threshold_episodes(
             values,
-            lambda value: abs(value) >= float(FLOW_CAPACITY_SPEC.warning_threshold)
-            and abs(value) < float(FLOW_CAPACITY_SPEC.fail_threshold),
+            lambda value: abs(value) >= float(warning_threshold)
+            and abs(value) < float(fail_threshold),
             labels,
             time_step_minutes,
         )
         failure = threshold_episodes(
             values,
-            lambda value: abs(value) >= float(FLOW_CAPACITY_SPEC.fail_threshold),
+            lambda value: abs(value) >= float(fail_threshold),
             labels,
             time_step_minutes,
         )
@@ -105,9 +111,11 @@ def _capacity_excursion_episodes(
     return result
 
 
-def _flow_ramp_events(summaries: Dict[str, Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+def _flow_ramp_events(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> Dict[str, List[Dict[str, Any]]]:
     result = {}
-    variables = variables_matching(summaries, FLOW_RAMP_SPEC.prefixes, FLOW_RAMP_SPEC.suffixes)
+    variables = variables_for_spec(FLOW_RAMP_SPEC, summaries, parsed_task)
     for variable in variables:
         values = summaries.get(variable, {}).get("predicted_values", [])
         labels = summaries.get(variable, {}).get("prediction_labels", [])
@@ -135,29 +143,36 @@ def _flow_ramp_events(summaries: Dict[str, Dict[str, Any]]) -> Dict[str, List[Di
 def _supply_demand_balance_check(
     summaries: Dict[str, Dict[str, Any]],
     time_step_minutes: float,
+    parsed_task: Dict[str, Any],
 ) -> Dict[str, Any]:
     supply_selector = BALANCE_RULE["supply_selector"]
     demand_selector = BALANCE_RULE["demand_selector"]
-    supply_variables = variables_matching(
-        summaries,
-        tuple(supply_selector.get("prefixes") or ()),
-        tuple(supply_selector.get("suffixes") or ()),
-    )
-    demand_variables = variables_matching(
-        summaries,
-        tuple(demand_selector.get("prefixes") or ()),
-        tuple(demand_selector.get("suffixes") or ()),
-    )
+    supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
+    demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
     variables = supply_variables + demand_variables
-    series_lengths = [len(summaries[name].get("predicted_values", [])) for name in variables]
-    step_count = min(series_lengths, default=0)
+    usable_supply_variables = [
+        name for name in supply_variables if summaries.get(name, {}).get("predicted_values")
+    ]
+    usable_demand_variables = [
+        name for name in demand_variables if summaries.get(name, {}).get("predicted_values")
+    ]
+    series_lengths = [
+        len(summaries[name]["predicted_values"])
+        for name in usable_supply_variables + usable_demand_variables
+    ]
+    step_count = min(series_lengths, default=0) if usable_supply_variables and usable_demand_variables else 0
     gaps = []
     for index in range(step_count):
-        supply = sum(summaries[name]["predicted_values"][index] for name in supply_variables)
-        demand = sum(summaries[name]["predicted_values"][index] for name in demand_variables)
+        supply = sum(
+            summaries[name]["predicted_values"][index] for name in usable_supply_variables
+        ) / len(usable_supply_variables)
+        demand = sum(
+            summaries[name]["predicted_values"][index] for name in usable_demand_variables
+        ) / len(usable_demand_variables)
         gaps.append(supply - demand)
 
-    labels = summaries.get(variables[0], {}).get("prediction_labels", []) if variables else []
+    usable_variables = usable_supply_variables + usable_demand_variables
+    labels = summaries.get(usable_variables[0], {}).get("prediction_labels", []) if usable_variables else []
     widening_change_indices = [
         index
         for index in range(1, len(gaps))

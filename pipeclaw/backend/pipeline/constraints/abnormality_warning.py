@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..rule_library import load_constraint_specs, load_rule_definition
-from .common import CATEGORY_DETAILS, max_status, run_specs, status_from_threshold, variables_matching
+from .common import CATEGORY_DETAILS, max_status, run_specs, status_from_threshold, variables_for_selector
 
 
 ABNORMALITY_SPECS = load_constraint_specs("abnormality_warning")
@@ -15,7 +15,7 @@ def run_abnormality_warning_checks(
     parsed_task: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     checks = run_specs(ABNORMALITY_SPECS, summaries, parsed_task)
-    leak_check = _potential_leak_check(summaries, checks)
+    leak_check = _potential_leak_check(summaries, checks, parsed_task)
     checks.append(leak_check)
     return checks
 
@@ -23,22 +23,15 @@ def run_abnormality_warning_checks(
 def _potential_leak_check(
     summaries: Dict[str, Dict[str, Any]],
     checks: List[Dict[str, Any]],
+    parsed_task: Dict[str, Any],
 ) -> Dict[str, Any]:
     by_name = {check["name"]: check for check in checks}
     pressure_check = by_name.get("abnormal_pressure_drop", {})
     flow_check = by_name.get("sudden_flow_change", {})
     supply_selector = POTENTIAL_LEAK_RULE["supply_selector"]
     demand_selector = POTENTIAL_LEAK_RULE["demand_selector"]
-    supply_variables = variables_matching(
-        summaries,
-        tuple(supply_selector.get("prefixes") or ()),
-        tuple(supply_selector.get("suffixes") or ()),
-    )
-    demand_variables = variables_matching(
-        summaries,
-        tuple(demand_selector.get("prefixes") or ()),
-        tuple(demand_selector.get("suffixes") or ()),
-    )
+    supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
+    demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
     variables = list(dict.fromkeys(pressure_check.get("variables", []) + supply_variables + demand_variables))
     usable_supply_variables = [
         variable
@@ -61,8 +54,8 @@ def _potential_leak_check(
     )
     gaps = []
     for index in range(step_count):
-        supply = sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply_variables)
-        demand = sum(float(summaries[name]["predicted_values"][index]) for name in usable_demand_variables)
+        supply = sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply_variables) / len(usable_supply_variables)
+        demand = sum(float(summaries[name]["predicted_values"][index]) for name in usable_demand_variables) / len(usable_demand_variables)
         gaps.append(supply - demand)
 
     max_gap = max((abs(value) for value in gaps), default=0.0)

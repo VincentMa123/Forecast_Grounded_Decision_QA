@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
-"""
-Create a tiny synthetic PipeFormer-compatible dataset for local smoke tests.
+"""Create a coherent synthetic PipeFormer fixture for lifecycle task controls.
 
-The generated data is intentionally fake. It is only meant to validate the
-preprocessing/cache/training wiring when the original industrial topology and
-sequence files are unavailable.
+The generated signals are causal but synthetic. They validate data, model, and
+teacher-trace integration; they are not calibrated pipeline simulations.
 """
 
 from __future__ import annotations
@@ -12,451 +10,476 @@ from __future__ import annotations
 import argparse
 import json
 import pickle
+import re
 import shutil
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
 
 BOUNDARY_DIMS = 538
-EQUIPMENT_DIMS = {
-    "B": 2058,
-    "C": 161,
-    "H": 192,
-    "N": 1716,
-    "P": 1610,
-    "R": 50,
-    "T&E": 387,
+VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
+CONTROL_SPECS = {
+    ("T", "SNQ"): ("supply_flow_setpoint", "p.u.", 0.4, 1.6),
+    ("E", "SNQ"): ("demand_flow_setpoint", "p.u.", 0.4, 1.6),
+    ("B", "FR"): ("valve_flow_ratio", "p.u.", 0.0, 1.2),
+    ("R", "SPD"): ("downstream_pressure_setpoint", "p.u.", 0.4, 1.6),
+    ("C", "SP_"): ("rotational_speed_setpoint", "p.u.", 0.4, 1.6),
+    ("C", "SP_out"): ("outlet_pressure_setpoint", "p.u.", 0.4, 1.6),
+    ("T", "SP"): ("source_pressure_setpoint", "p.u.", 0.4, 1.6),
+    ("C", "ST"): ("equipment_status", "binary", 0.0, 1.0),
+    ("R", "ST"): ("equipment_status", "binary", 0.0, 1.0),
 }
-EQUIPMENT_ORDER = ["B", "C", "H", "N", "P", "R", "T&E"]
+
+
+def extract_inventory(
+    dataset_paths: list[Path],
+) -> tuple[list[dict[str, Any]], list[str], dict[str, Any], dict[str, list[str]]]:
+    all_scenarios: list[dict[str, Any]] = []
+    source_summary: dict[str, Any] = {}
+    variable_sources: dict[str, list[str]] = defaultdict(list)
+    for dataset_path in dataset_paths:
+        scenarios = json.loads(dataset_path.read_text(encoding="utf-8-sig"))
+        if not isinstance(scenarios, list):
+            raise TypeError(f"Lifecycle dataset must contain a JSON list: {dataset_path}")
+        texts = []
+        scenario_types: dict[str, int] = defaultdict(int)
+        session_count = 0
+        turn_count = 0
+        for scenario in scenarios:
+            scenario_types[str(scenario.get("scenario_type") or "unknown")] += 1
+            texts.append(str(scenario.get("scenario_description") or ""))
+            sessions = scenario.get("sessions") or []
+            session_count += len(sessions)
+            for session in sessions:
+                dialogue = session.get("dialogue") or []
+                turn_count += len(dialogue)
+                for turn in dialogue:
+                    texts.append(str(turn.get("user_input") or ""))
+        variables = sorted({match.group(0) for match in VARIABLE_RE.finditer("\n".join(texts)) if ":" in match.group(0)})
+        for variable in variables:
+            variable_sources[variable].append(dataset_path.name)
+        all_scenarios.extend(scenarios)
+        source_summary[dataset_path.name] = {
+            "scenario_count": len(scenarios),
+            "scenario_types": dict(sorted(scenario_types.items())),
+            "session_count": session_count,
+            "turn_count": turn_count,
+            "control_variable_count": len(variables),
+        }
+    return all_scenarios, sorted(variable_sources), source_summary, dict(variable_sources)
+
+
+def control_registry(variable: str, sources: list[str]) -> dict[str, Any]:
+    equipment, tag = variable.split(":", 1)
+    equipment_prefix = equipment.split("_", 1)[0]
+    equipment_type = {
+        "T": "gas_source",
+        "E": "demand_boundary",
+        "B": "ball_valve",
+        "R": "pressure_regulator",
+        "C": "compressor",
+    }.get(equipment_prefix, "boundary_control")
+    quantity, unit, lower, upper = CONTROL_SPECS.get(
+        (equipment_prefix, tag),
+        ("control_setpoint", "p.u.", 0.0, 2.0),
+    )
+    return {
+        "variable": variable,
+        "equipment_id": equipment,
+        "equipment_type": equipment_type,
+        "physical_quantity": quantity,
+        "role": "input",
+        "unit": unit,
+        "controllable": True,
+        "lower_limit": lower,
+        "upper_limit": upper,
+        "warning_lower_limit": lower,
+        "warning_upper_limit": upper,
+        "source": sources[0] if len(sources) == 1 else "multiple_lifecycle_sources",
+        "sources": sources,
+    }
+
+
+def state_registry(control_names: list[str]) -> list[dict[str, Any]]:
+    specs: list[tuple[str, str, str, str, float, float, float, float]] = []
+    for device in ("N_001", "N_002", "N_003"):
+        specs.append((f"{device}_v000", device, "node", "pressure", -3.0, 3.0, -2.5, 2.5))
+    for device in ("P_001", "P_002"):
+        specs.extend(
+            [
+                (f"{device}_v000", device, "pipeline_segment", "pressure", -3.0, 3.0, -2.5, 2.5),
+                (f"{device}_v001", device, "pipeline_segment", "flow", -3.0, 3.0, -2.2, 2.2),
+            ]
+        )
+    devices_by_prefix: dict[str, list[str]] = defaultdict(list)
+    for variable in control_names:
+        device = variable.split(":", 1)[0]
+        prefix = device.split("_", 1)[0]
+        if device not in devices_by_prefix[prefix]:
+            devices_by_prefix[prefix].append(device)
+    for device in sorted(devices_by_prefix["B"]):
+        specs.extend(
+            [
+                (f"{device}_v000", device, "ball_valve", "valve_opening", -3.0, 3.0, -2.5, 2.5),
+                (f"{device}_v001", device, "ball_valve", "flow", -3.0, 3.0, -2.2, 2.2),
+            ]
+        )
+    for device in ("H_001", "H_002"):
+        specs.append((f"{device}_v000", device, "pipeline_segment", "linepack", -3.0, 3.0, -2.5, 2.5))
+    for device in sorted(devices_by_prefix["C"]):
+        specs.extend(
+            [
+                (f"{device}_v000", device, "compressor", "compressor_load", -2.0, 2.0, -1.2, 1.2),
+                (f"{device}_v001", device, "compressor", "compression_ratio", -2.0, 2.0, -1.2, 1.2),
+                (f"{device}_v002", device, "compressor", "rotational_speed", -2.0, 2.0, -1.2, 1.2),
+            ]
+        )
+        power_device = device.replace("C_", "TE_", 1)
+        specs.append((f"{power_device}_v000", power_device, "compressor_power", "power", -3.0, 3.0, -2.5, 2.5))
+    for device in sorted(devices_by_prefix["R"]):
+        specs.append((f"{device}_v000", device, "pressure_regulator", "regulator_range", -3.0, 3.0, -2.5, 2.5))
+    return [
+        {
+            "variable": variable,
+            "equipment_id": equipment,
+            "equipment_type": equipment_type,
+            "physical_quantity": quantity,
+            "role": "output",
+            "unit": "p.u.",
+            "controllable": False,
+            "lower_limit": lower,
+            "upper_limit": upper,
+            "warning_lower_limit": warning_lower,
+            "warning_upper_limit": warning_upper,
+            "source": "synthetic_derived_state",
+        }
+        for variable, equipment, equipment_type, quantity, lower, upper, warning_lower, warning_upper in specs
+    ]
 
 
 def make_dirs(root: Path, force: bool) -> dict[str, Path]:
     if root.exists() and force:
         shutil.rmtree(root)
-    root.mkdir(parents=True, exist_ok=True)
-
     paths = {
-        "dataset_train": root / "dataset" / "train",
-        "dataset_test": root / "dataset" / "test",
+        "train": root / "dataset" / "train",
+        "test": root / "dataset" / "test",
         "static_full": root / "static" / "full",
-        "static_tiny": root / "static" / "mock_tiny",
+        "static_active": root / "static" / "mock_lifecycle",
+        "process": root / "process_eq_argu",
         "relative": root / "relative_PPT",
-        "process_eq_argu": root / "process_eq_argu",
     }
     for path in paths.values():
         path.mkdir(parents=True, exist_ok=True)
     return paths
 
 
-def full_variable_names() -> list[str]:
-    names: list[str] = [f"T_001:BC{i:03d}" for i in range(BOUNDARY_DIMS)]
-    for equipment_type in EQUIPMENT_ORDER:
-        count = EQUIPMENT_DIMS[equipment_type]
-        prefix = "TE" if equipment_type == "T&E" else equipment_type
-        for i in range(count):
-            device_no = (i % 3) + 1
-            feature_no = i // 3
-            names.append(f"{prefix}_{device_no:03d}_v{feature_no:03d}")
-    return names
-
-
 def write_mapping(path: Path, names: list[str], global_indices: list[int] | None = None) -> None:
-    data = {"index": np.arange(len(names), dtype=np.int32), "variable_name": names}
+    payload: dict[str, Any] = {"index": np.arange(len(names), dtype=np.int32), "variable_name": names}
     if global_indices is not None:
-        data["global_index"] = np.asarray(global_indices, dtype=np.int32)
-    pd.DataFrame(data).to_csv(path, index=False)
+        payload["global_index"] = np.asarray(global_indices, dtype=np.int32)
+    pd.DataFrame(payload).to_csv(path, index=False)
 
 
-def write_full_static_mapping(static_full: Path, names: list[str]) -> None:
-    write_mapping(static_full / "index_variable_mapping.csv", names)
-    boundary_count = BOUNDARY_DIMS
-    hyper = {
-        "graph": {
-            "is_subgraph": False,
-            "center_node": None,
-            "total_nodes": 8,
-            "total_edges": 8,
-            "node_type_counts": {"B": 1, "C": 1, "E": 1, "N": 2, "P": 1, "R": 1, "T": 1},
-        },
-        "variables": {
-            "total_variables": len(names),
-            "boundary_variables": boundary_count,
-            "equipment_variables": len(names) - boundary_count,
-        },
-        "tokenizer": {},
-    }
-    (static_full / "graph_hyperparameters.json").write_text(
-        json.dumps(hyper, indent=2), encoding="utf-8"
+def full_mapping(control_names: list[str], state_names: list[str]) -> list[str]:
+    fillers = [f"T_999:BC{i:03d}" for i in range(BOUNDARY_DIMS - len(control_names))]
+    equipment = list(state_names)
+    for prefix, count in (("B", 2058), ("C", 161), ("H", 192), ("N", 1716), ("P", 1610), ("R", 50), ("TE", 387)):
+        existing = sum(name.startswith(f"{prefix}_") for name in equipment)
+        equipment.extend(f"{prefix}_999_v{i:04d}" for i in range(count - existing))
+    return control_names + fillers + equipment
+
+
+def equipment_id(variable: str) -> str:
+    base = variable.split(":", 1)[0]
+    parts = base.split("_")
+    return "_".join(parts[:2]) if len(parts) >= 2 else base
+
+
+def graph_edges(registry: list[dict[str, Any]]) -> list[tuple[str, str]]:
+    entities = sorted({str(item["equipment_id"]) for item in registry})
+    groups = defaultdict(list)
+    for entity in entities:
+        groups[entity.split("_", 1)[0]].append(entity)
+    backbone = groups["T"] + groups["N"] + groups["P"] + groups["H"] + groups["B"] + groups["C"] + groups["R"] + groups["E"] + groups["TE"]
+    return list(dict.fromkeys((backbone[index], backbone[index + 1]) for index in range(len(backbone) - 1)))
+
+
+def write_static(paths: dict[str, Path], root: Path, registry: list[dict[str, Any]]) -> None:
+    controls = [item["variable"] for item in registry if item["role"] == "input"]
+    states = [item["variable"] for item in registry if item["role"] == "output"]
+    full_names = full_mapping(controls, states)
+    active_names = controls + states
+    lookup = {name: index for index, name in enumerate(full_names)}
+    write_mapping(paths["static_full"] / "index_variable_mapping.csv", full_names)
+    write_mapping(paths["static_active"] / "index_variable_mapping.csv", active_names, [lookup[name] for name in active_names])
+    pd.DataFrame({"variable_name": active_names, "predict": [0] * len(controls) + [1] * len(states)}).to_csv(
+        paths["static_active"] / "prediction_mask.csv", index=False
     )
+    registry_payload = {
+        "schema_version": "mock_lifecycle_registry_v1",
+        "synthetic": True,
+        "physical_validation_status": "not_validated",
+        "variables": registry,
+    }
+    for directory in (root, paths["static_active"]):
+        (directory / "variable_registry.json").write_text(json.dumps(registry_payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    pd.DataFrame(registry).to_csv(root / "variable_registry.csv", index=False)
 
-
-def choose_tiny_variables(names: list[str]) -> tuple[list[str], list[int]]:
-    desired = [
-        "T_001:BC000",
-        "T_001:BC001",
-        "T_001:BC002",
-        "T_001:BC003",
-        "B_001_v000",
-        "B_001_v001",
-        "C_001_v000",
-        "C_001_v001",
-        "C_001_v002",
-        "P_001_v000",
-        "P_001_v001",
-        "R_001_v000",
-        "TE_001_v000",
-        "N_001_v000",
-        "N_002_v000",
-    ]
-    lookup = {name: idx for idx, name in enumerate(names)}
-    missing = [name for name in desired if name not in lookup]
-    if missing:
-        raise RuntimeError(f"Internal mock variable list is invalid: {missing}")
-    return desired, [lookup[name] for name in desired]
-
-
-def write_graph(static_dir: Path, root: Path) -> None:
+    edges = graph_edges(registry)
     graph = defaultdict(set)
-    edges = [
-        ("T_001", "N_001"),
-        ("N_001", "P_001"),
-        ("P_001", "N_002"),
-        ("N_002", "B_001"),
-        ("B_001", "C_001"),
-        ("C_001", "R_001"),
-        ("R_001", "E_001"),
-        ("E_001", "TE_001"),
-    ]
     for left, right in edges:
         graph[left].add(right)
         graph[right].add(left)
-
     graph_data = {
         "graph": dict(graph),
-        "equipment_dir": str(root / "equipment_arguments"),
-        "connected_nodes_file": str(root / "relative_PPT" / "connected_nodes.csv"),
-        "target_equipment_types": {"T", "E", "C", "R", "B"},
+        "equipment_dir": "equipment_arguments",
+        "connected_nodes_file": "relative_PPT/connected_nodes.csv",
+        "target_equipment_types": {"T", "E", "C", "R", "B", "N", "P", "H"},
     }
-    with (static_dir / "pipeline_graph_cache.pkl").open("wb") as handle:
+    with (paths["static_active"] / "pipeline_graph_cache.pkl").open("wb") as handle:
         pickle.dump(graph_data, handle)
-
-    rows = [{"node": min(a, b), "connected_node": max(a, b)} for a, b in edges]
-    pd.DataFrame(rows).to_csv(static_dir / "save_connect_all_nodes.csv", index=False)
-
-
-def write_tiny_static(static_tiny: Path, root: Path, tiny_names: list[str], tiny_global: list[int]) -> None:
-    write_mapping(static_tiny / "index_variable_mapping.csv", tiny_names, tiny_global)
-    write_graph(static_tiny, root)
-
-    mask = pd.DataFrame(
-        {
-            "variable_name": tiny_names,
-            "predict": [0 if ":" in name else 1 for name in tiny_names],
-        }
+    pd.DataFrame([{"node": left, "connected_node": right} for left, right in edges]).to_csv(
+        paths["static_active"] / "save_connect_all_nodes.csv", index=False
     )
-    mask.to_csv(static_tiny / "prediction_mask.csv", index=False)
-
-    boundary_count = sum(1 for name in tiny_names if ":" in name)
     hyper = {
-        "graph": {
-            "is_subgraph": True,
-            "center_node": "P_001",
-            "neighbor_count": len(tiny_names) - 1,
-            "total_nodes": 8,
-            "total_edges": 8,
-            "node_type_counts": {"B": 1, "C": 1, "E": 1, "N": 2, "P": 1, "R": 1, "T": 1},
-            "mock_data": True,
-        },
-        "variables": {
-            "total_variables": len(tiny_names),
-            "boundary_variables": boundary_count,
-            "equipment_variables": len(tiny_names) - boundary_count,
-        },
-        "tokenizer": {
-            "quantile_step": 0.1,
-            "constant_freq_threshold": 0.995,
-            "constant_variable_threshold": 0.995,
-        },
+        "graph": {"is_subgraph": True, "center_node": "P_001", "total_nodes": len(graph), "total_edges": len(edges), "mock_data": True},
+        "variables": {"total_variables": len(active_names), "boundary_variables": len(controls), "equipment_variables": len(states)},
+        "tokenizer": {"quantile_step": 0.1, "constant_freq_threshold": 0.995, "constant_variable_threshold": 0.995},
     }
-    (static_tiny / "graph_hyperparameters.json").write_text(
-        json.dumps(hyper, indent=2), encoding="utf-8"
+    (paths["static_active"] / "graph_hyperparameters.json").write_text(json.dumps(hyper, indent=2), encoding="utf-8")
+    (paths["static_full"] / "graph_hyperparameters.json").write_text(
+        json.dumps({"variables": {"total_variables": len(full_names), "boundary_variables": BOUNDARY_DIMS}}, indent=2), encoding="utf-8"
     )
+    write_attention(paths["static_active"], active_names, graph)
 
 
-def daily_times() -> tuple[pd.DatetimeIndex, pd.DatetimeIndex]:
-    boundary = pd.date_range("2025-01-01 00:00:00", "2025-01-01 23:30:00", freq="30min")
-    equipment = pd.date_range("2025-01-01 00:01:00", "2025-01-01 23:59:00", freq="1min")
-    return boundary, equipment
+def write_attention(static_dir: Path, names: list[str], graph: dict[str, set[str]], max_neighbors: int = 12) -> None:
+    by_entity: dict[str, list[int]] = defaultdict(list)
+    for index, name in enumerate(names):
+        by_entity[equipment_id(name)].append(index)
+    indices = np.zeros((len(names), max_neighbors), dtype=np.int32)
+    labels = np.empty((len(names), max_neighbors), dtype=object)
+    for index, name in enumerate(names):
+        entity = equipment_id(name)
+        candidates = [index] + [value for value in by_entity[entity] if value != index]
+        for neighbor in graph.get(entity, set()):
+            candidates.extend(by_entity.get(neighbor, []))
+        deduped = list(dict.fromkeys(candidates)) or [index]
+        padded = (deduped + [index] * max_neighbors)[:max_neighbors]
+        indices[index] = padded
+        labels[index] = [names[value] for value in padded]
+    with (static_dir / "attention_indices.pkl").open("wb") as handle:
+        pickle.dump({"attention_indices": indices, "variable_names": labels}, handle)
+    pd.DataFrame(indices).to_csv(static_dir / "attention_indices.csv", index_label="variable_index")
+    pd.DataFrame(labels).to_csv(static_dir / "attention_variable_names.csv", index_label="variable_index")
 
 
-def smooth_signal(length: int, sample_idx: int, scale: float, phase: float = 0.0) -> np.ndarray:
-    x = np.linspace(0.0, 2.0 * np.pi, length, dtype=np.float32)
-    return scale * (np.sin(x + phase) + 0.2 * np.cos(3.0 * x + sample_idx))
+def baseline(variable: str, case_number: int) -> float:
+    tag = variable.split(":", 1)[1]
+    prefix = variable.split("_", 1)[0]
+    if tag == "ST":
+        return 0.0 if (case_number + sum(map(ord, variable))) % 7 == 0 else 1.0
+    if tag == "FR":
+        return 0.78 + 0.05 * ((case_number % 5) - 2)
+    if tag == "SNQ" and prefix == "T":
+        return 1.0 + 0.06 * ((case_number % 7) - 3)
+    if tag == "SNQ" and prefix == "E":
+        return 0.95 + 0.05 * (((case_number * 3) % 7) - 3)
+    return 1.0 + 0.05 * ((case_number % 5) - 2)
 
 
-def write_sample(sample_dir: Path, sample_idx: int, tiny_names: list[str]) -> None:
-    sample_dir.mkdir(parents=True, exist_ok=True)
-    boundary_times, equipment_times = daily_times()
+def control_series(control_names: list[str], case_number: int) -> tuple[pd.DatetimeIndex, dict[str, np.ndarray]]:
+    times = pd.date_range("2025-01-01 00:00:00", "2025-01-01 23:30:00", freq="30min")
+    phase = case_number * 0.17
+    x = np.linspace(0.0, 2.0 * np.pi, len(times), dtype=np.float32)
+    result = {}
+    for index, variable in enumerate(control_names):
+        tag = variable.split(":", 1)[1]
+        if tag == "ST":
+            values = np.full(len(times), baseline(variable, case_number), dtype=np.float32)
+        else:
+            values = baseline(variable, case_number) + 0.08 * np.sin(x + phase + index * 0.23)
+        result[variable] = values.astype(np.float32)
+    return times, result
 
-    boundary_cols = [f"T_001:BC{i:03d}" for i in range(BOUNDARY_DIMS)]
-    boundary_data = {"TIME": boundary_times.strftime("%Y-%m-%d %H:%M:%S")}
-    base = 4.0 + 0.05 * sample_idx
-    for i, col in enumerate(boundary_cols):
-        boundary_data[col] = base + smooth_signal(len(boundary_times), sample_idx, 0.05, i * 0.03) + i * 0.0005
-    pd.DataFrame(boundary_data).to_csv(sample_dir / "Boundary.csv", index=False)
 
-    by_type: dict[str, list[str]] = {key: [] for key in EQUIPMENT_ORDER}
-    for name in tiny_names:
-        if ":" in name:
-            continue
+def minute_controls(boundary_times: pd.DatetimeIndex, controls: dict[str, np.ndarray]) -> tuple[pd.DatetimeIndex, dict[str, np.ndarray]]:
+    minute_times = pd.date_range("2025-01-01 00:01:00", "2025-01-01 23:59:00", freq="1min")
+    result = {}
+    for name, values in controls.items():
+        series = pd.Series(values, index=boundary_times).reindex(minute_times, method="ffill")
+        result[name] = series.fillna(float(values[0])).to_numpy(dtype=np.float32)
+    return minute_times, result
+
+
+def mean_controls(controls: dict[str, np.ndarray], prefixes: tuple[str, ...]) -> np.ndarray:
+    selected = [values for name, values in controls.items() if name.startswith(prefixes)]
+    return np.mean(selected, axis=0) if selected else np.zeros(len(next(iter(controls.values()))), dtype=np.float32)
+
+
+def derive_states(controls: dict[str, np.ndarray], case_number: int, state_names: list[str]) -> dict[str, np.ndarray]:
+    supply = mean_controls(controls, ("T_",))
+    demand = mean_controls(controls, ("E_",))
+    valves = mean_controls(controls, ("B_",))
+    regulators = mean_controls(controls, ("R_",))
+    compressor = mean_controls(controls, ("C_",))
+    gap = supply - demand
+    x = np.linspace(0.0, 2.0 * np.pi, len(supply), dtype=np.float32)
+    wave = 0.06 * np.sin(x + case_number * 0.11)
+    linepack = np.empty_like(gap)
+    linepack[0] = 0.9 + 0.08 * gap[0]
+    for index in range(1, len(linepack)):
+        linepack[index] = 0.997 * linepack[index - 1] + 0.003 * (0.9 + 0.7 * gap[index])
+
+    result: dict[str, np.ndarray] = {}
+    for offset, name in enumerate(state_names):
+        jitter = wave + 0.008 * np.sin(3.0 * x + offset * 0.3)
+        if name.startswith(("N_", "P_")) and name.endswith("_v000"):
+            values = 0.65 + 0.65 * gap + 0.18 * (compressor - 1.0) + 0.10 * (regulators - 1.0) - offset * 0.01 + jitter
+        elif name.startswith("P_") and name.endswith("_v001"):
+            values = 0.75 + 0.55 * demand + 0.12 * gap + jitter
+        elif name.startswith("B_") and name.endswith("_v000"):
+            values = 0.2 + 0.9 * valves + jitter
+        elif name.startswith("B_") and name.endswith("_v001"):
+            values = 0.72 + 0.55 * supply + 0.10 * (valves - 0.8) + jitter
+        elif name.startswith("H_"):
+            values = linepack - offset * 0.006 + jitter
+        elif name.startswith("C_") and name.endswith("_v000"):
+            values = 0.62 + 0.35 * demand - 0.20 * supply + 0.30 * compressor + jitter
+        elif name.startswith("C_") and name.endswith("_v001"):
+            values = 0.55 + 0.28 * demand - 0.15 * supply + 0.26 * compressor + jitter + 0.14 * np.sin(2.0 * x + offset * 0.2)
+        elif name.startswith("C_") and name.endswith("_v002"):
+            values = 0.25 + 0.78 * compressor + jitter
+        elif name.startswith("TE_"):
+            values = 0.35 + 0.48 * compressor + 0.25 * demand + jitter
+        elif name.startswith("R_"):
+            values = 0.15 + 0.85 * regulators + jitter
+        else:
+            values = 0.8 + jitter
+        result[name] = np.asarray(values, dtype=np.float32)
+    return result
+
+
+def write_case(case_dir: Path, case_number: int, controls: list[str], states: list[str]) -> None:
+    case_dir.mkdir(parents=True, exist_ok=True)
+    boundary_times, control_values = control_series(controls, case_number)
+    boundary_payload: dict[str, Any] = {"TIME": boundary_times.strftime("%Y-%m-%d %H:%M:%S")}
+    boundary_payload.update(control_values)
+    for index in range(BOUNDARY_DIMS - len(controls)):
+        boundary_payload[f"T_999:BC{index:03d}"] = np.zeros(len(boundary_times), dtype=np.float32)
+    pd.DataFrame(boundary_payload).to_csv(case_dir / "Boundary.csv", index=False)
+
+    minute_times, minute_control_values = minute_controls(boundary_times, control_values)
+    state_values = derive_states(minute_control_values, case_number, states)
+    by_file: dict[str, dict[str, Any]] = defaultdict(lambda: {"TIME": minute_times.strftime("%Y-%m-%d %H:%M:%S")})
+    for name, values in state_values.items():
         prefix = name.split("_", 1)[0]
-        if prefix == "TE":
-            by_type["T&E"].append(name)
-        elif prefix in by_type:
-            by_type[prefix].append(name)
-
-    for equipment_type, columns in by_type.items():
-        if not columns:
-            continue
-        data = {"TIME": equipment_times.strftime("%Y-%m-%d %H:%M:%S")}
-        for i, col in enumerate(columns):
-            trend = np.linspace(0, 0.1 + sample_idx * 0.02, len(equipment_times), dtype=np.float32)
-            data[col] = 1.0 + i * 0.25 + trend + smooth_signal(len(equipment_times), sample_idx, 0.08, i)
-        pd.DataFrame(data).to_csv(sample_dir / f"{equipment_type}.csv", index=False)
+        filename = "T&E" if prefix == "TE" else prefix
+        by_file[filename][name] = values
+    for filename, payload in by_file.items():
+        pd.DataFrame(payload).to_csv(case_dir / f"{filename}.csv", index=False)
 
 
-def write_samples(dataset_train: Path, dataset_test: Path, tiny_names: list[str]) -> None:
-    sample_names = ["case_001", "case_002"]
-    chinese_smoke_name = "第001个算例"
-    for idx, name in enumerate(sample_names, start=1):
-        write_sample(dataset_train / name, idx, tiny_names)
-    # Some PipeFormer helper code looks for this exact sample name when building
-    # fallback variable maps, so keep a tiny duplicate around for compatibility.
-    write_sample(dataset_train / chinese_smoke_name, 1, tiny_names)
-    write_sample(dataset_test / "case_101", 101, tiny_names)
+def write_samples(paths: dict[str, Path], controls: list[str], states: list[str]) -> None:
+    for case_number in range(1, 41):
+        write_case(paths["train"] / f"case_{case_number:03d}", case_number, controls, states)
+    for case_number in range(101, 105):
+        write_case(paths["test"] / f"case_{case_number:03d}", case_number, controls, states)
 
 
-def write_static_feature_placeholders(process_eq_argu: Path) -> None:
-    pd.DataFrame(
-        [[0.0] * 9],
-        index=["P_001"],
-        columns=[
-            "pipe_length_km",
-            "outer_diameter_mm",
-            "wall_thickness_mm",
-            "heat_transfer_coefficient",
-            "wall_roughness_mm",
-            "outlet_elevation_m",
-            "inlet_elevation_m",
-            "outlet_soil_temp_c",
-            "inlet_soil_temp_c",
-        ],
-    ).to_csv(process_eq_argu / "pipe_features.csv")
-    pd.DataFrame([[0.0]], index=["C_001"], columns=["pca_feature_1"]).to_csv(
-        process_eq_argu / "compressor_features.csv"
+def write_placeholders(paths: dict[str, Path]) -> None:
+    pd.DataFrame([[0.0] * 9], index=["P_001"], columns=[f"pipe_feature_{index}" for index in range(9)]).to_csv(
+        paths["process"] / "pipe_features.csv"
     )
-    pd.DataFrame(
-        [
-            {
-                "num_pipes": 1,
-                "num_compressors": 1,
-                "pipe_feature_dim": 9,
-                "compressor_feature_dim": 1,
-                "pipe_feature_columns": "['pipe_length_km', 'outer_diameter_mm', 'wall_thickness_mm', 'heat_transfer_coefficient', 'wall_roughness_mm', 'outlet_elevation_m', 'inlet_elevation_m', 'outlet_soil_temp_c', 'inlet_soil_temp_c']",
-            }
-        ]
-    ).to_csv(process_eq_argu / "metadata.csv", index=False)
+    pd.DataFrame([[0.0]], index=["C_001"], columns=["pca_feature_1"]).to_csv(paths["process"] / "compressor_features.csv")
+    pd.DataFrame([{"num_pipes": 1, "num_compressors": 1, "pipe_feature_dim": 9, "compressor_feature_dim": 1}]).to_csv(
+        paths["process"] / "metadata.csv", index=False
+    )
 
 
-def write_configs(project_root: Path, data_root: Path, static_tiny: Path, tiny_dim: int, boundary_dim: int) -> None:
+def write_configs(project_root: Path, data_root: Path, active_dir: Path, variable_count: int, boundary_count: int) -> None:
     model_dir = project_root / "configs" / "models" / "decoder"
     model_dir.mkdir(parents=True, exist_ok=True)
     model_config = {
-        "model_name": "FluidDecoder",
-        "model_version": "mock-smoke-test",
-        "input_dim": tiny_dim,
-        "output_dim": tiny_dim,
-        "sequence_length": 3,
-        "boundary_dims": boundary_dim,
-        "equipment_dims": tiny_dim - boundary_dim,
-        "d_model": 32,
-        "n_heads": 4,
-        "n_layers": 2,
-        "d_ff": 64,
-        "attention_dropout": 0.1,
-        "dropout_rate": 0.1,
-        "tokenizer_vocab_size": 4096,
-        "time_position_encoding": "learnable",
-        "variable_position_encoding": "learnable",
-        "max_time_positions": 10,
-        "max_variable_positions": tiny_dim,
-        "projection_hidden_dim": 32,
-        "input_projection_type": "token_embedding",
-        "use_topology_attention": True,
-        "use_layer_norm": True,
-        "activation": "gelu",
+        "model_name": "FluidDecoder", "model_version": "mock-lifecycle-integration", "input_dim": variable_count,
+        "output_dim": variable_count, "sequence_length": 5, "boundary_dims": boundary_count,
+        "equipment_dims": variable_count - boundary_count, "d_model": 48, "n_heads": 4, "n_layers": 2,
+        "d_ff": 96, "attention_dropout": 0.1, "dropout_rate": 0.1, "tokenizer_vocab_size": 4096,
+        "time_position_encoding": "learnable", "variable_position_encoding": "learnable", "max_time_positions": 10,
+        "max_variable_positions": variable_count, "projection_hidden_dim": 48, "input_projection_type": "token_embedding",
+        "use_topology_attention": True, "use_layer_norm": True, "activation": "gelu",
     }
-    (model_dir / "mock_tiny_decoder.json").write_text(
-        json.dumps(model_config, indent=2), encoding="utf-8"
-    )
-
+    (model_dir / "mock_decoder.json").write_text(json.dumps(model_config, indent=2), encoding="utf-8")
     train_config = {
-        "data_dir": str(data_root.relative_to(project_root)).replace("\\", "/"),
-        "static_dir": str(static_tiny.relative_to(project_root)).replace("\\", "/"),
-        "cache_dir": str((static_tiny / "cache").relative_to(project_root)).replace("\\", "/"),
-        "train_batch_size": 2,
-        "eval_batch_size": 2,
-        "sequence_length": 3,
-        "max_sequences_per_sample": 16,
-        "num_train_epochs": 1,
-        "learning_rate": 1e-4,
-        "weight_decay": 1e-5,
-        "model_config_path": "configs/models/decoder/mock_tiny_decoder.json",
-        "output_dir": "./outputs/mock_tiny_decoder",
-        "eval_steps": 5,
-        "save_steps": 5,
-        "save_total_limit": 1,
-        "normalization_method": "standard",
-        "device": "cpu",
-        "dataloader_num_workers": 0,
-        "mixed_precision": False,
-        "use_swanlab": False,
-        "debug_mode": True,
-        "log_level": "info",
-        "seed": 42,
+        "data_dir": data_root.relative_to(project_root).as_posix(), "static_dir": active_dir.relative_to(project_root).as_posix(),
+        "cache_dir": (active_dir / "cache").relative_to(project_root).as_posix(), "train_batch_size": 4, "eval_batch_size": 4,
+        "sequence_length": 5, "max_sequences_per_sample": 4, "num_train_epochs": 1, "learning_rate": 0.0001,
+        "weight_decay": 0.00001, "model_config_path": "configs/models/decoder/mock_decoder.json",
+        "output_dir": "./outputs/mock_decoder", "eval_steps": 10, "save_steps": 10, "save_total_limit": 1,
+        "normalization_method": "standard", "device": "cpu", "dataloader_num_workers": 0, "mixed_precision": False,
+        "use_swanlab": False, "debug_mode": True, "log_level": "info", "seed": 42,
     }
-    (project_root / "configs" / "mock_tiny_decoder.json").write_text(
-        json.dumps(train_config, indent=2), encoding="utf-8"
-    )
+    (project_root / "configs" / "mock_decoder.json").write_text(json.dumps(train_config, indent=2), encoding="utf-8")
 
 
-def _equipment_name(var_name: str) -> str:
-    if ":" in var_name:
-        return var_name.split(":", 1)[0]
-    parts = var_name.split("_")
-    return "_".join(parts[:2]) if len(parts) >= 2 else var_name
+def write_readme(data_root: Path) -> None:
+    (data_root / "README.md").write_text(
+        """# Mock lifecycle PipeFormer fixture
 
+This dataset covers the union of explicit control-variable vocabularies in the
+v4 and v7 lifecycle datasets and adds equipment-specific derived forecast
+states for the engineering constraint library. All signals are synthetic and
+the checkpoint is not physically validated.
 
-def write_attention_indices(static_tiny: Path, tiny_names: list[str], max_neighbors: int = 8) -> None:
-    """Write a compact, valid topology attention artifact without importing PipeFormer."""
-    graph_neighbors = {
-        "T_001": ["N_001"],
-        "N_001": ["T_001", "P_001"],
-        "P_001": ["N_001", "N_002"],
-        "N_002": ["P_001", "B_001"],
-        "B_001": ["N_002", "C_001"],
-        "C_001": ["B_001", "R_001"],
-        "R_001": ["C_001", "E_001"],
-        "E_001": ["R_001", "TE_001"],
-        "TE_001": ["E_001"],
-    }
-    by_equipment: dict[str, list[int]] = defaultdict(list)
-    for idx, name in enumerate(tiny_names):
-        by_equipment[_equipment_name(name)].append(idx)
-
-    indices = np.zeros((len(tiny_names), max_neighbors), dtype=np.int32)
-    variable_names = np.empty((len(tiny_names), max_neighbors), dtype=object)
-
-    for idx, name in enumerate(tiny_names):
-        equipment = _equipment_name(name)
-        candidates: list[int] = [idx]
-        candidates.extend(i for i in by_equipment.get(equipment, []) if i != idx)
-        for neighbor_equipment in graph_neighbors.get(equipment, []):
-            candidates.extend(by_equipment.get(neighbor_equipment, []))
-
-        deduped: list[int] = []
-        for candidate in candidates:
-            if candidate not in deduped:
-                deduped.append(candidate)
-        if not deduped:
-            deduped = [idx]
-
-        padded = (deduped + [idx] * max_neighbors)[:max_neighbors]
-        indices[idx, :] = padded
-        variable_names[idx, :] = [tiny_names[i] for i in padded]
-
-    with (static_tiny / "attention_indices.pkl").open("wb") as handle:
-        pickle.dump({"attention_indices": indices, "variable_names": variable_names}, handle)
-    pd.DataFrame(indices).to_csv(static_tiny / "attention_indices.csv", index_label="variable_index")
-    pd.DataFrame(variable_names).to_csv(static_tiny / "attention_variable_names.csv", index_label="variable_index")
-
-
-def write_readme(data_root: Path, rel_root: str, rel_static: str) -> None:
-    text = f"""# Mock Tiny PipeFormer Data
-
-This folder contains synthetic data for PipeFormer smoke tests only. It is not
-real pipeline telemetry and should not be used for scientific results.
-
-Generated contents:
-
-- `dataset/train` and `dataset/test`: tiny case folders with `Boundary.csv` and
-  equipment CSVs.
-- `static/mock_tiny`: active variable mapping, prediction mask, graph cache, and
-  topology attention files.
-- `static/full`: full 6,712-variable mapping used by `DataProcessor.combine_all_data`.
-- `process_eq_argu`: placeholder static feature files.
-
-Regenerate from the project root:
+Regenerate and train from `pipeFormer/`:
 
 ```powershell
 python scripts/create_mock_pipeformer_data.py --force
+python build_cache.py --data-dir data/mock_lifecycle --static-dir data/mock_lifecycle/static/mock_lifecycle --skip-tokens --force
+python data/compute_tokenizer_stats.py --data_dir data/mock_lifecycle --static-dir data/mock_lifecycle/static/mock_lifecycle --force
+python build_cache.py --data-dir data/mock_lifecycle --static-dir data/mock_lifecycle/static/mock_lifecycle --force
+python data/compute_normalization_stats.py --static_dir data/mock_lifecycle/static/mock_lifecycle --method standard --force
+python train.py --config configs/mock_decoder.json
 ```
-
-Smoke-test commands:
-
-```powershell
-python build_cache.py --data-dir {rel_root} --static-dir {rel_static} --skip-tokens --force
-python data/compute_tokenizer_stats.py --data_dir {rel_root} --static-dir {rel_static} --force
-python build_cache.py --data-dir {rel_root} --static-dir {rel_static} --force
-python data/compute_normalization_stats.py --static_dir {rel_static} --method standard --force
-python train.py --config configs/mock_tiny_decoder.json
-```
-"""
-    (data_root / "README.md").write_text(text, encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Create tiny mock data for PipeFormer smoke tests.")
-    parser.add_argument(
-        "--output-dir",
-        default="data/mock_tiny",
-        help="Output data root relative to the PipeFormer project root.",
-    )
-    parser.add_argument("--force", action="store_true", help="Delete and recreate the output directory.")
+    parser = argparse.ArgumentParser(description="Create a v4+v7-compatible synthetic PipeFormer fixture.")
+    parser.add_argument("--dataset", action="append", default=None, help="Lifecycle task dataset; repeat for multiple sources.")
+    parser.add_argument("--output-dir", default="data/mock_lifecycle")
+    parser.add_argument("--force", action="store_true")
     args = parser.parse_args()
-
     project_root = Path(__file__).resolve().parents[1]
+    dataset_values = args.dataset or [
+        "../pipeclaw/backend/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "../pipeclaw/backend/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+    ]
+    dataset_paths = [(project_root / value).resolve() for value in dataset_values]
     data_root = (project_root / args.output_dir).resolve()
+    scenarios, controls, source_summary, variable_sources = extract_inventory(dataset_paths)
+    registry = [control_registry(name, variable_sources[name]) for name in controls] + state_registry(controls)
     paths = make_dirs(data_root, args.force)
-
-    names = full_variable_names()
-    tiny_names, tiny_global = choose_tiny_variables(names)
-    boundary_count = sum(1 for name in tiny_names if ":" in name)
-
-    write_full_static_mapping(paths["static_full"], names)
-    write_tiny_static(paths["static_tiny"], data_root, tiny_names, tiny_global)
-    write_samples(paths["dataset_train"], paths["dataset_test"], tiny_names)
-    write_static_feature_placeholders(paths["process_eq_argu"])
-    write_configs(project_root, data_root, paths["static_tiny"], len(tiny_names), boundary_count)
-    write_attention_indices(paths["static_tiny"], tiny_names)
-
-    rel_root = data_root.relative_to(project_root).as_posix()
-    rel_static = paths["static_tiny"].relative_to(project_root).as_posix()
-    write_readme(data_root, rel_root, rel_static)
-
-    print("Mock PipeFormer data created.")
-    print(f"  data_dir: {rel_root}")
-    print(f"  static_dir: {rel_static}")
-    print(f"  active variables: {len(tiny_names)} ({boundary_count} boundary, {len(tiny_names) - boundary_count} equipment)")
-    print("Next smoke-test commands:")
-    print(f"  python build_cache.py --data-dir {rel_root} --static-dir {rel_static} --skip-tokens --force")
-    print(f"  python data/compute_tokenizer_stats.py --data_dir {rel_root} --static-dir {rel_static} --force")
-    print(f"  python build_cache.py --data-dir {rel_root} --static-dir {rel_static} --force")
-    print(f"  python data/compute_normalization_stats.py --static_dir {rel_static} --method standard --force")
-    print("  python train.py --config configs/mock_tiny_decoder.json")
+    write_static(paths, data_root, registry)
+    write_samples(paths, controls, [item["variable"] for item in registry if item["role"] == "output"])
+    write_placeholders(paths)
+    write_configs(project_root, data_root, paths["static_active"], len(registry), len(controls))
+    write_readme(data_root)
+    manifest = {
+        "schema_version": "mock_lifecycle_manifest_v1", "synthetic": True, "physical_validation_status": "not_validated",
+        "source_datasets": [path.name for path in dataset_paths], "source_summary": source_summary,
+        "source_record_count": len(scenarios),
+        "control_variable_count": len(controls), "forecast_state_variable_count": len(registry) - len(controls),
+        "control_variables": controls,
+    }
+    (data_root / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(json.dumps(manifest, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":

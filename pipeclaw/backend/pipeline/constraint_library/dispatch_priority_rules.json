@@ -6,7 +6,7 @@
       "evaluator": "mean_abs_delta_vs_observed",
       "description": "Energy and cost are considered only after the safety and equipment priorities.",
       "priority": 70,
-      "selector": {"prefixes": ["TE_", "C_"], "suffixes": ["_v000", "_v001"]},
+      "selector": {"prefixes": ["TE_", "C_"], "suffixes": ["_v000", "_v001"], "physical_quantities": ["power", "compressor_load", "compression_ratio"], "roles": ["output"]},
       "limits": {"warning_threshold": 0.6, "fail_threshold": 1.5},
       "flags": {"pass": "energy_cost_normal", "warning": "energy_cost_warning", "fail": "energy_cost_violation"}
     }

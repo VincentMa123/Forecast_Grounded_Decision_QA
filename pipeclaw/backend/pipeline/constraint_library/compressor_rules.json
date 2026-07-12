@@ -6,7 +6,8 @@
       "evaluator": "max_abs_prediction",
       "description": "Compressor load should remain below the normalized upper operating limit.",
       "priority": 40,
-      "selector": {"prefixes": ["C_"], "suffixes": ["_v000"]},
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v000"], "physical_quantities": ["compressor_load"], "roles": ["output"]},
+      "use_registry_limits": true,
       "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
       "flags": {"pass": "compressor_load_normal", "warning": "compressor_load_warning", "fail": "compressor_overload"}
     },
@@ -15,7 +16,8 @@
       "evaluator": "max_abs_prediction",
       "description": "Compression ratio should keep margin from the normalized operating-envelope boundary.",
       "priority": 41,
-      "selector": {"prefixes": ["C_"], "suffixes": ["_v001"]},
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v001"], "physical_quantities": ["compression_ratio"], "roles": ["output"]},
+      "use_registry_limits": true,
       "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
       "flags": {"pass": "compressor_ratio_normal", "warning": "compressor_ratio_warning", "fail": "compressor_ratio_violation"}
     },
@@ -24,7 +26,8 @@
       "evaluator": "max_abs_prediction",
       "description": "Compressor rotational speed should remain inside the configured operating-envelope limit.",
       "priority": 42,
-      "selector": {"prefixes": ["C_"], "suffixes": ["_v002", "_speed"]},
+      "selector": {"prefixes": ["C_"], "suffixes": ["_v002", "_speed"], "physical_quantities": ["rotational_speed"], "roles": ["output"]},
+      "use_registry_limits": true,
       "limits": {"warning_threshold": 1.2, "fail_threshold": 2.0},
       "flags": {"pass": "compressor_speed_normal", "warning": "compressor_speed_warning", "fail": "compressor_speed_violation"}
     },
@@ -33,7 +36,7 @@
       "evaluator": "mean_abs_delta_vs_observed",
       "description": "Compressor power should not change sharply from the observed baseline.",
       "priority": 43,
-      "selector": {"prefixes": ["TE_"], "suffixes": ["_v000"]},
+      "selector": {"prefixes": ["TE_"], "suffixes": ["_v000"], "physical_quantities": ["power"], "roles": ["output"]},
       "limits": {"warning_threshold": 0.5, "fail_threshold": 1.2},
       "flags": {"pass": "compressor_power_normal", "warning": "compressor_power_warning", "fail": "compressor_power_violation"}
     }
@@ -44,7 +47,8 @@
       "evaluator": "predicted_range",
       "description": "Valve-opening proxies should remain inside the configured normalized operating range.",
       "priority": 50,
-      "selector": {"prefixes": ["B_"], "suffixes": ["_v000", "_opening"]},
+      "selector": {"prefixes": ["B_"], "suffixes": ["_v000", "_opening"], "physical_quantities": ["valve_opening"], "roles": ["output"]},
+      "use_registry_limits": true,
       "limits": {"warning_low": -2.5, "warning_high": 2.5, "fail_low": -3.0, "fail_high": 3.0},
       "flags": {"pass": "valve_opening_normal", "warning": "valve_opening_warning", "fail": "valve_opening_violation"}
     },
@@ -53,7 +57,8 @@
       "evaluator": "predicted_range",
       "description": "Pressure-regulating equipment proxies should remain inside the configured normalized range.",
       "priority": 51,
-      "selector": {"prefixes": ["R_"], "suffixes": ["_v000", "_range"]},
+      "selector": {"prefixes": ["R_"], "suffixes": ["_v000", "_range"], "physical_quantities": ["regulator_range"], "roles": ["output"]},
+      "use_registry_limits": true,
       "limits": {"warning_low": -2.5, "warning_high": 2.5, "fail_low": -3.0, "fail_high": 3.0},
       "flags": {"pass": "regulator_range_normal", "warning": "regulator_range_warning", "fail": "regulator_range_violation"}
     },

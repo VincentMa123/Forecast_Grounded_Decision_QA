@@ -250,7 +250,7 @@ def main(args: argparse.Namespace) -> None:
             "quantile_method": tokenizer.quantile_method,
             "range_gap_epsilon": tokenizer.range_gap_epsilon,
             "round_gap": getattr(tokenizer, "round_gap", None),
-            "stats_dir": str(stats_dir),
+            "stats_dir": stats_dir.relative_to(static_dir).as_posix(),
             "stats_file": stats_filename,
         }
         _write_hyperparams(hyper_path, {"tokenizer": tokenizer_section})

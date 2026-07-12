@@ -753,9 +753,9 @@ class CacheManager:
         tokenizer_stats_dir: Optional[str] = None
         if aligned_tokenizer is not None and hasattr(aligned_tokenizer, 'stats_dir') and aligned_tokenizer.stats_dir is not None:
             try:
-                tokenizer_stats_dir = str(Path(aligned_tokenizer.stats_dir).resolve())
+                tokenizer_stats_dir = Path(aligned_tokenizer.stats_dir).resolve().relative_to(self.static_dir.resolve()).as_posix()
             except Exception:
-                tokenizer_stats_dir = str(aligned_tokenizer.stats_dir)
+                tokenizer_stats_dir = Path(str(aligned_tokenizer.stats_dir)).name
 
         # 保存元数据
         metadata = {
@@ -775,7 +775,7 @@ class CacheManager:
             'tokenizer_vocab_size': tokenizer_vocab_size,
             'tokenizer_stats_dir': tokenizer_stats_dir,
             'variable_hash': self.variable_hash,
-            'static_dir': str(self.static_dir),
+            'static_dir': '.',
             'variable_names': self.active_variable_names,
         }
         if generate_tokens and self.token_dtype is not None:

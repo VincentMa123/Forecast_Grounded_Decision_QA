@@ -32,7 +32,7 @@ CATEGORY_OUTPUT_STATE_VARIABLES: Dict[str, List[str]] = {
     "flow": ["flow"],
     "linepack": ["linepack"],
     "compressor": ["compressor_load", "compression_ratio", "compressor_speed", "compressor_power"],
-    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
+    "equipment_regulation": ["valve_opening", "regulator_range"],
     "abnormality_warning": ["pressure", "flow", "compressor"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
@@ -53,11 +53,15 @@ PERCENT_PATTERNS = [
     re.compile(r"(\u4e0a\u8c03|\u4e0b\u8c03|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%", re.I),
 ]
 HORIZON_RE = re.compile(r"(?:\u672a\u6765|next|future|forecast\s*horizon)?\s*(\d+(?:\.\d+)?)\s*(\u5c0f\u65f6|\u5206\u949f|hours?|hrs?|minutes?|mins?)", re.I)
-KEEP_OTHER_BOUNDARY_MARKERS = [
-    "\u4fdd\u6301\u5176\u5b83\u8fb9\u754c\u63a7\u5236\u91cf\u4e0d\u53d8",
-    "\u4fdd\u6301\u5176\u4ed6\u8fb9\u754c\u63a7\u5236\u91cf\u4e0d\u53d8",
-    "keep other boundary controls",
-    "keep other boundary conditions",
+STATUS_TARGET_PATTERNS = [
+    (re.compile(r"(?:\u5207\u6362\u4e3a|\u8bbe\u4e3a)\s*[\"'\u201c\u201d\u2018\u2019]*(?:\u505c\u673a|\u5173\u95ed)"), 0.0),
+    (re.compile(r"(?:\u5207\u6362\u4e3a|\u8bbe\u4e3a)\s*[\"'\u201c\u201d\u2018\u2019]*(?:\u5f00\u673a|\u5f00\u542f)"), 1.0),
+    (re.compile(r"\b(?:to|as)\s+(?:off|stopped|closed)\b", re.I), 0.0),
+    (re.compile(r"\b(?:to|as)\s+(?:on|running|open)\b", re.I), 1.0),
+]
+STATUS_VALUE_PATTERNS = [
+    (re.compile(r"(?:\u505c\u673a|\u5173\u95ed)|\b(?:off|stopped|closed)\b", re.I), 0.0),
+    (re.compile(r"(?:\u5f00\u673a|\u5f00\u542f)|\b(?:on|running|open)\b", re.I), 1.0),
 ]
 PREDICTION_MARKERS = ["\u9884\u6d4b", "forecast", "predict", "prediction"]
 VERIFICATION_MARKERS = ["\u6821\u6838", "\u68c0\u67e5", "verify", "verification", "check"]
@@ -77,8 +81,12 @@ def parse_condition(question: str) -> Dict[str, Any]:
     disturbance_magnitude_percent = float(percent_match.group(2)) if percent_match else None
     forecast_horizon_minutes = _parse_horizon_minutes(horizon_match)
     constraint_verification_types = _parse_constraint_verification_types(question)
-    keep_other_boundary_controls = _contains_any(question, KEEP_OTHER_BOUNDARY_MARKERS)
+    # Unspecified boundary controls are held at their observed values by default.
+    # Callers can still explicitly override this through the structured tool argument.
+    keep_other_boundary_controls = True
     disturbance_variable = variable_match.group(0)
+    status_setpoint = _parse_status_setpoint(question) if disturbance_variable.endswith(":ST") else None
+    setpoints = {disturbance_variable: status_setpoint} if status_setpoint is not None else {}
 
     task = {
         "case_id": f"mock_test_{case_number:03d}" if case_number is not None else None,
@@ -88,6 +96,7 @@ def parse_condition(question: str) -> Dict[str, Any]:
             "disturbance_variable": disturbance_variable,
             "disturbance_direction": disturbance_direction,
             "disturbance_magnitude_percent": disturbance_magnitude_percent,
+            "setpoints": setpoints,
         },
         "disturbance_variable": disturbance_variable,
         "disturbance_direction": disturbance_direction,
@@ -133,6 +142,18 @@ def _parse_horizon_minutes(match: Optional[re.Match[str]]) -> Optional[int]:
     if unit in {"\u5c0f\u65f6", "hour", "hours", "hr", "hrs"}:
         return int(magnitude * 60)
     return int(magnitude)
+
+
+def _parse_status_setpoint(text: str) -> Optional[float]:
+    for pattern, value in STATUS_TARGET_PATTERNS:
+        if pattern.search(text):
+            return value
+    matched_values = {
+        value
+        for pattern, value in STATUS_VALUE_PATTERNS
+        if pattern.search(text)
+    }
+    return next(iter(matched_values)) if len(matched_values) == 1 else None
 
 
 def _parse_constraint_verification_types(question: str) -> List[str]:

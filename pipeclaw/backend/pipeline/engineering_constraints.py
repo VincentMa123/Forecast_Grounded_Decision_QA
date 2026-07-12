@@ -80,6 +80,10 @@ def run_engineering_constraint_checks(
         if check["status"] in {"warning", "fail"} and check["category"] != "human_intervention"
     ]
     non_pass.sort(key=lambda check: (STATUS_RANK.get(check["status"], 0), -check["priority"]), reverse=True)
+    failures = [check for check in non_pass if check["status"] == "fail"]
+    warnings = [check for check in non_pass if check["status"] == "warning"]
+    selected_warnings = warnings[:max(0, 5 - len(failures))]
+    priority_findings = failures + selected_warnings
     dispatch_recommendation = _dispatch_recommendation(checks)
 
     return {
@@ -96,7 +100,12 @@ def run_engineering_constraint_checks(
         "dispatch_recommendation": dispatch_recommendation,
         "checks": checks,
         "executed_rule_ids": [check["name"] for check in checks],
-        "priority_findings": non_pass[:5],
+        "failure_count": len(failures),
+        "warning_count": len(warnings),
+        "omitted_warning_count": len(warnings) - len(selected_warnings),
+        "failed_rule_ids": [check["name"] for check in failures],
+        "warning_rule_ids": [check["name"] for check in warnings],
+        "priority_findings": priority_findings,
     }
 
 

@@ -37,14 +37,14 @@ CHECK_TO_OUTPUT_STATE_VARIABLES = {
     "flow": ["flow"],
     "linepack": ["linepack"],
     "compressor": ["compressor_load", "compression_ratio", "compressor_speed", "compressor_power"],
-    "equipment_regulation": ["valve_opening", "regulator_range", "boundary_control_adjustment"],
+    "equipment_regulation": ["valve_opening", "regulator_range"],
     "abnormality_warning": ["pressure", "flow", "compressor"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
 }
 VARIABLE_GROUP_RULES = {
     "nodes": (("N_",), ()),
     "segments": (("P_", "B_"), ()),
-    "linepack": (("R_",), ()),
+    "linepack": (("H_",), ()),
     "compressors": (("C_", "TE_"), ()),
     "pressure": (("N_", "P_"), ("_v000",)),
     "flow": (("B_", "P_"), ("_v001",)),
@@ -60,11 +60,36 @@ VARIABLE_GROUP_RULES = {
     "operating_cost": (("TE_",), ("_v000",)),
     "valves": (("B_",), ()),
     "pressure_regulators": (("R_",), ()),
-    "boundary_controls": (("T_",), ()),
+    "boundary_controls": (("T_", "E_", "B_", "C_", "R_"), ()),
     "valve_opening": (("B_",), ("_v000", "_opening")),
     "regulator_range": (("R_",), ("_v000", "_range")),
-    "boundary_control_adjustment": (("T_",), ()),
-    "dispatch_priority_audit": (("N_", "P_", "B_", "C_", "R_", "TE_"), ()),
+    "boundary_control_adjustment": (("T_", "E_", "B_", "C_", "R_"), ()),
+    "dispatch_priority_audit": (("N_", "P_", "B_", "C_", "H_", "R_", "TE_"), ()),
+}
+REGISTRY_GROUP_RULES = {
+    "nodes": {"equipment_types": {"node"}, "roles": {"output"}},
+    "segments": {"equipment_types": {"pipeline_segment", "ball_valve"}, "roles": {"output"}},
+    "linepack": {"physical_quantities": {"linepack"}, "roles": {"output"}},
+    "compressors": {"equipment_types": {"compressor", "compressor_power"}, "roles": {"output"}},
+    "pressure": {"physical_quantities": {"pressure"}, "roles": {"output"}},
+    "flow": {"physical_quantities": {"flow"}, "roles": {"output"}},
+    "compressor_load": {"physical_quantities": {"compressor_load"}, "roles": {"output"}},
+    "compressor": {"equipment_types": {"compressor", "compressor_power"}, "roles": {"output"}},
+    "compression_ratio": {"physical_quantities": {"compression_ratio"}, "roles": {"output"}},
+    "compressor_speed": {"physical_quantities": {"rotational_speed"}, "roles": {"output"}},
+    "compressor_power": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "power": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "energy": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "energy_consumption": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "energy_cost": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "operating_cost": {"physical_quantities": {"power"}, "roles": {"output"}},
+    "valves": {"equipment_types": {"ball_valve"}},
+    "pressure_regulators": {"equipment_types": {"pressure_regulator"}},
+    "boundary_controls": {"roles": {"input"}, "controllable": True},
+    "valve_opening": {"physical_quantities": {"valve_opening"}, "roles": {"output"}},
+    "regulator_range": {"physical_quantities": {"regulator_range"}, "roles": {"output"}},
+    "boundary_control_adjustment": {"roles": {"input"}, "controllable": True},
+    "dispatch_priority_audit": {"roles": {"output"}},
 }
 COMPACT_OUTPUT_KEYS = (
     "mean_prediction",
@@ -166,7 +191,16 @@ def _unique_targets(checks: List[str], mapping: Dict[str, List[str]]) -> List[st
     return result
 
 
-def _resolve_requested_variables(requested: List[str], variable_names: List[str]) -> tuple[List[str], List[str]]:
+def _resolve_requested_variables(
+    requested: List[str],
+    variable_names: List[str],
+    registry_entries: Optional[List[Dict[str, Any]]] = None,
+) -> tuple[List[str], List[str]]:
+    registry = {
+        str(item.get("variable")): item
+        for item in registry_entries or []
+        if isinstance(item, dict) and item.get("variable")
+    }
     resolved = []
     unresolved = []
     for raw in requested:
@@ -174,6 +208,13 @@ def _resolve_requested_variables(requested: List[str], variable_names: List[str]
         matches: List[str] = []
         if target in variable_names:
             matches = [target]
+        elif target in REGISTRY_GROUP_RULES and registry:
+            rule = REGISTRY_GROUP_RULES[target]
+            matches = [
+                name
+                for name in variable_names
+                if _registry_group_match(registry.get(name, {}), rule)
+            ]
         elif target in VARIABLE_GROUP_RULES:
             prefixes, suffixes = VARIABLE_GROUP_RULES[target]
             matches = [
@@ -193,6 +234,23 @@ def _resolve_requested_variables(requested: List[str], variable_names: List[str]
             if name not in resolved:
                 resolved.append(name)
     return resolved, unresolved
+
+
+def _registry_group_match(metadata: Dict[str, Any], rule: Dict[str, Any]) -> bool:
+    if not metadata:
+        return False
+    for key in ("physical_quantities", "equipment_types", "roles"):
+        allowed = rule.get(key)
+        metadata_key = {
+            "physical_quantities": "physical_quantity",
+            "equipment_types": "equipment_type",
+            "roles": "role",
+        }[key]
+        if allowed and metadata.get(metadata_key) not in allowed:
+            return False
+    if "controllable" in rule and bool(metadata.get("controllable")) != bool(rule["controllable"]):
+        return False
+    return True
 
 
 def _compact_output_summaries(
@@ -367,7 +425,7 @@ def run_pipeformer_forecast_analysis(
         resolved_checkpoint_dir = find_default_checkpoint_dir(repo_root).resolve()
     resolved_mapping_csv = _optional_path(mapping_csv) or _env_path(
         "PIPEFORMER_MAPPING_CSV",
-        resolved_pipeformer_root / "data" / "mock_tiny" / "static" / "mock_tiny" / "index_variable_mapping.csv",
+        resolved_pipeformer_root / "data" / "mock_lifecycle" / "static" / "mock_lifecycle" / "index_variable_mapping.csv",
     )
     resolved_data_dir = _optional_path(data_dir) or _env_optional_path("PIPEFORMER_DATA_DIR")
     resolved_static_dir = _optional_path(static_dir) or _env_optional_path("PIPEFORMER_STATIC_DIR")
@@ -410,16 +468,20 @@ def run_pipeformer_forecast_analysis(
     )
     logger.info("PipeFormer forecast context ready: mode=%s", forecast_context.get("mode"))
     parsed_task["forecast_time_step_minutes"] = forecast_context.get("time_step_minutes")
+    registry_entries = list(forecast_context.get("variable_registry") or [])
+    parsed_task["_variable_registry"] = registry_entries
     variable_summaries = summarize_variables(forecast_context["real_rows"], forecast_context["predict_rows"])
     logger.info("PipeFormer variable summaries built: variables=%d", len(variable_summaries))
     variable_names = list(variable_summaries)
     resolved_attention, unresolved_attention = _resolve_requested_variables(
         parsed_task.get("attention_targets") or [],
         variable_names,
+        registry_entries,
     )
     resolved_outputs, unresolved_outputs = _resolve_requested_variables(
         parsed_task.get("output_state_variables") or [],
         variable_names,
+        registry_entries,
     )
     parsed_task["resolved_attention_variables"] = resolved_attention
     parsed_task["resolved_output_variables"] = resolved_outputs
@@ -481,6 +543,7 @@ def run_pipeformer_forecast_analysis(
         "actual_forecast_horizon_source",
         "device",
         "model_input_projection_type",
+        "data_provenance",
         "operating_condition_number_used",
         "applied_boundary_conditions",
     ):
@@ -495,6 +558,7 @@ def run_pipeformer_forecast_analysis(
         if source_key in forecast_context:
             forecast_metadata[metadata_key] = _compact_source_name(forecast_context[source_key])
 
+    parsed_task.pop("_variable_registry", None)
     return {
         "success": True,
         "parsed_task": parsed_task,

@@ -3,7 +3,14 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..rule_library import load_constraint_specs
-from .common import longest_episode_minutes, run_specs, threshold_episodes, total_episode_minutes
+from .common import (
+    longest_episode_minutes,
+    range_limits_for_variable,
+    registry_index,
+    run_specs,
+    threshold_episodes,
+    total_episode_minutes,
+)
 
 
 PRESSURE_SPECS = load_constraint_specs("pressure")
@@ -26,18 +33,31 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
     simultaneous_warning_node_count = 0
     time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
 
-    end_user_variables = [name for name in pressure_variables if name.startswith("N_")]
-    end_user_series = [summaries.get(name, {}).get("predicted_values", []) for name in end_user_variables]
-    for step_index in range(max((len(values) for values in end_user_series), default=0)):
+    registry = registry_index(parsed_task)
+    pressure_limits = {
+        name: range_limits_for_variable(PRESSURE_WINDOW_SPEC, name, parsed_task)
+        for name in pressure_variables
+    }
+    end_user_variables = [
+        name
+        for name in pressure_variables
+        if registry.get(name, {}).get("equipment_type") == "node" or name.startswith("N_")
+    ]
+    end_user_series = {
+        name: summaries.get(name, {}).get("predicted_values", [])
+        for name in end_user_variables
+    }
+    for step_index in range(max((len(values) for values in end_user_series.values()), default=0)):
         near_lower_bound = sum(
             1
-            for values in end_user_series
+            for name, values in end_user_series.items()
             if step_index < len(values)
-            and PRESSURE_WINDOW_SPEC.fail_low <= values[step_index] < PRESSURE_WINDOW_SPEC.warning_low
+            and pressure_limits[name][2] <= values[step_index] < pressure_limits[name][0]
         )
         simultaneous_warning_node_count = max(simultaneous_warning_node_count, near_lower_bound)
 
     for variable in pressure_variables:
+        warning_low, warning_high, fail_low, fail_high, _ = pressure_limits[variable]
         summary = summaries.get(variable, {})
         values = summary.get("predicted_values", [])
         labels = summary.get("prediction_labels", [])
@@ -51,34 +71,34 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         minimum = float(values[minimum_index])
         maximum = float(values[maximum_index])
         pressure_margins[variable] = {
-            "warning_lower_margin": round(minimum - float(PRESSURE_WINDOW_SPEC.warning_low), 6),
-            "warning_upper_margin": round(float(PRESSURE_WINDOW_SPEC.warning_high) - maximum, 6),
-            "fail_lower_margin": round(minimum - float(PRESSURE_WINDOW_SPEC.fail_low), 6),
-            "fail_upper_margin": round(float(PRESSURE_WINDOW_SPEC.fail_high) - maximum, 6),
+            "warning_lower_margin": round(minimum - float(warning_low), 6),
+            "warning_upper_margin": round(float(warning_high) - maximum, 6),
+            "fail_lower_margin": round(minimum - float(fail_low), 6),
+            "fail_upper_margin": round(float(fail_high) - maximum, 6),
         }
 
         violation_indices = [
             index
             for index, value in enumerate(values)
-            if value < PRESSURE_WINDOW_SPEC.fail_low or value > PRESSURE_WINDOW_SPEC.fail_high
+            if value < fail_low or value > fail_high
         ]
         warning_indices = [
             index
             for index, value in enumerate(values)
             if index not in violation_indices
-            and (value < PRESSURE_WINDOW_SPEC.warning_low or value > PRESSURE_WINDOW_SPEC.warning_high)
+            and (value < warning_low or value > warning_high)
         ]
         variable_violation_episodes = threshold_episodes(
             values,
-            lambda value: value < PRESSURE_WINDOW_SPEC.fail_low or value > PRESSURE_WINDOW_SPEC.fail_high,
+            lambda value: value < fail_low or value > fail_high,
             labels,
             time_step_minutes,
         )
         variable_warning_episodes = threshold_episodes(
             values,
             lambda value: (
-                PRESSURE_WINDOW_SPEC.fail_low <= value < PRESSURE_WINDOW_SPEC.warning_low
-                or PRESSURE_WINDOW_SPEC.warning_high < value <= PRESSURE_WINDOW_SPEC.fail_high
+                fail_low <= value < warning_low
+                or warning_high < value <= fail_high
             ),
             labels,
             time_step_minutes,
@@ -93,7 +113,7 @@ def run_pressure_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
                 (
                     index
                     for index in range(last_violation + 1, len(values))
-                    if PRESSURE_WINDOW_SPEC.warning_low <= values[index] <= PRESSURE_WINDOW_SPEC.warning_high
+                    if warning_low <= values[index] <= warning_high
                 ),
                 None,
             )

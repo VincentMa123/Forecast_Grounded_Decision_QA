@@ -1,6 +1,6 @@
 {
   "library_name": "engineering_constraint_library_pdf_1_5",
-  "library_version": "pdf_1_5_v2",
+  "library_version": "pdf_1_5_v3",
   "rule_source": "Forecast-Grounded Decision QA Section 1.5 engineering design rules",
   "value_space": "normalized PipeFormer forecast variables; replace proxy limits with real station and segment limits",
   "category_order": [

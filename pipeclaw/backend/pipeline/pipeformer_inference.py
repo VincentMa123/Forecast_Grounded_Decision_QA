@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 SOURCE_FILES = {
     "B": "B.csv",
     "C": "C.csv",
+    "H": "H.csv",
     "N": "N.csv",
     "P": "P.csv",
     "R": "R.csv",
@@ -48,19 +49,35 @@ def load_variable_names(path: Path) -> List[str]:
     return [name for name, _ in sorted(mapping.items(), key=lambda item: item[1]["index"])]
 
 
+def load_variable_registry(static_dir: Path) -> Dict[str, Any]:
+    registry_path = static_dir / "variable_registry.json"
+    if not registry_path.exists():
+        return {}
+    return json.loads(registry_path.read_text(encoding="utf-8-sig"))
+
+
+def load_registry_provenance(static_dir: Path) -> Dict[str, Any]:
+    payload = load_variable_registry(static_dir)
+    return {
+        "registry_schema_version": payload.get("schema_version"),
+        "synthetic": bool(payload.get("synthetic")),
+        "physical_validation_status": payload.get("physical_validation_status"),
+    }
+
+
 def find_default_checkpoint_dir(repo_root: Path) -> Path:
-    preferred = repo_root / "pipeFormer" / "outputs" / "mock_tiny_decoder" / "checkpoint-16"
-    if preferred.exists():
-        return preferred
-    output_dir = repo_root / "pipeFormer" / "outputs" / "mock_tiny_decoder"
-    checkpoints = sorted(
-        [path for path in output_dir.glob("checkpoint-*") if path.is_dir()],
-        key=lambda item: item.stat().st_mtime,
-        reverse=True,
-    )
-    if not checkpoints:
-        raise FileNotFoundError(f"No PipeFormer checkpoint directory found under {output_dir}")
-    return checkpoints[0]
+    output_dirs = [
+        repo_root / "pipeFormer" / "outputs" / "mock_decoder",
+    ]
+    for output_dir in output_dirs:
+        checkpoints = sorted(
+            [path for path in output_dir.glob("checkpoint-*") if path.is_dir()],
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        if checkpoints:
+            return checkpoints[0]
+    raise FileNotFoundError(f"No PipeFormer checkpoint directory found under: {output_dirs}")
 
 
 def resolve_relative(path_value: Optional[str], base_dir: Path) -> Optional[Path]:
@@ -164,7 +181,7 @@ def load_tokenizer(static_dir: Path, vocab_size: Optional[int] = None):
 
 
 def source_file_for_variable(variable_name: str) -> str:
-    if variable_name.startswith("T_") and ":BC" in variable_name:
+    if ":" in variable_name:
         return "Boundary.csv"
     prefix = variable_name.split("_", 1)[0]
     if prefix in SOURCE_FILES:
@@ -301,7 +318,7 @@ def resolve_boundary_adjustments(
 
     keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", parsed_task.get("keep_other_boundary_controls", True)))
     if not keep_other:
-        boundary_variables = {name for name in variable_mapping if ":BC" in name}
+        boundary_variables = {name for name in variable_mapping if ":" in name}
         missing = sorted(boundary_variables - set(adjustments))
         if missing:
             raise ValueError(
@@ -545,6 +562,12 @@ def run_checkpoint_inference(
         new_predictions = window_predictions[-future_rows_per_pass:]
         remaining_steps = steps_requested - generated_steps
         new_predictions = new_predictions[:remaining_steps]
+        control_columns = np.asarray(prediction_mask) <= 0
+        if np.any(control_columns):
+            # Boundary controls are exogenous model inputs. Keep their applied
+            # values fixed during rollout instead of treating decoded logits as
+            # forecasts for variables the prediction mask excludes.
+            new_predictions[:, control_columns] = rollout_window[-1, control_columns]
         generated_chunks.append(new_predictions)
         generated_steps += int(new_predictions.shape[0])
         rollout_window = np.concatenate([rollout_window[new_predictions.shape[0]:], new_predictions], axis=0)
@@ -585,6 +608,8 @@ def run_checkpoint_inference(
         "forecast_time_labels": forecast_time_labels,
         "device": device,
         "model_input_projection_type": model_config.get("input_projection_type"),
+        "data_provenance": load_registry_provenance(static_dir),
+        "variable_registry": list(load_variable_registry(static_dir).get("variables") or []),
         "changed_variable_mapping": variable_mapping[changed_variable],
         "operating_condition_number_used": parsed_task.get("current_operating_condition_number"),
         "applied_boundary_conditions": boundary_adjustments,

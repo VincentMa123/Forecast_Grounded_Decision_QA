@@ -32,15 +32,107 @@ def select_requested_categories(values: Optional[Iterable[str]]) -> List[str]:
     return [category for category in CATEGORY_ORDER if category in categories]
 
 
-def variables_matching(names: Iterable[str], prefixes: Tuple[str, ...], suffixes: Tuple[str, ...] = ()) -> List[str]:
+def registry_index(parsed_task: Optional[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    entries = (parsed_task or {}).get("_variable_registry") or []
+    return {
+        str(item.get("variable")): dict(item)
+        for item in entries
+        if isinstance(item, dict) and item.get("variable")
+    }
+
+
+def variables_matching(
+    names: Iterable[str],
+    prefixes: Tuple[str, ...] = (),
+    suffixes: Tuple[str, ...] = (),
+    *,
+    registry: Optional[Dict[str, Dict[str, Any]]] = None,
+    physical_quantities: Tuple[str, ...] = (),
+    equipment_types: Tuple[str, ...] = (),
+    roles: Tuple[str, ...] = (),
+) -> List[str]:
     result = []
+    use_semantic_selector = bool(
+        registry and (physical_quantities or equipment_types or roles)
+    )
     for name in names:
-        if prefixes and not name.startswith(prefixes):
-            continue
-        if suffixes and not name.endswith(suffixes):
-            continue
+        if not use_semantic_selector:
+            if prefixes and not name.startswith(prefixes):
+                continue
+            if suffixes and not name.endswith(suffixes):
+                continue
+        if use_semantic_selector:
+            metadata = registry.get(name, {})
+            if physical_quantities and metadata.get("physical_quantity") not in physical_quantities:
+                continue
+            if equipment_types and metadata.get("equipment_type") not in equipment_types:
+                continue
+            if roles and metadata.get("role") not in roles:
+                continue
         result.append(name)
     return result
+
+
+def variables_for_spec(
+    spec: ConstraintSpec,
+    names: Iterable[str],
+    parsed_task: Optional[Dict[str, Any]],
+) -> List[str]:
+    return variables_matching(
+        names,
+        spec.prefixes,
+        spec.suffixes,
+        registry=registry_index(parsed_task),
+        physical_quantities=spec.physical_quantities,
+        equipment_types=spec.equipment_types,
+        roles=spec.roles,
+    )
+
+
+def variables_for_selector(
+    names: Iterable[str],
+    selector: Dict[str, Any],
+    parsed_task: Optional[Dict[str, Any]],
+) -> List[str]:
+    return variables_matching(
+        names,
+        tuple(selector.get("prefixes") or ()),
+        tuple(selector.get("suffixes") or ()),
+        registry=registry_index(parsed_task),
+        physical_quantities=tuple(selector.get("physical_quantities") or ()),
+        equipment_types=tuple(selector.get("equipment_types") or ()),
+        roles=tuple(selector.get("roles") or ()),
+    )
+
+
+def range_limits_for_variable(
+    spec: ConstraintSpec,
+    variable: str,
+    parsed_task: Optional[Dict[str, Any]],
+) -> Tuple[Optional[float], Optional[float], Optional[float], Optional[float], str]:
+    metadata = registry_index(parsed_task).get(variable, {})
+    if spec.use_registry_limits and metadata:
+        warning_low = metadata.get("warning_lower_limit", spec.warning_low)
+        warning_high = metadata.get("warning_upper_limit", spec.warning_high)
+        fail_low = metadata.get("lower_limit", spec.fail_low)
+        fail_high = metadata.get("upper_limit", spec.fail_high)
+        if any(value is not None for value in (warning_low, warning_high, fail_low, fail_high)):
+            return warning_low, warning_high, fail_low, fail_high, "variable_registry"
+    return spec.warning_low, spec.warning_high, spec.fail_low, spec.fail_high, "rule_library"
+
+
+def threshold_limits_for_variable(
+    spec: ConstraintSpec,
+    variable: str,
+    parsed_task: Optional[Dict[str, Any]],
+) -> Tuple[Optional[float], Optional[float], str]:
+    metadata = registry_index(parsed_task).get(variable, {})
+    if spec.use_registry_limits and metadata:
+        warning = _absolute_limit(metadata.get("warning_lower_limit"), metadata.get("warning_upper_limit"))
+        fail = _absolute_limit(metadata.get("lower_limit"), metadata.get("upper_limit"))
+        if warning is not None or fail is not None:
+            return warning if warning is not None else spec.warning_threshold, fail if fail is not None else spec.fail_threshold, "variable_registry"
+    return spec.warning_threshold, spec.fail_threshold, "rule_library"
 
 
 def max_status(statuses: Iterable[str]) -> str:
@@ -81,7 +173,12 @@ def base_check(spec: ConstraintSpec, variables: Sequence[str]) -> Dict[str, Any]
     }
 
 
-def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], variables: Sequence[str]) -> Dict[str, Any]:
+def evaluate_range(
+    spec: ConstraintSpec,
+    summaries: Dict[str, Dict[str, Any]],
+    variables: Sequence[str],
+    parsed_task: Dict[str, Any],
+) -> Dict[str, Any]:
     check = base_check(spec, variables)
     if not variables:
         check["message"] = "No matching variables were available for this rule."
@@ -89,13 +186,16 @@ def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], v
 
     statuses = []
     for variable in variables:
+        warning_low, warning_high, fail_low, fail_high, limit_source = range_limits_for_variable(
+            spec, variable, parsed_task
+        )
         predicted_values = summaries.get(variable, {}).get("predicted_values", [])
         variable_statuses = []
         for index, value in enumerate(predicted_values):
             status = "pass"
-            if _outside_range(value, spec.fail_low, spec.fail_high):
+            if _outside_range(value, fail_low, fail_high):
                 status = "fail"
-            elif _outside_range(value, spec.warning_low, spec.warning_high):
+            elif _outside_range(value, warning_low, warning_high):
                 status = "warning"
             statuses.append(status)
             variable_statuses.append(status)
@@ -106,8 +206,9 @@ def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], v
                         "step_index": index,
                         "value": value,
                         "status": status,
-                        "warning_range": [spec.warning_low, spec.warning_high],
-                        "fail_range": [spec.fail_low, spec.fail_high],
+                        "warning_range": [warning_low, warning_high],
+                        "fail_range": [fail_low, fail_high],
+                        "limit_source": limit_source,
                     }
                 )
 
@@ -123,10 +224,11 @@ def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], v
                     "max_prediction": maximum,
                     "max_step_index": predicted_values.index(maximum),
                     "status": max_status(variable_statuses),
-                    "warning_range": [spec.warning_low, spec.warning_high],
-                    "fail_range": [spec.fail_low, spec.fail_high],
-                    "warning_margin": _range_margin(minimum, maximum, spec.warning_low, spec.warning_high),
-                    "fail_margin": _range_margin(minimum, maximum, spec.fail_low, spec.fail_high),
+                    "warning_range": [warning_low, warning_high],
+                    "fail_range": [fail_low, fail_high],
+                    "warning_margin": _range_margin(minimum, maximum, warning_low, warning_high),
+                    "fail_margin": _range_margin(minimum, maximum, fail_low, fail_high),
+                    "limit_source": limit_source,
                 }
             )
 
@@ -142,7 +244,12 @@ def evaluate_range(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], v
     return check
 
 
-def evaluate_summary_metric(spec: ConstraintSpec, summaries: Dict[str, Dict[str, Any]], variables: Sequence[str]) -> Dict[str, Any]:
+def evaluate_summary_metric(
+    spec: ConstraintSpec,
+    summaries: Dict[str, Dict[str, Any]],
+    variables: Sequence[str],
+    parsed_task: Dict[str, Any],
+) -> Dict[str, Any]:
     check = base_check(spec, variables)
     if not variables:
         check["message"] = "No matching variables were available for this rule."
@@ -150,10 +257,13 @@ def evaluate_summary_metric(spec: ConstraintSpec, summaries: Dict[str, Dict[str,
 
     statuses = []
     for variable in variables:
+        warning_threshold, fail_threshold, limit_source = threshold_limits_for_variable(
+            spec, variable, parsed_task
+        )
         value = summaries.get(variable, {}).get(spec.metric)
         if value is None:
             continue
-        status = status_from_threshold(float(value), spec.warning_threshold, spec.fail_threshold)
+        status = status_from_threshold(float(value), warning_threshold, fail_threshold)
         statuses.append(status)
         if len(check["evaluated_values"]) < MAX_EVALUATED_VALUES:
             evaluated = {
@@ -161,10 +271,11 @@ def evaluate_summary_metric(spec: ConstraintSpec, summaries: Dict[str, Dict[str,
                 "metric": spec.metric,
                 "value": value,
                 "status": status,
-                "warning_threshold": spec.warning_threshold,
-                "fail_threshold": spec.fail_threshold,
-                "warning_margin": _threshold_margin(float(value), spec.warning_threshold),
-                "fail_margin": _threshold_margin(float(value), spec.fail_threshold),
+                "warning_threshold": warning_threshold,
+                "fail_threshold": fail_threshold,
+                "warning_margin": _threshold_margin(float(value), warning_threshold),
+                "fail_margin": _threshold_margin(float(value), fail_threshold),
+                "limit_source": limit_source,
             }
             if spec.metric == "max_abs_prediction":
                 predicted_values = summaries.get(variable, {}).get("predicted_values", [])
@@ -180,8 +291,9 @@ def evaluate_summary_metric(spec: ConstraintSpec, summaries: Dict[str, Dict[str,
                     "metric": spec.metric,
                     "value": value,
                     "status": status,
-                    "warning_threshold": spec.warning_threshold,
-                    "fail_threshold": spec.fail_threshold,
+                    "warning_threshold": warning_threshold,
+                    "fail_threshold": fail_threshold,
+                    "limit_source": limit_source,
                 }
             )
 
@@ -251,10 +363,10 @@ def evaluate_spec(
         return evaluate_boundary_change(spec, parsed_task)
 
     names = list(summaries)
-    variables = variables_matching(names, spec.prefixes, spec.suffixes)
+    variables = variables_for_spec(spec, names, parsed_task)
     if spec.metric == "predicted_range":
-        return evaluate_range(spec, summaries, variables)
-    return evaluate_summary_metric(spec, summaries, variables)
+        return evaluate_range(spec, summaries, variables, parsed_task)
+    return evaluate_summary_metric(spec, summaries, variables, parsed_task)
 
 
 def run_specs(
@@ -321,6 +433,11 @@ def total_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
 
 def _outside_range(value: float, low: Optional[float], high: Optional[float]) -> bool:
     return (low is not None and value < low) or (high is not None and value > high)
+
+
+def _absolute_limit(low: Any, high: Any) -> Optional[float]:
+    limits = [abs(float(value)) for value in (low, high) if value is not None]
+    return max(limits) if limits else None
 
 
 def _flag_for_status(spec: ConstraintSpec, status: str) -> Optional[str]:
