@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from .constraints.common import (
     CATEGORY_ORDER,
@@ -36,9 +36,36 @@ PIPELINE_CONSTRAINTS = load_pipeline_constraints()
 DISPATCH_RULES = load_rule_document("dispatch_priority")
 
 
+class EngineeringConstraintEngine:
+    """Execute the configured engineering rule categories as one policy."""
+
+    def __init__(self, category_runners: Optional[Mapping[str, CategoryRunner]] = None) -> None:
+        self.category_runners = dict(category_runners or CATEGORY_RUNNERS)
+
+    def evaluate(
+        self,
+        summaries: Dict[str, Dict[str, Any]],
+        parsed_task: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        return _run_engineering_constraint_checks(
+            summaries,
+            parsed_task=parsed_task,
+            category_runners=self.category_runners,
+        )
+
+
 def run_engineering_constraint_checks(
     summaries: Dict[str, Dict[str, Any]],
     parsed_task: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Compatibility wrapper around the default constraint engine."""
+    return EngineeringConstraintEngine().evaluate(summaries, parsed_task)
+
+
+def _run_engineering_constraint_checks(
+    summaries: Dict[str, Dict[str, Any]],
+    parsed_task: Optional[Dict[str, Any]],
+    category_runners: Mapping[str, CategoryRunner],
 ) -> Dict[str, Any]:
     parsed_task = parsed_task or {}
     if not (parsed_task.get("_variable_registry") or []):
@@ -48,7 +75,7 @@ def run_engineering_constraint_checks(
 
     checks: List[Dict[str, Any]] = []
     for category in CATEGORY_ORDER:
-        runner = CATEGORY_RUNNERS.get(category)
+        runner = category_runners.get(category)
         if runner is not None and category in selected:
             checks.extend(runner(summaries, parsed_task))
 

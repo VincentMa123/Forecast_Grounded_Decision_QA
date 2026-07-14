@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .registry import register_tool
-from pipeline.pipeformer_tool_runtime import run_pipeformer_forecast_analysis
+from pipeline.pipeformer_tool_runtime import PipeFormerForecastService
 
 _REGISTERED = False
 
@@ -19,6 +19,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         return
     _REGISTERED = True
     resolved_backend_root = Path(backend_root).resolve() if backend_root else _default_backend_root()
+    forecast_service = PipeFormerForecastService(resolved_backend_root)
 
     @register_tool(
         name="run_pipeformer_forecast",
@@ -119,9 +120,8 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         session_id: str = "",
         agent_id: str = "default",
     ) -> Dict[str, Any]:
-        return run_pipeformer_forecast_analysis(
+        return forecast_service.analyze(
             question=question,
-            backend_root=resolved_backend_root,
             case_id=case_id,
             current_operating_condition_number=current_operating_condition_number,
             boundary_conditions=boundary_conditions,

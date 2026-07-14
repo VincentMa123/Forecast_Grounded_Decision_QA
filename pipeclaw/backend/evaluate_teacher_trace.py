@@ -6,9 +6,8 @@ from pathlib import Path
 
 from evaluator.scorer import (
     DEFAULT_MINIMUM_SCORE,
-    evaluate_native_record,
-    load_records,
-    summarize_evaluations,
+    NativeEvaluationConfig,
+    NativeTraceEvaluator,
 )
 
 
@@ -31,46 +30,61 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+class TeacherTraceEvaluationRunner:
+    """Load, filter, evaluate, and persist one teacher-trace evaluation run."""
+
+    def __init__(self, args: argparse.Namespace) -> None:
+        self.args = args
+        self.evaluator = NativeTraceEvaluator(
+            NativeEvaluationConfig(minimum_score=args.minimum_score)
+        )
+
+    def run(self) -> Dict[str, object]:
+        args = self.args
+        records = [
+            record
+            for record in self.evaluator.load(args.teacher_trace.resolve())
+            if (not args.scenario_id or record.get("scenario_id") == args.scenario_id)
+            and (not args.sample_id or record.get("sample_id") == args.sample_id)
+        ]
+        if not records:
+            raise ValueError("No teacher-trace records matched the requested filters.")
+        evaluations = []
+        for record in records:
+            result = self.evaluator.evaluate(record, trace_status=record.get("trace_status"))
+            evaluations.append(
+                {
+                    "sample_id": record.get("sample_id"),
+                    "scenario_id": record.get("scenario_id"),
+                    **result,
+                }
+            )
+        self._write_jsonl(args.output_jsonl, evaluations)
+        summary = {
+            "schema_version": "native_pipeclaw_quality_v1",
+            "teacher_trace": str(args.teacher_trace.resolve()),
+            "minimum_pass_score": args.minimum_score,
+            **self.evaluator.summarize(evaluations),
+            "output_jsonl": str(args.output_jsonl.resolve()),
+        }
+        args.summary_json.parent.mkdir(parents=True, exist_ok=True)
+        args.summary_json.write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return summary
+
+    @staticmethod
+    def _write_jsonl(path: Path, evaluations: list[dict[str, object]]) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("w", encoding="utf-8", newline="\n") as handle:
+            for result in evaluations:
+                handle.write(json.dumps(result, ensure_ascii=False) + "\n")
+
+
 def main() -> int:
     args = build_parser().parse_args()
-    records = [
-        record
-        for record in load_records(args.teacher_trace.resolve())
-        if (not args.scenario_id or record.get("scenario_id") == args.scenario_id)
-        and (not args.sample_id or record.get("sample_id") == args.sample_id)
-    ]
-    if not records:
-        raise ValueError("No teacher-trace records matched the requested filters.")
-    evaluations = []
-    for record in records:
-        result = evaluate_native_record(
-            record,
-            trace_status=record.get("trace_status"),
-            minimum_score=args.minimum_score,
-        )
-        evaluations.append(
-            {
-                "sample_id": record.get("sample_id"),
-                "scenario_id": record.get("scenario_id"),
-                **result,
-            }
-        )
-    args.output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-    with args.output_jsonl.open("w", encoding="utf-8", newline="\n") as handle:
-        for result in evaluations:
-            handle.write(json.dumps(result, ensure_ascii=False) + "\n")
-    summary = {
-        "schema_version": "native_pipeclaw_quality_v1",
-        "teacher_trace": str(args.teacher_trace.resolve()),
-        "minimum_pass_score": args.minimum_score,
-        **summarize_evaluations(evaluations),
-        "output_jsonl": str(args.output_jsonl.resolve()),
-    }
-    args.summary_json.parent.mkdir(parents=True, exist_ok=True)
-    args.summary_json.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
+    summary = TeacherTraceEvaluationRunner(args).run()
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0
 

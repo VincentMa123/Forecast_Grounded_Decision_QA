@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
@@ -18,6 +19,44 @@ REQUIRED_VARIABLE_FIELDS = (
 )
 
 
+@dataclass(frozen=True)
+class VariableRegistry:
+    """Validated variable metadata loaded from one registry document."""
+
+    path: Path
+    document: Dict[str, Any]
+
+    @classmethod
+    def read(cls, path: Path) -> "VariableRegistry":
+        path = Path(path)
+        if not path.is_file():
+            raise ValueError(f"Variable registry validation failed: variable registry does not exist: {path}")
+        try:
+            document = json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Variable registry validation failed: could not read {path}: {exc}") from exc
+        if not isinstance(document, dict) or not isinstance(document.get("variables"), list):
+            raise ValueError("Variable registry validation failed: registry must contain a variables array.")
+        return cls(path=path, document=document)
+
+    def validate(self, required_variables: Iterable[str]) -> Dict[str, Any]:
+        return _registry_report(self.path, self.document, required_variables)
+
+    def require(self, required_variables: Iterable[str]) -> Dict[str, Any]:
+        report = self.validate(required_variables)
+        if not report["supported"]:
+            raise ValueError("Variable registry validation failed: " + "; ".join(report["errors"]))
+        return self.document
+
+    @property
+    def by_name(self) -> Dict[str, Dict[str, Any]]:
+        return {
+            str(item["variable"]): item
+            for item in self.document.get("variables") or []
+            if isinstance(item, dict) and item.get("variable")
+        }
+
+
 def registry_path_for_mapping(mapping_csv: Path) -> Path:
     return Path(mapping_csv).resolve().parent / "variable_registry.json"
 
@@ -30,12 +69,10 @@ def validate_variable_registry(
     if not path.is_file():
         return _missing_registry_report(path)
     try:
-        document = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError) as exc:
+        registry = VariableRegistry.read(path)
+    except ValueError as exc:
         return _invalid_registry_report(path, f"Could not read registry JSON: {exc}")
-    if not isinstance(document, dict) or not isinstance(document.get("variables"), list):
-        return _invalid_registry_report(path, "Registry must contain a variables array.")
-    return _registry_report(path, document, required_variables)
+    return registry.validate(required_variables)
 
 
 def load_variable_registry(
@@ -43,19 +80,7 @@ def load_variable_registry(
     required_variables: Iterable[str],
 ) -> Dict[str, Any]:
     path = Path(path)
-    if not path.is_file():
-        report = _missing_registry_report(path)
-        raise ValueError("Variable registry validation failed: " + "; ".join(report["errors"]))
-    try:
-        document = json.loads(path.read_text(encoding="utf-8-sig"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Variable registry validation failed: could not read {path}: {exc}") from exc
-    if not isinstance(document, dict) or not isinstance(document.get("variables"), list):
-        raise ValueError("Variable registry validation failed: registry must contain a variables array.")
-    report = _registry_report(path, document, required_variables)
-    if not report["supported"]:
-        raise ValueError("Variable registry validation failed: " + "; ".join(report["errors"]))
-    return document
+    return VariableRegistry.read(path).require(required_variables)
 
 
 def _registry_report(

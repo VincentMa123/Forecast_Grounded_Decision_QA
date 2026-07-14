@@ -16,9 +16,18 @@ from evaluator.teacher_quality import (
     numeric_claims_are_grounded,
     safety_and_energy_checks_pass as _safety_and_energy_checks_pass,
 )
-from evaluator.scorer import evaluate_native_record
+from evaluator.scorer import NativeTraceEvaluator
 from pipeline.io_utils import write_json, write_jsonl
 from pipeline.scenario_preflight import validate_scenario_sources
+from pipeline.teacher_trace_store import (
+    TeacherTraceStore,
+    load_existing_records,
+    merge_records,
+    merge_session_records,
+    scenario_sample_ids,
+    scenario_session_record_ids,
+    validate_combined_splits,
+)
 
 
 logger = logging.getLogger("teacher_trace")
@@ -78,6 +87,46 @@ def load_scenario_sources(paths: List[Path]) -> List[Dict[str, Any]]:
 
 def flatten_source_scenarios(sources: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [scenario for source in sources for scenario in source.get("scenarios") or []]
+
+
+def combined_preflight_sources(
+    all_sources: List[Dict[str, Any]],
+    selected_sources: List[Dict[str, Any]],
+    existing_records: List[Dict[str, Any]],
+) -> tuple[List[Dict[str, Any]], List[str]]:
+    required_pairs = {
+        (
+            str(record.get("dataset_source") or ""),
+            str(record.get("scenario_id") or ""),
+        )
+        for record in existing_records
+        if record.get("dataset_source") and record.get("scenario_id")
+    }
+    required_pairs.update(
+        (
+            str(source.get("dataset_source") or ""),
+            str(scenario.get("scenario_id") or ""),
+        )
+        for source in selected_sources
+        for scenario in source.get("scenarios") or []
+    )
+    available_pairs = {
+        (str(source.get("dataset_source") or ""), str(scenario.get("scenario_id") or ""))
+        for source in all_sources
+        for scenario in source.get("scenarios") or []
+    }
+    selected = []
+    for source in all_sources:
+        source_name = str(source.get("dataset_source") or "")
+        scenarios = [
+            scenario
+            for scenario in source.get("scenarios") or []
+            if (source_name, str(scenario.get("scenario_id") or "")) in required_pairs
+        ]
+        if scenarios:
+            selected.append({**source, "scenarios": scenarios})
+    missing = sorted(f"{source}:{scenario}" for source, scenario in required_pairs - available_pairs)
+    return selected, missing
 
 
 def configure_logging(level_name: str) -> None:
@@ -166,7 +215,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--split-seed", default="pipeclaw-lifecycle-v1")
-    parser.add_argument("--force", action="store_true")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Replace existing outputs. Without this flag, new unique records are appended.",
+    )
     parser.add_argument(
         "--log-level",
         default=os.getenv("TEACHER_TRACE_LOG_LEVEL", "INFO"),
@@ -263,18 +316,8 @@ def sanitize_tool_output(value: Any) -> Any:
 
 
 def compact_sft_tool_output(value: Any) -> Any:
-    """Remove runtime-only tool metadata while retaining evidence used by the answer."""
-    if isinstance(value, dict):
-        return {
-            key: compact_sft_tool_output(item)
-            for key, item in value.items()
-            if key not in SFT_OMITTED_TOOL_KEYS
-        }
-    if isinstance(value, list):
-        return [compact_sft_tool_output(item) for item in value]
-    if isinstance(value, str) and len(value) > SFT_MAX_TOOL_TEXT_CHARS:
-        return value[:SFT_MAX_TOOL_TEXT_CHARS] + "... [truncated for SFT]"
-    return value
+    """Compatibility wrapper around the configured trace projector."""
+    return DEFAULT_PROJECTOR.compact_sft_output(value)
 
 
 def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
@@ -503,12 +546,72 @@ def final_answer(trace: Dict[str, Any]) -> str:
     return ""
 
 
+class TeacherTraceProjector:
+    """Convert raw agent/tool traces into compact, stable training fields."""
+
+    def __init__(
+        self,
+        *,
+        max_tool_text_chars: int = SFT_MAX_TOOL_TEXT_CHARS,
+        omitted_tool_keys: Optional[set[str]] = None,
+    ) -> None:
+        self.max_tool_text_chars = max_tool_text_chars
+        self.omitted_tool_keys = frozenset(omitted_tool_keys or SFT_OMITTED_TOOL_KEYS)
+
+    @staticmethod
+    def sanitize(value: Any) -> Any:
+        return sanitize_tool_output(value)
+
+    def compact_sft_output(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: self.compact_sft_output(item)
+                for key, item in value.items()
+                if key not in self.omitted_tool_keys
+            }
+        if isinstance(value, list):
+            return [self.compact_sft_output(item) for item in value]
+        if isinstance(value, str) and len(value) > self.max_tool_text_chars:
+            return value[: self.max_tool_text_chars] + "... [truncated for SFT]"
+        return value
+
+    @staticmethod
+    def export_tools(
+        trace: Dict[str, Any],
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+        return export_trace_tools(trace)
 
 
+class TeacherTraceRecordBuilder:
+    """Build one evaluated SFT record from one assistant-turn trace."""
+
+    def __init__(
+        self,
+        projector: Optional[TeacherTraceProjector] = None,
+        evaluator: Optional[NativeTraceEvaluator] = None,
+    ) -> None:
+        self.projector = projector or TeacherTraceProjector()
+        self.evaluator = evaluator or NativeTraceEvaluator()
+
+    def build(
+        self,
+        scenario: Dict[str, Any],
+        question: str,
+        trace: Dict[str, Any],
+        **kwargs: Any,
+    ) -> Dict[str, Any]:
+        return _build_teacher_record(
+            scenario,
+            question,
+            trace,
+            projector=self.projector,
+            native_evaluator=self.evaluator,
+            **kwargs,
+        )
 
 
-
-
+DEFAULT_PROJECTOR = TeacherTraceProjector()
+DEFAULT_RECORD_BUILDER = TeacherTraceRecordBuilder(projector=DEFAULT_PROJECTOR)
 
 
 def build_teacher_record(
@@ -521,10 +624,42 @@ def build_teacher_record(
     conversation_context: Optional[List[Dict[str, Any]]] = None,
     split: str = "train",
 ) -> Dict[str, Any]:
+    """Compatibility entry point used by tests and existing integrations."""
+    return DEFAULT_RECORD_BUILDER.build(
+        scenario,
+        question,
+        trace,
+        source_session_id=source_session_id,
+        turn_id=turn_id,
+        conversation_context=conversation_context,
+        split=split,
+    )
+
+
+
+
+
+
+
+
+
+
+def _build_teacher_record(
+    scenario: Dict[str, Any],
+    question: str,
+    trace: Dict[str, Any],
+    *,
+    projector: TeacherTraceProjector,
+    native_evaluator: NativeTraceEvaluator,
+    source_session_id: str = "session_001",
+    turn_id: int = 1,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
+    split: str = "train",
+) -> Dict[str, Any]:
     dataset_source = str(scenario.get("dataset_source") or "unknown_source")
     scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
     record_id = f"{dataset_source}:{source_session_id}::turn_{turn_id:03d}"
-    tool_calls, tool_outputs, pipeformer_results = export_trace_tools(trace)
+    tool_calls, tool_outputs, pipeformer_results = projector.export_tools(trace)
     pipeformer_outputs = [item["output"] for item in pipeformer_results]
     projections = [item["projection"] for item in pipeformer_results]
     pipeformer_call_count = sum(
@@ -604,14 +739,14 @@ def build_teacher_record(
         "turn_id": turn_id,
         "scenario_type": scenario.get("scenario_type"),
         "split": split,
-        "conversation_context": sanitize_tool_output(conversation_context or []),
+        "conversation_context": projector.sanitize(conversation_context or []),
         "user_input": question,
-        "parsed_task": sanitize_tool_output(parsed_task),
+        "parsed_task": projector.sanitize(parsed_task),
         "tool_calls": tool_calls,
         "tool_outputs": tool_outputs,
-        "prediction_summary": sanitize_tool_output(prediction_summary),
-        "constraint_check": sanitize_tool_output(constraint_check),
-        "evidence": sanitize_tool_output(evidence),
+        "prediction_summary": projector.sanitize(prediction_summary),
+        "constraint_check": projector.sanitize(constraint_check),
+        "evidence": projector.sanitize(evidence),
         "risk_level": risk_level,
         "manual_intervention_label": manual_intervention_label,
         "dispatch_recommendation": dispatch_recommendation,
@@ -620,7 +755,7 @@ def build_teacher_record(
         "quality_flag": answer_quality_flag,
         "quality_issues": quality_issues,
     }
-    native_quality = evaluate_native_record(
+    native_quality = native_evaluator.evaluate(
         record,
         hard_issues=quality_issues,
         trace_status=trace.get("status"),
@@ -873,9 +1008,18 @@ def write_split_records(
     return written_count
 
 
-def main() -> int:
-    load_backend_env()
-    args = build_parser().parse_args()
+class TeacherTraceGenerator:
+    """Coordinate scenario selection, agent execution, merging, and export."""
+
+    def __init__(self, args: argparse.Namespace, store: Optional[TeacherTraceStore] = None) -> None:
+        self.args = args
+        self.store = store or TeacherTraceStore.from_args(args)
+
+    def run(self) -> int:
+        return run_teacher_trace_generation(self.args, self.store)
+
+
+def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceStore) -> int:
     configure_logging(args.log_level)
     scenario_files = list(args.scenario_file or default_scenario_files())
     all_sources = load_scenario_sources(scenario_files)
@@ -909,8 +1053,22 @@ def main() -> int:
     if args.session_id and (len(scenarios) != 1 or source_session_count != 1):
         raise ValueError("--session-id requires one selected scenario containing exactly one source session.")
 
-    preflight = validate_scenario_sources(selected_sources, args.mapping_csv)
-    write_json(args.preflight_output, preflight, force=args.force)
+    existing_records: List[Dict[str, Any]] = []
+    existing_session_records: List[Dict[str, Any]] = []
+    if not args.force:
+        existing_records = store.load_master()
+        existing_session_records = store.load_sessions()
+
+    preflight_sources, missing_preflight_pairs = combined_preflight_sources(
+        all_sources,
+        selected_sources,
+        existing_records,
+    )
+    preflight = validate_scenario_sources(preflight_sources or selected_sources, args.mapping_csv)
+    preflight["append_mode"] = not args.force
+    preflight["existing_record_count"] = len(existing_records)
+    preflight["unavailable_existing_scenarios"] = missing_preflight_pairs
+    write_json(args.preflight_output, preflight, force=True)
     if args.preflight_only:
         print(json.dumps(preflight, ensure_ascii=False, indent=2))
         return 0
@@ -934,8 +1092,34 @@ def main() -> int:
     records: List[Dict[str, Any]] = []
     session_records: List[Dict[str, Any]] = []
     split_map = scenario_split_map(all_scenarios, args.split_seed)
+    existing_sample_ids = {
+        str(record.get("sample_id"))
+        for record in existing_records
+        if record.get("sample_id")
+    }
+    existing_session_ids = {
+        str(record.get("session_record_id"))
+        for record in existing_session_records
+        if record.get("session_record_id")
+    }
+    skipped_scenarios = 0
     for index, scenario in enumerate(scenarios, start=1):
         scenario_id = str(scenario.get("scenario_id") or f"scenario_{index:06d}")
+        expected_sample_ids = store.sample_ids(scenario)
+        expected_session_ids = store.session_ids(scenario)
+        if (
+            expected_sample_ids
+            and set(expected_sample_ids) <= existing_sample_ids
+            and set(expected_session_ids) <= existing_session_ids
+        ):
+            skipped_scenarios += 1
+            logger.info(
+                "Skipping existing scenario without LLM calls: dataset=%s scenario=%s records=%d",
+                scenario.get("dataset_source"),
+                scenario_id,
+                len(expected_sample_ids),
+            )
+            continue
         split = split_map[scenario_id]
         scenario_history: List[Dict[str, Any]] = []
         for session_index, source_session in enumerate(scenario.get("sessions") or [], start=1):
@@ -952,29 +1136,46 @@ def main() -> int:
             records.extend(turn_records)
             session_records.append(session_record)
 
-    logger.info("Writing JSONL output: %s", args.output_jsonl)
-    write_jsonl(args.output_jsonl, records, force=args.force)
+    combined_records, duplicate_record_count = store.merge_records(
+        existing_records,
+        records,
+        id_field="sample_id",
+    )
+    combined_session_records, updated_session_count = store.merge_sessions(
+        existing_session_records,
+        session_records,
+    )
+    store.validate_splits(combined_records)
+    appended_record_count = len(combined_records) - len(existing_records)
+
+    logger.info("Writing combined JSONL output: %s", args.output_jsonl)
     logger.info("Writing pretty JSON output: %s", args.output_json)
-    write_json(args.output_json, records[0] if len(records) == 1 else records, force=args.force)
+    store.write_master(combined_records)
     logger.info("Writing session evaluation JSONL: %s", args.session_output_jsonl)
-    write_jsonl(args.session_output_jsonl, session_records, force=args.force)
+    store.write_sessions(combined_session_records)
     logger.info("Writing scenario-isolated split files: %s", args.split_output_dir)
     sft_record_count = write_split_records(
         args.split_output_dir,
-        records,
-        force=args.force,
+        combined_records,
+        force=True,
     )
     failed_sessions = sum(not bool(item.get("complete")) for item in session_records)
-    quality_pass_records = sum(item.get("quality_flag") == "pass" for item in records)
+    total_failed_sessions = sum(not bool(item.get("complete")) for item in combined_session_records)
+    quality_pass_records = sum(item.get("quality_flag") == "pass" for item in combined_records)
     if failed_sessions:
         run_status = "completed_with_errors"
-    elif sft_record_count < len(records):
+    elif not appended_record_count and existing_records:
+        run_status = "no_changes"
+    elif sft_record_count < len(combined_records):
         run_status = "completed_with_quality_issues"
     else:
         run_status = "ok"
     logger.info(
-        "Teacher trace generation complete: records=%d quality_pass_records=%d sft_records=%d failed_sessions=%d",
+        "Teacher trace generation complete: generated=%d appended=%d total=%d quality_pass_records=%d "
+        "sft_records=%d failed_sessions=%d",
         len(records),
+        appended_record_count,
+        len(combined_records),
         quality_pass_records,
         sft_record_count,
         failed_sessions,
@@ -983,11 +1184,18 @@ def main() -> int:
         json.dumps(
             {
                 "status": run_status,
-                "records": len(records),
+                "append_mode": not args.force,
+                "records": len(combined_records),
+                "generated_records": len(records),
+                "appended_records": appended_record_count,
+                "duplicate_records_skipped": duplicate_record_count,
+                "skipped_existing_scenarios": skipped_scenarios,
                 "quality_pass_records": quality_pass_records,
                 "sft_records": sft_record_count,
-                "sessions": len(session_records),
+                "sessions": len(combined_session_records),
                 "failed_sessions": failed_sessions,
+                "total_failed_sessions": total_failed_sessions,
+                "updated_existing_sessions": updated_session_count,
                 "output_jsonl": args.output_jsonl.as_posix(),
                 "output_json": args.output_json.as_posix(),
                 "session_output_jsonl": args.session_output_jsonl.as_posix(),
@@ -998,6 +1206,12 @@ def main() -> int:
         )
     )
     return 0 if failed_sessions == 0 else 1
+
+
+def main() -> int:
+    load_backend_env()
+    args = build_parser().parse_args()
+    return TeacherTraceGenerator(args).run()
 
 
 if __name__ == "__main__":

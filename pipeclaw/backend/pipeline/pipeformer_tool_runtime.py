@@ -13,11 +13,12 @@ from .condition_parser import (
     PIPEFORMER_TASK_SCHEMA_VERSION,
     parse_condition,
 )
-from .engineering_constraints import run_engineering_constraint_checks
+from .engineering_constraints import EngineeringConstraintEngine
 from .evidence_extractor import summarize_variables, top_variables
 from .pipeformer_inference import (
+    PipeFormerInferenceConfig,
+    PipeFormerInferenceEngine,
     find_default_checkpoint_dir,
-    run_checkpoint_inference,
 )
 
 
@@ -336,6 +337,19 @@ def build_pipeformer_task(
     return parsed
 
 
+class PipeFormerForecastService:
+    """Coordinate task parsing, checkpoint inference, constraints, and evidence."""
+
+    def __init__(self, backend_root: Path) -> None:
+        self.backend_root = Path(backend_root).resolve()
+
+    def analyze(self, **request: Any) -> Dict[str, Any]:
+        return run_pipeformer_forecast_analysis(
+            backend_root=self.backend_root,
+            **request,
+        )
+
+
 def run_pipeformer_forecast_analysis(
     *,
     question: str,
@@ -379,6 +393,17 @@ def run_pipeformer_forecast_analysis(
         mapping_override,
         resolved_device,
     )
+    inference_engine = PipeFormerInferenceEngine(
+        PipeFormerInferenceConfig(
+            checkpoint_dir=resolved_checkpoint_dir,
+            pipeformer_root=resolved_pipeformer_root,
+            data_dir=resolved_data_dir,
+            static_dir=resolved_static_dir,
+            mapping_path=mapping_override,
+            device=resolved_device,
+        )
+    )
+    constraint_engine = EngineeringConstraintEngine()
 
     parsed_task = build_pipeformer_task(
         question=question,
@@ -394,15 +419,7 @@ def run_pipeformer_forecast_analysis(
         constraint_verification_types=constraint_verification_types,
     )
     logger.info("PipeFormer parsed task: %s", parsed_task)
-    forecast_context = run_checkpoint_inference(
-        parsed_task=parsed_task,
-        mapping_path=mapping_override,
-        checkpoint_dir=resolved_checkpoint_dir,
-        pipeformer_root=resolved_pipeformer_root,
-        data_dir=resolved_data_dir,
-        static_dir=resolved_static_dir,
-        device=resolved_device,
-    )
+    forecast_context = inference_engine.forecast(parsed_task)
     logger.info("PipeFormer forecast context ready: mode=%s", forecast_context.get("mode"))
     parsed_task["forecast_time_step_minutes"] = forecast_context.get("time_step_minutes")
     registry_entries = list(forecast_context.get("variable_registry") or [])
@@ -441,15 +458,7 @@ def run_pipeformer_forecast_analysis(
             baseline_boundary.pop(key, None)
         baseline_boundary["keep_other_boundary_controls"] = True
         baseline_task["boundary_conditions"] = baseline_boundary
-        baseline_context = run_checkpoint_inference(
-            parsed_task=baseline_task,
-            mapping_path=mapping_override,
-            checkpoint_dir=resolved_checkpoint_dir,
-            pipeformer_root=resolved_pipeformer_root,
-            data_dir=resolved_data_dir,
-            static_dir=resolved_static_dir,
-            device=resolved_device,
-        )
+        baseline_context = inference_engine.forecast(baseline_task)
         counterfactual_comparison = _counterfactual_comparison(
             baseline_context["predict_rows"],
             forecast_context["predict_rows"],
@@ -464,7 +473,7 @@ def run_pipeformer_forecast_analysis(
             ),
             None,
         )
-    verification = run_engineering_constraint_checks(variable_summaries, parsed_task=parsed_task)
+    verification = constraint_engine.evaluate(variable_summaries, parsed_task=parsed_task)
     logger.info("PipeFormer constraint checks finished: overall_status=%s", verification.get("overall_status"))
     priority_evidence_variables = []
     for finding in verification.get("priority_findings", []):

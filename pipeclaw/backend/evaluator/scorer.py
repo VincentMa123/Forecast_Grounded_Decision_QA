@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
@@ -38,6 +39,42 @@ CRITICAL_PIPEFORMER_CHECKS = {
 }
 
 
+@dataclass(frozen=True)
+class NativeEvaluationConfig:
+    minimum_score: float = DEFAULT_MINIMUM_SCORE
+    max_record_chars: int = DEFAULT_MAX_RECORD_CHARS
+
+
+class NativeTraceEvaluator:
+    """Evaluate records using one reusable native PipeClaw quality policy."""
+
+    def __init__(self, config: Optional[NativeEvaluationConfig] = None) -> None:
+        self.config = config or NativeEvaluationConfig()
+
+    def evaluate(
+        self,
+        record: Dict[str, Any],
+        *,
+        hard_issues: Optional[Iterable[str]] = None,
+        trace_status: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        return _evaluate_native_record(
+            record,
+            hard_issues=hard_issues,
+            trace_status=trace_status,
+            minimum_score=self.config.minimum_score,
+            max_record_chars=self.config.max_record_chars,
+        )
+
+    @staticmethod
+    def summarize(results: List[Dict[str, Any]]) -> Dict[str, Any]:
+        return summarize_evaluations(results)
+
+    @staticmethod
+    def load(path: Path) -> List[Dict[str, Any]]:
+        return load_records(path)
+
+
 def evaluate_native_record(
     record: Dict[str, Any],
     *,
@@ -45,6 +82,24 @@ def evaluate_native_record(
     trace_status: Optional[str] = None,
     minimum_score: float = DEFAULT_MINIMUM_SCORE,
     max_record_chars: int = DEFAULT_MAX_RECORD_CHARS,
+) -> Dict[str, Any]:
+    """Compatibility wrapper for callers that do not need a configured evaluator."""
+    return _evaluate_native_record(
+        record,
+        hard_issues=hard_issues,
+        trace_status=trace_status,
+        minimum_score=minimum_score,
+        max_record_chars=max_record_chars,
+    )
+
+
+def _evaluate_native_record(
+    record: Dict[str, Any],
+    *,
+    hard_issues: Optional[Iterable[str]],
+    trace_status: Optional[str],
+    minimum_score: float,
+    max_record_chars: int,
 ) -> Dict[str, Any]:
     if trace_status is None:
         trace_status = record.get("trace_status")

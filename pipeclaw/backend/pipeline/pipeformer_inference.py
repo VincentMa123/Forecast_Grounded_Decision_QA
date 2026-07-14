@@ -6,6 +6,7 @@ import logging
 import math
 import sys
 import time
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
@@ -433,6 +434,26 @@ def rows_from_arrays(
     return rows
 
 
+@dataclass(frozen=True)
+class PipeFormerInferenceConfig:
+    checkpoint_dir: Path
+    pipeformer_root: Path
+    data_dir: Optional[Path] = None
+    static_dir: Optional[Path] = None
+    mapping_path: Optional[Path] = None
+    device: str = "cpu"
+
+
+class PipeFormerInferenceEngine:
+    """Run checkpoint inference using one resolved PipeFormer environment."""
+
+    def __init__(self, config: PipeFormerInferenceConfig) -> None:
+        self.config = config
+
+    def forecast(self, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
+        return _run_checkpoint_inference(parsed_task=parsed_task, config=self.config)
+
+
 def run_checkpoint_inference(
     parsed_task: Dict[str, Any],
     checkpoint_dir: Path,
@@ -442,6 +463,30 @@ def run_checkpoint_inference(
     mapping_path: Optional[Path],
     device: str = "cpu",
 ) -> Dict[str, Any]:
+    """Compatibility wrapper for the configured inference engine."""
+    return PipeFormerInferenceEngine(
+        PipeFormerInferenceConfig(
+            checkpoint_dir=checkpoint_dir,
+            pipeformer_root=pipeformer_root,
+            data_dir=data_dir,
+            static_dir=static_dir,
+            mapping_path=mapping_path,
+            device=device,
+        )
+    ).forecast(parsed_task)
+
+
+def _run_checkpoint_inference(
+    *,
+    parsed_task: Dict[str, Any],
+    config: PipeFormerInferenceConfig,
+) -> Dict[str, Any]:
+    checkpoint_dir = config.checkpoint_dir
+    pipeformer_root = config.pipeformer_root
+    data_dir = config.data_dir
+    static_dir = config.static_dir
+    mapping_path = config.mapping_path
+    device = config.device
     started_at = time.perf_counter()
     logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     import numpy as np
