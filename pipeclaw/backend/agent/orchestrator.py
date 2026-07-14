@@ -8,7 +8,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from openai import OpenAI
 
@@ -22,6 +22,8 @@ from .skills.skill_manager import SkillManager
 from executor.runner import get_runner
 
 logger = logging.getLogger(__name__)
+
+AnswerValidator = Callable[[str, List[Dict[str, Any]]], List[str]]
 
 
 class AgentOrchestrator:
@@ -102,7 +104,14 @@ class AgentOrchestrator:
         except json.JSONDecodeError:
             return None
 
-    def _tool_loop_stream(self, system_prompt: str, user_context: str, *, event_time: Optional[str] = None):
+    def _tool_loop_stream(
+        self,
+        system_prompt: str,
+        user_context: str,
+        *,
+        event_time: Optional[str] = None,
+        answer_validator: Optional[AnswerValidator] = None,
+    ):
         if not self.api_key:
             message = "Agent service is missing OPENAI_API_KEY; cannot run a live model call."
             timestamp = event_time or datetime.now().isoformat()
@@ -116,6 +125,7 @@ class AgentOrchestrator:
         client = OpenAI(**client_kwargs)
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_context}]
         tools_schema = tool_registry.openai_tools_schema()
+        completed_tool_calls: List[Dict[str, Any]] = []
         last_request_snapshot: Optional[Dict[str, Any]] = None
         logger.info("Agent tool loop ready: session_id=%s model=%s tools=%d", self.session_id, self.model, len(tools_schema))
 
@@ -126,7 +136,7 @@ class AgentOrchestrator:
                     "messages": messages,
                     "tools": tools_schema,
                     "tool_choice": "auto",
-                    "temperature": 0.2,
+                    "temperature": 0.0,
                 }
                 logger.info("LLM request started: session_id=%s step=%d model=%s", self.session_id, step_index + 1, self.model)
                 last_request_snapshot = self.trace_writer.append_llm_call(
@@ -142,7 +152,7 @@ class AgentOrchestrator:
                     messages=messages,
                     tools=tools_schema,
                     tool_choice="auto",
-                    temperature=0.2,
+                    temperature=0.0,
                 )
                 choice = response.choices[0]
                 message = choice.message
@@ -179,11 +189,11 @@ class AgentOrchestrator:
                         self.session_id,
                         step=step_index + 1,
                         phase="fallback_request",
-                        payload_data={"model": self.model, "messages": messages, "temperature": 0.2},
+                        payload_data={"model": self.model, "messages": messages, "temperature": 0.0},
                         summary={"model": self.model},
                         timestamp=event_time,
                     )
-                    fallback_response = client.chat.completions.create(model=self.model, messages=messages, temperature=0.2)
+                    fallback_response = client.chat.completions.create(model=self.model, messages=messages, temperature=0.0)
                     fallback_choice = fallback_response.choices[0]
                     response = fallback_response
                     message = fallback_choice.message
@@ -206,14 +216,14 @@ class AgentOrchestrator:
                         timestamp=event_time,
                     )
 
-                if content:
+                if content and tool_calls:
                     event_timestamp = event_time or datetime.now().isoformat()
                     yield {
                         "event": "assistant_message",
                         "data": {
                             "content": content,
                             "timestamp": event_timestamp,
-                            "final": not bool(tool_calls),
+                            "final": False,
                         },
                     }
 
@@ -223,17 +233,84 @@ class AgentOrchestrator:
                         final_text = "Model reported tool_calls without returning tool_calls. Check whether the current gateway supports OpenAI function calling."
                     if not final_text:
                         final_text = "Model did not return any displayable content."
-                    self.trace_writer.append_message(self.session_id, role="assistant", content=final_text, timestamp=event_time)
-                    if not content or final_text != content:
-                        event_timestamp = event_time or datetime.now().isoformat()
-                        yield {
-                            "event": "assistant_message",
-                            "data": {
-                                "content": final_text,
-                                "timestamp": event_timestamp,
-                                "final": True,
+
+                    quality_issues = answer_validator(final_text, completed_tool_calls) if answer_validator else []
+                    if quality_issues:
+                        repair_messages = messages + [
+                            {"role": "assistant", "content": final_text},
+                            {
+                                "role": "user",
+                                "content": (
+                                    "Rewrite only the final answer. The draft failed teacher-data validation: "
+                                    + ", ".join(quality_issues)
+                                    + ". Follow the applicable final-answer contract in the system prompt. "
+                                    "Use only the current request, visible history, and successful tool results; "
+                                    "add no new facts and return no preface."
+                                ),
                             },
+                        ]
+                        repair_payload = {
+                            "model": self.model,
+                            "messages": repair_messages,
+                            "temperature": 0.0,
                         }
+                        self.trace_writer.append_llm_call(
+                            self.session_id,
+                            step=step_index + 1,
+                            phase="quality_repair_request",
+                            payload_data=repair_payload,
+                            summary={"model": self.model, "quality_issues": quality_issues},
+                            timestamp=event_time,
+                        )
+                        try:
+                            repair_response = client.chat.completions.create(**repair_payload)
+                            repair_choice = repair_response.choices[0]
+                            repaired_text = (repair_choice.message.content or "").strip()
+                            repaired_issues = (
+                                answer_validator(repaired_text, completed_tool_calls)
+                                if repaired_text and answer_validator
+                                else quality_issues
+                            )
+                            try:
+                                repair_response_trace = repair_response.model_dump(mode="json")
+                            except Exception as exc:
+                                repair_response_trace = {
+                                    "serialization_error": str(exc),
+                                    "response_repr": repr(repair_response),
+                                }
+                            self.trace_writer.append_llm_call(
+                                self.session_id,
+                                step=step_index + 1,
+                                phase="quality_repair_response",
+                                payload_data={
+                                    "finish_reason": repair_choice.finish_reason,
+                                    "response": repair_response_trace,
+                                    "remaining_quality_issues": repaired_issues,
+                                },
+                                summary={"model": self.model, "finish_reason": repair_choice.finish_reason},
+                                timestamp=event_time,
+                            )
+                            if repaired_text and len(repaired_issues) < len(quality_issues):
+                                final_text = repaired_text
+                                quality_issues = repaired_issues
+                            logger.info(
+                                "Teacher answer repair finished: session_id=%s remaining_issues=%s",
+                                self.session_id,
+                                quality_issues,
+                            )
+                        except Exception:
+                            logger.exception("Teacher answer repair failed: session_id=%s", self.session_id)
+
+                    event_timestamp = event_time or datetime.now().isoformat()
+                    yield {
+                        "event": "assistant_message",
+                        "data": {
+                            "content": final_text,
+                            "timestamp": event_timestamp,
+                            "final": True,
+                        },
+                    }
+                    self.trace_writer.append_message(self.session_id, role="assistant", content=final_text, timestamp=event_time)
                     return final_text, "completed"
 
                 assistant_tool_calls = [
@@ -289,7 +366,12 @@ class AgentOrchestrator:
                         except Exception as exc:
                             result = {"success": False, "error": str(exc), "tool": call.function.name, "params": args}
 
-                    result_success = not isinstance(result, dict) or not bool(result.get("error"))
+                    result_success = not isinstance(result, dict) or (
+                        result.get("success") is not False
+                        and not bool(result.get("error"))
+                        and result.get("exit_code") in (None, 0)
+                    )
+                    completed_tool_calls.append({"name": call.function.name, "output": result})
                     logger.info(
                         "Tool call finished: session_id=%s tool=%s call_id=%s success=%s",
                         self.session_id,
@@ -349,8 +431,13 @@ class AgentOrchestrator:
         }
         return timeout_message, "timeout"
 
-    def run_agent(self, request: AgentChatRequest) -> OneTurnAfterRunAgent:
-        stream = self.run_agent_stream(request)
+    def run_agent(
+        self,
+        request: AgentChatRequest,
+        *,
+        answer_validator: Optional[AnswerValidator] = None,
+    ) -> OneTurnAfterRunAgent:
+        stream = self.run_agent_stream(request, answer_validator=answer_validator)
         while True:
             try:
                 next(stream)
@@ -359,7 +446,12 @@ class AgentOrchestrator:
                     raise RuntimeError("run_agent_stream did not return a result")
                 return stop.value
 
-    def run_agent_stream(self, request: AgentChatRequest):
+    def run_agent_stream(
+        self,
+        request: AgentChatRequest,
+        *,
+        answer_validator: Optional[AnswerValidator] = None,
+    ):
         event_time = request.event_time
         event_timestamp = event_time or datetime.now().isoformat()
         logger.info("Agent run started: agent_id=%s session_id=%s", self.agent_id, self.session_id)
@@ -391,7 +483,12 @@ class AgentOrchestrator:
         skills_section = self.skill_manager.render_skills_section() if self.skill_manager else ""
         system_prompt = self.prompt_builder.build(memory_payload=memory_payload, skills_section=skills_section)
         user_context = self._build_user_context(request, trace_payload)
-        assistant_message, final_status = yield from self._tool_loop_stream(system_prompt, user_context, event_time=event_time)
+        assistant_message, final_status = yield from self._tool_loop_stream(
+            system_prompt,
+            user_context,
+            event_time=event_time,
+            answer_validator=answer_validator,
+        )
         memory_commit = self.memory_manager.commit_turn(
             session_id=self.session_id,
             user_message=request.message,

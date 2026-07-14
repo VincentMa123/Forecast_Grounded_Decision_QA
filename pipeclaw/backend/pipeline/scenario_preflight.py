@@ -3,7 +3,9 @@ from __future__ import annotations
 import csv
 import re
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Sequence
+from typing import Any, Dict, Iterable, List, Optional, Sequence
+
+from .variable_registry import registry_path_for_mapping, validate_variable_registry
 
 
 VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
@@ -28,8 +30,12 @@ def mapping_variables(mapping_csv: Path) -> List[str]:
         return [str(row["variable_name"]).strip() for row in reader if str(row.get("variable_name") or "").strip()]
 
 
-def validate_scenarios(scenarios: Sequence[Dict[str, Any]], mapping_csv: Path) -> Dict[str, Any]:
-    supported = set(mapping_variables(mapping_csv))
+def validate_scenarios(
+    scenarios: Sequence[Dict[str, Any]],
+    mapping_csv: Path,
+    supported_variables: Optional[Sequence[str]] = None,
+) -> Dict[str, Any]:
+    supported = set(supported_variables or mapping_variables(mapping_csv))
     reports = []
     all_required = set()
     all_unsupported = set()
@@ -57,17 +63,14 @@ def validate_scenarios(scenarios: Sequence[Dict[str, Any]], mapping_csv: Path) -
     }
 
 
-def require_supported_scenarios(scenarios: Sequence[Dict[str, Any]], mapping_csv: Path) -> Dict[str, Any]:
-    report = validate_scenarios(scenarios, mapping_csv)
-    if not report["supported"]:
-        joined = ", ".join(report["unsupported_variables"])
-        raise ValueError(f"Scenario preflight failed; variables absent from {mapping_csv}: {joined}")
-    return report
-
-
 def validate_scenario_sources(
     sources: Sequence[Dict[str, Any]], mapping_csv: Path
 ) -> Dict[str, Any]:
+    mapped_variables = mapping_variables(mapping_csv)
+    registry_report = validate_variable_registry(
+        registry_path_for_mapping(mapping_csv),
+        mapped_variables,
+    )
     source_reports = []
     all_unsupported = set()
     all_required = set()
@@ -78,7 +81,7 @@ def validate_scenario_sources(
     for source in sources:
         source_name = str(source["dataset_source"])
         scenarios = list(source.get("scenarios") or [])
-        report = validate_scenarios(scenarios, mapping_csv)
+        report = validate_scenarios(scenarios, mapping_csv, mapped_variables)
         report["dataset_source"] = source_name
         source_reports.append(report)
         scenario_count += len(scenarios)
@@ -127,7 +130,8 @@ def validate_scenario_sources(
         "required_variable_count": len(all_required),
         "unsupported_variable_count": len(all_unsupported),
         "unsupported_variables": sorted(all_unsupported),
-        "supported": not all_unsupported,
+        "supported": not all_unsupported and registry_report["supported"],
+        "variable_registry": registry_report,
         "id_collisions": {
             "scenario_id": scenario_collisions,
             "session_id_count": sum(len(values) > 1 for values in session_occurrences.values()),
@@ -136,16 +140,6 @@ def validate_scenario_sources(
         },
         "sources": source_reports,
     }
-
-
-def require_supported_scenario_sources(
-    sources: Sequence[Dict[str, Any]], mapping_csv: Path
-) -> Dict[str, Any]:
-    report = validate_scenario_sources(sources, mapping_csv)
-    if not report["supported"]:
-        joined = ", ".join(report["unsupported_variables"])
-        raise ValueError(f"Scenario preflight failed; variables absent from {mapping_csv}: {joined}")
-    return report
 
 
 def _content_fingerprint(value: Dict[str, Any]) -> str:

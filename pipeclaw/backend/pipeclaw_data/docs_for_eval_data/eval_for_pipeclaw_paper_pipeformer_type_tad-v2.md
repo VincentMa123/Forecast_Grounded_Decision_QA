@@ -1,15 +1,18 @@
-# PipeFormer v2 数据集与评测改造 TAD
+# PipeFormer v2 Dataset and Evaluation Refactoring TAD
 
-## 1. 总体目标
-本 TAD 对应 v7 数据集和 v2 评测器。目标是把前 40 个 PipeFormer 场景改造成单次回答任务，并实现一个与论文叙述完全一致的自动评测闭环。
+## 1. Overall Objective
 
-## 2. 数据集读取层
+This TAD corresponds to the v7 dataset and the v2 evaluator. Its objective is to convert the first 40 PipeFormer scenarios into single-response tasks and implement an automated evaluation loop that fully aligns with the description in the paper.
 
-### 2.1 输入文件
-输入文件为 `Pipeline_Full_Life_Cycle_Test_Dataset-v7.json`。文件最外层是 list。list 内共有 40 个 scenario dict。
+## 2. Dataset Loading Layer
 
-### 2.2 场景对象
-加载后统一转成内部 `ScenarioRecord`，字段至少包含：
+### 2.1 Input File
+
+The input file is `Pipeline_Full_Life_Cycle_Test_Dataset-v7.json`. Its top level is a list containing 40 scenario dictionaries.
+
+### 2.2 Scenario Object
+
+After loading, each scenario must be converted into an internal `ScenarioRecord` containing at least the following fields:
 
 - `scenario_id`
 - `scenario_type`
@@ -18,14 +21,16 @@
 - `session_id`
 - `user_input`
 
-### 2.3 场景类型判定
-不要再依赖 `scenario_type` 区分 prediction 与 dispatch。统一通过 `scenario_id` 解析。
+### 2.3 Scenario-Type Detection
 
-- `scenario_pipeformer_prediction_*` 归为 prediction
-- `scenario_pipeformer_dispatch_*` 归为 dispatch
+Do not rely on `scenario_type` to distinguish prediction tasks from dispatch tasks. Determine the task type by parsing `scenario_id`.
 
-### 2.4 场景元信息抽取
-由于 v7 数据集刻意保持简单，评测器需要在加载阶段从 `user_input` 中抽取并缓存以下字段，写入内部 registry。
+- `scenario_pipeformer_prediction_*` is classified as prediction
+- `scenario_pipeformer_dispatch_*` is classified as dispatch
+
+### 2.4 Scenario-Metadata Extraction
+
+Because the v7 dataset is intentionally kept simple, the evaluator must extract and cache the following fields from `user_input` during loading and store them in an internal registry.
 
 - `mock_case_id`
 - `target_boundary_var`
@@ -33,18 +38,20 @@
 - `forecast_horizon`
 - `scenario_kind`
 - `scenario_class_label`
-- `preference`，仅 dispatch
-- `field_constraint`，仅 dispatch
+- `preference`, for dispatch tasks only
+- `field_constraint`, for dispatch tasks only
 
-建议实现 `PipeformerPromptParser`，通过正则和轻量规则抽取这些字段。抽取结果落盘为 `scenario_registry_v2.json`，但该文件不需要作为公开数据集的一部分。
+Implementing a `PipeformerPromptParser` that uses regular expressions and lightweight rules to extract these fields is recommended. The extracted results must be persisted as `scenario_registry_v2.json`, but this file does not need to be included in the public dataset.
 
-## 3. 参数注册表
+## 3. Parameter Registry
 
-### 3.1 输入
-参数注册表从 `附件2：管道设备参数.zip` 构建。建议在评测启动前完成一次解析并缓存。
+### 3.1 Input
 
-### 3.2 解析结果
-内部注册表至少包括以下结构。
+The parameter registry is built from `附件2：管道设备参数.zip`. It is recommended that the attachment be parsed and cached once before evaluation begins.
+
+### 3.2 Parsed Output
+
+The internal registry must include at least the following structures.
 
 - `compressor_meta`
 - `compressor_curve_envelopes`
@@ -53,35 +60,40 @@
 - `pipe_meta`
 - `segment_meta`
 
-### 3.3 压缩机包络
-压缩机文件按 `总体说明` 和 `C_001` 到 `C_023` 各 sheet 解析。对每台压缩机保存如下数据。
+### 3.3 Compressor Envelopes
 
-- 设备编号
-- 上下游节点
-- 驱动方式
-- 特性曲线最小流量
-- 特性曲线最大流量
-- 特性曲线表本身
+Parse the compressor file using the `总体说明` sheet and the individual sheets from `C_001` through `C_023`. Store the following data for each compressor.
 
-当前附件没有给出所有设备统一的硬压力上限，因此不要构造伪造的压力上限表。压缩机部分只做附件真实支持的包络检查。
+- Equipment ID
+- Upstream and downstream nodes
+- Drive type
+- Minimum flow in the characteristic curve
+- Maximum flow in the characteristic curve
+- The characteristic-curve table itself
 
-### 3.4 阀门与调节阀
-球阀与调节阀文件至少保存设备编号、上下游节点和调节阀类型。评测使用这些数据做设备存在性校验和边界变量合法性校验。
+The current attachment does not provide a uniform hard pressure limit for all equipment. Therefore, do not construct a fabricated table of pressure limits. Compressor verification must be limited to envelope checks genuinely supported by the attachment.
 
-### 3.5 管道与管段
-管道和管段参数先作为身份与拓扑注册表使用。若后续代码需要附加诊断指标，可以基于直径和长度计算速度代理量或压降代理量，但这些代理量默认不参与硬评分。
+### 3.4 Valves and Regulators
 
-## 4. 执行痕迹采集
+For ball valves and regulators, store at least the equipment ID, upstream and downstream nodes, and regulator type. The evaluator uses these data to verify equipment existence and boundary-variable validity.
+
+### 3.5 Pipelines and Pipeline Segments
+
+Pipeline and pipeline-segment parameters must initially be used as identity and topology registries. If later code requires additional diagnostic indicators, velocity or pressure-drop proxy quantities may be calculated from diameter and length, but these proxies must not contribute to hard scoring by default.
+
+## 4. Execution-Trace Collection
 
 ### 4.1 TraceCollector
-TraceCollector 负责统一收集运行命令、文件读写和输出目录访问事件。建议至少落盘以下文件。
+
+`TraceCollector` is responsible for consistently collecting command-execution, file-access, file-modification, and output-directory access events. It is recommended that at least the following files be persisted.
 
 - `trace/run_command.jsonl`
 - `trace/file_events.jsonl`
 - `trace/output_reads.jsonl`
 
-### 4.2 run_command 事件
-每条事件至少包含：
+### 4.2 `run_command` Events
+
+Each event must contain at least:
 
 - `ts`
 - `cmd`
@@ -90,8 +102,9 @@ TraceCollector 负责统一收集运行命令、文件读写和输出目录访�
 - `stdout_path`
 - `stderr_path`
 
-### 4.3 file_events 事件
-每条事件至少包含：
+### 4.3 `file_events` Events
+
+Each event must contain at least:
 
 - `ts`
 - `op`
@@ -100,84 +113,95 @@ TraceCollector 负责统一收集运行命令、文件读写和输出目录访�
 - `sha256_after`
 - `size_after`
 
-## 5. 参考复跑层
+## 5. Reference-Rerun Layer
 
 ### 5.1 ReferenceRunner
-ReferenceRunner 负责对模型产出的 original 与 modified 输入做独立复跑。所有复跑统一使用 `python -m real_predict.main`。
 
-### 5.2 输入恢复
-输入恢复分两步。
+`ReferenceRunner` independently reruns the original and modified inputs produced by the model. All reruns must use `python -m real_predict.main`.
 
-第一步，读取模型实际写入的 `Boundary.csv`、`batch_jobs_for_skill_1.json`、`batch_jobs_for_skill_2.json`。  
-第二步，按 original 和 modified 两个版本重建独立运行目录。
+### 5.2 Input Reconstruction
 
-### 5.3 输出采集
-每次复跑后都要把 split CSV 收集到统一结构下，例如：
+Input reconstruction consists of two steps.
+
+First, read the `Boundary.csv`, `batch_jobs_for_skill_1.json`, and `batch_jobs_for_skill_2.json` files actually written by the model.
+
+Second, reconstruct separate run directories for the original and modified versions.
+
+### 5.3 Output Collection
+
+After each rerun, collect the split CSV files under a consistent structure, for example:
 
 - `reference_runs/original/...`
 - `reference_runs/modified/...`
 - `reference_runs/candidate_A1/...`
 - `reference_runs/candidate_A2/...`
 
-### 5.4 CSV 对齐比较
-实现 `SplitCsvComparator`。比较步骤如下。
+### 5.4 CSV Alignment and Comparison
 
-1. 先按文件名对齐
-2. 再按 `TIME` 和列名对齐
-3. 对非时间列做数值比较
-4. 输出 `max_abs_diff`、`mean_abs_diff`、`relative_l1_diff`
+Implement `SplitCsvComparator`. The comparison procedure is as follows.
 
-预测器是确定性的，因此优先使用严格一致。若 CSV 文本格式导致轻微浮点差异，可允许极小数值容差。
+1. Align by filename
+2. Align by `TIME` and column name
+3. Perform numerical comparisons on non-time columns
+4. Output `max_abs_diff`, `mean_abs_diff`, and `relative_l1_diff`
 
-## 6. G1 调用真实性实现
-实现 `CallAuthenticityScorer`。原始打分直接统计 7 个必查项的通过数量，再做 `passed / 7 * 20` 归一化。7 个检查项如下。
+The predictor is deterministic, so strict equality should be preferred. If CSV text formatting introduces minor floating-point differences, a very small numerical tolerance may be allowed.
 
-- 出现 `run_command`
-- 读或写 `Boundary.csv`
-- 读或写 `batch_jobs_for_skill_1.json`
-- 读或写 `batch_jobs_for_skill_2.json`
-- 至少执行两次 `python -m real_predict.main`
-- 读取至少一种 split CSV
-- 最终回答明确包含 modified 与 original 的对照
+## 6. G1 Call Authenticity Implementation
 
-## 7. G2 运行真实性实现
+Implement `CallAuthenticityScorer`. The raw score directly counts how many of the seven mandatory checks pass and is normalized using `passed / 7 * 20`. The seven checks are:
 
-### 7.1 双运行完整性
-实现 `RunCompletenessChecker`。预测题要求 original 与 modified 都有完整输出。调度题要求 original 存在，且至少 1 个候选动作完成真实复跑。若模型声称比较了多个动作，则相应动作都应有输出目录。
+- `run_command` appears
+- `Boundary.csv` is read or written
+- `batch_jobs_for_skill_1.json` is read or written
+- `batch_jobs_for_skill_2.json` is read or written
+- `python -m real_predict.main` is executed at least twice
+- At least one type of split CSV is read
+- The final answer explicitly compares modified and original results
 
-### 7.2 参考复跑一致性
-实现 `ReferenceMatchScorer`。它读取模型保存输出和独立 reference 输出，对全部 split CSV 做文件级与数值级一致性比较。建议把 10 分拆成两层。
+## 7. G2 Execution Authenticity Implementation
 
-- 5 分给文件齐备和 schema 一致
-- 5 分给数值一致性
+### 7.1 Dual-Run Completeness
 
-## 8. G3 校核真实性实现
+Implement `RunCompletenessChecker`. Prediction tasks require complete original and modified outputs. Dispatch tasks require an original output and at least one candidate action that has been actually rerun. If the model claims to have compared multiple actions, output directories must exist for all corresponding actions.
 
-### 8.1 参数边界校核器
-实现 `ParameterBoundAuditor`。它至少检查以下内容。
+### 7.2 Reference-Rerun Consistency
 
-- 目标边界变量是否存在于真实 Boundary schema
-- 目标设备是否存在于参数注册表
-- `FR` 是否在 `[0, 1]`
-- `ST` 是否在离散状态域
-- `SNQ` 和各类设定压力是否为合法数值
-- 压缩机 `q_in` 或 `q_out` 是否落在对应机组特性曲线流量范围内
+Implement `ReferenceMatchScorer`. It reads the model-saved outputs and independently produced reference outputs, then compares all split CSV files at both the file and numerical levels. The recommended division of the 10 points is:
 
-当前附件不能直接支撑管道或节点统一压力上限，因此不要编造这类评分规则。
+- 5 points for file completeness and schema consistency
+- 5 points for numerical consistency
 
-### 8.2 CSV 证据校核器
-实现 `EvidenceGroundingAuditor`。它需要基于 original 与 modified 输出构造一个统一摘要表。摘要表建议包含每个变量的：
+## 8. G3 Verification Authenticity Implementation
+
+### 8.1 Parameter-Bound Auditor
+
+Implement `ParameterBoundAuditor`. It must check at least the following:
+
+- Whether the target boundary variable exists in the actual Boundary schema
+- Whether the target equipment exists in the parameter registry
+- Whether `FR` is within `[0, 1]`
+- Whether `ST` is in the discrete state domain
+- Whether `SNQ` and the various pressure setpoints are valid numerical values
+- Whether compressor `q_in` or `q_out` falls within the flow range of the corresponding compressor characteristic curve
+
+The current attachment cannot directly support a uniform upper pressure limit for pipelines or nodes. Therefore, do not fabricate such scoring rules.
+
+### 8.2 CSV Evidence Auditor
+
+Implement `EvidenceGroundingAuditor`. It must construct a consolidated summary table from the original and modified outputs. The recommended summary fields for each variable are:
 
 - `delta_last`
 - `delta_mean`
 - `delta_max_abs`
-- `family`，例如 pressure、flow、linepack、power
+- `family`, such as pressure, flow, linepack, or power
 - `source_file`
 
-然后按场景类别生成参考结论。
+Then generate a reference conclusion according to the scenario class.
 
-### 8.3 预测题参考结论生成
-实现 `PredictionOutcomeSynthesizer`。它根据摘要表和规则引擎自动生成：
+### 8.3 Reference-Conclusion Generation for Prediction Tasks
+
+Implement `PredictionOutcomeSynthesizer`. It automatically generates the following from the summary table and rule engine:
 
 - `main_consequence`
 - `watch_indicators`
@@ -185,21 +209,23 @@ ReferenceRunner 负责对模型产出的 original 与 modified 输入做独立�
 - `constraint_priority`
 - `evidence_vars`
 
-这一步取代人工金标准文案，保证结论来自真实输出。
+This replaces manually written gold-standard text and ensures that conclusions are derived from actual outputs.
 
-### 8.4 调度题参考结论生成
-实现 `DispatchReplayAuditor`。流程如下。
+### 8.4 Reference-Conclusion Generation for Dispatch Tasks
 
-1. 从模型答案中抽取候选动作
-2. 对每个候选动作真实复跑
-3. 对每个动作做规则审计
-4. 根据场景类别的目标函数重新排序
-5. 把最优动作、排序结果和主要淘汰理由作为参考结论
+Implement `DispatchReplayAuditor`. The procedure is as follows.
 
-## 9. 调度题动作解析与重排
+1. Extract candidate actions from the model answer
+2. Actually rerun each candidate action
+3. Audit every action against the rules
+4. Rerank the actions according to the objective function of the scenario class
+5. Use the best action, ranking result, and primary elimination reasons as the reference conclusion
 
-### 9.1 动作抽取
-实现 `DispatchActionExtractor`。建议优先支持结构化 JSON，其次支持 markdown 列表。统一归一成如下结构。
+## 9. Dispatch-Action Parsing and Reranking
+
+### 9.1 Action Extraction
+
+Implement `DispatchActionExtractor`. Structured JSON should be supported first, followed by Markdown lists. Normalize the extracted result into the following structure.
 
 ```json
 {
@@ -217,52 +243,57 @@ ReferenceRunner 负责对模型产出的 original 与 modified 输入做独立�
 }
 ```
 
-### 9.2 场景类别目标函数
-实现 `DispatchUtilityEngine`。不同类别使用不同排序目标，但都必须先处理现场约束。
+### 9.2 Objective Functions by Scenario Class
 
-- D1：先看硬约束，再看压力违反率和关键节点压力余度，再看能耗
-- D2：先看硬约束，再看总违反率，再看能耗
-- D3：先看硬约束，再看管存或系统余度，再看能耗
-- D4：先看硬约束，再看压力波动幅度和单点失稳迹象，再看能耗
-- D5：先看硬约束，再看高流速或潜在超限消除情况，再看能耗
+Implement `DispatchUtilityEngine`. Different classes use different ranking objectives, but field constraints must always be processed first.
 
-### 9.3 现场约束解释
-把 prompt 中的现场约束转成机器规则。
+- D1: hard constraints first, followed by pressure-violation rate and critical-node pressure margin, then energy consumption
+- D2: hard constraints first, followed by total violation rate, then energy consumption
+- D3: hard constraints first, followed by linepack or system margin, then energy consumption
+- D4: hard constraints first, followed by pressure-fluctuation amplitude and signs of single-point instability, then energy consumption
+- D5: hard constraints first, followed by elimination of high velocity or potential limit violations, then energy consumption
 
-- “暂时不允许停压缩机” 对任何新增 `C_xxx:ST -> off` 给出硬惩罚
-- “不希望大幅改动主气源设定” 对主气源 `T_xxx` 的大幅调节给出硬惩罚
-- “尽量少动阀门” 对涉及过多 `B_xxx` 或 `R_xxx` 的动作给出软惩罚
-- “不希望牺牲末端压力” 对末端压力余度下降给出硬惩罚
-- “优先减少额外能耗” 在可行方案中把能耗作为主要排序项
+### 9.3 Interpretation of Field Constraints
 
-阈值要写成可配置参数，不要写死在代码里。
+Convert field constraints in the prompt into machine-executable rules.
 
-## 10. G4 诊断正确性实现
+- "Temporarily do not allow compressors to be stopped" assigns a hard penalty to any new `C_xxx:ST -> off` operation.
+- "Avoid large changes to the main gas-source setpoint" assigns a hard penalty to large adjustments of the main gas-source variable `T_xxx`.
+- "Minimize valve operations" assigns a soft penalty to actions involving too many `B_xxx` or `R_xxx` variables.
+- "Avoid sacrificing terminal pressure" assigns a hard penalty to reductions in terminal-pressure margin.
+- "Prioritize reducing additional energy consumption" treats energy consumption as the primary ranking criterion among feasible solutions.
 
-### 10.1 预测题
-实现 `PredictionAnswerNormalizer` 和 `PredictionDiagnosticScorer`。原始评分使用 35 分结构。
+Thresholds must be configurable rather than hard-coded.
 
-- 主结论 10 分
-- Top-3 指标 10 分
-- 人工干预 5 分
-- 优先约束 5 分
-- 证据变量 5 分
+## 10. G4 Diagnostic Correctness Implementation
 
-最后做 `raw / 35 * 20`。
+### 10.1 Prediction Tasks
 
-### 10.2 调度题
-实现 `DispatchAnswerNormalizer` 和 `DispatchDiagnosticScorer`。原始评分也使用 35 分结构。
+Implement `PredictionAnswerNormalizer` and `PredictionDiagnosticScorer`. Use the following 35-point raw scoring structure.
 
-- 首选动作 10 分
-- 排序一致性 10 分
-- 淘汰或拒绝理由 5 分
-- 优先约束 5 分
-- 证据变量 5 分
+- Main conclusion: 10 points
+- Top-3 indicators: 10 points
+- Human intervention: 5 points
+- Priority constraint: 5 points
+- Evidence variables: 5 points
 
-最后做 `raw / 35 * 20`。
+Finally, calculate `raw / 35 * 20`.
 
-## 11. G5 资产真实性实现
-实现 `AssetAuthenticityScorer`。要求以下五类资产存在且互相可追踪。
+### 10.2 Dispatch Tasks
+
+Implement `DispatchAnswerNormalizer` and `DispatchDiagnosticScorer`. Use the same 35-point raw scoring structure.
+
+- Preferred action: 10 points
+- Ranking consistency: 10 points
+- Elimination or rejection reasons: 5 points
+- Priority constraint: 5 points
+- Evidence variables: 5 points
+
+Finally, calculate `raw / 35 * 20`.
+
+## 11. G5 Asset Authenticity Implementation
+
+Implement `AssetAuthenticityScorer`. The following five asset types must exist and be mutually traceable.
 
 - `trace_manifest.json`
 - `boundary_diff.json`
@@ -270,7 +301,8 @@ ReferenceRunner 负责对模型产出的 original 与 modified 输入做独立�
 - `report.md`
 - `report.pdf`
 
-建议每项 4 分。若文件存在但无法追踪到对应 run 或对应 scenario，则该项不得满分。
+The recommended score is 4 points per item. If a file exists but cannot be traced to the corresponding run or scenario, that item must not receive full credit.
 
-## 12. 论文文本生成约束
-`eval_pipeformer_ability_paper_paragraph-v2.tex` 和 `design_pipeformer_dataset_paper_paragraph-v2.tex` 必须用英文撰写。文本风格要符合学术论文习惯，句子要短，术语要稳，不要使用口语和不必要的缩写。内容需要服务于 `paper_blueprint.md` 的主线，即长期运维、瞬态预测、调度闭环和可审计资产。
+## 12. Constraints for Paper Text Generation
+
+`eval_pipeformer_ability_paper_paragraph-v2.tex` and `design_pipeformer_dataset_paper_paragraph-v2.tex` must be written in English. The writing style must follow academic-paper conventions, use short sentences and consistent terminology, and avoid colloquial language and unnecessary abbreviations. The content must support the central narrative in `paper_blueprint.md`: long-term operations, transient prediction, closed-loop dispatch, and auditable assets.

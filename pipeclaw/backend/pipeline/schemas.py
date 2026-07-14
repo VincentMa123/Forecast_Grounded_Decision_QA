@@ -17,8 +17,6 @@ class ConstraintSpec:
     description: str
     priority: int
     metric: str
-    prefixes: Tuple[str, ...] = ()
-    suffixes: Tuple[str, ...] = ()
     physical_quantities: Tuple[str, ...] = ()
     equipment_types: Tuple[str, ...] = ()
     roles: Tuple[str, ...] = ()

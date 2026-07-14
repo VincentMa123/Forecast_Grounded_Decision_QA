@@ -1,10 +1,12 @@
-# PipeFormer v2 数据集与评测改造 PRD
+# PipeFormer v2 Dataset and Evaluation Refactoring PRD
 
-## 1. 目标
-本文件面向工程实现。目标是同时完成两件事。第一，重写 PipeFormer 前 40 个场景，使其适配单次回答评测。第二，重写评测代码，使 G1 到 G5 与论文表述完全一致，不再出现论文写法和代码实现方向不一致的问题。
+## 1. Objective
 
-## 2. 交付物
-工程实现完成后，必须产出以下文件。
+This document is intended for engineering implementation. It has two objectives. First, rewrite the first 40 PipeFormer scenarios so that they are suitable for single-response evaluation. Second, rewrite the evaluation code so that G1 through G5 fully align with the descriptions in the paper, eliminating inconsistencies between the paper and the implementation.
+
+## 2. Deliverables
+
+The following files must be produced after the engineering implementation is complete.
 
 - `Pipeline_Full_Life_Cycle_Test_Dataset-v7.json`
 - `eval_for_pipeclaw_paper_pipeformer_type_prd-v2.md`
@@ -12,12 +14,13 @@
 - `eval_pipeformer_ability_paper_paragraph-v2.tex`
 - `design_pipeformer_dataset_paper_paragraph-v2.tex`
 
-## 3. 数据集改造要求
+## 3. Dataset Refactoring Requirements
 
-### 3.1 数据文件结构
-`Pipeline_Full_Life_Cycle_Test_Dataset-v7.json` 的最外层必须是一个 list。list 内只保留 40 个 PipeFormer 场景 dict，不要增加任何总说明、统计字段、分组摘要或顶层元信息。每个场景保持和旧版一致的基础结构，只额外增加一个分类字段。
+### 3.1 Data File Structure
 
-每个场景必须包含以下键。
+The top level of `Pipeline_Full_Life_Cycle_Test_Dataset-v7.json` must be a list. The list must contain only 40 PipeFormer scenario dictionaries. Do not add an overall description, statistical fields, group summaries, or top-level metadata. Each scenario must retain the basic structure of the previous version, with only one additional classification field.
+
+Each scenario must contain the following keys.
 
 - `scenario_id`
 - `scenario_type`
@@ -25,149 +28,166 @@
 - `scenario_description`
 - `sessions`
 
-其中 `scenario_type` 统一写为 `pipeformer`。`scenario_class_label` 直接写中文类名，不写 P1 到 P5 或 D1 到 D5 代码。
+The value of `scenario_type` must always be `pipeformer`. The value of `scenario_class_label` must be the Chinese class name rather than a P1-P5 or D1-D5 code.
 
-### 3.2 单轮化要求
-每个场景只能保留一个 session 和一个 turn。
+### 3.2 Single-Turn Requirements
 
-- `sessions` 只保留 1 个元素。
-- `dialogue` 只保留 1 个元素。
-- `offset_hours` 统一为 0。
+Each scenario must contain exactly one session and one turn.
 
-单轮提示必须保留原题的业务目标。实现时不得机械删掉重要约束。预测题的单轮提示必须同时要求模型给出运行后果、Top-3 指标、人工干预判断、优先约束和两项关键证据变量。调度题的单轮提示必须同时要求模型给出候选动作排序、首选理由、淘汰或拒绝理由、优先约束和两项关键证据变量，并保留原题中的优化偏好与现场约束。
+- `sessions` must contain exactly one element.
+- `dialogue` must contain exactly one element.
+- `offset_hours` must always be 0.
 
-### 3.3 变量选择要求
-v7 中的 40 个场景必须使用 40 个不重复的边界变量。变量名必须来自真实 `Boundary.csv` 列名，并遵循赛题 PDF 中的命名含义。允许使用的边界变量类型如下。
+The single-turn prompt must preserve the business objective of the original task. Important constraints must not be removed mechanically. A prediction-task prompt must ask the model to provide the operational consequences, Top-3 indicators, human-intervention decision, priority constraint, and two key evidence variables. A dispatch-task prompt must ask the model to provide a ranking of candidate actions, the reason for the preferred action, reasons for eliminating or rejecting other actions, the priority constraint, and two key evidence variables. It must also preserve the optimization preferences and field constraints from the original task.
 
-- `T_xxx:SNQ`，气源流量设定
-- `T_005:SP`，气源压力设定
-- `E_xxx:SNQ`，用户侧需求流量设定
-- `B_xxx:FR`，球阀通流比例
-- `C_xxx:SP_out`，压缩机出口设定压力
-- `C_xxx:ST`，压缩机启停状态
-- `R_xxx:SPD`，调节阀下游设定压力
-- `R_xxx:ST`，调节阀启停状态
+### 3.3 Variable Selection Requirements
 
-不得继续沿用旧稿中的伪变量名，例如 `C_xxx:SP_`。变量选择应尽量分散到中后段编号资产，不要集中在少数前缀为 001 的变量上。
+The 40 scenarios in v7 must use 40 distinct boundary variables. Variable names must come from actual columns in `Boundary.csv` and must follow the naming semantics defined in the competition PDF. The following boundary-variable types are allowed.
 
-### 3.4 十类问题设计
-v7 仍然包含两组任务，共 40 题。每组 5 类，每类 4 个实例。
+- `T_xxx:SNQ`: gas-source flow setpoint
+- `T_005:SP`: gas-source pressure setpoint
+- `E_xxx:SNQ`: user-side demand-flow setpoint
+- `B_xxx:FR`: ball-valve flow ratio
+- `C_xxx:SP_out`: compressor outlet-pressure setpoint
+- `C_xxx:ST`: compressor on/off state
+- `R_xxx:SPD`: regulator downstream-pressure setpoint
+- `R_xxx:ST`: regulator on/off state
 
-| 组别 | 类别代码 | 中文类名 | 主要关注点 |
+Pseudo-variable names from previous drafts, such as `C_xxx:SP_`, must not be reused. Variables should be distributed across assets with middle and higher index numbers rather than concentrated among a small number of variables with the `001` prefix.
+
+### 3.4 Ten Problem Classes
+
+Version 7 still contains two task groups and 40 tasks in total. Each group contains five classes, with four instances per class.
+
+| Group | Class Code | Chinese Class Name | Primary Focus |
 |---|---|---|---|
-| 预测 | P1 | 富余抬升与高压能耗 | 富余侧高压、局部过压、能耗抬升 |
-| 预测 | P2 | 紧平衡与低压消耗 | 低压风险、管存下降、保供余度收缩 |
-| 预测 | P3 | 压缩机工况边界 | 机组负荷边界、机组启停、出口设定压力变化 |
-| 预测 | P4 | 节流瓶颈与通道受限 | 阀门或调节阀收紧后的瓶颈暴露与旁路挤压 |
-| 预测 | P5 | 重分配与稳态重构 | 通道开大或抬压后的路径切换与新稳态 |
-| 调度 | D1 | 末端保压与关键供气 | 末端或关键节点压力优先 |
-| 调度 | D2 | 约束减违与安全回边界 | 先降违反率，再谈能耗 |
-| 调度 | D3 | 管存与系统余度保持 | 管存下降、供需余度和系统弹性 |
-| 调度 | D4 | 波动抑制与单点失稳防控 | 压力波动控制与单点异常防扩散 |
-| 调度 | D5 | 低负荷优化与越限消除 | 低负荷节能和高流速或潜在超限消除 |
+| Prediction | P1 | 富余抬升与高压能耗 | High pressure on the surplus side, local overpressure, and increased energy consumption |
+| Prediction | P2 | 紧平衡与低压消耗 | Low-pressure risk, declining linepack, and reduced supply-security margin |
+| Prediction | P3 | 压缩机工况边界 | Compressor load boundaries, compressor switching, and outlet-pressure setpoint changes |
+| Prediction | P4 | 节流瓶颈与通道受限 | Bottleneck exposure and bypass crowding after tightening a valve or regulator |
+| Prediction | P5 | 重分配与稳态重构 | Path switching and a new steady state after opening a channel or increasing pressure |
+| Dispatch | D1 | 末端保压与关键供气 | Priority protection of terminal or critical-node pressure |
+| Dispatch | D2 | 约束减违与安全回边界 | Reduce the violation rate before considering energy consumption |
+| Dispatch | D3 | 管存与系统余度保持 | Linepack decline, supply-demand margin, and system flexibility |
+| Dispatch | D4 | 波动抑制与单点失稳防控 | Pressure-fluctuation control and prevention of single-point anomaly propagation |
+| Dispatch | D5 | 低负荷优化与越限消除 | Low-load energy optimization and elimination of high velocity or potential limit violations |
 
-## 4. 评测总要求
-PipeFormer 方向的总分仍为 100 分。五个能力维度各 20 分，不允许修改这一总结构。
+## 4. Overall Evaluation Requirements
 
-- G1 调用真实性
-- G2 运行真实性
-- G3 校核真实性
-- G4 诊断正确性
-- G5 资产真实性
+The total score for the PipeFormer track remains 100 points. Each of the five capability dimensions is worth 20 points. This overall structure must not be changed.
 
-## 5. G1 调用真实性
-G1 只检查模型是否真的走了 skill 闭环。评分依据是 7 个必查项。原始得分按通过项数量计算，然后线性映射到 20 分。
+- G1 Call Authenticity
+- G2 Execution Authenticity
+- G3 Verification Authenticity
+- G4 Diagnostic Correctness
+- G5 Asset Authenticity
 
-必查项如下。
+## 5. G1 Call Authenticity
 
-1. 是否出现 `run_command`
-2. 是否出现读取或修改 `Boundary.csv`
-3. 是否出现读取或修改 `batch_jobs_for_skill_1.json`
-4. 是否出现读取或修改 `batch_jobs_for_skill_2.json`
-5. 是否至少执行两次 `python -m real_predict.main`
-6. 是否读取输出目录中的至少 1 类 split CSV
-7. 是否在最终回答中明确出现 modified 与 original 的对照
+G1 checks only whether the model actually completes the skill execution loop. Scoring is based on seven mandatory checks. The raw score is calculated from the number of passed checks and then linearly mapped to 20 points.
 
-## 6. G2 运行真实性
-G2 必须拆成两个子部分。
+The mandatory checks are as follows.
 
-### 6.1 双运行完整性
-检查是否真的拿到了 original 和 modified 两套输出。预测题要求 baseline 与单扰动输出都完整。调度题要求 baseline 与候选动作输出完整，且至少有 1 个候选动作被真实复跑。
+1. Whether `run_command` appears
+2. Whether `Boundary.csv` is read or modified
+3. Whether `batch_jobs_for_skill_1.json` is read or modified
+4. Whether `batch_jobs_for_skill_2.json` is read or modified
+5. Whether `python -m real_predict.main` is executed at least twice
+6. Whether at least one type of split CSV in the output directory is read
+7. Whether the final answer explicitly compares modified and original results
 
-### 6.2 参考复跑一致性
-评测器必须对模型产出的 original 和 modified 输入做独立复跑。复跑命令仍使用 `python -m real_predict.main`。复跑结果要和模型保存的 split CSV 输出逐文件比对。比对对象至少覆盖 `B.csv`、`C.csv`、`H.csv`、`N.csv`、`P.csv`、`R.csv`、`T&E.csv` 中实际生成的文件。代码必须支持按时间列和列名对齐后再做数值比较。
+## 6. G2 Execution Authenticity
 
-G2 的 20 分建议按 10 分双运行完整性加 10 分参考复跑一致性实现。
+G2 must be divided into two subcomponents.
 
-## 7. G3 校核真实性
-G3 也必须拆成两个子部分。
+### 6.1 Dual-Run Completeness
 
-### 7.1 参数边界校核
-评测器必须读取 `附件2：管道设备参数.zip`，建立参数注册表。注册表至少要解析以下文件。
+Verify that both original and modified outputs were actually obtained. Prediction tasks require complete baseline and single-perturbation outputs. Dispatch tasks require complete baseline and candidate-action outputs, with at least one candidate action actually rerun.
 
-- 压缩机基本参数表及各压缩机特性曲线
-- 球阀基本参数表
-- 调节阀基本参数表
-- 管道基本参数表
-- 管段基本参数表
+### 6.2 Reference-Rerun Consistency
 
-参数边界校核不允许虚构不存在的硬阈值。当前附件能够稳定支持的检查包括：
+The evaluator must independently rerun the original and modified inputs produced by the model. The rerun command remains `python -m real_predict.main`. The rerun results must be compared file by file with the split CSV outputs saved by the model. The comparison must cover all generated files among `B.csv`, `C.csv`, `H.csv`, `N.csv`, `P.csv`, `R.csv`, and `T&E.csv`. The code must align files by time column and column name before performing numerical comparisons.
 
-- 目标设备是否真实存在
-- `FR` 是否落在合法比例域
-- `ST` 是否落在合法状态域
-- `SNQ` 与各类设定压力是否满足基本数值域
-- 压缩机输出流量是否落在对应机组特性曲线支持的流量包络内
+The recommended implementation for the 20 G2 points is 10 points for dual-run completeness and 10 points for reference-rerun consistency.
 
-对附件中没有给出明确上限的数据，不要人为制造“最大压力”之类的硬阈值。这部分应由参考复跑和证据校核覆盖。
+## 7. G3 Verification Authenticity
 
-### 7.2 CSV 证据落地
-模型的风险判断必须能在真实输出里找到证据。评测器需要从 original 与 modified 的 split CSV 中计算关键差值摘要，并据此判断：
+G3 must also be divided into two subcomponents.
 
-- 主风险类别是否与真实输出方向一致
-- Top-3 关注指标是否来自真实高影响变量
-- 优先约束是否由真实冲突触发
-- 两个证据变量是否能在输出中找到，并且确实支撑该结论
+### 7.1 Parameter-Bound Verification
 
-G3 的 20 分建议按 10 分参数边界校核加 10 分 CSV 证据落地实现。
+The evaluator must read `附件2：管道设备参数.zip` and construct a parameter registry. The registry must parse at least the following files.
 
-## 8. G4 诊断正确性
-G4 不做全文字符串匹配，先抽取最小结论字段，再打分。
+- Compressor basic-parameter tables and characteristic curves for each compressor
+- Ball-valve basic-parameter table
+- Regulator basic-parameter table
+- Pipeline basic-parameter table
+- Pipeline-segment basic-parameter table
 
-### 8.1 预测题最小字段
+Parameter-bound verification must not invent hard thresholds that do not exist. The checks reliably supported by the current attachment include:
+
+- Whether the target equipment actually exists
+- Whether `FR` falls within the legal ratio domain
+- Whether `ST` falls within the legal state domain
+- Whether `SNQ` and the various pressure setpoints fall within their basic numerical domains
+- Whether compressor output flow falls within the flow envelope supported by the corresponding compressor characteristic curve
+
+For data without an explicit upper bound in the attachment, do not fabricate hard thresholds such as a "maximum pressure." Such cases must instead be covered by reference reruns and evidence verification.
+
+### 7.2 CSV Evidence Grounding
+
+The model's risk assessment must be supported by evidence in the actual outputs. The evaluator must calculate summaries of key differences from the original and modified split CSV files and use them to determine:
+
+- Whether the primary risk category agrees with the direction of the actual output changes
+- Whether the Top-3 indicators are actual high-impact variables
+- Whether the priority constraint was triggered by an actual conflict
+- Whether both evidence variables exist in the output and genuinely support the conclusion
+
+The recommended implementation for the 20 G3 points is 10 points for parameter-bound verification and 10 points for CSV evidence grounding.
+
+## 8. G4 Diagnostic Correctness
+
+G4 must not use full-text string matching. It must first extract the minimum conclusion fields and then score them.
+
+### 8.1 Minimum Fields for Prediction Tasks
+
 - `main_consequence`
 - `watch_indicators`
 - `manual_intervention`
 - `constraint_priority`
 - `evidence_vars`
 
-### 8.2 预测题原始打分
-- 主结论：10 分
-- Top-3 指标：10 分
-- 是否需要人工干预：5 分
-- 优先约束：5 分
-- 证据变量：5 分
+### 8.2 Raw Scoring for Prediction Tasks
 
-预测题原始满分为 35 分，最后线性归一到 20 分。
+- Main conclusion: 10 points
+- Top-3 indicators: 10 points
+- Whether human intervention is required: 5 points
+- Priority constraint: 5 points
+- Evidence variables: 5 points
 
-### 8.3 调度题最小字段
+The raw maximum for a prediction task is 35 points, which is then linearly normalized to 20 points.
+
+### 8.3 Minimum Fields for Dispatch Tasks
+
 - `top_action`
 - `action_ranking`
 - `rejection_reasons`
 - `constraint_priority`
 - `evidence_vars`
 
-### 8.4 调度题打分原则
-调度题不能用固定文案做金标准。评测器要先把模型给出的候选动作抽出来，再对这些候选动作逐个复跑，依据场景类别的目标函数和现场约束做排序。G4 的核心是检查模型报告的排序、首选动作和淘汰理由，是否与复跑后的审计结果一致。建议使用以下 35 分原始结构，再线性归一到 20 分。
+### 8.4 Scoring Principles for Dispatch Tasks
 
-- 首选动作：10 分
-- 排序一致性：10 分
-- 淘汰或拒绝理由：5 分
-- 优先约束：5 分
-- 证据变量：5 分
+Dispatch tasks must not use fixed text as the gold standard. The evaluator must first extract the candidate actions proposed by the model, rerun each action, and rank the actions according to the objective function and field constraints of the scenario class. The core of G4 is to verify whether the ranking, preferred action, and elimination reasons reported by the model agree with the audit results from the reruns. The following 35-point raw structure is recommended, followed by linear normalization to 20 points.
 
-## 9. G5 资产真实性
-G5 检查中间结果是否真的落盘为可追踪资产。建议按 5 个等权子项实现，每项 4 分。
+- Preferred action: 10 points
+- Ranking consistency: 10 points
+- Elimination or rejection reasons: 5 points
+- Priority constraint: 5 points
+- Evidence variables: 5 points
+
+## 9. G5 Asset Authenticity
+
+G5 verifies whether intermediate results are actually persisted as traceable assets. The recommended implementation consists of five equally weighted subitems worth 4 points each.
 
 1. `trace_manifest.json`
 2. `boundary_diff.json`
@@ -175,11 +195,12 @@ G5 检查中间结果是否真的落盘为可追踪资产。建议按 5 个等�
 4. `report.md`
 5. `report.pdf`
 
-资产之间必须能相互追踪。至少要能从报告追到归一化结论，再追到执行痕迹和输入改动记录。
+The assets must be mutually traceable. At a minimum, the report must link to the normalized conclusions, which must in turn link to the execution trace and the record of input modifications.
 
-## 10. 工程约束
-- 不要在 v7 数据文件顶层加入任何额外说明字段。
-- 不要在数据集里写论文解释文本。
-- 不要为附件中不存在的物理上限强行打分。
-- 论文段落文件必须写成英文学术表达，服务于 `paper_blueprint.md` 的行文方向。
-- 论文段落尽量使用管道运维与调度表述，减少纯计算机术语。
+## 10. Engineering Constraints
+
+- Do not add explanatory fields at the top level of the v7 data file.
+- Do not include explanatory paper text in the dataset.
+- Do not impose scores based on physical upper bounds that are absent from the attachment.
+- The paper-paragraph files must use academic English and follow the narrative direction of `paper_blueprint.md`.
+- The paper paragraphs should favor pipeline operations and dispatch terminology and minimize purely computational terminology.

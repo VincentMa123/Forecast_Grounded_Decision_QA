@@ -44,15 +44,20 @@ def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str,
     capacity_episodes = _capacity_excursion_episodes(summaries, time_step_minutes, parsed_task)
     ramp_events = _flow_ramp_events(summaries, parsed_task)
     balance_check = _supply_demand_balance_check(summaries, time_step_minutes, parsed_task)
-    for check in checks:
-        check["flow_change_magnitude"] = flow_change_magnitude
-        check["boundary_flow_change_rate"] = boundary_flow_change_rate
-        check["abnormal_flow_segments"] = abnormal_segments
-        check["supply_demand_balance_status"] = balance_check["status"]
-        if check["name"] == FLOW_RAMP_SPEC.name:
-            check["flow_ramp_events"] = ramp_events
-        elif check["name"] == FLOW_CAPACITY_SPEC.name:
-            check["flow_capacity_excursion_episodes"] = capacity_episodes
+    checks_by_name = {check["name"]: check for check in checks}
+    ramp_check = checks_by_name.get(FLOW_RAMP_SPEC.name)
+    if ramp_check is not None:
+        ramp_check.update(
+            {
+                "flow_change_magnitude": flow_change_magnitude,
+                "boundary_flow_change_rate": boundary_flow_change_rate,
+                "abnormal_flow_segments": abnormal_segments,
+                "flow_ramp_events": ramp_events,
+            }
+        )
+    capacity_check = checks_by_name.get(FLOW_CAPACITY_SPEC.name)
+    if capacity_check is not None:
+        capacity_check["flow_capacity_excursion_episodes"] = capacity_episodes
     checks.append(balance_check)
     return checks
 

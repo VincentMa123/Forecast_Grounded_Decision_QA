@@ -18,11 +18,13 @@
     ],
     "mock_expected_parse": {
       "case_id": "mock_test_001",
-      "changed_variable": "T_001:BC000",
-      "change_direction": "up",
-      "change_percent": 11.0,
+      "disturbance_variable": "T_001:BC000",
+      "disturbance_direction": "up",
+      "disturbance_magnitude_percent": 11.0,
       "forecast_horizon_minutes": 120,
-      "keep_other_boundary_controls": true,
+      "boundary_conditions": {
+        "keep_other_boundary_controls": true
+      },
       "task_type": "prediction_and_verification"
     }
   }

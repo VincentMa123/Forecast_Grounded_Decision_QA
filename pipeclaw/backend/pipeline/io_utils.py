@@ -5,11 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Iterable
 
 
-def load_json(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as fh:
-        return json.load(fh)
-
-
 def write_json(path: Path, payload: Any, force: bool) -> None:
     if path.exists() and not force:
         raise FileExistsError(f"Output exists; pass --force to overwrite: {path}")

@@ -43,32 +43,23 @@ def registry_index(parsed_task: Optional[Dict[str, Any]]) -> Dict[str, Dict[str,
 
 def variables_matching(
     names: Iterable[str],
-    prefixes: Tuple[str, ...] = (),
-    suffixes: Tuple[str, ...] = (),
     *,
-    registry: Optional[Dict[str, Dict[str, Any]]] = None,
+    registry: Dict[str, Dict[str, Any]],
     physical_quantities: Tuple[str, ...] = (),
     equipment_types: Tuple[str, ...] = (),
     roles: Tuple[str, ...] = (),
 ) -> List[str]:
+    if not registry:
+        raise ValueError("Variable registry metadata is required for constraint selection.")
     result = []
-    use_semantic_selector = bool(
-        registry and (physical_quantities or equipment_types or roles)
-    )
     for name in names:
-        if not use_semantic_selector:
-            if prefixes and not name.startswith(prefixes):
-                continue
-            if suffixes and not name.endswith(suffixes):
-                continue
-        if use_semantic_selector:
-            metadata = registry.get(name, {})
-            if physical_quantities and metadata.get("physical_quantity") not in physical_quantities:
-                continue
-            if equipment_types and metadata.get("equipment_type") not in equipment_types:
-                continue
-            if roles and metadata.get("role") not in roles:
-                continue
+        metadata = registry.get(name, {})
+        if physical_quantities and metadata.get("physical_quantity") not in physical_quantities:
+            continue
+        if equipment_types and metadata.get("equipment_type") not in equipment_types:
+            continue
+        if roles and metadata.get("role") not in roles:
+            continue
         result.append(name)
     return result
 
@@ -80,8 +71,6 @@ def variables_for_spec(
 ) -> List[str]:
     return variables_matching(
         names,
-        spec.prefixes,
-        spec.suffixes,
         registry=registry_index(parsed_task),
         physical_quantities=spec.physical_quantities,
         equipment_types=spec.equipment_types,
@@ -96,8 +85,6 @@ def variables_for_selector(
 ) -> List[str]:
     return variables_matching(
         names,
-        tuple(selector.get("prefixes") or ()),
-        tuple(selector.get("suffixes") or ()),
         registry=registry_index(parsed_task),
         physical_quantities=tuple(selector.get("physical_quantities") or ()),
         equipment_types=tuple(selector.get("equipment_types") or ()),
@@ -310,25 +297,23 @@ def evaluate_summary_metric(
 
 
 def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
-    changed_variable = parsed_task.get("disturbance_variable") or parsed_task.get("changed_variable")
-    variables = [changed_variable] if changed_variable else []
+    disturbance_variable = parsed_task.get("disturbance_variable")
+    variables = [disturbance_variable] if disturbance_variable else []
     check = base_check(spec, variables)
-    change_percent = parsed_task.get("disturbance_magnitude_percent")
-    if change_percent is None:
-        change_percent = parsed_task.get("change_percent")
-    if change_percent is None:
+    disturbance_percent = parsed_task.get("disturbance_magnitude_percent")
+    if disturbance_percent is None:
         check["message"] = "No boundary-control adjustment magnitude was parsed."
         return check
 
-    magnitude = abs(float(change_percent))
+    magnitude = abs(float(disturbance_percent))
     status = status_from_threshold(magnitude, spec.warning_threshold, spec.fail_threshold)
     check["status"] = status
     check["evaluation_status"] = "evaluated"
     check["flag"] = _flag_for_status(spec, status)
     check["evaluated_values"].append(
         {
-            "variable": changed_variable,
-            "metric": "abs_change_percent",
+            "variable": disturbance_variable,
+            "metric": "abs_disturbance_percent",
             "value": magnitude,
             "status": status,
             "warning_threshold": spec.warning_threshold,
@@ -343,8 +328,8 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
         check["message"] = "Boundary-control adjustment magnitude requires review."
         check["offending_values"].append(
             {
-                "variable": changed_variable,
-                "metric": "abs_change_percent",
+                "variable": disturbance_variable,
+                "metric": "abs_disturbance_percent",
                 "value": magnitude,
                 "status": status,
                 "warning_threshold": spec.warning_threshold,
@@ -359,7 +344,7 @@ def evaluate_spec(
     summaries: Dict[str, Dict[str, Any]],
     parsed_task: Dict[str, Any],
 ) -> Dict[str, Any]:
-    if spec.metric == "boundary_change_percent":
+    if spec.metric == "boundary_disturbance_percent":
         return evaluate_boundary_change(spec, parsed_task)
 
     names = list(summaries)

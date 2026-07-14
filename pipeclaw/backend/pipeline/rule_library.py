@@ -16,7 +16,7 @@ GENERIC_EVALUATORS = {
     "max_abs_step_change",
     "max_step_decline",
     "max_decline_from_start",
-    "boundary_change_percent",
+    "boundary_disturbance_percent",
 }
 
 
@@ -33,7 +33,7 @@ def load_json_document(filename: str) -> Dict[str, Any]:
 
 def load_pipeline_constraints() -> Dict[str, Any]:
     document = load_json_document("pipeline_constraints.json")
-    required = {"library_name", "library_version", "rule_files", "category_order"}
+    required = {"library_name", "rule_files", "category_order"}
     missing = sorted(required - set(document))
     if missing:
         raise ValueError(f"pipeline_constraints.json is missing required fields: {missing}")
@@ -76,8 +76,6 @@ def load_constraint_specs(category: str) -> Tuple[ConstraintSpec, ...]:
                 description=str(rule.get("description") or ""),
                 priority=int(rule.get("priority", 999)),
                 metric=evaluator,
-                prefixes=tuple(selector.get("prefixes") or ()),
-                suffixes=tuple(selector.get("suffixes") or ()),
                 physical_quantities=tuple(selector.get("physical_quantities") or ()),
                 equipment_types=tuple(selector.get("equipment_types") or ()),
                 roles=tuple(selector.get("roles") or ()),

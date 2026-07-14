@@ -8,13 +8,13 @@ PIPEFORMER_TASK_SCHEMA_VERSION = "pipeformer_task"
 
 
 CATEGORY_MARKERS: Dict[str, List[str]] = {
-    "pressure": ["\u538b\u529b", "pressure"],
-    "flow": ["\u6d41\u91cf", "flow"],
-    "linepack": ["\u7ba1\u5b58", "linepack"],
-    "compressor": ["\u538b\u7f29\u673a", "compressor"],
-    "equipment_regulation": ["\u8bbe\u5907", "\u9600\u95e8", "\u8c03\u538b", "\u8fb9\u754c\u63a7\u5236", "equipment", "valve", "regulator", "boundary control"],
-    "abnormality_warning": ["\u5f02\u5e38", "\u6cc4\u6f0f", "\u7a81\u53d8", "abnormal", "leak", "sudden"],
-    "dispatch_priority": ["\u80fd\u8017", "\u6210\u672c", "\u4f18\u5148", "energy", "cost", "priority"],
+    "pressure": ["压力", "pressure"],
+    "flow": ["流量", "flow"],
+    "linepack": ["管存", "linepack"],
+    "compressor": ["压缩机", "compressor"],
+    "equipment_regulation": ["设备", "阀门", "调压", "边界控制", "equipment", "valve", "regulator", "boundary control"],
+    "abnormality_warning": ["异常", "泄漏", "突变", "abnormal", "leak", "sudden"],
+    "dispatch_priority": ["能耗", "成本", "优先", "energy", "cost", "priority"],
 }
 
 CATEGORY_ATTENTION_TARGETS: Dict[str, List[str]] = {
@@ -39,32 +39,33 @@ CATEGORY_OUTPUT_STATE_VARIABLES: Dict[str, List[str]] = {
 
 DEFAULT_CONSTRAINT_VERIFICATION_TYPES = list(CATEGORY_MARKERS)
 CASE_PATTERNS = [
-    re.compile(r"mock_test\s*(?:\u7684)?\u7b2c\s*0*(\d+)\s*(?:\u4e2a)?\u7b97\u4f8b", re.I),
+    re.compile(r"mock_test\s*(?:的)?第\s*0*(\d+)\s*(?:个)?算例", re.I),
     re.compile(r"mock_test[_\s-]*0*(\d+)", re.I),
     re.compile(r"case[_\s-]*0*(\d+)", re.I),
 ]
 OPERATING_CONDITION_PATTERNS = [
     re.compile(r"(?:operating[-\s]?condition|current\s+condition|condition)\s*(?:number|id|#|:)?\s*0*(\d+)", re.I),
-    re.compile(r"(?:\u5de5\u51b5|\u8fd0\u884c\u6761\u4ef6)\s*(?:\u7f16\u53f7|id|#|:|\u4e3a|\u662f)?\s*0*(\d+)", re.I),
+    re.compile(r"(?:工况|运行条件)\s*(?:编号|id|#|:|为|是)?\s*0*(\d+)", re.I),
 ]
 VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
 PERCENT_PATTERNS = [
-    re.compile(r"(\u4e0a\u8c03|\u4e0b\u8c03|increase|decrease|raise|lower|up|down)\s*(\d+(?:\.\d+)?)\s*%", re.I),
-    re.compile(r"(\u4e0a\u8c03|\u4e0b\u8c03|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%", re.I),
+    re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)\s*(\d+(?:\.\d+)?)\s*%", re.I),
+    re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%", re.I),
 ]
-HORIZON_RE = re.compile(r"(?:\u672a\u6765|next|future|forecast\s*horizon)?\s*(\d+(?:\.\d+)?)\s*(\u5c0f\u65f6|\u5206\u949f|hours?|hrs?|minutes?|mins?)", re.I)
+DIRECTION_RE = re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)", re.I)
+HORIZON_RE = re.compile(r"(?:未来|next|future|forecast\s*horizon)?\s*(\d+(?:\.\d+)?)\s*(小时|分钟|hours?|hrs?|minutes?|mins?)", re.I)
 STATUS_TARGET_PATTERNS = [
-    (re.compile(r"(?:\u5207\u6362\u4e3a|\u8bbe\u4e3a)\s*[\"'\u201c\u201d\u2018\u2019]*(?:\u505c\u673a|\u5173\u95ed)"), 0.0),
-    (re.compile(r"(?:\u5207\u6362\u4e3a|\u8bbe\u4e3a)\s*[\"'\u201c\u201d\u2018\u2019]*(?:\u5f00\u673a|\u5f00\u542f)"), 1.0),
+    (re.compile(r"(?:切换为|设为)\s*[\"'“”‘’]*(?:停机|关闭)"), 0.0),
+    (re.compile(r"(?:切换为|设为)\s*[\"'“”‘’]*(?:开机|开启)"), 1.0),
     (re.compile(r"\b(?:to|as)\s+(?:off|stopped|closed)\b", re.I), 0.0),
     (re.compile(r"\b(?:to|as)\s+(?:on|running|open)\b", re.I), 1.0),
 ]
 STATUS_VALUE_PATTERNS = [
-    (re.compile(r"(?:\u505c\u673a|\u5173\u95ed)|\b(?:off|stopped|closed)\b", re.I), 0.0),
-    (re.compile(r"(?:\u5f00\u673a|\u5f00\u542f)|\b(?:on|running|open)\b", re.I), 1.0),
+    (re.compile(r"(?:停机|关闭)|\b(?:off|stopped|closed)\b", re.I), 0.0),
+    (re.compile(r"(?:开机|开启)|\b(?:on|running|open)\b", re.I), 1.0),
 ]
-PREDICTION_MARKERS = ["\u9884\u6d4b", "forecast", "predict", "prediction"]
-VERIFICATION_MARKERS = ["\u6821\u6838", "\u68c0\u67e5", "verify", "verification", "check"]
+PREDICTION_MARKERS = ["预测", "forecast", "predict", "prediction"]
+VERIFICATION_MARKERS = ["校核", "检查", "verify", "verification", "check"]
 
 
 def parse_condition(question: str) -> Dict[str, Any]:
@@ -72,12 +73,13 @@ def parse_condition(question: str) -> Dict[str, Any]:
     operating_condition_number = _first_matched_int(question, OPERATING_CONDITION_PATTERNS) or case_number
     variable_match = VARIABLE_RE.search(question)
     percent_match = _first_match(question, PERCENT_PATTERNS)
+    direction_match = percent_match or DIRECTION_RE.search(question)
     horizon_match = HORIZON_RE.search(question)
 
     if not variable_match:
         raise ValueError("Could not parse disturbance variable from scenario question.")
 
-    disturbance_direction = _parse_direction(percent_match.group(1) if percent_match else "")
+    disturbance_direction = _parse_direction(direction_match.group(1) if direction_match else "")
     disturbance_magnitude_percent = float(percent_match.group(2)) if percent_match else None
     forecast_horizon_minutes = _parse_horizon_minutes(horizon_match)
     constraint_verification_types = _parse_constraint_verification_types(question)
@@ -108,7 +110,6 @@ def parse_condition(question: str) -> Dict[str, Any]:
         "task_type": _parse_task_type(question),
         "parse_schema_version": PIPEFORMER_TASK_SCHEMA_VERSION,
     }
-    task.update(_legacy_aliases(task))
     return task
 
 
@@ -127,9 +128,9 @@ def _first_matched_int(text: str, patterns: Iterable[re.Pattern[str]]) -> Option
 
 def _parse_direction(raw: str) -> str:
     value = raw.lower()
-    if value in {"\u4e0a\u8c03", "increase", "raise", "up"}:
+    if value in {"上调", "increase", "raise", "up"}:
         return "up"
-    if value in {"\u4e0b\u8c03", "decrease", "lower", "down"}:
+    if value in {"下调", "decrease", "lower", "down"}:
         return "down"
     return "unknown"
 
@@ -139,7 +140,7 @@ def _parse_horizon_minutes(match: Optional[re.Match[str]]) -> Optional[int]:
         return None
     magnitude = float(match.group(1))
     unit = match.group(2).lower()
-    if unit in {"\u5c0f\u65f6", "hour", "hours", "hr", "hrs"}:
+    if unit in {"小时", "hour", "hours", "hr", "hrs"}:
         return int(magnitude * 60)
     return int(magnitude)
 
@@ -190,13 +191,3 @@ def _parse_task_type(question: str) -> str:
     if has_verification:
         return "verification"
     return "unknown"
-
-
-def _legacy_aliases(task: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "changed_variable": task["disturbance_variable"],
-        "change_direction": task["disturbance_direction"],
-        "change_percent": task["disturbance_magnitude_percent"],
-        "keep_other_boundary_controls": task["boundary_conditions"]["keep_other_boundary_controls"],
-        "requested_checks": task["constraint_verification_types"],
-    }

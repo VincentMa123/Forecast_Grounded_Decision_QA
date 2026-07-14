@@ -122,13 +122,25 @@ def run_linepack_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[
         "fail": "linepack_violation",
     }.get(overall_linepack_status)
 
-    for check in checks:
-        check["minimum_linepack"] = minimum_record
-        check["linepack_change_rate"] = change_rates
-        check["linepack_decline_episodes"] = decline_episodes
-        check["linepack_recovery"] = recovery
-        check["short_term_peak_shaving_capacity"] = reserve_check.get("peak_shaving_capacity", {})
-        check["linepack_warning_status"] = overall_linepack_flag
+    if recovery_check is not None:
+        recovery_check.update(
+            {
+                "minimum_linepack": minimum_record,
+                "linepack_recovery": recovery,
+                "linepack_warning_status": overall_linepack_flag,
+            }
+        )
+    change_rate_check = next(
+        (check for check in checks if check["name"] == "linepack_change_rate"),
+        None,
+    )
+    if change_rate_check is not None:
+        change_rate_check.update(
+            {
+                "linepack_change_rate": change_rates,
+                "linepack_decline_episodes": decline_episodes,
+            }
+        )
     return checks
 
 

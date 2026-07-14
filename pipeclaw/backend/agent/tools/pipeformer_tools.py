@@ -83,20 +83,12 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                     },
                     "description": "Engineering constraint categories to execute, using the PDF names.",
                 },
-                "changed_variable": {"type": "string", "description": "Legacy alias for disturbance_variable."},
-                "change_direction": {"type": "string", "enum": ["up", "down"], "description": "Legacy alias for disturbance_direction."},
-                "change_percent": {"type": "number", "description": "Legacy alias for disturbance_magnitude_percent."},
-                "keep_other_boundary_controls": {
+                "include_baseline_comparison": {
                     "type": "boolean",
-                    "description": "Legacy shortcut for boundary_conditions.keep_other_boundary_controls.",
-                },
-                "requested_checks": {
-                    "type": "array",
-                    "items": {
-                        "type": "string",
-                        "enum": ["pressure", "flow", "linepack", "compressor", "equipment_regulation", "abnormality_warning", "dispatch_priority"],
-                    },
-                    "description": "Legacy alias for constraint_verification_types.",
+                    "description": (
+                        "Run an additional unchanged baseline forecast and return compact baseline-versus-disturbed "
+                        "deltas. Use only when the question requires causal, propagation, or disturbance-impact claims."
+                    ),
                 },
                 "device": {"type": "string", "description": "Optional Torch device override, for example cpu or cuda."},
             },
@@ -117,11 +109,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         attention_targets: Optional[List[str]] = None,
         output_state_variables: Optional[List[str]] = None,
         constraint_verification_types: Optional[List[str]] = None,
-        changed_variable: Optional[str] = None,
-        change_direction: Optional[str] = None,
-        change_percent: Optional[float] = None,
-        keep_other_boundary_controls: Optional[bool] = None,
-        requested_checks: Optional[List[str]] = None,
+        include_baseline_comparison: bool = False,
         device: Optional[str] = None,
         pipeformer_root: Optional[str] = None,
         checkpoint_dir: Optional[str] = None,
@@ -144,11 +132,7 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
             attention_targets=attention_targets,
             output_state_variables=output_state_variables,
             constraint_verification_types=constraint_verification_types,
-            changed_variable=changed_variable,
-            change_direction=change_direction,
-            change_percent=change_percent,
-            keep_other_boundary_controls=keep_other_boundary_controls,
-            requested_checks=requested_checks,
+            include_baseline_comparison=include_baseline_comparison,
             pipeformer_root=pipeformer_root,
             checkpoint_dir=checkpoint_dir,
             data_dir=data_dir,

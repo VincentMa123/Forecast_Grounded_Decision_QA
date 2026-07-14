@@ -25,26 +25,23 @@ class PromptBuilder:
             "- If you are unsure about tool arguments, make a smaller valid tool call first instead of emitting a large risky one.",
         ])
         sections.append(tool_calling_contract)
+        sections.append("\n".join([
+            "## Evidence Grounding",
+            "- Base factual and numerical claims only on the current request, visible conversation history, and successful tool results.",
+            "- If a requested file or record is unavailable, say so plainly. Do not substitute another date, case, file, or pipeline unless the user authorizes it.",
+            "- Do not infer stability, capacity, bottlenecks, causality, or measurement faults from rankings or aggregate balance alone; label what remains unresolved.",
+            "- Keep historical/current-state answers concise and avoid repeating raw tool output.",
+        ]))
         pipeformer_routing = "\n".join([
             "## PipeFormer Routing",
-            "- For forecast, what-if, risk, dispatch, or transient-operation questions about future pipeline states, call `run_pipeformer_forecast` before answering.",
-            "- This includes requests that mention PipeFormer, future prediction, boundary/control perturbations, mock_test cases, pressure/flow/linepack checks, compressor load, or energy checks.",
-            "- For historical lookup, current-state retrieval, ranking, aggregation, or visualization questions that do not ask for future prediction, use the workspace/data workflow instead of PipeFormer.",
-            "- Do not simulate PipeFormer tool calls in text; use the registered tool and base the final answer on its returned evidence.",
-            "- Treat the returned PipeFormer result as the sole evidence for the answer. Do not claim prior runs, repeated reproduction, stability across runs, execution times, or historical agreement unless those facts are explicitly present in the tool result.",
-            "- Do not invent numerical values, thresholds, model details, timestamps, or operational facts that are absent from the tool result.",
-            "- Never describe a `not_evaluated` rule or category as passing. If `verification_complete` is false, state briefly which requested checks lacked required variables and treat the risk conclusion as incomplete.",
-            "- Follow the user's requested answer scope exactly. If the user excludes dispatch actions or another topic, do not add it.",
-            "- Keep the final answer compact: use at most 8 short bullets and no more than 180 English words or about 300 Chinese characters.",
-            "- Do not use Markdown tables, code fences, emoji, repeated summaries, or decorative headings in the final answer.",
-            "- Report the overall result, non-pass constraints with grounded values, requested watch variables, intervention label, and only the recommendation explicitly returned by the tool and requested by the user.",
-            "- When the user asks for watch variables or key evidence variables, copy `evidence.top_watch_variables` and `evidence.key_observation_variables` exactly in their returned order; do not rerank or replace them.",
-            "- Do not call a variable, constraint, or warning unique/only unless the returned structured result explicitly proves that no other item has the same status.",
-            "- Treat PipeFormer variable identifiers as opaque unless the tool returns explicit variable metadata. Do not infer that a `B_`, `R_`, `T_`, or other proxy is a physical flow, causal bridge, transmission hub, or specific equipment measurement.",
-            "- For watch and evidence variables, report only the variable id and numerical fields actually returned by the tool; do not add causal explanations or unreturned engineering meanings.",
-            "- Keep safety, equipment, and energy conclusions distinct: pressure/flow/linepack and abnormality warnings are safety, compressor and equipment regulation are equipment, and energy consumption/cost is energy. Never relabel an equipment warning as an energy warning.",
-            "- Only answer a user-requested conditional section when the structured result proves its condition; otherwise state briefly that the condition was not met.",
-            "- Summarize passing categories in one sentence instead of listing every passing rule.",
+            "- For questions about future pipeline states, forecasts, what-if disturbances, risk, dispatch, or transient operation, call `run_pipeformer_forecast` before answering. Use the workspace/data workflow for purely historical, current-state, ranking, aggregation, or visualization requests.",
+            "- Use only registered tool keys. Put `keep_other_boundary_controls` inside `boundary_conditions`, never at the top level. Treat the returned result as the sole evidence; a `not_evaluated` check never passes.",
+            "- Set `include_baseline_comparison=true` only when the user asks what the disturbance caused, changed, propagated to, or affected. Make those claims only from `counterfactual_comparison`; otherwise report the disturbed forecast without causal wording.",
+            "- When a prediction-and-verification request asks for the operating result, intervention, watch variables, and a safety-energy conditional, return exactly four short bullets and no heading: (1) summarize passing categories once and copy every `priority_findings` warning/failure with returned values and thresholds; (2) copy `risk_level` and `human_intervention_label`; (3) copy `top_watch_variables` in order using only `variable`, `mean_prediction`, and `mean_abs_delta_vs_observed`; (4) follow `verification.safety_energy_comparison`.",
+            "- In bullet 4, when `comparison_complete` is true and `consistent` is true, say `安全侧与能耗侧结论一致` and do not report an audit constraint or key observations. When `consistent` is false, report the first priority audit constraint and copy `key_observation_variables` using identifiers and numerical fields only. When comparison is incomplete, say so without inferring a result.",
+            "- For a narrower follow-up, answer only the requested slots instead of forcing all four bullets. User prohibitions override tool fields; omit dispatch wording when the user says `不要给调度动作`, `不要给调度建议`, or equivalent.",
+            "- Never add physical meanings to evidence identifiers unless the tool returns metadata for that exact variable. Never claim uniqueness, prior runs, propagation, causality, or relationships between variables unless the corresponding structured evidence is returned.",
+            "- Keep the answer within 180 English words or 500 total characters for Chinese/mixed answers. Do not use headings, tables, code fences, emoji, repeated summaries, or decorative formatting.",
         ])
         sections.append(pipeformer_routing)
         control_files = memory_payload.get("control_files", [])

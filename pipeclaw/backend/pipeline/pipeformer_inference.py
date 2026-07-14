@@ -8,9 +8,10 @@ import sys
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 
 from .schemas import ForecastRow
+from .variable_registry import load_variable_registry
 
 
 logger = logging.getLogger(__name__)
@@ -42,27 +43,6 @@ def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
                 "global_index": int(row["global_index"]),
             }
     return mapping
-
-
-def load_variable_names(path: Path) -> List[str]:
-    mapping = load_variable_mapping(path)
-    return [name for name, _ in sorted(mapping.items(), key=lambda item: item[1]["index"])]
-
-
-def load_variable_registry(static_dir: Path) -> Dict[str, Any]:
-    registry_path = static_dir / "variable_registry.json"
-    if not registry_path.exists():
-        return {}
-    return json.loads(registry_path.read_text(encoding="utf-8-sig"))
-
-
-def load_registry_provenance(static_dir: Path) -> Dict[str, Any]:
-    payload = load_variable_registry(static_dir)
-    return {
-        "registry_schema_version": payload.get("schema_version"),
-        "synthetic": bool(payload.get("synthetic")),
-        "physical_validation_status": payload.get("physical_validation_status"),
-    }
 
 
 def find_default_checkpoint_dir(repo_root: Path) -> Path:
@@ -116,6 +96,8 @@ def ensure_optional_matplotlib() -> None:
     import importlib.util
     import types
 
+    if "matplotlib" in sys.modules:
+        return
     if importlib.util.find_spec("matplotlib") is not None:
         return
     matplotlib_stub = types.ModuleType("matplotlib")
@@ -280,21 +262,19 @@ def resolve_boundary_adjustments(
     boundary_conditions = dict(parsed_task.get("boundary_conditions") or {})
     adjustments: Dict[str, Dict[str, Any]] = {}
 
-    changed_variable = parsed_task.get("disturbance_variable") or parsed_task.get("changed_variable")
+    disturbance_variable = parsed_task.get("disturbance_variable")
     percent = parsed_task.get("disturbance_magnitude_percent")
-    if percent is None:
-        percent = parsed_task.get("change_percent")
-    direction = parsed_task.get("disturbance_direction") or parsed_task.get("change_direction")
-    if changed_variable and percent is not None:
+    direction = parsed_task.get("disturbance_direction")
+    if disturbance_variable and percent is not None:
         signed_percent = abs(float(percent)) if direction == "up" else -abs(float(percent))
-        adjustments[changed_variable] = {
-            "variable": changed_variable,
+        adjustments[disturbance_variable] = {
+            "variable": disturbance_variable,
             "mode": "percent_change",
             "value": signed_percent,
             "source": "disturbance",
         }
 
-    percentage_changes = boundary_conditions.get("percentage_changes") or boundary_conditions.get("changes_percent") or {}
+    percentage_changes = boundary_conditions.get("percentage_changes") or {}
     for variable, value in dict(percentage_changes).items():
         adjustments[str(variable)] = {
             "variable": str(variable),
@@ -303,7 +283,7 @@ def resolve_boundary_adjustments(
             "source": "boundary_conditions.percentage_changes",
         }
 
-    setpoints = boundary_conditions.get("setpoints") or boundary_conditions.get("values") or {}
+    setpoints = boundary_conditions.get("setpoints") or {}
     for variable, value in dict(setpoints).items():
         adjustments[str(variable)] = {
             "variable": str(variable),
@@ -316,7 +296,7 @@ def resolve_boundary_adjustments(
     if unknown:
         raise ValueError(f"Boundary-condition variables are not in the PipeFormer mapping: {unknown}")
 
-    keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", parsed_task.get("keep_other_boundary_controls", True)))
+    keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", True))
     if not keep_other:
         boundary_variables = {name for name in variable_mapping if ":" in name}
         missing = sorted(boundary_variables - set(adjustments))
@@ -459,7 +439,7 @@ def run_checkpoint_inference(
     pipeformer_root: Path,
     data_dir: Optional[Path],
     static_dir: Optional[Path],
-    mapping_path: Path,
+    mapping_path: Optional[Path],
     device: str = "cpu",
 ) -> Dict[str, Any]:
     started_at = time.perf_counter()
@@ -472,17 +452,32 @@ def run_checkpoint_inference(
     training_config = load_training_config(checkpoint_dir, pipeformer_root)
     data_dir = (data_dir or resolve_relative(training_config.get("data_dir"), pipeformer_root))
     static_dir = (static_dir or resolve_relative(training_config.get("static_dir"), pipeformer_root))
-    logger.info("PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s", data_dir, static_dir, mapping_path)
     if data_dir is None or static_dir is None:
         raise ValueError("Could not resolve PipeFormer data_dir/static_dir for checkpoint inference.")
+    mapping_path = (mapping_path or static_dir / "index_variable_mapping.csv").resolve()
+    logger.info("PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s", data_dir, static_dir, mapping_path)
 
     add_pipeformer_import_paths(pipeformer_root)
     variable_mapping = load_variable_mapping(mapping_path)
-    variable_names = load_variable_names(mapping_path)
-    changed_variable = parsed_task.get("disturbance_variable") or parsed_task["changed_variable"]
-    logger.info("PipeFormer variable mapping loaded: variables=%d changed_variable=%s", len(variable_mapping), changed_variable)
-    if changed_variable not in variable_mapping:
-        raise ValueError(f"Parsed variable {changed_variable} is not in mock PipeFormer mapping {mapping_path}")
+    variable_names = [
+        name
+        for name, _ in sorted(
+            variable_mapping.items(),
+            key=lambda item: item[1]["index"],
+        )
+    ]
+    variable_registry = load_variable_registry(
+        static_dir / "variable_registry.json",
+        variable_names,
+    )
+    disturbance_variable = parsed_task["disturbance_variable"]
+    logger.info(
+        "PipeFormer variable mapping loaded: variables=%d disturbance_variable=%s",
+        len(variable_mapping),
+        disturbance_variable,
+    )
+    if disturbance_variable not in variable_mapping:
+        raise ValueError(f"Parsed variable {disturbance_variable} is not in PipeFormer mapping {mapping_path}")
 
     sequence_length = int(training_config.get("sequence_length", 3))
     time_step_offset = int(training_config.get("time_step_offset", 1))
@@ -494,9 +489,9 @@ def run_checkpoint_inference(
     scenario_matrix = apply_condition_to_matrix(base_matrix, parsed_task, variable_mapping, boundary_adjustments)
     logger.info(
         "Applied parsed condition: variable=%s direction=%s percent=%s",
-        changed_variable,
-        parsed_task.get("disturbance_direction") or parsed_task.get("change_direction"),
-        parsed_task.get("disturbance_magnitude_percent") if parsed_task.get("disturbance_magnitude_percent") is not None else parsed_task.get("change_percent"),
+        disturbance_variable,
+        parsed_task.get("disturbance_direction"),
+        parsed_task.get("disturbance_magnitude_percent"),
     )
     if len(base_matrix) < sequence_length + time_step_offset:
         raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
@@ -586,6 +581,11 @@ def run_checkpoint_inference(
         actual_horizon_minutes,
         time.perf_counter() - started_at,
     )
+    data_provenance = {
+        "registry_schema_version": variable_registry.get("schema_version"),
+        "synthetic": bool(variable_registry.get("synthetic")),
+        "physical_validation_status": variable_registry.get("physical_validation_status"),
+    }
     return {
         "mode": "checkpoint_inference",
         "checkpoint_dir": checkpoint_dir.as_posix(),
@@ -608,32 +608,11 @@ def run_checkpoint_inference(
         "forecast_time_labels": forecast_time_labels,
         "device": device,
         "model_input_projection_type": model_config.get("input_projection_type"),
-        "data_provenance": load_registry_provenance(static_dir),
-        "variable_registry": list(load_variable_registry(static_dir).get("variables") or []),
-        "changed_variable_mapping": variable_mapping[changed_variable],
+        "data_provenance": data_provenance,
+        "variable_registry": list(variable_registry.get("variables") or []),
+        "disturbance_variable_mapping": variable_mapping[disturbance_variable],
         "operating_condition_number_used": parsed_task.get("current_operating_condition_number"),
         "applied_boundary_conditions": boundary_adjustments,
         "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
         "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),
     }
-
-
-def load_pipeformer_forecast_context(
-    parsed_task: Dict[str, Any],
-    mapping_path: Path,
-    *,
-    checkpoint_dir: Path,
-    pipeformer_root: Path,
-    data_dir: Optional[Path] = None,
-    static_dir: Optional[Path] = None,
-    device: str = "cpu",
-) -> Dict[str, Any]:
-    return run_checkpoint_inference(
-        parsed_task=parsed_task,
-        checkpoint_dir=checkpoint_dir,
-        pipeformer_root=pipeformer_root,
-        data_dir=data_dir,
-        static_dir=static_dir,
-        mapping_path=mapping_path,
-        device=device,
-    )
