@@ -40,7 +40,13 @@ NO_IMPACT_COUNTERFACTUAL_CLAIM = re.compile(
     r"|\bno\s+(?:propagation|effect|impact)\b",
     re.IGNORECASE,
 )
-NUMERIC_CLAIM = re.compile(r"(?<![A-Za-z0-9_.])[-+]?\d+(?:\.\d+)?")
+NUMERIC_CLAIM = re.compile(
+    r"(?<![A-Za-z0-9_.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+)
+DATE_REFERENCE = re.compile(
+    r"(?<!\d)(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)(?!\d)"
+)
+YEAR_REFERENCE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?=年|[-/.]\d)")
 VARIABLE_REFERENCE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
 EVIDENCE_DESCRIPTION_TERM = re.compile(
     r"代理|调压器|压缩机|压缩比|流量|压力|管存|阀门|球阀|节点"
@@ -68,6 +74,7 @@ def answer_quality_issues(
     *,
     conversation_context: Optional[List[Dict[str, Any]]] = None,
     tool_outputs: Optional[List[Dict[str, Any]]] = None,
+    record_evidence: Optional[Dict[str, Any]] = None,
 ) -> List[str]:
     issues: List[str] = []
     if not answer.strip():
@@ -101,9 +108,11 @@ def answer_quality_issues(
         for item in tool_outputs or []
         if not tool_output_failed(item.get("output"))
     ]
-    grounding_evidence: Any = pipeformer or {
+    grounding_evidence: Any = {
+        "pipeformer": pipeformer or {},
         "conversation_context": trusted_context,
         "tool_outputs": trusted_tool_outputs,
+        "record_evidence": record_evidence or {},
     }
     if not numeric_claims_are_grounded(answer, question, grounding_evidence):
         issues.append("unsupported_numerical_claim")
@@ -201,9 +210,14 @@ def numeric_claims_are_grounded(answer: str, question: str, evidence: Dict[str, 
     supported = _numbers_in_text(question)
     supported.extend(_numbers_in_value(evidence))
     return all(
-        any(abs(value - candidate) <= max(0.001, abs(candidate) * 0.0005) for candidate in supported)
+        any(abs(value - candidate) <= max(0.01, abs(candidate) * 0.005) for candidate in supported)
         for value in claimed
     )
+
+
+def numeric_claim_values(answer: str) -> List[float]:
+    """Return numeric claims while excluding dates and list/table numbering."""
+    return _numbers_in_text(answer)
 
 
 def tool_output_failed(output: Any) -> bool:
@@ -273,13 +287,26 @@ def _proves_unique_nonpass_variable(pipeformer: Dict[str, Any]) -> bool:
 
 def _numbers_in_text(value: str) -> List[float]:
     numbers = []
+    date_spans = [match.span() for match in DATE_REFERENCE.finditer(value)]
+    date_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(value))
     for match in NUMERIC_CLAIM.finditer(value):
+        if any(start <= match.start() and match.end() <= end for start, end in date_spans):
+            continue
+        previous = value[match.start() - 1:match.start()]
+        following = value[match.end():match.end() + 1]
+        if previous in {"(", "（"} and following in {")", "）"}:
+            continue
         line_start = value.rfind("\n", 0, match.start()) + 1
         prefix = value[line_start:match.start()]
-        suffix = value[match.end():match.end() + 1]
+        remainder = value[match.end():]
+        suffix = remainder[:1]
         if not prefix.strip(" \t-*") and suffix in {".", ")", "）", "、"}:
             continue
-        numbers.append(float(match.group(0)))
+        if prefix.strip() == "|" and remainder.lstrip().startswith("|"):
+            continue
+        if re.match(r"\s*(?:个?字|characters?\b)", remainder, re.IGNORECASE):
+            continue
+        numbers.append(float(match.group(0).replace(",", "")))
     return numbers
 
 

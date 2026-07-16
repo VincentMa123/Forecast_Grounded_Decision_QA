@@ -550,6 +550,8 @@ def run_pipeformer_forecast_analysis(
         "actual_forecast_steps",
         "actual_forecast_horizon_minutes",
         "actual_forecast_horizon_source",
+        "disturbance_timing_mode",
+        "adjusted_input_step_count",
         "device",
         "model_input_projection_type",
         "data_provenance",

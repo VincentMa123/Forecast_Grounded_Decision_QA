@@ -4,6 +4,7 @@ import csv
 import json
 import logging
 import math
+import os
 import sys
 import time
 from dataclasses import dataclass
@@ -29,6 +30,42 @@ SOURCE_FILES = {
 }
 
 EQUIPMENT_MISSING_FILL = -1.0
+DISTURBANCE_TIMING_LEGACY = "legacy_observation_window"
+DISTURBANCE_TIMING_CURRENT_STEP = "current_step"
+
+
+def resolve_disturbance_timing_mode(
+    parsed_task: Dict[str, Any],
+    configured_mode: Optional[str] = None,
+) -> str:
+    """Resolve when a new boundary condition enters the observation window.
+
+    Legacy is intentionally the default because the released teacher traces
+    applied the condition to every row in the input window. Real-data runs can
+    opt into ``current_step`` without changing the behavior used to evaluate
+    students trained on those archived traces.
+    """
+    boundary_conditions = dict(parsed_task.get("boundary_conditions") or {})
+    requested = (
+        parsed_task.get("disturbance_timing_mode")
+        or boundary_conditions.get("disturbance_timing_mode")
+        or configured_mode
+        or os.getenv("PIPEFORMER_DISTURBANCE_TIMING_MODE")
+        or DISTURBANCE_TIMING_LEGACY
+    )
+    aliases = {
+        "legacy": DISTURBANCE_TIMING_LEGACY,
+        DISTURBANCE_TIMING_LEGACY: DISTURBANCE_TIMING_LEGACY,
+        "forecast_origin": DISTURBANCE_TIMING_CURRENT_STEP,
+        DISTURBANCE_TIMING_CURRENT_STEP: DISTURBANCE_TIMING_CURRENT_STEP,
+    }
+    mode = aliases.get(str(requested).strip().lower())
+    if mode is None:
+        raise ValueError(
+            "disturbance_timing_mode must be one of: "
+            f"{DISTURBANCE_TIMING_LEGACY}, {DISTURBANCE_TIMING_CURRENT_STEP}."
+        )
+    return mode
 
 
 def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
@@ -314,16 +351,21 @@ def apply_condition_to_matrix(
     parsed_task: Dict[str, Any],
     variable_mapping: Dict[str, Dict[str, Any]],
     adjustments: Optional[List[Dict[str, Any]]] = None,
+    timing_mode: str = DISTURBANCE_TIMING_LEGACY,
 ):
     import numpy as np
 
     scenario_matrix = np.array(matrix, copy=True)
-    for adjustment in adjustments or resolve_boundary_adjustments(parsed_task, variable_mapping):
+    resolved_adjustments = adjustments or resolve_boundary_adjustments(parsed_task, variable_mapping)
+    row_selection = slice(None) if timing_mode == DISTURBANCE_TIMING_LEGACY else slice(-1, None)
+    if timing_mode not in {DISTURBANCE_TIMING_LEGACY, DISTURBANCE_TIMING_CURRENT_STEP}:
+        raise ValueError(f"Unsupported disturbance timing mode: {timing_mode}")
+    for adjustment in resolved_adjustments:
         variable_idx = variable_mapping[adjustment["variable"]]["index"]
         if adjustment["mode"] == "setpoint":
-            scenario_matrix[:, variable_idx] = float(adjustment["value"])
+            scenario_matrix[row_selection, variable_idx] = float(adjustment["value"])
         else:
-            scenario_matrix[:, variable_idx] *= 1.0 + float(adjustment["value"]) / 100.0
+            scenario_matrix[row_selection, variable_idx] *= 1.0 + float(adjustment["value"]) / 100.0
     return scenario_matrix
 
 
@@ -442,6 +484,7 @@ class PipeFormerInferenceConfig:
     static_dir: Optional[Path] = None
     mapping_path: Optional[Path] = None
     device: str = "cpu"
+    disturbance_timing_mode: Optional[str] = None
 
 
 class PipeFormerInferenceEngine:
@@ -462,6 +505,7 @@ def run_checkpoint_inference(
     static_dir: Optional[Path],
     mapping_path: Optional[Path],
     device: str = "cpu",
+    disturbance_timing_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Compatibility wrapper for the configured inference engine."""
     return PipeFormerInferenceEngine(
@@ -472,6 +516,7 @@ def run_checkpoint_inference(
             static_dir=static_dir,
             mapping_path=mapping_path,
             device=device,
+            disturbance_timing_mode=disturbance_timing_mode,
         )
     ).forecast(parsed_task)
 
@@ -487,6 +532,10 @@ def _run_checkpoint_inference(
     static_dir = config.static_dir
     mapping_path = config.mapping_path
     device = config.device
+    disturbance_timing_mode = resolve_disturbance_timing_mode(
+        parsed_task,
+        config.disturbance_timing_mode,
+    )
     started_at = time.perf_counter()
     logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     import numpy as np
@@ -531,17 +580,22 @@ def _run_checkpoint_inference(
     base_matrix, time_labels = load_case_matrix(case_dir, variable_names)
     logger.info("Loaded PipeFormer case matrix: shape=%s time_steps=%d", base_matrix.shape, len(time_labels))
     boundary_adjustments = resolve_boundary_adjustments(parsed_task, variable_mapping)
-    scenario_matrix = apply_condition_to_matrix(base_matrix, parsed_task, variable_mapping, boundary_adjustments)
+    if len(base_matrix) < sequence_length + time_step_offset:
+        raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
+    input_values = apply_condition_to_matrix(
+        base_matrix[:sequence_length],
+        parsed_task,
+        variable_mapping,
+        boundary_adjustments,
+        timing_mode=disturbance_timing_mode,
+    )
     logger.info(
-        "Applied parsed condition: variable=%s direction=%s percent=%s",
+        "Applied parsed condition: variable=%s direction=%s percent=%s timing=%s",
         disturbance_variable,
         parsed_task.get("disturbance_direction"),
         parsed_task.get("disturbance_magnitude_percent"),
+        disturbance_timing_mode,
     )
-    if len(base_matrix) < sequence_length + time_step_offset:
-        raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
-
-    input_values = scenario_matrix[:sequence_length]
     time_step_minutes = infer_time_step_minutes(time_labels)
     steps_requested = requested_forecast_steps(parsed_task, time_step_minutes, sequence_length)
 
@@ -657,6 +711,12 @@ def _run_checkpoint_inference(
         "variable_registry": list(variable_registry.get("variables") or []),
         "disturbance_variable_mapping": variable_mapping[disturbance_variable],
         "operating_condition_number_used": parsed_task.get("current_operating_condition_number"),
+        "disturbance_timing_mode": disturbance_timing_mode,
+        "adjusted_input_step_count": (
+            sequence_length
+            if boundary_adjustments and disturbance_timing_mode == DISTURBANCE_TIMING_LEGACY
+            else 1 if boundary_adjustments else 0
+        ),
         "applied_boundary_conditions": boundary_adjustments,
         "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
         "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),

@@ -12,6 +12,8 @@ pipeclaw/backend/generated_teacher_traces/teacher_trace.pretty.json
 pipeclaw/backend/generated_teacher_traces/teacher_trace.json
 pipeclaw/backend/generated_teacher_traces/scenario_preflight.json
 pipeclaw/backend/generated_teacher_traces/teacher_trace_sessions.jsonl
-pipeclaw/backend/generated_teacher_traces/splits/
+pipeclaw/backend/generated_teacher_traces/backups
+pipeclaw/backend/scripts
 pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
 pipeFormer/data/
+

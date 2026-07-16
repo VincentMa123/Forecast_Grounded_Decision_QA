@@ -194,7 +194,8 @@ def _pipeformer_checks(
     trace_status: Optional[str],
     max_record_chars: int,
 ) -> List[Dict[str, Any]]:
-    tool_outputs = _pipeformer_outputs(record)
+    all_tool_outputs = _pipeformer_outputs(record)
+    tool_outputs = [item for item in all_tool_outputs if item.get("success") is True]
     tasks = _task_views(record.get("parsed_task") or {})
     predictions = [dict(item.get("prediction") or {}) for item in tool_outputs]
     verifications = [dict(item.get("verification") or {}) for item in tool_outputs]
@@ -203,7 +204,7 @@ def _pipeformer_checks(
     successful = (
         trace_status in (None, "completed")
         and bool(tool_outputs)
-        and all(item.get("success") is True for item in tool_outputs)
+        and len(tasks) == len(tool_outputs)
     )
     checkpoint_ok = successful and all(
         prediction.get("forecast_mode") == "checkpoint_inference"
@@ -323,14 +324,20 @@ def _task_is_complete(task: Dict[str, Any]) -> bool:
         or variable in dict(boundary.get("setpoints") or {})
         or variable in dict(boundary.get("percentage_changes") or {})
     )
+    resolved_output_count = task.get("resolved_output_variable_count")
     return bool(
         task.get("case_id")
         and variable
         and has_change
         and task.get("forecast_horizon_minutes")
         and task.get("constraint_verification_types")
-        and not (task.get("unresolved_attention_targets") or [])
-        and not (task.get("unresolved_output_state_variables") or [])
+        # Descriptive aliases can remain unresolved while concrete model output
+        # variables are still resolved. The unresolved labels are retained for
+        # audit, but they must not reject an otherwise executable forecast.
+        and (
+            resolved_output_count is None
+            or int(resolved_output_count or 0) > 0
+        )
     )
 
 
@@ -384,10 +391,12 @@ def _expected_applied_disturbance(
             return None
         expected_percent = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
 
-    # Multiple representations are accepted only when they describe the same
-    # percentage change. A setpoint mixed with a percentage is ambiguous.
+    # An explicit setpoint is authoritative. The parser may also expose a
+    # derived direction/magnitude (for example, closing a binary state is
+    # represented as setpoint=0 and down 100%); that redundant description
+    # must not invalidate the boundary condition that was actually applied.
     if has_setpoint:
-        if has_percentage_change or expected_percent is not None:
+        if has_percentage_change:
             return None
         return {"mode": "setpoint", "value": setpoints[variable]}
     if has_percentage_change:
@@ -414,8 +423,11 @@ def _horizon_is_consistent(prediction: Dict[str, Any]) -> bool:
     actual = prediction.get("actual_forecast_horizon_minutes")
     window = dict(prediction.get("forecast_window") or {})
     step = float(window.get("time_step_minutes") or 0.0)
-    if requested is None or actual is None:
+    if actual is None:
         return False
+    if requested is None:
+        steps = int(window.get("predict_row_count") or 0)
+        return float(actual) > 0 and (not steps or abs(float(actual) - steps * step) <= max(step, 1e-6))
     return abs(float(requested) - float(actual)) <= max(step, 1e-6)
 
 

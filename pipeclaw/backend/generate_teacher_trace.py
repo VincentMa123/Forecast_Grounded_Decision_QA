@@ -5,6 +5,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -13,8 +14,10 @@ from evaluator.teacher_quality import (
     answer_quality_issues,
     evaluate_teacher_quality,
     llm_answer_quality_issues,
+    numeric_claim_values,
     numeric_claims_are_grounded,
     safety_and_energy_checks_pass as _safety_and_energy_checks_pass,
+    tool_output_failed,
 )
 from evaluator.scorer import NativeTraceEvaluator
 from pipeline.io_utils import write_json, write_jsonl
@@ -34,6 +37,11 @@ logger = logging.getLogger("teacher_trace")
 
 SFT_MAX_RECORD_CHARS = 24_000
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
+SFT_MAX_GENERIC_TOOL_PAIRS = 6
+SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
+SFT_MAX_PIPEFORMER_VARIABLES = 3
+SFT_VARIABLE_REFERENCE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
+SFT_FILE_REFERENCE = re.compile(r"(?i)\b[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)\b")
 SFT_OMITTED_TOOL_KEYS = {
     "cmd",
     "cwd",
@@ -575,6 +583,335 @@ class TeacherTraceProjector:
             return value[: self.max_tool_text_chars] + "... [truncated for SFT]"
         return value
 
+    def compact_sft_trajectory(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        tool_outputs: List[Dict[str, Any]],
+        answer: str,
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Keep the smallest evidence-bearing tool trajectory for SFT."""
+        outputs_by_id = {
+            str(item.get("tool_call_id") or ""): item for item in tool_outputs
+        }
+        pairs = [
+            (index, call, outputs_by_id.get(str(call.get("tool_call_id") or "")))
+            for index, call in enumerate(tool_calls)
+        ]
+        successful = [
+            pair
+            for pair in pairs
+            if pair[2] is not None and not tool_output_failed(pair[2].get("output"))
+        ]
+        successful_pipeformer = [
+            pair for pair in successful if pair[1].get("name") == "run_pipeformer_forecast"
+        ]
+        multiple_pipeformer = len(successful_pipeformer) > 1
+        if successful_pipeformer:
+            selected = successful_pipeformer
+        elif successful:
+            selected = self._select_generic_evidence_pairs(successful, answer)
+        else:
+            selected = pairs[-1:]
+
+        compact_calls = []
+        compact_outputs = []
+        for _, call, output in selected:
+            compact_calls.append(
+                {
+                    "tool_call_id": call.get("tool_call_id"),
+                    "name": call.get("name"),
+                    "arguments": self._compact_call_arguments(
+                        call.get("arguments") or {},
+                        pipeformer=call.get("name") == "run_pipeformer_forecast",
+                    ),
+                }
+            )
+            if output is None:
+                continue
+            raw_output = output.get("output")
+            if call.get("name") == "run_pipeformer_forecast" and isinstance(raw_output, dict):
+                raw_output = self._compact_pipeformer_sft_output(
+                    raw_output,
+                    answer,
+                    include_auxiliary_variables=not multiple_pipeformer,
+                )
+            else:
+                raw_output = self._compact_generic_sft_output(raw_output, answer)
+            compact_outputs.append(
+                {
+                    "tool_call_id": output.get("tool_call_id"),
+                    "name": output.get("name"),
+                    "output": raw_output,
+                }
+            )
+        return compact_calls, compact_outputs
+
+    def _select_generic_evidence_pairs(
+        self,
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        answer: str,
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        references = self._reference_tokens(answer)
+        remaining = set(references)
+        available = list(pairs)
+        selected = []
+        while available and len(selected) < SFT_MAX_GENERIC_TOOL_PAIRS:
+            ranked = []
+            for pair in available:
+                blob = json.dumps((pair[2] or {}).get("output") or {}, ensure_ascii=False).casefold()
+                normalized = blob.replace(",", "")
+                covered = {
+                    value for value in remaining
+                    if value.casefold().replace(",", "") in normalized
+                }
+                ranked.append((len(covered), self._evidence_score(pair[2], answer), -pair[0], pair, covered))
+            _, _, _, best, covered = max(ranked, key=lambda item: item[:3])
+            selected.append(best)
+            remaining.difference_update(covered)
+            available.remove(best)
+            if not remaining and selected:
+                break
+        return sorted(selected, key=lambda pair: pair[0])
+
+    @staticmethod
+    def _reference_tokens(answer: str) -> set[str]:
+        values = set(SFT_VARIABLE_REFERENCE.findall(answer))
+        values.update(SFT_FILE_REFERENCE.findall(answer))
+        values.update(str(value) for value in numeric_claim_values(answer))
+        return {value for value in values if value}
+
+    def _compact_generic_sft_output(self, value: Any, answer: str) -> Any:
+        """Retain a small excerpt containing every answer-grounding token possible."""
+        if not isinstance(value, (dict, list, str)):
+            return value
+        if isinstance(value, dict):
+            status = {
+                key: value[key]
+                for key in ("success", "exit_code", "error", "stderr")
+                if key in value and value[key] not in (None, "")
+            }
+        else:
+            status = {}
+        text_value = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
+        lines = text_value.splitlines() or [text_value]
+        references = self._reference_tokens(answer)
+        selected_indices = {0, len(lines) - 1}
+        normalized_lines = [line.casefold().replace(",", "") for line in lines]
+        for reference in references:
+            token = reference.casefold().replace(",", "")
+            for index, line in enumerate(normalized_lines):
+                if token in line:
+                    selected_indices.update({max(0, index - 1), index, min(len(lines) - 1, index + 1)})
+                    break
+        excerpt_lines = [lines[index] for index in sorted(selected_indices)]
+        excerpt = "\n".join(excerpt_lines)
+        if len(selected_indices) <= 2 and len(excerpt) < min(800, len(text_value)):
+            excerpt = text_value[: min(len(text_value), SFT_MAX_GENERIC_OUTPUT_CHARS)]
+        if len(excerpt) > SFT_MAX_GENERIC_OUTPUT_CHARS:
+            excerpt = excerpt[:SFT_MAX_GENERIC_OUTPUT_CHARS].rsplit("\n", 1)[0]
+        return {**status, "evidence_excerpt": excerpt}
+
+    def compact_record_evidence(self, evidence: Dict[str, Any]) -> Dict[str, Any]:
+        compact = {
+            key: value
+            for key, value in evidence.items()
+            if key not in {
+                "top_watch_variables",
+                "key_observation_variables",
+                "verified_numeric_claims",
+                "candidate_forecasts",
+            }
+        }
+        for key in ("top_watch_variables", "key_observation_variables"):
+            if not evidence.get(key):
+                continue
+            compact[key] = [
+                {
+                    item_key: item[item_key]
+                    for item_key in (
+                        "variable",
+                        "role",
+                        "metric",
+                        "value",
+                        "status",
+                        "mean_prediction",
+                        "mean_abs_delta_vs_observed",
+                    )
+                    if item_key in item
+                }
+                for item in list(evidence.get(key) or [])[:3]
+            ]
+        return self.compact_sft_output(compact)
+
+    def _compact_call_arguments(self, value: Any, *, pipeformer: bool) -> Any:
+        if pipeformer and isinstance(value, dict):
+            value = {key: item for key, item in value.items() if key != "question"}
+        if isinstance(value, dict):
+            return {key: self._compact_call_arguments(item, pipeformer=False) for key, item in value.items()}
+        if isinstance(value, list):
+            return [self._compact_call_arguments(item, pipeformer=False) for item in value]
+        if isinstance(value, str) and len(value) > 2_000:
+            return value[:2_000] + "... [truncated for SFT]"
+        return value
+
+    @staticmethod
+    def _evidence_score(output: Optional[Dict[str, Any]], answer: str) -> int:
+        blob = json.dumps((output or {}).get("output") or {}, ensure_ascii=False).casefold()
+        references = set(SFT_VARIABLE_REFERENCE.findall(answer))
+        references.update(SFT_FILE_REFERENCE.findall(answer))
+        references.update(str(value) for value in numeric_claim_values(answer))
+        score = sum(3 for value in references if value.casefold() in blob)
+        if '"stdout"' in blob or '"content"' in blob:
+            score += 1
+        return score
+
+    def _compact_pipeformer_sft_output(
+        self,
+        output: Dict[str, Any],
+        answer: str,
+        *,
+        include_auxiliary_variables: bool,
+    ) -> Dict[str, Any]:
+        prediction = dict(output.get("prediction") or {})
+        verification = dict(output.get("verification") or {})
+        evidence = dict(output.get("evidence") or {})
+        referenced = list(dict.fromkeys(SFT_VARIABLE_REFERENCE.findall(answer)))
+        if include_auxiliary_variables:
+            for key in ("top_watch_variables", "key_observation_variables"):
+                referenced.extend(
+                    str(item.get("variable"))
+                    for item in evidence.get(key) or []
+                    if item.get("variable")
+                )
+            for finding in verification.get("priority_findings") or []:
+                referenced.extend(str(value) for value in finding.get("affected_variables") or [])
+        referenced = list(dict.fromkeys(referenced))[:SFT_MAX_PIPEFORMER_VARIABLES]
+        summary = dict(prediction.get("output_forecast_summary") or {})
+        metric_keys = {
+            "mean_prediction",
+            "minimum_prediction",
+            "maximum_prediction",
+            "max_abs_prediction",
+            "prediction_change",
+            "max_abs_step_change",
+            "max_step_decline",
+            "max_decline_from_start",
+            "recovery_from_minimum",
+        }
+        compact_summary = {
+            variable: {
+                key: value
+                for key, value in dict(summary.get(variable) or {}).items()
+                if key in metric_keys
+            }
+            for variable in referenced
+            if variable in summary
+        }
+        prediction_keys = (
+            "forecast_mode",
+            "case_id",
+            "current_operating_condition_number",
+            "forecast_horizon_minutes",
+            "actual_forecast_horizon_minutes",
+            "actual_forecast_steps",
+            "disturbance_variable",
+            "disturbance_direction",
+            "disturbance_magnitude_percent",
+            "forecast_window",
+            "counterfactual_comparison",
+            "total_output_variable_count",
+        )
+        compact_prediction = {
+            key: prediction[key] for key in prediction_keys if key in prediction
+        }
+        compact_prediction["output_forecast_summary"] = compact_summary
+        verification_keys = (
+            "requested_categories",
+            "category_status",
+            "safety_energy_comparison",
+            "rule_status",
+            "overall_status",
+            "verification_complete",
+            "not_evaluated_rules",
+            "risk_level",
+            "risk_escalations",
+            "failure_count",
+            "warning_count",
+            "failed_rule_ids",
+            "warning_rule_ids",
+            "triggered_flags",
+            "human_intervention_label",
+            "dispatch_recommendation",
+            "priority_findings",
+        )
+        compact_verification = {
+            key: verification[key]
+            for key in verification_keys
+            if key in verification and key not in {"rule_status", "risk_escalations", "priority_findings"}
+        }
+        compact_verification["priority_findings"] = [
+            {
+                key: finding[key]
+                for key in (
+                    "name",
+                    "category",
+                    "status",
+                    "evaluation_status",
+                    "flag",
+                    "priority",
+                    "affected_variables",
+                )
+                if key in finding
+            }
+            for finding in (verification.get("priority_findings") or [])[:5]
+        ]
+        compact_evidence = {
+            key: [
+                {
+                    item_key: item[item_key]
+                    for item_key in (
+                        "variable",
+                        "role",
+                        "metric",
+                        "value",
+                        "status",
+                        "mean_prediction",
+                        "mean_abs_delta_vs_observed",
+                    )
+                    if item_key in item
+                }
+                for item in list(evidence.get(key) or [])[:3]
+            ]
+            for key in ("top_watch_variables", "key_observation_variables")
+            if include_auxiliary_variables and evidence.get(key)
+        }
+        task_resolution = dict(output.get("task_resolution") or {})
+        compact_resolution = {
+            key: task_resolution[key]
+            for key in (
+                "resolved_attention_variable_count",
+                "resolved_output_variable_count",
+                "unresolved_attention_targets",
+                "unresolved_output_state_variables",
+                "applied_boundary_conditions",
+            )
+            if key in task_resolution
+        }
+        provenance = dict(output.get("provenance") or {})
+        compact_provenance = {
+            key: provenance[key]
+            for key in ("checkpoint_id", "forecast_mode", "device")
+            if key in provenance
+        }
+        return {
+            "success": output.get("success") is True,
+            "task_resolution": compact_resolution,
+            "prediction": compact_prediction,
+            "verification": compact_verification,
+            "evidence": compact_evidence,
+            "provenance": compact_provenance,
+        }
+
     @staticmethod
     def export_tools(
         trace: Dict[str, Any],
@@ -955,6 +1292,7 @@ def write_split_records(
         item
         for item in records
         if item.get("quality_flag") == "pass"
+        and not item.get("sft_exclusion_reason")
         # A turn can be valid for audit while still being unsafe for SFT when
         # its prompt contains an unresolved earlier assistant answer.
         and all(
@@ -973,6 +1311,7 @@ def write_split_records(
         "parsed_task",
         "tool_calls",
         "tool_outputs",
+        "evidence",
         "final_answer",
     )
     written_count = 0
@@ -982,10 +1321,37 @@ def write_split_records(
             if item.get("split") != split:
                 continue
             projected = {key: item[key] for key in sft_fields if key in item}
-            projected["tool_outputs"] = compact_sft_tool_output(projected.get("tool_outputs", []))
+            full_grounding_evidence = {
+                "conversation_context": projected.get("conversation_context", []),
+                "tool_outputs": projected.get("tool_outputs", []),
+                "evidence": projected.get("evidence", {}),
+            }
+            projected["tool_calls"], projected["tool_outputs"] = DEFAULT_PROJECTOR.compact_sft_trajectory(
+                list(projected.get("tool_calls") or []),
+                list(projected.get("tool_outputs") or []),
+                str(projected.get("final_answer") or ""),
+            )
+            projected_evidence = DEFAULT_PROJECTOR.compact_record_evidence(
+                dict(projected.get("evidence") or {})
+            )
+            supporting_values = []
+            answer_text = str(projected.get("final_answer") or "")
+            for value in numeric_claim_values(answer_text):
+                token = str(value)
+                if numeric_claims_are_grounded(
+                    token,
+                    str(projected.get("user_input") or ""),
+                    full_grounding_evidence,
+                ):
+                    if value not in supporting_values:
+                        supporting_values.append(value)
+            if supporting_values:
+                projected_evidence["supporting_numeric_values"] = supporting_values
+            projected["evidence"] = projected_evidence
             compact_evidence = {
                 "conversation_context": projected.get("conversation_context", []),
                 "tool_outputs": projected["tool_outputs"],
+                "evidence": projected.get("evidence", {}),
             }
             if not numeric_claims_are_grounded(
                 str(projected.get("final_answer") or ""),
