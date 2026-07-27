@@ -28,7 +28,12 @@ logger = logging.getLogger(__name__)
 MAX_READ_CHARS = 200_000
 MAX_OUTPUT_CHARS = 50_000
 DEFAULT_READ_LINE_LIMIT = 400
-CSV_DEFAULT_READ_LINE_LIMIT = 10
+CSV_DEFAULT_READ_LINE_LIMIT = 400
+PIPELINE_DATA_FILE_SUFFIXES = {
+    "node_flow": "_node.csv",
+    "pipeline_flow": "_pipeline.csv",
+    "consumer_flow": "_consumer.csv",
+}
 ALLOWED_EXTERNAL_TOOL_PATH = Path("D:/ml_pro_master/chroes/fluid_model").resolve()
 ALLOWED_COMMANDS = {
     "python", "python3", "py", "pip", "pip3", "powershell", "powershell.exe", "pwsh",
@@ -64,6 +69,7 @@ class WorkspaceRunner:
         if not root.is_absolute():
             root = (backend_dir / root).resolve()
         self.backend_dir = backend_dir
+        self.pipeline_data_root = (self.backend_dir / "pipeline_data").resolve()
         self.workspace_root = root
         self.allowed_external_tool_path = ALLOWED_EXTERNAL_TOOL_PATH
         self.allowed_skill_read_path = (self.backend_dir / "agent" / "skills").resolve()
@@ -121,6 +127,8 @@ class WorkspaceRunner:
         return self._is_within_root(target, self.allowed_skill_read_path)
 
     def _resolve_tool_path(self, workspace_dir: Path, path: str) -> Optional[Path]:
+        if self._is_pipeline_data_logical_path(path):
+            return None
         raw_path = Path(path)
         if raw_path.is_absolute():
             target = raw_path.resolve()
@@ -130,6 +138,11 @@ class WorkspaceRunner:
         return self._safe_resolve(workspace_dir, raw_path.as_posix())
 
     def _resolve_read_path(self, workspace_dir: Path, path: str) -> Optional[Path]:
+        if self._is_pipeline_data_logical_path(path):
+            relative = path.replace("\\", "/")[len("pipeline_data/") :]
+            if not self._valid_pipeline_data_relative(relative):
+                return None
+            return self._safe_resolve(self.pipeline_data_root, relative)
         raw_path = Path(path)
         if raw_path.is_absolute():
             target = raw_path.resolve()
@@ -141,6 +154,22 @@ class WorkspaceRunner:
                 return target
             return None
         return self._safe_resolve(workspace_dir, raw_path.as_posix())
+
+    @staticmethod
+    def _is_pipeline_data_logical_path(path: str) -> bool:
+        normalized = str(path).replace("\\", "/")
+        return normalized == "pipeline_data" or normalized.startswith("pipeline_data/")
+
+    @staticmethod
+    def _valid_pipeline_data_relative(relative: str) -> bool:
+        parts = Path(relative).parts
+        if len(parts) != 2:
+            return False
+        suffix = PIPELINE_DATA_FILE_SUFFIXES.get(parts[0])
+        if not suffix or not parts[1].endswith(suffix):
+            return False
+        date = parts[1][: -len(suffix)]
+        return len(date) == 8 and date.isdigit()
 
     def _file_meta(self, file_path: Path, base_dir: Path) -> FileMeta:
         rel_path = file_path.relative_to(base_dir).as_posix()
@@ -213,7 +242,8 @@ class WorkspaceRunner:
         normalized_path = Path(path).as_posix()
         invalid_path_error = (
             "Allowed read_file paths: relative to WORKSPACE_DIR, absolute under "
-            "D:/ml_pro_master/chroes/fluid_model, or absolute under backend/agent/skills. "
+            "D:/ml_pro_master/chroes/fluid_model, absolute under backend/agent/skills, "
+            "or read-only under pipeline_data/. "
             f"Received: {path}"
         )
         target = self._resolve_read_path(workspace_dir, path)

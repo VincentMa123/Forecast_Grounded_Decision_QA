@@ -133,6 +133,58 @@ class TeacherTraceStore:
         return merged, updated_count
 
     @staticmethod
+    def contains_scenario(
+        records: List[Dict[str, Any]], *, dataset_source: str, scenario_id: str
+    ) -> bool:
+        return any(
+            str(item.get("dataset_source") or "") == dataset_source
+            and str(item.get("source_scenario_id") or item.get("scenario_id") or "") == scenario_id
+            for item in records
+        )
+    @staticmethod
+    def replace_scenario(
+        existing: List[Dict[str, Any]],
+        generated: List[Dict[str, Any]],
+        *,
+        dataset_source: str,
+        scenario_id: str,
+        id_field: str,
+    ) -> tuple[List[Dict[str, Any]], int]:
+        """Replace one fully generated source/scenario pair without touching collisions."""
+        def matches(item: Dict[str, Any]) -> bool:
+            item_scenario = item.get("source_scenario_id") or item.get("scenario_id")
+            return (
+                str(item.get("dataset_source") or "") == dataset_source
+                and str(item_scenario or "") == scenario_id
+            )
+
+        target_positions = [index for index, item in enumerate(existing) if matches(item)]
+        if not target_positions:
+            raise ValueError(
+                f"No existing records match dataset {dataset_source!r} and scenario {scenario_id!r}."
+            )
+        if not generated or any(not matches(item) for item in generated):
+            raise ValueError("Generated replacement contains a foreign or missing scenario record.")
+
+        generated_ids = [str(item.get(id_field) or "") for item in generated]
+        if any(not value for value in generated_ids) or len(generated_ids) != len(set(generated_ids)):
+            raise ValueError(f"Generated replacement has missing or duplicate {id_field} values.")
+        retained = [item for item in existing if not matches(item)]
+        retained_ids = {str(item.get(id_field) or "") for item in retained}
+        collisions = retained_ids & set(generated_ids)
+        if collisions:
+            raise ValueError(
+                f"Generated replacement collides with retained {id_field} values: {sorted(collisions)}"
+            )
+
+        first_target = target_positions[0]
+        before_count = sum(not matches(item) for item in existing[:first_target])
+        return (
+            retained[:before_count] + list(generated) + retained[before_count:],
+            len(target_positions),
+        )
+
+    @staticmethod
     def validate_splits(records: List[Dict[str, Any]]) -> None:
         scenario_splits: Dict[str, str] = {}
         for record in records:

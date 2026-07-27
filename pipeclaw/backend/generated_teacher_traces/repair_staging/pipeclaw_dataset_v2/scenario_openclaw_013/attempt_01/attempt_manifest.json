@@ -1,0 +1,111 @@
+{
+  "attempt": 1,
+  "command_exit_code": 0,
+  "stdout_tail": "{\n  \"status\": \"completed_with_quality_issues\",\n  \"append_mode\": false,\n  \"replacement_mode\": false,\n  \"replaced_dataset_source\": null,\n  \"replaced_scenario_id\": null,\n  \"removed_records\": 0,\n  \"removed_sessions\": 0,\n  \"records\": 15,\n  \"generated_records\": 15,\n  \"appended_records\": 15,\n  \"duplicate_records_skipped\": 0,\n  \"skipped_existing_scenarios\": 0,\n  \"quality_pass_records\": 14,\n  \"sft_records\": 0,\n  \"sessions\": 5,\n  \"failed_sessions\": 0,\n  \"total_failed_sessions\": 0,\n  \"updated_existing_sessions\": 0,\n  \"output_jsonl\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/pipeclaw_dataset_v2/scenario_openclaw_013/attempt_01/teacher_trace.jsonl\",\n  \"output_json\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/pipeclaw_dataset_v2/scenario_openclaw_013/attempt_01/teacher_trace.json\",\n  \"session_output_jsonl\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/pipeclaw_dataset_v2/scenario_openclaw_013/attempt_01/teacher_trace_sessions.jsonl\",\n  \"split_output_dir\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/pipeclaw_dataset_v2/scenario_openclaw_013/attempt_01/splits\"\n}\n",
+  "stderr_tail": "0725_231254_743309\n2026-07-25 23:17:10,210 - agent.orchestrator - INFO - Agent tool loop ready: session_id=teacher_0001_005_20260725_231254_743309 model=gpt-5.6-sol tools=7\n2026-07-25 23:17:10,211 - agent.orchestrator - INFO - LLM request started: session_id=teacher_0001_005_20260725_231254_743309 step=1 model=gpt-5.6-sol\n2026-07-25 23:17:22,088 - httpx - INFO - HTTP Request: POST https://vip-sg.freemodel.dev/v1/chat/completions \"HTTP/1.1 200 OK\"\n2026-07-25 23:17:22,089 - agent.orchestrator - INFO - LLM response received: session_id=teacher_0001_005_20260725_231254_743309 step=1 finish_reason=stop tool_calls=0 content_chars=31\n2026-07-25 23:17:22,110 - agent.orchestrator - INFO - Agent run finished: agent_id=teacher_trace session_id=teacher_0001_005_20260725_231254_743309 status=completed tool_calls=0 trace=C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/.openclaw/tt_runs/r0001_2075b99cf5/workspace-teacher_trace/context_trace/teacher_0001_005_20260725_231254_743309.json\n2026-07-25 23:17:22,117 - teacher_trace - INFO - Turn finished: scenario=scenario_openclaw_013 session=scenario_openclaw_013_session_005 turn=2 quality=pass\n2026-07-25 23:17:22,117 - teacher_trace - INFO - Turn started: scenario=scenario_openclaw_013 session=scenario_openclaw_013_session_005 turn=3 question=\\u518d\\u8865\\u4e00\\u53e5\\u4f60\\u4f1a\\u4e3b\\u52a8\\u8ffd\\u95ee\\u8425\\u9500\\u4fa7\\u6216\\u73b0\\u573a\\u7684\\u95ee\\u9898\\u3002\n2026-07-25 23:17:22,118 - agent.orchestrator - INFO - Agent run started: agent_id=teacher_trace session_id=teacher_0001_005_20260725_231254_743309\n2026-07-25 23:17:22,194 - agent.orchestrator - INFO - Agent tool loop ready: session_id=teacher_0001_005_20260725_231254_743309 model=gpt-5.6-sol tools=7\n2026-07-25 23:17:22,195 - agent.orchestrator - INFO - LLM request started: session_id=teacher_0001_005_20260725_231254_743309 step=1 model=gpt-5.6-sol\n2026-07-25 23:17:34,267 - httpx - INFO - HTTP Request: POST https://vip-sg.freemodel.dev/v1/chat/completions \"HTTP/1.1 200 OK\"\n2026-07-25 23:17:34,269 - agent.orchestrator - INFO - LLM response received: session_id=teacher_0001_005_20260725_231254_743309 step=1 finish_reason=stop tool_calls=0 content_chars=68\n2026-07-25 23:17:34,291 - agent.orchestrator - INFO - Agent run finished: agent_id=teacher_trace session_id=teacher_0001_005_20260725_231254_743309 status=completed tool_calls=0 trace=C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/.openclaw/tt_runs/r0001_2075b99cf5/workspace-teacher_trace/context_trace/teacher_0001_005_20260725_231254_743309.json\n2026-07-25 23:17:34,298 - teacher_trace - INFO - Turn finished: scenario=scenario_openclaw_013 session=scenario_openclaw_013_session_005 turn=3 quality=pass\n2026-07-25 23:17:34,298 - teacher_trace - INFO - Writing combined JSONL output: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\pipeclaw_dataset_v2\\scenario_openclaw_013\\attempt_01\\teacher_trace.jsonl\n2026-07-25 23:17:34,298 - teacher_trace - INFO - Writing pretty JSON output: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\pipeclaw_dataset_v2\\scenario_openclaw_013\\attempt_01\\teacher_trace.json\n2026-07-25 23:17:34,320 - teacher_trace - INFO - Writing session evaluation JSONL: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\pipeclaw_dataset_v2\\scenario_openclaw_013\\attempt_01\\teacher_trace_sessions.jsonl\n2026-07-25 23:17:34,324 - teacher_trace - INFO - Writing scenario-isolated split files: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\pipeclaw_dataset_v2\\scenario_openclaw_013\\attempt_01\\splits\n2026-07-25 23:17:34,328 - teacher_trace - INFO - Teacher trace generation complete: generated=15 appended=15 total=15 quality_pass_records=14 sft_records=0 failed_sessions=0\n",
+  "root": "C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/pipeclaw_dataset_v2/scenario_openclaw_013/attempt_01",
+  "record_count": 15,
+  "session_count": 5,
+  "automatic_pass": true,
+  "automatic_failures": [],
+  "manual_review_required": true,
+  "manual_review_focus": "Review each deterministic wording repair against the stored tool evidence.",
+  "original_reviewer_notes": [
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_001::turn_001",
+      "reviewer_notes": "This record should pass due to evaluator false positive since evaluator doesn't check numbers that are result of mathematical operation",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_001::turn_002",
+      "reviewer_notes": "The agent gives the suitable answer for the given question",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_002::turn_001",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_003::turn_002",
+      "reviewer_notes": "The agent gives the suitable answer for the given question",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_003::turn_003",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_005::turn_002",
+      "reviewer_notes": "The agent gives the suitable answer for the given question",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_001::turn_001",
+      "reviewer_notes": "This record should pass due to evaluator false positive since the evaluator doesn't check numbers that are result of mathematical operation",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_001::turn_003",
+      "reviewer_notes": "This record should pass due to evaluator false positive because of the number in the date",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_002::turn_001",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_002::turn_002",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_002::turn_003",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_003::turn_003",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_004::turn_001",
+      "reviewer_notes": "This record should pass due to evaluator false positive because it doesn't call any tools. As a result, no evidence which the evaluator depends on it when checking the numerical consistency",
+      "final_disposition": "pass"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_013_session_004::turn_002",
+      "reviewer_notes": "The tool execution failed due to  \"error\": \"Topology evidence could not be built from the requested files and target.\"",
+      "final_disposition": "failed"
+    }
+  ],
+  "required_human_checks": [
+    "all_turns_reviewed",
+    "original_reviewer_notes_satisfied",
+    "answer_is_grounded"
+  ],
+  "deterministic_repairs": {
+    "repaired_sample_ids": [
+      "pipeclaw_dataset_v2:scenario_openclaw_013_session_001::turn_003"
+    ],
+    "repaired_record_count": 1,
+    "skipped": {}
+  }
+}

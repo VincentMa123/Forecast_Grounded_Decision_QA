@@ -1,0 +1,29 @@
+{
+  "train_result": [
+    8110,
+    0.4041346814129708,
+    {
+      "train_runtime": 2293.3057,
+      "train_samples_per_second": 56.573,
+      "train_steps_per_second": 3.536,
+      "total_flos": 0.0,
+      "train_loss": 0.4041346814129708,
+      "epoch": 10.0,
+      "step": 8110,
+      "train/token_accuracy": 0.9703832864761353,
+      "learning_rate": 0.0
+    }
+  ],
+  "eval_result": {
+    "eval_loss": 0.029464054852724075,
+    "eval_runtime": 6.5856,
+    "eval_samples_per_second": 136.055,
+    "eval_steps_per_second": 8.503,
+    "epoch": 10.0,
+    "step": 8110,
+    "learning_rate": 0.0
+  },
+  "model_path": "./outputs/mock_decoder_candidate_causal",
+  "total_steps": 8110,
+  "best_metric": 0.029464054852724075
+}

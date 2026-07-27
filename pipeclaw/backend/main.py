@@ -4,7 +4,6 @@ FastAPI backend for GIS Pipeline Visualization.
 from __future__ import annotations
 
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -14,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from agent.orchestrator import init_orchestrator
+from agent.llm_provider import LLMProviderSettings
 from agent.router import router as agent_router
 from data_loader import DataLoader
 from models import ApiResponse, AvailableDates, ConsumerFlowData, NodeFlowData, PipelineFlowData
@@ -26,13 +26,14 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv(Path(__file__).with_name(".env"), override=True)
-api_key = os.getenv("OPENAI_API_KEY")
-if api_key:
-    logger.info("✓ OPENAI_API_KEY 已加载: %s...%s", api_key[:10], api_key[-4:])
-else:
-    logger.warning("✗ 未找到 OPENAI_API_KEY")
-logger.info("OPENAI_API_BASE 当前值: %s", os.getenv("OPENAI_API_BASE", "未设置"))
-logger.info("OPENAI_MODEL 当前值: %s", os.getenv("OPENAI_MODEL", "未设置"))
+provider_settings = LLMProviderSettings.from_env()
+logger.info(
+    "LLM provider=%s model=%s api_key_configured=%s custom_base=%s",
+    provider_settings.provider,
+    provider_settings.model,
+    bool(provider_settings.api_key),
+    bool(provider_settings.base_url),
+)
 
 app = FastAPI(title="GIS Pipeline API", description="API for gas pipeline network visualization and dispatch", version="2.0.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

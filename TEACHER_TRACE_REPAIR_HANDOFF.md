@@ -1,0 +1,1069 @@
+# Teacher-Trace Repair Handoff — 2026-07-27
+
+> **Latest-status rule:** Section 0 is the current project state and
+> supersedes conflicting counts or scenario lists in the 2026-07-26
+> historical sections below. The older sections are retained as an audit
+> trail of the first repair pass.
+
+## 0. Latest continuation update — 2026-07-27
+
+### Current outcome
+
+The latest staging summary contains:
+
+- 21 staged scenarios;
+- 15 scenarios with `automatic_pass=true`, all still pending human review;
+- 6 unresolved scenarios;
+- no newly approved or merged scenarios from this continuation;
+- no live API calls made while implementing the latest code fixes.
+
+Current unresolved scenarios:
+
+```text
+Pipeline_Full_Life_Cycle_Test_Dataset-v4:
+  scenario_pipeformer_dispatch_010   real failed calls; regenerate after current fixes
+  scenario_pipeformer_dispatch_012   HTTP 402 / insufficient balance
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v7:
+  scenario_pipeformer_dispatch_014   HTTP 402 / insufficient balance
+  scenario_pipeformer_dispatch_015   HTTP 402 / insufficient balance
+  scenario_pipeformer_prediction_012 HTTP 402 / insufficient balance
+  scenario_pipeformer_prediction_015 HTTP 402 / insufficient balance
+```
+
+The other 15 staged scenarios are automatic-pass candidates, not approved
+records. They still require turn-by-turn human review before merge.
+
+### Work completed since the 2026-07-26 handoff
+
+#### Registry and forecast authorization
+
+- Every forecast now requires relevant successful registry evidence for the
+  exact disturbance and every candidate action variable.
+- Exact-ID and meaningful normalized searches can authorize the disturbance;
+  zero-match and broad role-only searches cannot invent a regional mapping.
+- Candidate actions must be returned as controllable inputs.
+- Registry and forecast tools remain visible; no regex routing or wording-based
+  tool hiding was added.
+- Registry search now supports deterministic `offset` pagination and returns
+  `next_offset` when another page exists.
+
+#### OpenClaw forecast applicability
+
+- Future-looking wording alone no longer forces PipeFormer.
+- A forecast requires a canonical disturbance, valid operating case, and
+  relevant registry evidence.
+- When those inputs are unavailable, the agent must give a bounded qualitative
+  answer from verified CSV/topology evidence and name the missing forecast
+  inputs.
+- Unverified history summaries are excluded; verified summaries may be reused.
+- Decimal aggregation guidance now requires safe string serialization.
+
+#### Binary-state correctness
+
+- Registry semantics, not only the variable suffix, determine variable type.
+- Binary `:ST` disturbances and actions require setpoint `0` or `1`.
+- Binary percentages and non-binary setpoints are rejected.
+- A binary disturbance requires top-level `disturbance_setpoint`.
+- Deterministic answers render `R_006:ST=0` or `R_006:ST=1`, never `None%`.
+
+#### Decision policy and scalable ranking
+
+- Added `set_decision_policy` so the LLM converts current user wording into a
+  typed, source-grounded objective list.
+- Every objective requires its own exact contiguous `source_excerpt`.
+- `METRIC_CATALOG` is the central extensible registry for ranking metrics,
+  direction, label, unit, and extraction path.
+- Ranking applies hard constraints first, then lexicographic ordered
+  objectives; no scenario-specific keyword rule is used by the deterministic
+  ranker.
+- Equivalent candidate actions are deduplicated by canonical action signature
+  even if the LLM renames the candidate.
+- Exact objective ties are retained as tie groups. Stable candidate ID is only
+  a deterministic presentation tie-break, not fabricated engineering
+  preference.
+
+#### Multi-turn grounding and answer generation
+
+- `DecisionTraceState` carries verified candidate results, disturbances, and
+  decision policy across turns.
+- `GroundingContractBuilder` can rank prior verified candidates when the user
+  supplies priorities in a later turn.
+- The next LLM turn now receives a compact verified candidate-state projection
+  containing every candidate ID, canonical action, constraint evidence, and
+  comparison metrics while excluding unused audit payloads.
+- Policy-only follow-ups are instructed to reuse unchanged verified forecasts.
+  A new forecast is needed only when case, disturbance, horizon, or action
+  changes.
+- Canonical IDs must retain suffixes such as `:SNQ`, `:ST`, `:FR`, `:SP_`, and
+  `:SP_out`.
+- Ordinary Chinese/mixed forecast answers use a 500-character target;
+  multi-candidate comparisons use 650 characters; English uses 160 words.
+- Deterministic compaction preserves candidates, actions, rankings, essential
+  audit evidence, and assumption disclosure.
+- Scientific notation such as `4.3e-05` is accepted and rendered deterministically.
+
+#### Regeneration usability
+
+- `repair_teacher_trace.py` supports `--workers N` using bounded threads for
+  independent scenario subprocesses.
+- Default `--workers 1` remains the safest option for a single scenario or
+  constrained GPU/API resources.
+- Progress logs identify `[current/total] START`, `DONE`, or `FAILED`, scenario
+  ID, attempt, elapsed time, automatic-pass state, and manifest path.
+- Failed attempts clean stale attempt artifacts before writing new output.
+
+### Latest `v4 dispatch_010` audit and fix
+
+The newly generated five-record trace is **not mergeable**. Its final
+turn-3 ranking is grounded and correct, but the trajectory contains real tool
+failures:
+
+1. Turn 1 called `search_pipeformer_registry(offset=30)` before pagination was
+   supported.
+2. Turn 3 passed policy metrics
+   `flow.max_abs_supply_demand_gap` and `energy.delta_vs_baseline` as
+   PipeFormer `output_state_variables`, causing four
+   `unresolved_task_vocabulary` failures before successful retries.
+
+It also exposed two evaluator bugs:
+
+1. Native scoring counted the explicit baseline as another candidate, so
+   `2 candidates + 1 baseline` and `3 candidates + 1 baseline` failed candidate
+   count, checkpoint, disturbance, and horizon checks.
+2. Staging used “does this output contain grounding evidence?” as “did this
+   tool fail?”, so successful zero-result or locator-only calls could be
+   reported as failed.
+
+Long-term fixes implemented:
+
+- registry pagination is now a supported validated interface;
+- decision-policy metric IDs are blocked before forecast execution using
+  `METRIC_CATALOG`, with the internal correction omitted from SFT traces;
+- native scoring matches parsed candidates to forecast outputs by
+  `tool_call_id`, excluding baselines and superseded retries;
+- staging reports only `ToolEvidenceState.EXECUTION_FAILED` as a failed tool;
+- missing/locator evidence remains unusable for grounding;
+- verified prior candidates are compactly exposed and reused on policy-only
+  turns.
+
+The existing staged trace still contains recorded failures and must not be
+deterministically upgraded. It requires one fresh regeneration.
+
+### Latest local verification
+
+No live scenario generation was run. Focused verification:
+
+```powershell
+python -m unittest tests.test_pipeformer_registry_tool agent.test_forecast_execution_contract tests.test_pipeline_data_contract tests.test_parallel_regeneration tests.test_repair_progress_logging
+python -m unittest pipeclaw.backend.tests.test_native pipeclaw.backend.tests.test_v4_teacher_trace_export
+python -m compileall -q pipeclaw/backend/agent pipeclaw/backend/evaluator pipeclaw/backend/pipeline pipeclaw/backend/generate_teacher_trace.py pipeclaw/backend/repair_teacher_trace.py
+```
+
+Results:
+
+```text
+31 tests passed
+71 tests passed
+102 focused tests total
+Python compilation: exit code 0
+git diff --check: no whitespace errors; only existing LF/CRLF warnings
+```
+
+Design and implementation records:
+
+```text
+docs/superpowers/specs/2026-07-27-dispatch-trace-reliability-design.md
+docs/superpowers/plans/2026-07-27-dispatch-trace-reliability.md
+```
+
+### Exact next steps
+
+#### 1. Regenerate only `v4 dispatch_010`
+
+In `repair_teacher_trace.py`, leave only this target uncommented:
+
+```python
+(
+    "Pipeline_Full_Life_Cycle_Test_Dataset-v4",
+    "scenario_pipeformer_dispatch_010",
+),
+```
+
+Then run without `--resume`:
+
+```powershell
+conda activate pipeclaw
+cd C:\Users\NIGGABALLS\Documents\Forecast_Grounded_Decision_QA\pipeclaw\backend
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 1 --workers 1
+```
+
+For several independent scenarios, `--workers 2` is supported, but a larger
+value can increase API throttling and memory/GPU pressure.
+
+#### 2. Review the regenerated scenario
+
+Require all of the following:
+
+- `command_exit_code=0`;
+- `automatic_pass=true`;
+- all five expected sample IDs present;
+- no recorded failed tools or unresolved vocabulary;
+- baseline excluded from candidate count but retained in the trace;
+- turn 2 contains all three candidates and audit categories;
+- turn 3 calls `set_decision_policy`, reuses verified candidate forecasts when
+  unchanged, and ranks `candidate_1 > candidate_3 > candidate_2` from the
+  stored balance-then-energy policy;
+- every action keeps its complete canonical variable suffix;
+- no failed trajectory is approved.
+
+#### 3. Restore provider balance and regenerate the five API-blocked scenarios
+
+The current quota-blocked list is:
+
+```text
+v4 scenario_pipeformer_dispatch_012
+v7 scenario_pipeformer_dispatch_014
+v7 scenario_pipeformer_dispatch_015
+v7 scenario_pipeformer_prediction_012
+v7 scenario_pipeformer_prediction_015
+```
+
+Regenerate them one at a time without `--resume`, or use `--workers 2` only if
+the provider and local resources can sustain parallel requests.
+
+#### 4. Human review, approval, and merge
+
+- Review every turn in each changed scenario, including turns that passed
+  before scenario-level regeneration.
+- Create an approval entry only for an automatic-pass, human-reviewed attempt.
+- Ensure each approved scenario is present in `REGENERATION_TARGETS`.
+- Run `--merge-approved`; never approve the staging directory wholesale.
+- No unchanged PipeFormer scenario needs regeneration solely because grounding
+  and evaluator code changed. Regenerate only unresolved or substantively
+  affected scenarios.
+
+#### 5. Preserve annotations and regenerate deliverables
+
+Before report regeneration:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --export-annotations
+```
+
+After approved merges:
+
+```powershell
+python -X utf8 evaluate_teacher_trace.py
+```
+
+Final invariant checklist:
+
+- exactly 1,140 master records;
+- exactly 1,140 unique sample IDs;
+- original split assignment for every sample ID;
+- no failed tool trajectory marked pass;
+- repaired records reset to pending human review;
+- untouched reviewer decisions preserved;
+- no unexpected SFT compaction-grounding or oversized-record warnings;
+- master JSON, JSONL, sessions, splits, annotations, and reports synchronized.
+
+## 1. Project goal and current status
+
+Repository:
+
+```text
+C:\Users\NIGGABALLS\Documents\Forecast_Grounded_Decision_QA
+```
+
+Primary working directory:
+
+```text
+C:\Users\NIGGABALLS\Documents\Forecast_Grounded_Decision_QA\pipeclaw\backend
+```
+
+Goal: produce a grounded, human-reviewed teacher-trace dataset suitable for 7B/14B distillation, with valid train/valid/test splits, reliable native and Task 1 evaluation, polished Excel reports, and safe repair/regeneration tooling.
+
+Current master dataset:
+
+- 1,140 records.
+- 1,140 unique sample IDs.
+- Splits preserved:
+  - train: 902
+  - valid: 124
+  - test: 114
+- Stored quality flags:
+  - pass: 1,078
+  - needs_review: 62
+- Current compact SFT split counts:
+  - train: 614
+  - valid: 103
+  - test: 87
+
+The master dataset has already received the original deterministic repairs, including OpenClaw 006 evidence recovery and five answer repairs. The later eight-scenario repairs described below are still staged and have not been merged into the master.
+
+Regeneration staging status:
+
+- 33 scenario manifests exist.
+- 13 scenarios have `automatic_pass=true`.
+- 20 scenarios still fail automatic checks and must not be merged.
+- The eight recently repaired scenarios contain 80 records, all synchronized and passing native and Task 1 evaluation.
+
+Reviewer annotations:
+
+- 420 workbook annotation rows exported to JSONL.
+- 379 marked pass.
+- 41 failed rows representing 37 unique failed sample IDs.
+- Sheets:
+  - Manual Spot Check: 285 rows
+  - Needs Review: 135 rows
+
+No Git commit was created. The worktree is heavily dirty and contains both task changes and unrelated PipeFormer work. Do not reset or discard existing changes.
+
+## 2. Important decisions and assumptions
+
+### Tool routing
+
+Do not add regex-based routing between OpenClaw and PipeFormer.
+
+- Keep the existing tool set available.
+- Let the LLM choose tools.
+- Judge the selected tool by relevance and grounding.
+- A successful but irrelevant PipeFormer forecast is still unacceptable.
+- OpenClaw scenarios 021–024 must not be rejected solely because they are OpenClaw scenarios.
+
+### Repair strategy
+
+Use a hybrid approach:
+
+- Deterministic wording/answer repair only when stored tool execution and evidence are correct.
+- Regenerate scenarios with failed tools, wrong forecast inputs, parsing failures, incomplete verification, irrelevant tools, or incorrect answers.
+- Stage regeneration before touching the master.
+- Human-review every changed turn before merging.
+- Never force an unresolved record to `pass`.
+
+### Regeneration controls
+
+`REGENERATION_TARGETS` in `repair_teacher_trace.py` acts as the active scenario subset.
+
+- It is acceptable to comment out scenarios.
+- Commented targets produce an `unassigned_warning`, not a `ValueError`.
+- Uncommented scenarios are executed.
+- The validator still confirms that the workbook contains 37 unique failed records.
+
+Preferred command:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 1
+```
+
+The user prefers manually rerunning failed scenarios rather than automatically performing three attempts.
+
+`--resume` semantics:
+
+- It skips a scenario if these three staged files exist and are non-empty:
+  - `teacher_trace.json`
+  - `teacher_trace.jsonl`
+  - `teacher_trace_sessions.jsonl`
+- It does not inspect `automatic_pass`.
+- Do not use `--resume` when intentionally overwriting a failed staged scenario.
+- Commented scenarios must be uncommented again before merging because `_merge_approved` rejects approvals for scenarios absent from `REGENERATION_TARGETS`.
+
+### Evidence and SFT eligibility
+
+Task 1 quality pass and SFT eligibility are different:
+
+- Task 1 pass means the record passes schema, numerical, rule, dispatch, and native checks.
+- SFT eligibility additionally requires:
+  - no SFT exclusion reason;
+  - all prior context turns passing;
+  - grounding surviving compaction;
+  - compact record size within the cap.
+
+The SFT cap is currently 35,000 characters. Increasing it only affects oversized records. It does not fix:
+
+```text
+Skipping SFT record with evidence removed by compaction
+```
+
+That warning means the compacted SFT record no longer contains enough evidence for the answer’s claims.
+
+### Dataset invariants
+
+Preserve:
+
+- exactly 1,140 master records;
+- the complete sample-ID set;
+- existing split assignments;
+- tool trajectories for deterministic answer-only repairs;
+- reviewer annotations for untouched records.
+
+Reset repaired records to pending human review when regenerating reports.
+
+## 3. Files created or modified
+
+The following inventory covers teacher-trace/evaluator work. Unrelated dirty `pipeFormer/` changes were not part of this repair work and must be preserved.
+
+### Core repair and evaluation files
+
+Created:
+
+```text
+pipeclaw/backend/repair_teacher_trace.py
+pipeclaw/backend/agent/llm_provider.py
+pipeclaw/backend/evaluator/csv_evidence.py
+pipeclaw/backend/evaluator/deterministic_repairs.py
+pipeclaw/backend/evaluator/grounding_contract.py
+pipeclaw/backend/evaluator/pipeformer_audit_report.py
+pipeclaw/backend/evaluator/pipeline_scope.py
+pipeclaw/backend/evaluator/reviewer_annotations.py
+pipeclaw/backend/evaluator/statistics_report.py
+pipeclaw/backend/evaluator/task1.py
+pipeclaw/backend/evaluator/tool_evidence.py
+pipeclaw/backend/evaluator/topology_evidence.py
+pipeclaw/backend/evaluator/workbook_style.py
+```
+
+Created tests:
+
+```text
+pipeclaw/backend/evaluator/test_csv_evidence.py
+pipeclaw/backend/evaluator/test_deterministic_repairs.py
+pipeclaw/backend/evaluator/test_grounding_contract.py
+pipeclaw/backend/evaluator/test_regeneration_targets.py
+pipeclaw/backend/evaluator/test_reviewer_annotations.py
+pipeclaw/backend/evaluator/test_sft_grounding.py
+pipeclaw/backend/pipeline/test_repair_prerequisites.py
+```
+
+Modified:
+
+```text
+pipeclaw/backend/evaluate_teacher_trace.py
+pipeclaw/backend/generate_teacher_trace.py
+pipeclaw/backend/evaluator/README.md
+pipeclaw/backend/evaluator/scorer.py
+pipeclaw/backend/evaluator/teacher_quality.py
+pipeclaw/backend/pipeline/teacher_trace_store.py
+pipeclaw/backend/requirements.txt
+pipeclaw/how_to_run.md
+```
+
+### Agent and tool runtime
+
+Modified:
+
+```text
+pipeclaw/backend/agent/orchestrator.py
+pipeclaw/backend/agent/prompt_builder.py
+pipeclaw/backend/agent/tools/README.md
+pipeclaw/backend/agent/tools/pipeformer_tools.py
+pipeclaw/backend/agent/tools/workspace_tools.py
+pipeclaw/backend/executor/runner.py
+pipeclaw/backend/main.py
+```
+
+### PipeFormer execution and constraints
+
+Modified:
+
+```text
+pipeclaw/backend/pipeline/constraints/common.py
+pipeclaw/backend/pipeline/engineering_constraints.py
+pipeclaw/backend/pipeline/pipeformer_inference.py
+pipeclaw/backend/pipeline/pipeformer_tool_runtime.py
+pipeclaw/backend/pipeline/scenario_preflight.py
+pipeclaw/backend/pipeline/variable_registry.py
+pipeclaw/backend/pipeclaw_data/Pipeline_Full_Life_Cycle_Test_Dataset-v4.json
+```
+
+### Topology fixtures and mappings
+
+Modified:
+
+```text
+pipeclaw/backend/pipeline_data/consumer_station.csv
+pipeclaw/backend/pipeline_data/synthetic_fixture_manifest.json
+```
+
+Created node fixtures:
+
+```text
+pipeclaw/backend/pipeline_data/node_flow/20190401_node.csv
+pipeclaw/backend/pipeline_data/node_flow/20190413_node.csv
+pipeclaw/backend/pipeline_data/node_flow/20190425_node.csv
+pipeclaw/backend/pipeline_data/node_flow/20190510_node.csv
+```
+
+Created pipeline fixtures:
+
+```text
+pipeclaw/backend/pipeline_data/pipeline_flow/20190401_pipeline.csv
+pipeclaw/backend/pipeline_data/pipeline_flow/20190413_pipeline.csv
+pipeclaw/backend/pipeline_data/pipeline_flow/20190425_pipeline.csv
+pipeclaw/backend/pipeline_data/pipeline_flow/20190510_pipeline.csv
+```
+
+Modified node fixtures for synthetic-data consistency:
+
+```text
+20190114, 20190211, 20190223, 20190307, 20190319,
+20191001, 20191013, 20191025, 20191029,
+20191101–20191107, 20191118, 20191128–20191130,
+20191201–20191207
+```
+
+All are under:
+
+```text
+pipeclaw/backend/pipeline_data/node_flow/
+```
+
+Modified pipeline fixtures:
+
+```text
+20190102, 20190105, 20190108, 20190111,
+20190114–20190116, 20190119–20190121,
+20190124–20190130,
+20190202–20190208, 20190211, 20190223,
+20190307, 20190319,
+20191201–20191207
+```
+
+All are under:
+
+```text
+pipeclaw/backend/pipeline_data/pipeline_flow/
+```
+
+### Generated master and splits
+
+Generated or updated:
+
+```text
+pipeclaw/backend/generated_teacher_traces/teacher_trace.json
+pipeclaw/backend/generated_teacher_traces/teacher_trace.jsonl
+pipeclaw/backend/generated_teacher_traces/teacher_trace_sessions.jsonl
+pipeclaw/backend/generated_teacher_traces/scenario_preflight.json
+pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_train.jsonl
+pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_valid.jsonl
+pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl
+```
+
+### Reports and annotations
+
+Created or updated:
+
+```text
+pipeclaw/backend/generated_teacher_traces/task1_deliverables/manual_quality_decisions.jsonl
+pipeclaw/backend/generated_teacher_traces/task1_deliverables/pipeformer_additional_audit.xlsx
+pipeclaw/backend/generated_teacher_traces/task1_deliverables/teacher_trace_quality_report.xlsx
+pipeclaw/backend/generated_teacher_traces/task1_deliverables/teacher_trace_statistics.xlsx
+```
+
+Additional audit outputs:
+
+```text
+pipeclaw/backend/generated_teacher_traces/pipeformer_audit_eval/quality_evaluation.jsonl
+pipeclaw/backend/generated_teacher_traces/pipeformer_audit_eval/quality_evaluation_summary.json
+pipeclaw/backend/generated_teacher_traces/pipeformer_audit_eval/teacher_trace_quality_report.xlsx
+pipeclaw/backend/generated_teacher_traces/pipeformer_audit_eval/teacher_trace_schema.json
+pipeclaw/backend/generated_teacher_traces/pipeformer_audit_eval/teacher_trace_statistics.xlsx
+```
+
+### Regeneration staging
+
+Created:
+
+```text
+pipeclaw/backend/generated_teacher_traces/repair_staging/staging_summary.json
+```
+
+There are 33 scenario directories under:
+
+```text
+repair_staging/pipeclaw_dataset_v2/
+repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v4/
+repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/
+```
+
+Each generated `attempt_01` directory contains, where applicable:
+
+```text
+teacher_trace.json
+teacher_trace.jsonl
+teacher_trace_sessions.jsonl
+scenario_preflight.json
+quality_evaluation.jsonl
+attempt_manifest.json
+splits/teacher_trace_train.jsonl
+splits/teacher_trace_valid.jsonl
+splits/teacher_trace_test.jsonl
+```
+
+Raw runtime traces also exist under:
+
+```text
+pipeclaw/backend/.openclaw/tt_runs/
+```
+
+## 4. Important code changes
+
+### Repair orchestration
+
+`repair_teacher_trace.py` now provides:
+
+- staged scenario regeneration;
+- up to three attempts, though `--attempts 1` is preferred;
+- `--resume` based only on non-empty generated files;
+- staged native and Task 1 evaluation;
+- tool-failure, parsing, verification, session, and sample-ID checks;
+- safe scenario-level merge with `TeacherTraceStore.replace_scenario`;
+- annotation export and repaired-ID reset handling;
+- non-blocking assignment validation when targets are commented;
+- automatic staged deterministic repairs during `_evaluate_attempt`.
+
+### Deterministic staged repairs
+
+Eight scenarios were classified as repairable without another LLM call:
+
+```text
+pipeclaw_dataset_v2:
+  scenario_openclaw_013
+  scenario_openclaw_014
+  scenario_openclaw_015
+  scenario_openclaw_016
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v4:
+  scenario_pipeformer_dispatch_004
+  scenario_pipeformer_dispatch_005
+  scenario_pipeformer_dispatch_008
+  scenario_pipeformer_dispatch_013
+```
+
+Repairs applied:
+
+- OpenClaw 013 handoff total: `1640.497`
+- OpenClaw 014 handoff total: `1339.885`
+- OpenClaw 015 handoff total: `1275.738`
+- OpenClaw 016 handoff total: `1638.528`
+- Dispatch 004:
+  - canonical action identifiers;
+  - `LLM暂设` accepted as an explicit assumption disclosure.
+- Dispatch 005:
+  - includes all three real candidates;
+  - correct ranking: `C_002:SP_out +5% > C_001:SP_ +5% > C_014:SP_out +8%`.
+- Dispatch 008:
+  - first answer shortened below the PipeFormer answer limit;
+  - energy totals and deltas retained in compact repair evidence.
+- Dispatch 013:
+  - `LLM暂设` no longer triggers a false positive.
+
+These eight scenarios now have:
+
+- `automatic_pass=true`;
+- all 80 records passing native and Task 1 evaluation;
+- synchronized JSON, JSONL, session, split, evaluation, manifest, and staging-summary artifacts.
+
+They remain staged and require human approval before merge.
+
+### CSV and numerical grounding
+
+The evaluator now:
+
+- rebuilds CSV evidence from successful stored `read_file` calls;
+- keeps up to 12 relevant evidence rows;
+- supports single-group totals such as consumer-station total consumption;
+- records zero and nonzero row counts;
+- preserves verified derived counts and totals;
+- ignores digits in dates, compact dates, filenames, years, list numbering, and candidate identifiers;
+- handles signed percentages;
+- carries trusted conversation evidence forward;
+- preserves supporting numerical values through SFT compaction.
+
+### Topology evidence
+
+Added:
+
+- missing fixtures for 20190401, 20190413, 20190425, and 20190510;
+- canonical mappings:
+  - `通州南分输站 → 通州南站`
+  - `湘潭分输站 → 湘潭站`
+  - `乌鲁木齐压气站 → 乌鲁木齐站`
+- synthetic, non-disruptive topology support for `阳曲压气站`;
+- clearer topology failure messages;
+- preflight failure when required topology files or mappings are missing.
+
+### Binary status variables
+
+Binary `:ST` handling now requires:
+
+- only setpoints `0` or `1`;
+- no percentage change for status variables;
+- explicit setpoint verification in boundary evidence;
+- invalid percentage or non-binary values rejected before forecast execution.
+
+### Reports
+
+Excel generation now includes:
+
+- consistent workbook styling;
+- formatted status cells;
+- adjusted widths, filters, freeze panes, and charts;
+- separate Task 1 quality and statistics workbooks;
+- durable annotation export/import;
+- reviewer decisions preserved for untouched records.
+
+### SFT size
+
+`SFT_MAX_RECORD_CHARS` is now:
+
+```python
+35_000
+```
+
+This is a character cap, not a tokenizer context guarantee.
+
+## 5. Commands run and results
+
+Environment:
+
+```powershell
+conda activate pipeclaw
+cd C:\Users\NIGGABALLS\Documents\Forecast_Grounded_Decision_QA\pipeclaw\backend
+```
+
+Main evaluation/report command:
+
+```powershell
+python -X utf8 evaluate_teacher_trace.py
+```
+
+This command generates evaluation JSONL, summary/schema outputs, quality/statistics workbooks, and compact splits using default paths.
+
+Regeneration command:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 1
+```
+
+Previous three-attempt command:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 3
+```
+
+The three-attempt run was slow and difficult to observe because subprocess output is captured until a scenario completes.
+
+Resume command:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 1 --resume
+```
+
+It successfully skips any scenario with non-empty staged JSON, JSONL, and session output, regardless of `automatic_pass`.
+
+Deterministic master repair was previously applied. Current master confirms:
+
+- five answer repairs contain `repair_provenance`;
+- OpenClaw 006 contains deterministic CSV evidence recovery;
+- all six affected master records currently pass.
+
+Recent verification:
+
+```powershell
+python -X utf8 -m unittest evaluator.test_csv_evidence evaluator.test_sft_grounding evaluator.test_deterministic_repairs
+```
+
+Result:
+
+```text
+Ran 16 tests in 18.930s
+OK
+```
+
+Compilation:
+
+```powershell
+python -X utf8 -m py_compile evaluator\csv_evidence.py evaluator\teacher_quality.py evaluator\deterministic_repairs.py repair_teacher_trace.py
+```
+
+Result: exit code 0.
+
+Custom staged consistency verification:
+
+- 8 scenarios verified.
+- 80 records verified.
+- JSON and JSONL identical.
+- Session answers and quality fields match records.
+- All sessions complete.
+- Split sample-ID sets match scenario record sets.
+- All native and Task 1 evaluations pass.
+- All eight manifests report `automatic_pass=true`.
+
+Commented-target validator simulation:
+
+- 37 unique failed reviewer records found.
+- A one-target subset assigned 7 records to active repair paths.
+- 30 records reported as unassigned warnings.
+- No `ValueError` occurred.
+
+## 6. Errors encountered and fixes
+
+### Commenting regeneration targets raised `ValueError`
+
+Original error:
+
+```text
+ValueError: Failed reviewer records are not assigned to a repair path
+```
+
+Cause: assignment validation treated every failed workbook record as requiring an active target.
+
+Fix: commented scenarios are now reported under:
+
+```text
+unassigned_record_count
+unassigned_sample_ids
+unassigned_warning
+```
+
+They no longer block staging.
+
+### “Evidence removed by compaction” warnings persisted after raising the cap
+
+Cause: this is a grounding failure, not a size failure.
+
+Fixes:
+
+- compacted tool calls and arguments retained;
+- CSV evidence rebuilt;
+- dates and filenames excluded from numeric claims;
+- verified derived totals/counts preserved;
+- up to 12 query-relevant rows retained.
+
+### Oversized SFT record
+
+One record was approximately 31,012 characters under the old cap.
+
+Fix: cap increased to 35,000 characters. This does not guarantee compatibility with every 7B/14B tokenizer context.
+
+### Topology execution failures
+
+Error:
+
+```json
+{
+  "error": "Topology evidence could not be built from the requested files and target."
+}
+```
+
+Causes:
+
+- missing same-day node/pipeline fixtures;
+- consumer supply-point names differed from topology node names;
+- `阳曲压气站` had no reachable topology.
+
+Fix: added fixtures, aliases, synthetic connection, preflight checks, and more specific errors.
+
+### False-positive numerical claims
+
+Examples included:
+
+- sums derived from CSV rows;
+- dates such as `2019-04-01`;
+- filenames such as `20190401_consumer.csv`;
+- nonzero counts;
+- signed percentages;
+- numbers repeated from trusted earlier turns.
+
+Fix: expanded numerical normalization, derived evidence, and trusted-context handling.
+
+### `LLM暂设` incorrectly treated as undisclosed
+
+Cause: the assumption-disclosure matcher recognized `假设`, `暂定`, and similar phrases but not `暂设`.
+
+Fix: `LLM暂设` and `暂设` are now accepted.
+
+### Canonical variable false positives
+
+Some answers used device shorthand such as `C_001` after first naming `C_001:SP_`.
+
+Fix: deterministic repair expands affected references to canonical action identifiers instead of weakening the evaluator broadly.
+
+### Silent or apparently stalled regeneration
+
+Cause:
+
+```python
+subprocess.run(..., capture_output=True)
+```
+
+in `repair_teacher_trace.py` captures child logs until the scenario finishes.
+
+The inner orchestrator now logs request start, response, tool calls, and failures, but the repair parent still hides those logs while the subprocess is running.
+
+This remains a usability issue. Workarounds:
+
+- run the individual generation command directly;
+- inspect `.openclaw/tt_runs`;
+- or modify the repair subprocess to stream output.
+
+### API `402 Usage limit reached`
+
+Several v7 scenarios failed with:
+
+```text
+HTTP 402 Payment Required
+Usage limit reached
+```
+
+These are not dataset-quality failures. Retry after the provider quota resets or use a valid provider account/configuration.
+
+## 7. Remaining tasks and recommended next steps
+
+### A. Human-review the 13 automatic-pass scenarios
+
+Currently passing:
+
+```text
+pipeclaw_dataset_v2:
+  scenario_openclaw_013
+  scenario_openclaw_014
+  scenario_openclaw_015
+  scenario_openclaw_016
+  scenario_openclaw_023
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v4:
+  scenario_pipeformer_dispatch_003
+  scenario_pipeformer_dispatch_004
+  scenario_pipeformer_dispatch_005
+  scenario_pipeformer_dispatch_008
+  scenario_pipeformer_dispatch_011
+  scenario_pipeformer_dispatch_013
+  scenario_pipeformer_prediction_015
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v7:
+  scenario_pipeformer_dispatch_008
+```
+
+Review every turn, including previously passing turns changed by scenario-level regeneration.
+
+### B. Regenerate the 20 failing scenarios
+
+Do not merge these:
+
+```text
+pipeclaw_dataset_v2:
+  scenario_openclaw_021
+  scenario_openclaw_022
+  scenario_openclaw_024
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v4:
+  scenario_pipeformer_dispatch_007
+  scenario_pipeformer_dispatch_009
+  scenario_pipeformer_dispatch_010
+  scenario_pipeformer_dispatch_012
+  scenario_pipeformer_dispatch_014
+  scenario_pipeformer_dispatch_015
+  scenario_pipeformer_dispatch_019
+  scenario_pipeformer_prediction_012
+
+Pipeline_Full_Life_Cycle_Test_Dataset-v7:
+  scenario_pipeformer_dispatch_004
+  scenario_pipeformer_dispatch_011
+  scenario_pipeformer_dispatch_012
+  scenario_pipeformer_dispatch_014
+  scenario_pipeformer_dispatch_015
+  scenario_pipeformer_dispatch_020
+  scenario_pipeformer_prediction_012
+  scenario_pipeformer_prediction_015
+  scenario_pipeformer_prediction_016
+```
+
+Most fail because of failed forecast calls. Seven v7 manifests contain `generation_command_failed`, largely associated with provider/API failures.
+
+For a subset:
+
+1. Comment all unwanted entries in `REGENERATION_TARGETS`.
+2. Do not use `--resume`.
+3. Run:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --stage-regeneration --attempts 1
+```
+
+### C. Create an approval file after human review
+
+Example:
+
+```json
+{
+  "approved": [
+    {
+      "dataset_source": "pipeclaw_dataset_v2",
+      "scenario_id": "scenario_openclaw_013",
+      "attempt": 1
+    }
+  ]
+}
+```
+
+Before merging, ensure every approved scenario is uncommented in `REGENERATION_TARGETS`.
+
+Merge:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --merge-approved approved_repair_attempts.json
+```
+
+Never approve the entire staging directory automatically.
+
+### D. Preserve annotations before regenerating reports
+
+Run:
+
+```powershell
+python -X utf8 repair_teacher_trace.py --export-annotations
+```
+
+Then regenerate evaluation, workbooks, and splits:
+
+```powershell
+python -X utf8 evaluate_teacher_trace.py
+```
+
+Confirm afterward:
+
+- 1,140 master records;
+- 1,140 unique IDs;
+- unchanged split assignments;
+- repaired records reset to pending human review;
+- untouched reviewer decisions preserved;
+- no unexpected SFT compaction or oversized warnings.
+
+### E. Consider live subprocess logging
+
+The repair script still uses `capture_output=True`. A future improvement could stream stdout/stderr while keeping a bounded tail in the manifest. This should not change repair logic.
+
+## 8. User instructions and preferences
+
+- Use the `pipeclaw` Conda environment.
+- Do not implement regex-based PipeFormer/OpenClaw tool routing.
+- Let the LLM choose from the existing tools.
+- Do not hide PipeFormer tools based on wording.
+- Use deterministic edits for minor, evidence-complete wording problems.
+- Regenerate wrong-tool, failed-tool, parsing, verification, or materially wrong-answer scenarios.
+- Stage before merging.
+- Preserve all sample IDs and split assignments.
+- Human-review regenerated turns before acceptance.
+- Do not force persistent LLM mistakes to `pass`.
+- Prefer `--attempts 1` and manual reruns over automatic three-attempt retry.
+- Allow commenting entries in `REGENERATION_TARGETS` to choose a subset.
+- `--resume` should skip generated outputs regardless of `automatic_pass`.
+- Do not use `automatic_pass` as a substitute for human review.
+- Keep the 35,000-character SFT cap for now.
+- Preserve Chinese text and canonical variable identifiers.
+- Improve workbook readability and styling.
+- Avoid unrelated or unnecessarily broad changes.
+- The user is comfortable running regeneration personally and wants clear commands and visible failure information.

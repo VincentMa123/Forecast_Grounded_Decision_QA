@@ -1,0 +1,38 @@
+{
+  "attempt": 1,
+  "command_exit_code": 0,
+  "stdout_tail": "{\n  \"status\": \"ok\",\n  \"append_mode\": false,\n  \"replacement_mode\": false,\n  \"replaced_dataset_source\": null,\n  \"replaced_scenario_id\": null,\n  \"removed_records\": 0,\n  \"removed_sessions\": 0,\n  \"records\": 1,\n  \"generated_records\": 1,\n  \"appended_records\": 1,\n  \"duplicate_records_skipped\": 0,\n  \"skipped_existing_scenarios\": 0,\n  \"quality_pass_records\": 1,\n  \"sft_records\": 1,\n  \"sessions\": 1,\n  \"failed_sessions\": 0,\n  \"total_failed_sessions\": 0,\n  \"updated_existing_sessions\": 0,\n  \"output_jsonl\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/scenario_pipeformer_dispatch_011/attempt_01/teacher_trace.jsonl\",\n  \"output_json\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/scenario_pipeformer_dispatch_011/attempt_01/teacher_trace.json\",\n  \"session_output_jsonl\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/scenario_pipeformer_dispatch_011/attempt_01/teacher_trace_sessions.jsonl\",\n  \"split_output_dir\": \"C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/scenario_pipeformer_dispatch_011/attempt_01/splits\"\n}\n",
+  "stderr_tail": " - PipeFormer forward pass finished: generated_steps=238/240\n2026-07-26 18:33:35,537 - pipeline.pipeformer_inference - INFO - PipeFormer forward pass started: rollout_start_step=238 input_values=(5, 130) input_tokens=(5, 130)\n2026-07-26 18:33:35,681 - pipeline.pipeformer_inference - INFO - PipeFormer forward pass finished: generated_steps=239/240\n2026-07-26 18:33:35,696 - pipeline.pipeformer_inference - INFO - PipeFormer forward pass started: rollout_start_step=239 input_values=(5, 130) input_tokens=(5, 130)\n2026-07-26 18:33:35,844 - pipeline.pipeformer_inference - INFO - PipeFormer forward pass finished: generated_steps=240/240\n2026-07-26 18:33:35,845 - pipeline.pipeformer_inference - INFO - PipeFormer autoregressive rollout finished: predictions_shape=(240, 130) actual_horizon_minutes=240.0 elapsed_s=42.058\n2026-07-26 18:33:36,062 - pipeline.pipeformer_tool_runtime - INFO - PipeFormer forecast context ready: mode=checkpoint_inference\n2026-07-26 18:33:36,333 - pipeline.pipeformer_tool_runtime - INFO - PipeFormer variable summaries built: variables=130\n2026-07-26 18:33:36,911 - pipeline.pipeformer_tool_runtime - INFO - PipeFormer constraint checks finished: overall_status=warning\n2026-07-26 18:33:36,911 - pipeline.pipeformer_tool_runtime - INFO - PipeFormer evidence assembled: manual_intervention=monitoring_only top_variables=['H_001_v000', 'H_002_v000', 'P_002_v000']\n2026-07-26 18:33:36,923 - agent.orchestrator - INFO - Tool call finished: session_id=teacher_0001_001_20260726_182602_222651 tool=run_pipeformer_forecast call_id=call_MzpPrgXRwHw6ABDojK5xOO73 success=True\n2026-07-26 18:33:37,105 - agent.orchestrator - INFO - LLM request started: session_id=teacher_0001_001_20260726_182602_222651 step=10 model=gpt-5.6-sol\n2026-07-26 18:36:07,805 - httpx - INFO - HTTP Request: POST https://vip-sg.freemodel.dev/v1/chat/completions \"HTTP/1.1 200 OK\"\n2026-07-26 18:36:07,807 - agent.orchestrator - INFO - LLM response received: session_id=teacher_0001_001_20260726_182602_222651 step=10 finish_reason=stop tool_calls=0 content_chars=447\n2026-07-26 18:36:08,761 - agent.orchestrator - INFO - Agent run finished: agent_id=teacher_trace session_id=teacher_0001_001_20260726_182602_222651 status=completed tool_calls=9 trace=C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/.openclaw/tt_runs/r0001_bbafb71297/workspace-teacher_trace/context_trace/teacher_0001_001_20260726_182602_222651.json\n2026-07-26 18:36:10,793 - teacher_trace - INFO - Turn finished: scenario=scenario_pipeformer_dispatch_011 session=scenario_pipeformer_dispatch_011_session_001 turn=1 quality=pass\n2026-07-26 18:36:10,794 - teacher_trace - INFO - Writing combined JSONL output: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\Pipeline_Full_Life_Cycle_Test_Dataset-v7\\scenario_pipeformer_dispatch_011\\attempt_01\\teacher_trace.jsonl\n2026-07-26 18:36:10,794 - teacher_trace - INFO - Writing pretty JSON output: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\Pipeline_Full_Life_Cycle_Test_Dataset-v7\\scenario_pipeformer_dispatch_011\\attempt_01\\teacher_trace.json\n2026-07-26 18:36:10,820 - teacher_trace - INFO - Writing session evaluation JSONL: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\Pipeline_Full_Life_Cycle_Test_Dataset-v7\\scenario_pipeformer_dispatch_011\\attempt_01\\teacher_trace_sessions.jsonl\n2026-07-26 18:36:10,825 - teacher_trace - INFO - Writing scenario-isolated split files: C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\generated_teacher_traces\\repair_staging\\Pipeline_Full_Life_Cycle_Test_Dataset-v7\\scenario_pipeformer_dispatch_011\\attempt_01\\splits\n2026-07-26 18:36:11,561 - teacher_trace - INFO - Teacher trace generation complete: generated=1 appended=1 total=1 quality_pass_records=1 sft_records=1 failed_sessions=0\n",
+  "root": "C:/Users/NIGGABALLS/Documents/Forecast_Grounded_Decision_QA/pipeclaw/backend/generated_teacher_traces/repair_staging/Pipeline_Full_Life_Cycle_Test_Dataset-v7/scenario_pipeformer_dispatch_011/attempt_01",
+  "record_count": 1,
+  "session_count": 1,
+  "automatic_pass": true,
+  "automatic_failures": [],
+  "deterministic_repairs": {
+    "repaired_sample_ids": [],
+    "repaired_record_count": 0,
+    "skipped": {}
+  },
+  "manual_review_required": true,
+  "manual_review_focus": "Review every regenerated turn against the original reviewer notes, including turns that previously passed.",
+  "original_reviewer_notes": [
+    {
+      "sheet": "Manual Spot Check",
+      "sample_id": "Pipeline_Full_Life_Cycle_Test_Dataset-v7:scenario_pipeformer_dispatch_011_session_001::turn_001",
+      "reviewer_notes": "parsed_task contains unresolved attention target 末端. The answer nevertheless selects candidate 2 for energy even though candidate 1 is the available pressure-margin leader. It also explicitly leaves the remaining candidates unranked despite the request for an action ranking.",
+      "final_disposition": "failed"
+    },
+    {
+      "sheet": "Needs Review",
+      "sample_id": "Pipeline_Full_Life_Cycle_Test_Dataset-v7:scenario_pipeformer_dispatch_011_session_001::turn_001",
+      "reviewer_notes": "parsed_task contains unresolved attention target 末端. The answer nevertheless selects candidate 2 for energy even though candidate 1 is the available pressure-margin leader. It also explicitly leaves the remaining candidates unranked despite the request for an action ranking.",
+      "final_disposition": "failed"
+    }
+  ],
+  "required_human_checks": [
+    "all_turns_reviewed",
+    "original_reviewer_notes_satisfied",
+    "chosen_tool_is_relevant",
+    "answer_is_grounded"
+  ]
+}

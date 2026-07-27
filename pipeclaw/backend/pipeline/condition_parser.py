@@ -47,7 +47,10 @@ OPERATING_CONDITION_PATTERNS = [
     re.compile(r"(?:operating[-\s]?condition|current\s+condition|condition)\s*(?:number|id|#|:)?\s*0*(\d+)", re.I),
     re.compile(r"(?:工况|运行条件)\s*(?:编号|id|#|:|为|是)?\s*0*(\d+)", re.I),
 ]
-VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
+VARIABLE_RE = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?"
+    r"(?![A-Za-z0-9_])"
+)
 PERCENT_PATTERNS = [
     re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)\s*(\d+(?:\.\d+)?)\s*%", re.I),
     re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%", re.I),
@@ -121,7 +124,11 @@ def _parse_condition(question: str, parser: ConditionParser) -> Dict[str, Any]:
     # Callers can still explicitly override this through the structured tool argument.
     keep_other_boundary_controls = True
     disturbance_variable = variable_match.group(0)
-    status_setpoint = _parse_status_setpoint(question) if disturbance_variable.endswith(":ST") else None
+    status_setpoint = (
+        _parse_status_setpoint(question, disturbance_variable)
+        if disturbance_variable.endswith(":ST")
+        else None
+    )
     setpoints = {disturbance_variable: status_setpoint} if status_setpoint is not None else {}
 
     task = {
@@ -179,7 +186,19 @@ def _parse_horizon_minutes(match: Optional[re.Match[str]]) -> Optional[int]:
     return int(magnitude)
 
 
-def _parse_status_setpoint(text: str) -> Optional[float]:
+def _parse_status_setpoint(
+    text: str,
+    disturbance_variable: Optional[str] = None,
+) -> Optional[float]:
+    if disturbance_variable:
+        assignment = re.search(
+            rf"(?<![A-Za-z0-9_]){re.escape(disturbance_variable)}"
+            r"(?![A-Za-z0-9_])\s*=\s*([01])(?:\.0+)?(?![\d.])",
+            text,
+            re.I,
+        )
+        if assignment:
+            return float(assignment.group(1))
     for pattern, value in STATUS_TARGET_PATTERNS:
         if pattern.search(text):
             return value

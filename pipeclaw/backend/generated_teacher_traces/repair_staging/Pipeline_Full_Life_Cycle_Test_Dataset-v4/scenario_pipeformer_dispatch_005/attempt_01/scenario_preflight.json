@@ -1,0 +1,78 @@
+{
+  "mapping_csv": "index_variable_mapping.csv",
+  "source_count": 1,
+  "scenario_record_count": 1,
+  "canonical_scenario_count": 1,
+  "required_variable_count": 1,
+  "unsupported_variable_count": 0,
+  "unsupported_variables": [],
+  "required_data_file_count": 0,
+  "required_data_files": [],
+  "missing_data_file_count": 0,
+  "missing_data_files": [],
+  "supported": true,
+  "missing_target_mapping_count": 0,
+  "missing_target_mappings": [],
+  "variable_registry": {
+    "registry_json": "variable_registry.json",
+    "registry_schema_version": "mock_lifecycle_registry_v1",
+    "variable_count": 130,
+    "missing_variables": [],
+    "extra_variables": [],
+    "duplicate_variables": [],
+    "incomplete_variables": {},
+    "errors": [],
+    "supported": true
+  },
+  "id_collisions": {
+    "scenario_id": [],
+    "session_id_count": 0,
+    "sample_id_count": 0,
+    "namespacing_required": false
+  },
+  "sources": [
+    {
+      "mapping_csv": "index_variable_mapping.csv",
+      "scenario_count": 1,
+      "required_variable_count": 1,
+      "unsupported_variable_count": 0,
+      "unsupported_variables": [],
+      "required_data_file_count": 0,
+      "required_data_files": [],
+      "missing_data_file_count": 0,
+      "missing_data_files": [],
+      "missing_target_mapping_count": 0,
+      "missing_target_mappings": [],
+      "supported": true,
+      "scenarios": [
+        {
+          "scenario_id": "scenario_pipeformer_dispatch_005",
+          "required_variables": [
+            "E_018:SNQ"
+          ],
+          "unsupported_variables": [],
+          "required_data_files": [],
+          "missing_data_files": [],
+          "topology_requirements": {
+            "required_data_files": [],
+            "targets": [],
+            "missing_target_mappings": []
+          },
+          "missing_target_mappings": [],
+          "supported": true
+        }
+      ],
+      "dataset_source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4"
+    }
+  ],
+  "selected_data_files": {
+    "required_data_file_count": 0,
+    "required_data_files": [],
+    "missing_data_file_count": 0,
+    "missing_data_files": []
+  },
+  "append_mode": false,
+  "replacement_mode": false,
+  "existing_record_count": 0,
+  "unavailable_existing_scenarios": []
+}

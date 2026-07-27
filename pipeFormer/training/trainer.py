@@ -23,6 +23,19 @@ from models.base import BaseModel
 logger = logging.getLogger(__name__)
 
 
+def add_hybrid_evaluation_inputs(model_kwargs, batch, device) -> None:
+    """Forward tokenizer-derived value features during detailed evaluation."""
+    for key in (
+        "input_token_medians",
+        "input_token_offsets",
+        "target_token_medians",
+        "target_token_offsets",
+    ):
+        value = batch.get(key)
+        if value is not None:
+            model_kwargs[key] = value.to(device)
+
+
 class FluidDataCollator:
     """
     Data collator that converts our custom data format to HuggingFace format.
@@ -377,6 +390,7 @@ class FluidTrainer(Trainer):
                     'input_tokens': input_tokens,
                     'target_tokens': target_tokens,
                 }
+                add_hybrid_evaluation_inputs(model_kwargs, batch, self.args.device)
                 if attention_indices is not None:
                     model_kwargs['attention_indices'] = attention_indices
 

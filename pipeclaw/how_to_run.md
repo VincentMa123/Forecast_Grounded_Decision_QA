@@ -107,6 +107,35 @@ At minimum, configure:
 - `OPENAI_API_BASE`
 - `OPENAI_MODEL`
 
+For DeepSeek or another OpenAI-compatible endpoint, omit `LLM_PROVIDER` or configure:
+
+```env
+LLM_PROVIDER=openai
+OPENAI_API_KEY=your_key
+OPENAI_API_BASE=https://api.deepseek.com
+OPENAI_MODEL=deepseek-v4-flash
+OPENAI_THINKING=true
+OPENAI_REASONING_EFFORT=high
+```
+
+`OPENAI_THINKING` and `OPENAI_REASONING_EFFORT` are optional. When configured,
+they are forwarded through `extra_body` for OpenAI-compatible providers that
+support those fields.
+
+For native GLM-5.2 through the Z.AI SDK, configure:
+
+```env
+LLM_PROVIDER=zai
+ZAI_API_KEY=your_key
+ZAI_MODEL=glm-5.2
+ZAI_THINKING=enabled
+ZAI_REASONING_EFFORT=max
+ZAI_MAX_TOKENS=65536
+ZAI_TEMPERATURE=1.0
+```
+
+`LLM_PROVIDER=None` is invalid. Remove the variable or set `LLM_PROVIDER=openai` when switching back to DeepSeek.
+
 Start the backend:
 
 ```bash

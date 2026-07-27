@@ -13,10 +13,58 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from .schemas import ForecastRow
-from .variable_registry import load_variable_registry
+from .variable_registry import VariableRegistry, load_variable_registry, normalize_task_variables
 
 
 logger = logging.getLogger(__name__)
+
+
+def build_hybrid_token_features(
+    tokenizer: Any,
+    values: np.ndarray,
+    token_ids: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build the raw token-median and within-bin offset inputs used by hybrid mode."""
+    import numpy as np
+
+    medians, half_widths = tokenizer.get_token_value_stats()
+    token_medians = np.asarray(medians, dtype=np.float32)[token_ids]
+    token_half_widths = np.asarray(half_widths, dtype=np.float32)[token_ids]
+    safe_half_widths = np.where(np.abs(token_half_widths) < 1e-4, 1.0, token_half_widths)
+    offsets = (np.asarray(values, dtype=np.float32) - token_medians) / safe_half_widths
+    offsets = np.where(np.abs(token_half_widths) < 1e-4, 0.0, offsets)
+    return token_medians.astype(np.float32), offsets.astype(np.float32)
+
+
+def attach_hybrid_token_statistics(model: Any, model_config: dict[str, Any], tokenizer: Any) -> None:
+    import torch
+
+    if str(model_config.get("input_projection_type", "")).lower() != "hybrid":
+        return
+    medians, half_widths = tokenizer.get_token_value_stats()
+    model.set_token_value_statistics(
+        torch.as_tensor(medians, dtype=torch.float32),
+        torch.as_tensor(half_widths, dtype=torch.float32),
+    )
+
+
+def decode_model_predictions(outputs: Any, tokenizer: Any, projection_type: str) -> np.ndarray:
+    """Prefer hybrid continuous values; retain argmax decoding for token-only checkpoints."""
+    import numpy as np
+    import torch
+
+    if isinstance(outputs, dict) and projection_type.lower() == "hybrid":
+        value_predictions = outputs.get("value_predictions")
+        if value_predictions is not None:
+            return value_predictions.detach().cpu().numpy()
+    token_logits = outputs.get("token_logits") if isinstance(outputs, dict) else None
+    if token_logits is None:
+        raise RuntimeError("PipeFormer checkpoint inference did not return decodable predictions.")
+    predicted_tokens = torch.argmax(token_logits, dim=-1)
+    decoded = tokenizer.tokens_to_values(predicted_tokens)
+    if isinstance(decoded, torch.Tensor):
+        return decoded.detach().cpu().numpy()
+    return np.asarray(decoded, dtype=np.float32)
 
 
 SOURCE_FILES = {
@@ -84,8 +132,23 @@ def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
 
 
 def find_default_checkpoint_dir(repo_root: Path) -> Path:
+    outputs_root = repo_root / "pipeFormer" / "outputs"
+    active_manifest = outputs_root / "mock_decoder_active.json"
+    if active_manifest.is_file():
+        try:
+            active = json.loads(active_manifest.read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError):
+            active = {}
+        if active.get("accepted") is True and active.get("checkpoint_dir"):
+            candidate = (outputs_root / str(active["checkpoint_dir"])).resolve()
+            try:
+                candidate.relative_to(outputs_root.resolve())
+            except ValueError:
+                candidate = Path()
+            if candidate.is_dir():
+                return candidate
     output_dirs = [
-        repo_root / "pipeFormer" / "outputs" / "mock_decoder",
+        outputs_root / "mock_decoder",
     ]
     for output_dir in output_dirs:
         checkpoints = sorted(
@@ -304,6 +367,11 @@ def resolve_boundary_adjustments(
     percent = parsed_task.get("disturbance_magnitude_percent")
     direction = parsed_task.get("disturbance_direction")
     if disturbance_variable and percent is not None:
+        if str(disturbance_variable).endswith(":ST"):
+            raise ValueError(
+                f"Binary status variable {disturbance_variable} cannot use a percentage disturbance; "
+                "provide boundary_conditions.setpoints with 0 or 1."
+            )
         signed_percent = abs(float(percent)) if direction == "up" else -abs(float(percent))
         adjustments[disturbance_variable] = {
             "variable": disturbance_variable,
@@ -314,6 +382,10 @@ def resolve_boundary_adjustments(
 
     percentage_changes = boundary_conditions.get("percentage_changes") or {}
     for variable, value in dict(percentage_changes).items():
+        if str(variable).endswith(":ST"):
+            raise ValueError(
+                f"Binary status variable {variable} cannot use a percentage change; use setpoint 0 or 1."
+            )
         adjustments[str(variable)] = {
             "variable": str(variable),
             "mode": "percent_change",
@@ -323,10 +395,15 @@ def resolve_boundary_adjustments(
 
     setpoints = boundary_conditions.get("setpoints") or {}
     for variable, value in dict(setpoints).items():
+        numeric_value = float(value)
+        if str(variable).endswith(":ST") and numeric_value not in {0.0, 1.0}:
+            raise ValueError(
+                f"Binary status setpoint {variable} must be exactly 0 or 1, got {value}."
+            )
         adjustments[str(variable)] = {
             "variable": str(variable),
             "mode": "setpoint",
-            "value": float(value),
+            "value": numeric_value,
             "source": "boundary_conditions.setpoints",
         }
 
@@ -367,6 +444,49 @@ def apply_condition_to_matrix(
         else:
             scenario_matrix[row_selection, variable_idx] *= 1.0 + float(adjustment["value"]) / 100.0
     return scenario_matrix
+
+
+def boundary_application_evidence(
+    base_matrix,
+    adjusted_matrix,
+    variable_mapping: Dict[str, Dict[str, Any]],
+    adjustments: List[Dict[str, Any]],
+    timing_mode: str,
+) -> List[Dict[str, Any]]:
+    """Record the actual boundary values supplied to the model input window."""
+    import numpy as np
+
+    row_indices = (
+        list(range(len(adjusted_matrix)))
+        if timing_mode == DISTURBANCE_TIMING_LEGACY
+        else [len(adjusted_matrix) - 1]
+    )
+    evidence = []
+    for adjustment in adjustments:
+        variable = str(adjustment["variable"])
+        variable_idx = int(variable_mapping[variable]["index"])
+        before = [float(base_matrix[index, variable_idx]) for index in row_indices]
+        applied = [float(adjusted_matrix[index, variable_idx]) for index in row_indices]
+        requested = float(adjustment["value"])
+        if adjustment["mode"] == "setpoint":
+            verified = all(np.isclose(value, requested, atol=1e-8) for value in applied)
+        else:
+            expected = [value * (1.0 + requested / 100.0) for value in before]
+            verified = all(
+                np.isclose(actual, target, rtol=1e-7, atol=1e-8)
+                for actual, target in zip(applied, expected)
+            )
+        evidence.append({
+            "variable": variable,
+            "mode": adjustment["mode"],
+            "requested_value": requested,
+            "source": adjustment.get("source"),
+            "applied_step_indices": row_indices,
+            "input_values_before": before,
+            "input_values_applied": applied,
+            "verified": bool(verified),
+        })
+    return evidence
 
 
 def load_attention_indices(static_dir: Path):
@@ -564,6 +684,27 @@ def _run_checkpoint_inference(
         static_dir / "variable_registry.json",
         variable_names,
     )
+    registry = VariableRegistry(
+        path=static_dir / "variable_registry.json",
+        document=variable_registry,
+    )
+    normalized_task = normalize_task_variables(
+        parsed_task,
+        registry,
+    )
+    parsed_task.clear()
+    parsed_task.update(normalized_task)
+    boundary = dict(parsed_task.get("boundary_conditions") or {})
+    adjusted_variables = list(
+        dict.fromkeys(
+            [parsed_task.get("disturbance_variable")]
+            + list(dict(boundary.get("percentage_changes") or {}))
+            + list(dict(boundary.get("setpoints") or {}))
+        )
+    )
+    registry.require_controllable_inputs(
+        variable for variable in adjusted_variables if variable
+    )
     disturbance_variable = parsed_task["disturbance_variable"]
     logger.info(
         "PipeFormer variable mapping loaded: variables=%d disturbance_variable=%s",
@@ -589,6 +730,15 @@ def _run_checkpoint_inference(
         boundary_adjustments,
         timing_mode=disturbance_timing_mode,
     )
+    application_evidence = boundary_application_evidence(
+        base_matrix[:sequence_length],
+        input_values,
+        variable_mapping,
+        boundary_adjustments,
+        disturbance_timing_mode,
+    )
+    if any(not item["verified"] for item in application_evidence):
+        raise RuntimeError("One or more boundary controls were not applied to the model input as requested.")
     logger.info(
         "Applied parsed condition: variable=%s direction=%s percent=%s timing=%s",
         disturbance_variable,
@@ -601,6 +751,8 @@ def _run_checkpoint_inference(
 
     tokenizer = load_tokenizer(static_dir, vocab_size=training_config.get("tokenizer_vocab_size"))
     model, model_config, weights_path, model_config_path = load_pipeformer_model(checkpoint_dir, pipeformer_root, device)
+    attach_hybrid_token_statistics(model, model_config, tokenizer)
+    projection_type = str(model_config.get("input_projection_type", "token_embedding"))
     attention_indices = load_attention_indices(static_dir)
     prediction_mask = load_prediction_mask(static_dir, variable_names)
     logger.info(
@@ -626,6 +778,17 @@ def _run_checkpoint_inference(
     while generated_steps < steps_requested:
         input_tokens = tokenizer.transform_to_tokens(rollout_window)
         input_tokens = np.asarray(input_tokens, dtype=np.int64)
+        model_inputs: dict[str, Any] = {}
+        if projection_type.lower() == "hybrid":
+            token_medians, token_offsets = build_hybrid_token_features(
+                tokenizer, rollout_window, input_tokens
+            )
+            model_inputs["input_token_medians"] = torch.as_tensor(
+                token_medians, dtype=torch.float32, device=device
+            ).unsqueeze(0)
+            model_inputs["input_token_offsets"] = torch.as_tensor(
+                token_offsets, dtype=torch.float32, device=device
+            ).unsqueeze(0)
         logger.info(
             "PipeFormer forward pass started: rollout_start_step=%d input_values=%s input_tokens=%s",
             generated_steps,
@@ -642,16 +805,11 @@ def _run_checkpoint_inference(
                 input_tokens=token_tensor,
                 prediction_mask=mask_tensor,
                 attention_indices=attention_tensor,
+                **model_inputs,
             )
-            token_logits = outputs.get("token_logits") if isinstance(outputs, dict) else None
-            if token_logits is None:
-                raise RuntimeError("PipeFormer checkpoint inference did not return token_logits.")
-            predicted_tokens = torch.argmax(token_logits, dim=-1)
-            decoded = tokenizer.tokens_to_values(predicted_tokens)
-            if isinstance(decoded, torch.Tensor):
-                window_predictions = decoded.squeeze(0).detach().cpu().numpy()
-            else:
-                window_predictions = np.asarray(decoded, dtype=np.float32).squeeze(0)
+            window_predictions = decode_model_predictions(
+                outputs, tokenizer, projection_type
+            ).squeeze(0)
 
         new_predictions = window_predictions[-future_rows_per_pass:]
         remaining_steps = steps_requested - generated_steps
@@ -718,6 +876,7 @@ def _run_checkpoint_inference(
             else 1 if boundary_adjustments else 0
         ),
         "applied_boundary_conditions": boundary_adjustments,
+        "boundary_application_evidence": application_evidence,
         "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
         "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),
     }

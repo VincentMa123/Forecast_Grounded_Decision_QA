@@ -91,7 +91,13 @@ def load_config_from_file(filepath: str) -> ModelConfig:
         model_type = "decoder"
 
     if "decoder" in model_type or model_type == "fluiddecoder":
-        return DecoderConfig.from_dict(config_dict)
+        # The decoder package owns the complete runtime configuration.  Keep
+        # this release-level module focused on dispatching config files so it
+        # cannot silently drift behind projection modes implemented by the
+        # decoder itself (for example, hybrid token/value projection).
+        from .decoder.config import DecoderConfig as RuntimeDecoderConfig
+
+        return RuntimeDecoderConfig.from_dict(config_dict)
 
     raise ValueError(f"Only decoder configs are supported in the open-source package: {filepath}")
 

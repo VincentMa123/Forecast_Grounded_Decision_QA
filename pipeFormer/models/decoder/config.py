@@ -20,6 +20,8 @@ class DecoderConfig(ModelConfig):
     
     # Attention parameters
     attention_dropout: float = 0.1
+    use_topology_attention: bool = True
+    whether_causal: bool = True
     
     # Positional encoding
     time_position_encoding: str = "sinusoidal"  # "sinusoidal" or "learned"

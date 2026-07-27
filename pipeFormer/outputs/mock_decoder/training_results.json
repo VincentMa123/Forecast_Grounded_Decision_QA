@@ -1,7 +1,0 @@
-{
-  "train_result": "TrainOutput(global_step=36, training_loss=6.579909960428874, metrics={'train_runtime': 18.5393, 'train_samples_per_second': 7.767, 'train_steps_per_second': 1.942, 'total_flos': 0.0, 'train_loss': 6.579909960428874, 'epoch': 1.0, 'step': 36, 'train/token_accuracy': 0.9451219439506531, 'learning_rate': 0.0})",
-  "eval_result": "{'eval_loss': 6.50541877746582, 'eval_runtime': 0.4536, 'eval_samples_per_second': 35.273, 'eval_steps_per_second': 8.818, 'epoch': 1.0, 'step': 36, 'learning_rate': 0.0}",
-  "model_path": "./outputs/mock_decoder",
-  "total_steps": "36",
-  "best_metric": "6.50541877746582"
-}

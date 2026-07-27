@@ -1,0 +1,3912 @@
+[
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_001",
+    "turn_id": 1,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "file_grounded",
+    "grounding_contract": {
+      "answer_mode": "file_grounded",
+      "evidence_sources": [
+        {
+          "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+          "artifact": "20190510_consumer.csv",
+          "state": "content_evidence",
+          "reason": "file_content_read"
+        }
+      ]
+    },
+    "decision_summary": {},
+    "conversation_context": [],
+    "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+    "parsed_task": {},
+    "tool_calls": [
+      {
+        "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+        "name": "read_file",
+        "arguments": {
+          "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+          "limit": 400
+        }
+      }
+    ],
+    "tool_outputs": [
+      {
+        "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+        "name": "read_file",
+        "output": {
+          "success": true,
+          "tool": "read_file",
+          "session_id": "teacher_0001_001_20260725_232904_180674",
+          "timestamp": "2026-07-25T23:29:20",
+          "error": null,
+          "warnings": [],
+          "workspace": null,
+          "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+          "abs_path": "C:\\Users\\NIGGABALLS\\Documents\\Forecast_Grounded_Decision_QA\\pipeclaw\\backend\\pipeline_data\\consumer_flow\\20190510_consumer.csv",
+          "size_bytes": 3032,
+          "content": "管线,所属地,供气点,用户,消耗量\n陕京二线,北京,通州南分输站,北京城市燃气,603.854\n陕京二线,北京,通州南分输站,通州热电,451.797\n陕京二线,北京,通州南分输站,通州工业园,369.496\n陕京二线,北京,通州南分输站,通州医院,190.347\n中俄东线,北京,宝坻站,北京燃气,513.489\n中俄东线,北京,永清站,北京燃气,395.492\n川气东送,湖南,湘潭分输站,湘潭钢铁,489.464\n川气东送,湖南,湘潭分输站,湘潭城市燃气,411.204\n川气东送,湖南,湘潭分输站,湘潭化工,280.173\n川气东送,湖南,湘潭分输站,湘潭医院,119.351\n陕京二线,山西,阳曲压气站,太原城市燃气,591.099\n陕京二线,山西,阳曲压气站,山西电力,422.301\n陕京二线,山西,阳曲压气站,山西代输-工业用户,265.893\n陕京二线,山西,阳曲压气站,阳曲停用表位,0.0\n西气东输二线,新疆,乌鲁木齐压气站,新疆广汇,667.62\n西气东输二线,新疆,乌鲁木齐压气站,乌鲁木齐燃气,566.355\n西气东输二线,新疆,乌鲁木齐压气站,新疆化工,404.553\n西气东输二线,新疆,乌鲁木齐压气站,乌鲁木齐零值表位,0.0\n陕京二线,河北,石家庄压气站,河北钢铁,658.503\n陕京二线,河北,石家庄压气站,石家庄燃气,591.753\n陕京二线,河北,石家庄压气站,河北化工,405.455\n陕京二线,河北,石家庄压气站,石家庄停用表位,0.0\n川气东送,上海,上海白鹤末站,上海管网,742.374\n川气东送,上海,上海白鹤末站,上海电力,547.592\n川气东送,上海,上海白鹤末站,白鹤工业园,341.021\n川气东送,上海,上海白鹤末站,白鹤零值表位,0.0\n西气东输一线,新疆,王家沟末站,新疆生产建设兵团,495.65\n西气东输一线,新疆,王家沟末站,王家沟工业,309.481\n西气东输一线,新疆,王家沟末站,王家沟零值表位,0.0\n西气东输二线,甘肃,兰州分输站,甘肃城市燃气,625.846\n西气东输二线,甘肃,兰州分输站,兰州石化,449.037\n西气东输三线,甘肃,武威分输站,甘肃工业集团,377.176\n西气东输三线,甘肃,张掖分输站,河西城市燃气,249.395\n川气东送,贵州,贵阳北站,贵州管网,447.492\n川气东送,贵州,遵义站,贵州管网,348.294\n川气东送,贵州,安顺站,贵州管网,298.062\n川气东送,广西,南宁站,广西管网,474.038\n川气东送,广西,柳州站,广西管网,348.22\n川气东送,广西,桂林站,广西管网,282.343\n川气东送,上海,甪直站,上海管网,500.017\n中俄东线,上海,南通站,上海管网,345.443\n中俄东线,江苏,南通站,江苏城市燃气,680.832\n冀宁线,江苏,南京站,江苏电力,527.523\n中俄东线,江苏,海安站,江苏化工,421.523\n川气东送,江苏,甪直站,苏州工业园,370.632\n中俄东线,江苏,如皋站,江苏交通能源,268.307\n冀宁线,河北,安平站,河北城市燃气,465.127\n西气东输一线,新疆,昌吉站,昌吉工业,341.083\n西气东输一线,新疆,精河站,伊犁能源,304.74\n",
+          "truncated": false,
+          "parsed_json": null,
+          "start_line": 1,
+          "end_line": 50
+        }
+      }
+    ],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {
+      "csv_evidence": {
+        "source_files": [
+          "20190510_consumer.csv"
+        ],
+        "source_file_count": 1,
+        "answer_rows": [
+          {
+            "source_file": "20190510_consumer.csv",
+            "values": {
+              "管线": "西气东输二线",
+              "所属地": "新疆",
+              "供气点": "乌鲁木齐压气站",
+              "用户": "新疆广汇",
+              "消耗量": 667.62
+            }
+          },
+          {
+            "source_file": "20190510_consumer.csv",
+            "values": {
+              "管线": "西气东输二线",
+              "所属地": "新疆",
+              "供气点": "乌鲁木齐压气站",
+              "用户": "乌鲁木齐燃气",
+              "消耗量": 566.355
+            }
+          },
+          {
+            "source_file": "20190510_consumer.csv",
+            "values": {
+              "管线": "西气东输二线",
+              "所属地": "新疆",
+              "供气点": "乌鲁木齐压气站",
+              "用户": "新疆化工",
+              "消耗量": 404.553
+            }
+          },
+          {
+            "source_file": "20190510_consumer.csv",
+            "values": {
+              "管线": "西气东输二线",
+              "所属地": "新疆",
+              "供气点": "乌鲁木齐压气站",
+              "用户": "乌鲁木齐零值表位",
+              "消耗量": 0
+            }
+          }
+        ],
+        "selection_summary": {
+          "selected_row_count": 4,
+          "selected_source_file_count": 1,
+          "pipeline_count": 1
+        },
+        "derived_results": [
+          {
+            "operation": "sum",
+            "measure": "消耗量",
+            "row_count": 4,
+            "nonzero_row_count": 3,
+            "zero_row_count": 1,
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "value": 1638.528
+          }
+        ]
+      }
+    },
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_002",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_001",
+    "turn_id": 2,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      }
+    ],
+    "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_003",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_001",
+    "turn_id": 3,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {
+      "repair_contract": {
+        "repair_type": "consumer_handoff_total",
+        "source_sample_ids": [
+          "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+        ],
+        "supporting_numeric_values": [
+          667.62,
+          1638.528
+        ]
+      }
+    },
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": [],
+    "repair_provenance": {
+      "method": "deterministic_staged_answer_repair",
+      "external_llm_calls": 0,
+      "reason": "The requested handoff total was restored from verified CSV rows already retrieved earlier in the session."
+    }
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_002::turn_001",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_002",
+    "turn_id": 1,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      }
+    ],
+    "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_002::turn_002",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_002",
+    "turn_id": 2,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_002::turn_003",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_002",
+    "turn_id": 3,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "为什么这句可能不完整？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_003::turn_001",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_003",
+    "turn_id": 1,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_003::turn_002",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_003",
+    "turn_id": 2,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_003::turn_003",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_003",
+    "turn_id": 3,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_004::turn_001",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_004",
+    "turn_id": 1,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "若下一班只能跟一个用户，你会选谁？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_004::turn_002",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_004",
+    "turn_id": 2,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": [
+        {
+          "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+          "artifact": "20190510_node.csv",
+          "state": "content_evidence",
+          "reason": "compact_content_evidence"
+        },
+        {
+          "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+          "artifact": "20190510_pipeline.csv",
+          "state": "content_evidence",
+          "reason": "compact_content_evidence"
+        }
+      ]
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 1,
+        "user_input": "若下一班只能跟一个用户，你会选谁？",
+        "assistant_output": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？",
+    "parsed_task": {},
+    "tool_calls": [
+      {
+        "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+        "name": "analyze_pipeline_topology",
+        "arguments": {
+          "node_file": "20190510_node.csv",
+          "pipeline_file": "20190510_pipeline.csv",
+          "target_station": "乌鲁木齐压气站"
+        }
+      }
+    ],
+    "tool_outputs": [
+      {
+        "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+        "name": "analyze_pipeline_topology",
+        "output": {
+          "success": true,
+          "evidence_kind": "file_content",
+          "source_artifacts": [
+            "20190510_node.csv",
+            "20190510_pipeline.csv"
+          ],
+          "evidence_excerpt": "{\"source_files\": [\"20190510_node.csv\", \"20190510_pipeline.csv\"], \"target_station\": \"乌鲁木齐站\", \"reachable_sources\": [{\"station\": \"霍尔果斯首站\", \"hops\": 1}], \"reachable_source_count\": 1, \"nearest_source\": \"霍尔果斯首站\", \"example_shortest_path\": [{\"source\": \"霍尔果斯首站\", \"target\": \"乌鲁木齐站\", \"pipeline\": \"西气东输一线\"}], \"reachable_source_instances\": [{\"station\": \"霍尔果斯首站\", \"pipeline\": \"西气东输一线\", \"hops\": 1}, {\"station\": \"霍尔果斯首站\", \"pipeline\": \"西气东输三线\", \"hops\": 1}, {\"station\": \"霍尔果斯首站\", \"pipeline\": \"西气东输二线\", \"hops\": 1}], \"reachable_source_instance_count\": 3, \"direct_inbound_segment_count\": 3, \"direct_upstream_stations\": [\"霍尔果斯首站\"], \"direct_inbound_segments\": [{\"source\": \"霍尔果斯首站\", \"target\": \"乌鲁木齐站\", \"pipeline\": \"西气东输一线\", \"flow\": \"1567.276\"}, {\"source\": \"霍尔果斯首站\", \"target\": \"乌鲁木齐站\", \"pipeline\": \"西气东输二线\", \"flow\": \"1756.286\"}, {\"source\": \"霍尔果斯首站\", \"target\": \"乌鲁木齐站\", \"pipeline\": \"西气东输三线\", \"flow\": \"1662.933\"}], \"multi_source_reachable\": false, \"shared_gateway_dependency\": true, \"requested_target_station\": \"乌鲁木齐压气站\", \"target_normalization\": {\"requested\": \"乌鲁木齐压气站\", \"canonical\": \"乌鲁木齐站\"}}",
+          "topology_summary": {
+            "source_files": [
+              "20190510_node.csv",
+              "20190510_pipeline.csv"
+            ],
+            "target_station": "乌鲁木齐站",
+            "reachable_sources": [
+              {
+                "station": "霍尔果斯首站",
+                "hops": 1
+              }
+            ],
+            "reachable_source_count": 1,
+            "nearest_source": "霍尔果斯首站",
+            "example_shortest_path": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线"
+              }
+            ],
+            "reachable_source_instances": [
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输一线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输三线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输二线",
+                "hops": 1
+              }
+            ],
+            "reachable_source_instance_count": 3,
+            "direct_inbound_segment_count": 3,
+            "direct_upstream_stations": [
+              "霍尔果斯首站"
+            ],
+            "direct_inbound_segments": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线",
+                "flow": "1567.276"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输二线",
+                "flow": "1756.286"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输三线",
+                "flow": "1662.933"
+              }
+            ],
+            "multi_source_reachable": false,
+            "shared_gateway_dependency": true,
+            "requested_target_station": "乌鲁木齐压气站",
+            "target_normalization": {
+              "requested": "乌鲁木齐压气站",
+              "canonical": "乌鲁木齐站"
+            }
+          }
+        }
+      }
+    ],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {
+      "topology_summary": {
+        "source_files": [
+          "20190510_node.csv",
+          "20190510_pipeline.csv"
+        ],
+        "target_station": "乌鲁木齐站",
+        "reachable_sources": [
+          {
+            "station": "霍尔果斯首站",
+            "hops": 1
+          }
+        ],
+        "reachable_source_count": 1,
+        "nearest_source": "霍尔果斯首站",
+        "example_shortest_path": [
+          {
+            "source": "霍尔果斯首站",
+            "target": "乌鲁木齐站",
+            "pipeline": "西气东输一线"
+          }
+        ],
+        "reachable_source_instances": [
+          {
+            "station": "霍尔果斯首站",
+            "pipeline": "西气东输一线",
+            "hops": 1
+          },
+          {
+            "station": "霍尔果斯首站",
+            "pipeline": "西气东输三线",
+            "hops": 1
+          },
+          {
+            "station": "霍尔果斯首站",
+            "pipeline": "西气东输二线",
+            "hops": 1
+          }
+        ],
+        "reachable_source_instance_count": 3,
+        "direct_inbound_segment_count": 3,
+        "direct_upstream_stations": [
+          "霍尔果斯首站"
+        ],
+        "direct_inbound_segments": [
+          {
+            "source": "霍尔果斯首站",
+            "target": "乌鲁木齐站",
+            "pipeline": "西气东输一线",
+            "flow": "1567.276"
+          },
+          {
+            "source": "霍尔果斯首站",
+            "target": "乌鲁木齐站",
+            "pipeline": "西气东输二线",
+            "flow": "1756.286"
+          },
+          {
+            "source": "霍尔果斯首站",
+            "target": "乌鲁木齐站",
+            "pipeline": "西气东输三线",
+            "flow": "1662.933"
+          }
+        ],
+        "multi_source_reachable": false,
+        "shared_gateway_dependency": true,
+        "requested_target_station": "乌鲁木齐压气站",
+        "target_normalization": {
+          "requested": "乌鲁木齐压气站",
+          "canonical": "乌鲁木齐站"
+        }
+      }
+    },
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "建议优先盯**霍尔果斯首站**：2019-05-10拓扑显示，乌鲁木齐站的3条直接入站管段（西气东输一、二、三线）均来自该站。此为拓扑监测优先级，不代表波动必由其引起，仍需两站高频流量、压力时序核实。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_004::turn_003",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_004",
+    "turn_id": 3,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 1,
+        "user_input": "若下一班只能跟一个用户，你会选谁？",
+        "assistant_output": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 2,
+        "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？",
+        "assistant_output": "建议优先盯**霍尔果斯首站**：2019-05-10拓扑显示，乌鲁木齐站的3条直接入站管段（西气东输一、二、三线）均来自该站。此为拓扑监测优先级，不代表波动必由其引起，仍需两站高频流量、压力时序核实。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "verified_evidence_summary": {
+          "topology_summary": {
+            "source_files": [
+              "20190510_node.csv",
+              "20190510_pipeline.csv"
+            ],
+            "target_station": "乌鲁木齐站",
+            "reachable_sources": [
+              {
+                "station": "霍尔果斯首站",
+                "hops": 1
+              }
+            ],
+            "reachable_source_count": 1,
+            "nearest_source": "霍尔果斯首站",
+            "example_shortest_path": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线"
+              }
+            ],
+            "reachable_source_instances": [
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输一线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输三线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输二线",
+                "hops": 1
+              }
+            ],
+            "reachable_source_instance_count": 3,
+            "direct_inbound_segment_count": 3,
+            "direct_upstream_stations": [
+              "霍尔果斯首站"
+            ],
+            "direct_inbound_segments": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线",
+                "flow": "1567.276"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输二线",
+                "flow": "1756.286"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输三线",
+                "flow": "1662.933"
+              }
+            ],
+            "multi_source_reachable": false,
+            "shared_gateway_dependency": true,
+            "requested_target_station": "乌鲁木齐压气站",
+            "target_normalization": {
+              "requested": "乌鲁木齐压气站",
+              "canonical": "乌鲁木齐站"
+            }
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+            "name": "analyze_pipeline_topology",
+            "arguments": {
+              "node_file": "20190510_node.csv",
+              "pipeline_file": "20190510_pipeline.csv",
+              "target_station": "乌鲁木齐压气站"
+            }
+          }
+        ]
+      }
+    ],
+    "user_input": "这张表现在还回答不了哪一个关键问题？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "还回答不了：晚高峰波动究竟来自霍尔果斯首站/某条入站管线，还是乌鲁木齐端某个用户；需两站、三条入站管线及分用户的同步高频流量与压力时序才能定位。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_005::turn_001",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_005",
+    "turn_id": 1,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 1,
+        "user_input": "若下一班只能跟一个用户，你会选谁？",
+        "assistant_output": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 2,
+        "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？",
+        "assistant_output": "建议优先盯**霍尔果斯首站**：2019-05-10拓扑显示，乌鲁木齐站的3条直接入站管段（西气东输一、二、三线）均来自该站。此为拓扑监测优先级，不代表波动必由其引起，仍需两站高频流量、压力时序核实。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "verified_evidence_summary": {
+          "topology_summary": {
+            "source_files": [
+              "20190510_node.csv",
+              "20190510_pipeline.csv"
+            ],
+            "target_station": "乌鲁木齐站",
+            "reachable_sources": [
+              {
+                "station": "霍尔果斯首站",
+                "hops": 1
+              }
+            ],
+            "reachable_source_count": 1,
+            "nearest_source": "霍尔果斯首站",
+            "example_shortest_path": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线"
+              }
+            ],
+            "reachable_source_instances": [
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输一线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输三线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输二线",
+                "hops": 1
+              }
+            ],
+            "reachable_source_instance_count": 3,
+            "direct_inbound_segment_count": 3,
+            "direct_upstream_stations": [
+              "霍尔果斯首站"
+            ],
+            "direct_inbound_segments": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线",
+                "flow": "1567.276"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输二线",
+                "flow": "1756.286"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输三线",
+                "flow": "1662.933"
+              }
+            ],
+            "multi_source_reachable": false,
+            "shared_gateway_dependency": true,
+            "requested_target_station": "乌鲁木齐压气站",
+            "target_normalization": {
+              "requested": "乌鲁木齐压气站",
+              "canonical": "乌鲁木齐站"
+            }
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+            "name": "analyze_pipeline_topology",
+            "arguments": {
+              "node_file": "20190510_node.csv",
+              "pipeline_file": "20190510_pipeline.csv",
+              "target_station": "乌鲁木齐压气站"
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 3,
+        "user_input": "这张表现在还回答不了哪一个关键问题？",
+        "assistant_output": "还回答不了：晚高峰波动究竟来自霍尔果斯首站/某条入站管线，还是乌鲁木齐端某个用户；需两站、三条入站管线及分用户的同步高频流量与压力时序才能定位。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "建议最少放三块：\n\n1. **用气结构**：4条用户记录、总消耗量、用户排序与占比；突出新疆广汇667.62，并标注零值表位。  \n2. **供气边界**：霍尔果斯首站至乌鲁木齐站的三条直接入站管线及各自流量；注明仅代表当日拓扑快照，单位未提供。  \n3. **交接监测**：标注“多用户混合负荷”为分析判断；列出下一班需跟踪的站级流量/压力、分用户高频消耗，以及波动来源和零值原因等未决项。",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_005::turn_002",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_005",
+    "turn_id": 2,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 1,
+        "user_input": "若下一班只能跟一个用户，你会选谁？",
+        "assistant_output": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 2,
+        "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？",
+        "assistant_output": "建议优先盯**霍尔果斯首站**：2019-05-10拓扑显示，乌鲁木齐站的3条直接入站管段（西气东输一、二、三线）均来自该站。此为拓扑监测优先级，不代表波动必由其引起，仍需两站高频流量、压力时序核实。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "verified_evidence_summary": {
+          "topology_summary": {
+            "source_files": [
+              "20190510_node.csv",
+              "20190510_pipeline.csv"
+            ],
+            "target_station": "乌鲁木齐站",
+            "reachable_sources": [
+              {
+                "station": "霍尔果斯首站",
+                "hops": 1
+              }
+            ],
+            "reachable_source_count": 1,
+            "nearest_source": "霍尔果斯首站",
+            "example_shortest_path": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线"
+              }
+            ],
+            "reachable_source_instances": [
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输一线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输三线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输二线",
+                "hops": 1
+              }
+            ],
+            "reachable_source_instance_count": 3,
+            "direct_inbound_segment_count": 3,
+            "direct_upstream_stations": [
+              "霍尔果斯首站"
+            ],
+            "direct_inbound_segments": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线",
+                "flow": "1567.276"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输二线",
+                "flow": "1756.286"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输三线",
+                "flow": "1662.933"
+              }
+            ],
+            "multi_source_reachable": false,
+            "shared_gateway_dependency": true,
+            "requested_target_station": "乌鲁木齐压气站",
+            "target_normalization": {
+              "requested": "乌鲁木齐压气站",
+              "canonical": "乌鲁木齐站"
+            }
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+            "name": "analyze_pipeline_topology",
+            "arguments": {
+              "node_file": "20190510_node.csv",
+              "pipeline_file": "20190510_pipeline.csv",
+              "target_station": "乌鲁木齐压气站"
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 3,
+        "user_input": "这张表现在还回答不了哪一个关键问题？",
+        "assistant_output": "还回答不了：晚高峰波动究竟来自霍尔果斯首站/某条入站管线，还是乌鲁木齐端某个用户；需两站、三条入站管线及分用户的同步高频流量与压力时序才能定位。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_005",
+        "turn_id": 1,
+        "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？",
+        "assistant_output": "建议最少放三块：\n\n1. **用气结构**：4条用户记录、总消耗量、用户排序与占比；突出新疆广汇667.62，并标注零值表位。  \n2. **供气边界**：霍尔果斯首站至乌鲁木齐站的三条直接入站管线及各自流量；注明仅代表当日拓扑快照，单位未提供。  \n3. **交接监测**：标注“多用户混合负荷”为分析判断；列出下一班需跟踪的站级流量/压力、分用户高频消耗，以及波动来源和零值原因等未决项。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "给我一句适合写标题的小句子。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "2019年5月10日乌鲁木齐压气站：多用户负荷与三线同源入站监测",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  },
+  {
+    "sample_id": "pipeclaw_dataset_v2:scenario_openclaw_016_session_005::turn_003",
+    "dataset_source": "pipeclaw_dataset_v2",
+    "source_scenario_id": "scenario_openclaw_016",
+    "scenario_id": "scenario_openclaw_016",
+    "split_group_id": "scenario_openclaw_016",
+    "session_id": "scenario_openclaw_016_session_005",
+    "turn_id": 3,
+    "scenario_type": "openclaw",
+    "split": "train",
+    "answer_mode": "generic_tool",
+    "grounding_contract": {
+      "answer_mode": "generic_tool",
+      "evidence_sources": []
+    },
+    "decision_summary": {},
+    "conversation_context": [
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 1,
+        "user_input": "请用 20190510_consumer.csv 看 乌鲁木齐压气站，给我总用户数、总消耗量和前 5 名用户。",
+        "assistant_output": "乌鲁木齐压气站在 `20190510_consumer.csv` 中共有 **4 个用户记录**（其中非零用户 3 个），总消耗量 **1638.528**。文件未注明消耗量单位。\n\n按消耗量排序：\n1. 新疆广汇：667.620\n2. 乌鲁木齐燃气：566.355\n3. 新疆化工：404.553\n4. 乌鲁木齐零值表位：0.000\n\n该站仅有 4 条用户记录，因此没有第 5 名。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [
+          "20190510_consumer.csv"
+        ],
+        "verified_evidence_summary": {
+          "csv_evidence": {
+            "source_files": [
+              "20190510_consumer.csv"
+            ],
+            "source_file_count": 1,
+            "answer_rows": [
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆广汇",
+                  "消耗量": 667.62
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐燃气",
+                  "消耗量": 566.355
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "新疆化工",
+                  "消耗量": 404.553
+                }
+              },
+              {
+                "source_file": "20190510_consumer.csv",
+                "values": {
+                  "管线": "西气东输二线",
+                  "所属地": "新疆",
+                  "供气点": "乌鲁木齐压气站",
+                  "用户": "乌鲁木齐零值表位",
+                  "消耗量": 0
+                }
+              }
+            ],
+            "selection_summary": {
+              "selected_row_count": 4,
+              "selected_source_file_count": 1,
+              "pipeline_count": 1
+            },
+            "derived_results": [
+              {
+                "operation": "sum",
+                "measure": "消耗量",
+                "row_count": 4,
+                "nonzero_row_count": 3,
+                "zero_row_count": 1,
+                "source_files": [
+                  "20190510_consumer.csv"
+                ],
+                "value": 1638.528
+              }
+            ]
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_lZzpXXIpjYEhQkO0w0GH7Ugm",
+            "name": "read_file",
+            "arguments": {
+              "path": "pipeline_data/consumer_flow/20190510_consumer.csv",
+              "limit": 400
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 2,
+        "user_input": "再用一句话判断这里更像单一大户驱动，还是混合负荷。",
+        "assistant_output": "更像混合负荷，因为消耗量分布在新疆广汇、乌鲁木齐燃气和新疆化工三家用户，而非仅由单一大户贡献。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_001",
+        "turn_id": 3,
+        "user_input": "请把第一大用户、总量和你的判断复述成一条交接记忆。",
+        "assistant_output": "交接记忆：乌鲁木齐压气站第一大用户为新疆广汇（消耗量667.62），总消耗量1638.528（源表未注明单位）；非零消耗分布于多个用户，更像混合负荷而非单一大户驱动。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "verified_evidence_summary": {
+          "repair_contract": {
+            "repair_type": "consumer_handoff_total",
+            "source_sample_ids": [
+              "pipeclaw_dataset_v2:scenario_openclaw_016_session_001::turn_001"
+            ],
+            "supporting_numeric_values": [
+              667.62,
+              1638.528
+            ]
+          }
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 1,
+        "user_input": "现在先不重算，你还记得第一大用户是谁吗？",
+        "assistant_output": "记得，第一大用户是**新疆广汇**，消耗量为 **667.62**。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 2,
+        "user_input": "如果有人想把这个站直接写成“只要盯头部用户就够了”，你会不会同意？先给结论，再给一句纠正。",
+        "assistant_output": "结论：不同意。  \n纠正：除新疆广汇（667.62）外，乌鲁木齐燃气（566.355）和新疆化工（404.553）也有显著消耗，应按混合负荷同时监测，而非只盯头部用户。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_002",
+        "turn_id": 3,
+        "user_input": "为什么这句可能不完整？",
+        "assistant_output": "因为它把单日用量结构直接推成了监测策略：现有证据只能说明2019-05-10三家用户均有非零消耗，不能证明其跨班波动、异常风险或“显著”的判定阈值；同时零值表位的状态也未解释。完整判断还需多时点数据和零值原因。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 1,
+        "user_input": "夜班补了一句：乌鲁木齐压气站 附近晚高峰又起波动。你先用一句话更新判断。",
+        "assistant_output": "更新判断：若夜班所报晚高峰波动属实，应继续按混合负荷开展跨班监测，不能只盯新疆广汇，具体波动来源仍需分用户时序数据核实。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 2,
+        "user_input": "你最先会主动补要哪两类更高频的运行数据？",
+        "assistant_output": "1. 各用户的高频消耗量时序，用于核实晚高峰波动来源及零值表位状态。  \n2. 同期站级流量与进出口压力时序，用于核实波动是否伴随站内工况变化。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_003",
+        "turn_id": 3,
+        "user_input": "如果只有一个对象可盯，你更先盯头部用户，还是盯站级边界状态？",
+        "assistant_output": "我会优先盯站级边界状态（流量及进、出口压力）；这是监测建议，因为三家用户均有非零消耗，只盯新疆广汇可能漏掉其他负荷，需再用边界与分用户高频时序对照验证。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 1,
+        "user_input": "若下一班只能跟一个用户，你会选谁？",
+        "assistant_output": "若只能选一个，我会先跟新疆广汇：2019-05-10消耗量为667.62，居该站首位；但这只是按单日负荷规模排序，不能证明它就是晚高峰波动来源。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 2,
+        "user_input": "若只能盯一个相邻站点或供气点，你会选哪里？",
+        "assistant_output": "建议优先盯**霍尔果斯首站**：2019-05-10拓扑显示，乌鲁木齐站的3条直接入站管段（西气东输一、二、三线）均来自该站。此为拓扑监测优先级，不代表波动必由其引起，仍需两站高频流量、压力时序核实。",
+        "quality_flag": "pass",
+        "grounding_verified": true,
+        "evidence_artifacts": [],
+        "verified_evidence_summary": {
+          "topology_summary": {
+            "source_files": [
+              "20190510_node.csv",
+              "20190510_pipeline.csv"
+            ],
+            "target_station": "乌鲁木齐站",
+            "reachable_sources": [
+              {
+                "station": "霍尔果斯首站",
+                "hops": 1
+              }
+            ],
+            "reachable_source_count": 1,
+            "nearest_source": "霍尔果斯首站",
+            "example_shortest_path": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线"
+              }
+            ],
+            "reachable_source_instances": [
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输一线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输三线",
+                "hops": 1
+              },
+              {
+                "station": "霍尔果斯首站",
+                "pipeline": "西气东输二线",
+                "hops": 1
+              }
+            ],
+            "reachable_source_instance_count": 3,
+            "direct_inbound_segment_count": 3,
+            "direct_upstream_stations": [
+              "霍尔果斯首站"
+            ],
+            "direct_inbound_segments": [
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输一线",
+                "flow": "1567.276"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输二线",
+                "flow": "1756.286"
+              },
+              {
+                "source": "霍尔果斯首站",
+                "target": "乌鲁木齐站",
+                "pipeline": "西气东输三线",
+                "flow": "1662.933"
+              }
+            ],
+            "multi_source_reachable": false,
+            "shared_gateway_dependency": true,
+            "requested_target_station": "乌鲁木齐压气站",
+            "target_normalization": {
+              "requested": "乌鲁木齐压气站",
+              "canonical": "乌鲁木齐站"
+            }
+          }
+        },
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        },
+        "tool_calls": [
+          {
+            "tool_call_id": "call_d7Els4anAZiAZEKHS4qu6jnq",
+            "name": "analyze_pipeline_topology",
+            "arguments": {
+              "node_file": "20190510_node.csv",
+              "pipeline_file": "20190510_pipeline.csv",
+              "target_station": "乌鲁木齐压气站"
+            }
+          }
+        ]
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_004",
+        "turn_id": 3,
+        "user_input": "这张表现在还回答不了哪一个关键问题？",
+        "assistant_output": "还回答不了：晚高峰波动究竟来自霍尔果斯首站/某条入站管线，还是乌鲁木齐端某个用户；需两站、三条入站管线及分用户的同步高频流量与压力时序才能定位。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_005",
+        "turn_id": 1,
+        "user_input": "如果做成日报 PDF，这一页最少放哪三块内容？",
+        "assistant_output": "建议最少放三块：\n\n1. **用气结构**：4条用户记录、总消耗量、用户排序与占比；突出新疆广汇667.62，并标注零值表位。  \n2. **供气边界**：霍尔果斯首站至乌鲁木齐站的三条直接入站管线及各自流量；注明仅代表当日拓扑快照，单位未提供。  \n3. **交接监测**：标注“多用户混合负荷”为分析判断；列出下一班需跟踪的站级流量/压力、分用户高频消耗，以及波动来源和零值原因等未决项。",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      },
+      {
+        "session_id": "scenario_openclaw_016_session_005",
+        "turn_id": 2,
+        "user_input": "给我一句适合写标题的小句子。",
+        "assistant_output": "2019年5月10日乌鲁木齐压气站：多用户负荷与三线同源入站监测",
+        "quality_flag": "pass",
+        "grounding_verified": false,
+        "evidence_artifacts": [],
+        "parsed_task": {
+          "resolved_attention_variable_count": 0,
+          "resolved_output_variable_count": 0,
+          "boundary_conditions": {}
+        }
+      }
+    ],
+    "user_input": "再补一句你会主动追问营销侧或现场的问题。",
+    "parsed_task": {},
+    "tool_calls": [],
+    "tool_outputs": [],
+    "prediction_summary": {},
+    "constraint_check": {},
+    "evidence": {},
+    "risk_level": null,
+    "manual_intervention_label": null,
+    "dispatch_recommendation": null,
+    "final_answer": "我会主动追问营销侧或现场：三家非零用户当日是否有计划性用气变化，以及“乌鲁木齐零值表位”的零值是停用、无用气还是计量异常？",
+    "trace_status": "completed",
+    "quality_flag": "pass",
+    "quality_issues": [],
+    "quality_score": 100.0,
+    "quality_profile": "native_pipeclaw_generic",
+    "quality_failed_checks": []
+  }
+]

@@ -4,10 +4,6 @@ Utility functions for tensor manipulations and visualization in the decoder.
 
 import os
 
-import matplotlib
-
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
 import torch
 
 
@@ -45,6 +41,11 @@ def save_attention_mask_image(attention_mask: torch.Tensor, save_dir: str, filen
         save_dir: 保存目录
         filename: 保存文件名
     """
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     os.makedirs(save_dir, exist_ok=True)
     if attention_mask.dim() == 3:
         mask_2d = attention_mask[0]

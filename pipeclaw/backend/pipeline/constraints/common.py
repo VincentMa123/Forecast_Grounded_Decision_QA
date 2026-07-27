@@ -297,22 +297,45 @@ def evaluate_summary_metric(
 
 
 def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
-    disturbance_variable = parsed_task.get("disturbance_variable")
-    variables = [disturbance_variable] if disturbance_variable else []
-    check = base_check(spec, variables)
-    disturbance_percent = parsed_task.get("disturbance_magnitude_percent")
-    if disturbance_percent is None:
-        check["message"] = "No boundary-control adjustment magnitude was parsed."
+    boundary = dict(parsed_task.get("boundary_conditions") or {})
+    percentage_adjustments = [
+        (str(variable), float(value))
+        for variable, value in dict(boundary.get("percentage_changes") or {}).items()
+    ]
+    if parsed_task.get("disturbance_source") != "external_condition":
+        disturbance_variable = parsed_task.get("disturbance_variable")
+        disturbance_percent = parsed_task.get("disturbance_magnitude_percent")
+        if (
+            disturbance_variable
+            and disturbance_percent is not None
+            and str(disturbance_variable) not in {variable for variable, _ in percentage_adjustments}
+        ):
+            percentage_adjustments.append((str(disturbance_variable), float(disturbance_percent)))
+
+    binary_setpoints = [
+        (str(variable), float(value))
+        for variable, value in dict(boundary.get("setpoints") or {}).items()
+        if str(variable).endswith(":ST")
+    ]
+    adjustments = percentage_adjustments + binary_setpoints
+
+    check = base_check(spec, [variable for variable, _ in adjustments])
+    if not adjustments:
+        check["status"] = "pass"
+        check["evaluation_status"] = "not_applicable"
+        check["message"] = (
+            "The percentage-adjustment rule is not applicable because this action "
+            "does not contain a percentage boundary-control change."
+        )
         return check
 
-    magnitude = abs(float(disturbance_percent))
-    status = status_from_threshold(magnitude, spec.warning_threshold, spec.fail_threshold)
-    check["status"] = status
-    check["evaluation_status"] = "evaluated"
-    check["flag"] = _flag_for_status(spec, status)
-    check["evaluated_values"].append(
-        {
-            "variable": disturbance_variable,
+    statuses = []
+    for variable, value in percentage_adjustments:
+        magnitude = abs(value)
+        status = status_from_threshold(magnitude, spec.warning_threshold, spec.fail_threshold)
+        statuses.append(status)
+        evaluated = {
+            "variable": variable,
             "metric": "abs_disturbance_percent",
             "value": magnitude,
             "status": status,
@@ -321,21 +344,54 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
             "warning_margin": _threshold_margin(magnitude, spec.warning_threshold),
             "fail_margin": _threshold_margin(magnitude, spec.fail_threshold),
         }
-    )
-    if status == "pass":
-        check["message"] = "Boundary-control adjustment is within the allowable magnitude."
+        check["evaluated_values"].append(evaluated)
+        if status != "pass":
+            check["offending_values"].append({
+                key: evaluated[key]
+                for key in (
+                    "variable",
+                    "metric",
+                    "value",
+                    "status",
+                    "warning_threshold",
+                    "fail_threshold",
+                )
+            })
+
+    application_evidence = {
+        str(item.get("variable") or ""): dict(item)
+        for item in parsed_task.get("_boundary_application_evidence") or []
+    }
+    for variable, value in binary_setpoints:
+        applied = application_evidence.get(variable, {})
+        valid_value = value in {0.0, 1.0}
+        verified = bool(applied.get("verified")) and applied.get("mode") == "setpoint"
+        status = "pass" if valid_value and verified else "fail"
+        statuses.append(status)
+        evaluated = {
+            "variable": variable,
+            "metric": "binary_setpoint",
+            "value": value,
+            "status": status,
+            "allowed_values": [0, 1],
+            "application_verified": verified,
+            "applied_values": list(applied.get("input_values_applied") or []),
+        }
+        check["evaluated_values"].append(evaluated)
+        if status != "pass":
+            check["offending_values"].append(evaluated)
+
+    check["status"] = max_status(statuses)
+    check["evaluation_status"] = "evaluated"
+    check["flag"] = _flag_for_status(spec, check["status"])
+    if check["status"] == "pass":
+        check["message"] = (
+            "Boundary-control percentage changes and binary setpoints were applied and verified."
+            if binary_setpoints
+            else "Boundary-control adjustment is within the allowable magnitude."
+        )
     else:
         check["message"] = "Boundary-control adjustment magnitude requires review."
-        check["offending_values"].append(
-            {
-                "variable": disturbance_variable,
-                "metric": "abs_disturbance_percent",
-                "value": magnitude,
-                "status": status,
-                "warning_threshold": spec.warning_threshold,
-                "fail_threshold": spec.fail_threshold,
-            }
-        )
     return check
 
 

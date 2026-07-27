@@ -10,15 +10,26 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from evaluator.csv_evidence import build_csv_evidence
+from evaluator.decision_trace_state import DecisionTraceState
+from evaluator.grounding_contract import (
+    GroundingContractBuilder,
+    applied_disturbance_disclosure,
+    comparison_answer_issues,
+    grounded_fallback_answer,
+)
 from evaluator.teacher_quality import (
     answer_quality_issues,
     evaluate_teacher_quality,
     llm_answer_quality_issues,
     numeric_claim_values,
     numeric_claims_are_grounded,
+    numeric_grounding_evidence,
     safety_and_energy_checks_pass as _safety_and_energy_checks_pass,
     tool_output_failed,
 )
+from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from evaluator.topology_evidence import topology_summary_from_tool_outputs
 from evaluator.scorer import NativeTraceEvaluator
 from pipeline.io_utils import write_json, write_jsonl
 from pipeline.scenario_preflight import validate_scenario_sources
@@ -35,14 +46,24 @@ from pipeline.teacher_trace_store import (
 
 logger = logging.getLogger("teacher_trace")
 
-SFT_MAX_RECORD_CHARS = 24_000
+SFT_MAX_RECORD_CHARS = 35_000
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
 SFT_MAX_GENERIC_TOOL_PAIRS = 6
 SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
 SFT_MAX_PIPEFORMER_VARIABLES = 3
-SFT_VARIABLE_REFERENCE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
+COMPACT_COMPARABLE_METRIC_KEYS = (
+    "energy_consumption",
+    "energy_consumption_delta",
+    "energy_unit",
+    "energy_variable_count",
+    "baseline_reference",
+)
+SFT_VARIABLE_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?(?![A-Za-z0-9_:])"
+)
 SFT_FILE_REFERENCE = re.compile(r"(?i)\b[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)\b")
 SFT_OMITTED_TOOL_KEYS = {
+    "abs_path",
     "cmd",
     "cwd",
     "duration_s",
@@ -52,6 +73,34 @@ SFT_OMITTED_TOOL_KEYS = {
     "timestamp",
     "workspace",
 }
+AGENT_CANDIDATE_STATE_KEYS = (
+    "candidate_id",
+    "tool_call_id",
+    "action",
+    "failure_count",
+    "warning_count",
+    "risk_level",
+    "manual_intervention_label",
+    "failed_rule_ids",
+    "warning_rule_ids",
+    "category_status",
+    "elimination_reasons",
+    "energy_consumption",
+    "nonzero_impacted_variable_count",
+    "pressure_metrics",
+    "linepack_metrics",
+    "flow_metrics",
+    "compressor_metrics",
+    "energy_metrics",
+    "baseline_reference",
+)
+AGENT_PIPEFORMER_STATE_KEYS = (
+    "decision_summary",
+    "comparison_leaders",
+    "applied_disturbances",
+    "worst_case_risk_level",
+    "worst_case_intervention_label",
+)
 
 
 def backend_root() -> Path:
@@ -155,6 +204,77 @@ def short_text(value: Any, limit: int = 700) -> str:
     return text if len(text) <= limit else text[: limit - 3] + "..."
 
 
+def scenario_evidence_text(scenario: Dict[str, Any], question: str) -> str:
+    description = str(scenario.get("scenario_description") or "").strip()
+    return "\n".join(value for value in (description, question) if value)
+
+
+def _verified_evidence_for_agent(
+    history: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Project verified history to the decision state needed by the next turn."""
+    projected_summaries: List[Dict[str, Any]] = []
+    for item in history:
+        if item.get("grounding_verified") is not True:
+            continue
+        summary = item.get("verified_evidence_summary")
+        if not isinstance(summary, dict) or not summary:
+            continue
+        projected = {
+            key: value
+            for key, value in summary.items()
+            if key != "pipeformer"
+        }
+        pipeformer = summary.get("pipeformer")
+        if isinstance(pipeformer, dict) and pipeformer:
+            candidate_results = list(pipeformer.get("candidate_results") or [])
+            if candidate_results:
+                compact_pipeformer = {
+                    key: pipeformer[key]
+                    for key in AGENT_PIPEFORMER_STATE_KEYS
+                    if pipeformer.get(key) not in (None, "", [], {})
+                }
+                compact_pipeformer["candidate_results"] = [
+                    {
+                        key: candidate[key]
+                        for key in AGENT_CANDIDATE_STATE_KEYS
+                        if candidate.get(key) not in (None, "", [], {})
+                    }
+                    for candidate in candidate_results
+                    if isinstance(candidate, dict)
+                ]
+                projected["pipeformer"] = compact_pipeformer
+            else:
+                projected["pipeformer"] = pipeformer
+        if projected:
+            projected_summaries.append(projected)
+    return projected_summaries[-3:]
+
+
+def agent_turn_message(
+    scenario: Dict[str, Any],
+    question: str,
+    history: Optional[List[Dict[str, Any]]] = None,
+) -> str:
+    description = str(scenario.get("scenario_description") or "").strip()
+    parts = []
+    if description:
+        parts.extend([
+            "Scenario context (scope and task intent only; verify factual claims with tools):",
+            description,
+        ])
+    verified = _verified_evidence_for_agent(history or [])
+    if verified:
+        parts.extend([
+            "Previously verified evidence summaries may be reused without rereading their source files. "
+            "Only the structured facts below are verified; prior assistant wording is not evidence. "
+            "Do not claim a listed source file was unread merely because this turn made no tool call:",
+            json.dumps(verified, ensure_ascii=False, separators=(",", ":")),
+        ])
+    parts.extend(["Current user request:", question])
+    return "\n\n".join(parts)
+
+
 def load_backend_env() -> None:
     env_path = backend_root() / ".env"
     if not env_path.exists():
@@ -227,6 +347,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--force",
         action="store_true",
         help="Replace existing outputs. Without this flag, new unique records are appended.",
+    )
+    parser.add_argument(
+        "--replace-selected-scenario",
+        action="store_true",
+        help="Replace only the scenario selected by both --dataset-source and --scenario-id.",
     )
     parser.add_argument(
         "--log-level",
@@ -351,6 +476,8 @@ def compact_parsed_task(output: Dict[str, Any]) -> Dict[str, Any]:
         "disturbance_variable",
         "disturbance_direction",
         "disturbance_magnitude_percent",
+        "disturbance_assumption",
+        "disturbance_source",
         "forecast_horizon_minutes",
         "attention_targets",
         "output_state_variables",
@@ -359,6 +486,9 @@ def compact_parsed_task(output: Dict[str, Any]) -> Dict[str, Any]:
         "forecast_time_step_minutes",
         "unresolved_attention_targets",
         "unresolved_output_state_variables",
+        "variable_normalizations",
+        "vocabulary_normalizations",
+        "invalid_normalized_variables",
     )
     compact = {key: parsed.get(key) for key in keys}
     compact["resolved_attention_variable_count"] = len(parsed.get("resolved_attention_variables") or [])
@@ -378,6 +508,8 @@ def compact_prediction_summary(output: Dict[str, Any]) -> Dict[str, Any]:
         "disturbance_variable",
         "disturbance_direction",
         "disturbance_magnitude_percent",
+        "disturbance_assumption",
+        "disturbance_source",
         "counterfactual_comparison",
         "output_forecast_summary",
     )
@@ -475,6 +607,17 @@ def compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
         "priority_findings": findings,
         "engineering_evidence": verification.get("engineering_evidence", {}),
     }
+    comparable_metrics = dict(verification.get("comparable_metrics") or {})
+    if comparable_metrics:
+        compact["comparable_metrics"] = {
+            key: comparable_metrics[key]
+            for key in COMPACT_COMPARABLE_METRIC_KEYS
+            if key in comparable_metrics
+        }
+        if "energy_evaluation_status" in comparable_metrics:
+            compact["comparable_metrics"]["energy_evaluation_status"] = comparable_metrics[
+                "energy_evaluation_status"
+            ]
     return _without_none_values(compact)
 
 
@@ -487,6 +630,9 @@ def project_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
         "unresolved_attention_targets": parsed_task.get("unresolved_attention_targets", []),
         "unresolved_output_state_variables": parsed_task.get("unresolved_output_state_variables", []),
         "applied_boundary_conditions": metadata.get("applied_boundary_conditions", []),
+        "variable_normalizations": parsed_task.get("variable_normalizations", []),
+        "vocabulary_normalizations": parsed_task.get("vocabulary_normalizations", []),
+        "invalid_normalized_variables": parsed_task.get("invalid_normalized_variables", []),
     }
     provenance = {
         "checkpoint_id": metadata.get("checkpoint_id"),
@@ -500,6 +646,9 @@ def project_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
         "prediction_summary": compact_prediction_summary(output),
         "constraint_check": compact_constraint_check(output),
         "evidence": dict(output.get("evidence") or {}),
+        "risk_level": output.get("risk_level"),
+        "manual_intervention_label": output.get("manual_intervention_label"),
+        "dispatch_recommendation": output.get("dispatch_recommendation"),
         "task_resolution": _without_none_values(task_resolution),
         "provenance": _without_none_values(provenance),
     }
@@ -512,6 +661,9 @@ def compact_pipeformer_output(projection: Dict[str, Any]) -> Dict[str, Any]:
         "prediction": projection["prediction_summary"],
         "verification": projection["constraint_check"],
         "evidence": projection["evidence"],
+        "risk_level": projection.get("risk_level"),
+        "manual_intervention_label": projection.get("manual_intervention_label"),
+        "dispatch_recommendation": projection.get("dispatch_recommendation"),
         "provenance": projection["provenance"],
     }
 
@@ -534,9 +686,15 @@ def export_trace_tools(
         )
         output = sanitize_tool_output(parse_tool_output(item))
         if tool_name == "run_pipeformer_forecast" and isinstance(output, dict) and output.get("success"):
+            candidate_id = (item.get("args") or {}).get("candidate_id") or output.get("candidate_id")
+            candidate_role = (item.get("args") or {}).get("candidate_role") or output.get("candidate_role")
             projection = project_pipeformer_output(output)
-            pipeformer_results.append({"output": output, "projection": projection})
+            pipeformer_results.append({"tool_call_id": call_id, "output": output, "projection": projection})
             output = compact_pipeformer_output(projection)
+            if candidate_id:
+                output["candidate_id"] = candidate_id
+            if candidate_role:
+                output["candidate_role"] = candidate_role
         outputs.append(
             {
                 "tool_call_id": call_id,
@@ -600,14 +758,20 @@ class TeacherTraceProjector:
         successful = [
             pair
             for pair in pairs
-            if pair[2] is not None and not tool_output_failed(pair[2].get("output"))
+            if pair[2] is not None and not tool_output_failed(pair[2])
         ]
         successful_pipeformer = [
             pair for pair in successful if pair[1].get("name") == "run_pipeformer_forecast"
         ]
+        successful_decision_policies = [
+            pair for pair in successful if pair[1].get("name") == "set_decision_policy"
+        ]
         multiple_pipeformer = len(successful_pipeformer) > 1
         if successful_pipeformer:
-            selected = successful_pipeformer
+            selected = sorted(
+                [*successful_decision_policies[-1:], *successful_pipeformer],
+                key=lambda pair: pair[0],
+            )
         elif successful:
             selected = self._select_generic_evidence_pairs(successful, answer)
         else:
@@ -636,7 +800,12 @@ class TeacherTraceProjector:
                     include_auxiliary_variables=not multiple_pipeformer,
                 )
             else:
-                raw_output = self._compact_generic_sft_output(raw_output, answer)
+                raw_output = self._compact_generic_sft_output(
+                    raw_output,
+                    answer,
+                    tool_name=str(call.get("name") or ""),
+                    arguments=dict(call.get("arguments") or {}),
+                )
             compact_outputs.append(
                 {
                     "tool_call_id": output.get("tool_call_id"),
@@ -680,7 +849,14 @@ class TeacherTraceProjector:
         values.update(str(value) for value in numeric_claim_values(answer))
         return {value for value in values if value}
 
-    def _compact_generic_sft_output(self, value: Any, answer: str) -> Any:
+    def _compact_generic_sft_output(
+        self,
+        value: Any,
+        answer: str,
+        *,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> Any:
         """Retain a small excerpt containing every answer-grounding token possible."""
         if not isinstance(value, (dict, list, str)):
             return value
@@ -692,7 +868,33 @@ class TeacherTraceProjector:
             }
         else:
             status = {}
-        text_value = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=2)
+        if isinstance(value, dict):
+            assessment = classify_tool_evidence(
+                {"name": tool_name, "arguments": arguments, "output": value}
+            )
+            evidence_kind = {
+                "file_content_read": "file_content",
+                "command_content_or_computation": "command_content",
+            }.get(assessment.reason)
+            if evidence_kind:
+                status["evidence_kind"] = evidence_kind
+                source_payload = {
+                    "path": value.get("path"),
+                    "abs_path": value.get("abs_path"),
+                    "cmd": value.get("cmd"),
+                    "arguments": arguments,
+                }
+                source_artifacts = list(
+                    requested_artifacts(json.dumps(source_payload, ensure_ascii=False))
+                )
+                if source_artifacts:
+                    status["source_artifacts"] = source_artifacts
+        compact_value = self.compact_sft_output(value)
+        text_value = (
+            compact_value
+            if isinstance(compact_value, str)
+            else json.dumps(compact_value, ensure_ascii=False, indent=2)
+        )
         lines = text_value.splitlines() or [text_value]
         references = self._reference_tokens(answer)
         selected_indices = {0, len(lines) - 1}
@@ -817,6 +1019,8 @@ class TeacherTraceProjector:
             "disturbance_variable",
             "disturbance_direction",
             "disturbance_magnitude_percent",
+            "disturbance_assumption",
+            "disturbance_source",
             "forecast_window",
             "counterfactual_comparison",
             "total_output_variable_count",
@@ -824,6 +1028,21 @@ class TeacherTraceProjector:
         compact_prediction = {
             key: prediction[key] for key in prediction_keys if key in prediction
         }
+        if not include_auxiliary_variables and "counterfactual_comparison" in compact_prediction:
+            comparison = dict(compact_prediction["counterfactual_comparison"] or {})
+            compact_prediction["counterfactual_comparison"] = {
+                key: comparison[key]
+                for key in (
+                    "mode",
+                    "compared_step_count",
+                    "compared_output_variable_count",
+                    "nonzero_impacted_variable_count",
+                    "baseline_reference",
+                    "disturbance_variable",
+                    "applied_disturbance",
+                )
+                if key in comparison
+            }
         compact_prediction["output_forecast_summary"] = compact_summary
         verification_keys = (
             "requested_categories",
@@ -849,6 +1068,17 @@ class TeacherTraceProjector:
             for key in verification_keys
             if key in verification and key not in {"rule_status", "risk_escalations", "priority_findings"}
         }
+        if "comparable_metrics" in verification:
+            metrics = dict(verification.get("comparable_metrics") or {})
+            compact_verification["comparable_metrics"] = {
+                key: metrics[key]
+                for key in COMPACT_COMPARABLE_METRIC_KEYS
+                if key in metrics
+            }
+            if "energy_evaluation_status" in metrics:
+                compact_verification["comparable_metrics"]["evaluation_status"] = metrics[
+                    "energy_evaluation_status"
+                ]
         compact_verification["priority_findings"] = [
             {
                 key: finding[key]
@@ -885,6 +1115,21 @@ class TeacherTraceProjector:
             for key in ("top_watch_variables", "key_observation_variables")
             if include_auxiliary_variables and evidence.get(key)
         }
+        if evidence.get("boundary_application_evidence"):
+            compact_evidence["boundary_application_evidence"] = [
+                {
+                    key: item[key]
+                    for key in (
+                        "variable",
+                        "mode",
+                        "requested_value",
+                        "input_values_applied",
+                        "verified",
+                    )
+                    if key in item
+                }
+                for item in evidence.get("boundary_application_evidence") or []
+            ]
         task_resolution = dict(output.get("task_resolution") or {})
         compact_resolution = {
             key: task_resolution[key]
@@ -981,6 +1226,31 @@ def build_teacher_record(
 
 
 
+def _ensure_applied_disturbance_disclosure(
+    answer: str,
+    question: str,
+    grounding_contract: Dict[str, Any],
+) -> str:
+    """Prepend missing canonical disturbance evidence without rewriting the answer."""
+    if grounding_contract.get("answer_mode") != "single_forecast":
+        return answer
+    issues = set(comparison_answer_issues(answer, grounding_contract))
+    required_issues = {
+        "applied_disturbance_disclosure_missing",
+        "disturbance_no_op_disclosure_missing",
+    }
+    if not issues.intersection(required_issues):
+        return answer
+    disclosure = applied_disturbance_disclosure(
+        question,
+        grounding_contract,
+    ).strip()
+    if not disclosure:
+        return answer
+    stripped_answer = answer.strip()
+    return disclosure + (f"\n{stripped_answer}" if stripped_answer else "")
+
+
 def _build_teacher_record(
     scenario: Dict[str, Any],
     question: str,
@@ -997,25 +1267,45 @@ def _build_teacher_record(
     scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
     record_id = f"{dataset_source}:{source_session_id}::turn_{turn_id:03d}"
     tool_calls, tool_outputs, pipeformer_results = projector.export_tools(trace)
-    pipeformer_outputs = [item["output"] for item in pipeformer_results]
-    projections = [item["projection"] for item in pipeformer_results]
     pipeformer_call_count = sum(
         item.get("tool_name") == "run_pipeformer_forecast"
         for item in trace.get("tool_calls", [])
     )
+    grounded_tool_outputs = attach_tool_arguments(tool_outputs, tool_calls)
+    history_state = DecisionTraceState.from_history(conversation_context or [])
+    grounding_contract = GroundingContractBuilder().build(
+        question,
+        grounded_tool_outputs,
+        prior_candidate_results=history_state.candidate_results,
+        prior_decision_policy=history_state.decision_policy,
+        prior_decision_policy_source_question=(
+            history_state.decision_policy_source_question
+        ),
+        prior_applied_disturbances=history_state.applied_disturbances,
+        require_decision_policy=True,
+    )
+    candidate_ids = {
+        str(item.get("tool_call_id") or ""): str(item.get("candidate_id") or "")
+        for item in grounding_contract.get("candidate_results") or []
+    }
+    if candidate_ids:
+        pipeformer_results = [
+            item
+            for item in pipeformer_results
+            if str(item.get("tool_call_id") or "") in candidate_ids
+        ]
+    pipeformer_outputs = [item["output"] for item in pipeformer_results]
+    projections = [item["projection"] for item in pipeformer_results]
     pipeformer = pipeformer_outputs[0] if len(pipeformer_outputs) == 1 else None
     projection = projections[0] if len(projections) == 1 else None
     answer = final_answer(trace).strip()
-    answer_quality_flag, quality_issues = evaluate_teacher_quality(
-        answer=answer,
-        question=question,
-        pipeformer=pipeformer,
-        trace_status=trace.get("status"),
-        pipeformer_call_count=pipeformer_call_count,
-        pipeformer_outputs=pipeformer_outputs,
-        conversation_context=conversation_context,
-        tool_outputs=tool_outputs,
+    original_answer = answer
+    answer = _ensure_applied_disturbance_disclosure(
+        answer,
+        question,
+        grounding_contract,
     )
+    disclosure_repair_applied = answer != original_answer
     parsed_task: Dict[str, Any] = {}
     prediction_summary: Dict[str, Any] = {}
     constraint_check: Dict[str, Any] = {}
@@ -1032,37 +1322,106 @@ def _build_teacher_record(
         manual_intervention_label = pipeformer.get("manual_intervention_label")
         dispatch_recommendation = pipeformer.get("dispatch_recommendation")
     elif len(pipeformer_outputs) > 1:
+        def candidate_projection(item: Dict[str, Any], field: str) -> Dict[str, Any]:
+            return {
+                "candidate_id": candidate_ids[str(item["tool_call_id"])],
+                "tool_call_id": str(item["tool_call_id"]),
+                **dict(item["projection"].get(field) or {}),
+            }
+
         parsed_task = {
-            "candidate_forecasts": [item["parsed_task"] for item in projections]
+            "candidate_forecasts": [
+                candidate_projection(item, "parsed_task")
+                for item in pipeformer_results
+            ]
         }
         prediction_summary = {
-            "candidate_forecasts": [item["prediction_summary"] for item in projections]
+            "candidate_forecasts": [
+                candidate_projection(item, "prediction_summary")
+                for item in pipeformer_results
+            ]
         }
         constraint_check = {
-            "candidate_forecasts": [item["constraint_check"] for item in projections]
+            "candidate_forecasts": [
+                candidate_projection(item, "constraint_check")
+                for item in pipeformer_results
+            ]
         }
         evidence = {
-            "candidate_forecasts": [item["evidence"] for item in projections]
+            "candidate_forecasts": [
+                candidate_projection(item, "evidence")
+                for item in pipeformer_results
+            ]
         }
-        risk_rank = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-        intervention_rank = {
-            "no_intervention": 0,
-            "monitoring_only": 1,
-            "operator_attention_required": 2,
-            "immediate_intervention_required": 3,
-        }
-        risk_level = max(
-            (str(output.get("risk_level") or "low") for output in pipeformer_outputs),
-            key=lambda value: risk_rank.get(value, -1),
+        risk_level = grounding_contract.get("worst_case_risk_level")
+        manual_intervention_label = grounding_contract.get(
+            "worst_case_intervention_label"
         )
-        manual_intervention_label = max(
-            (str(output.get("manual_intervention_label") or "no_intervention") for output in pipeformer_outputs),
-            key=lambda value: intervention_rank.get(value, -1),
+        dispatch_recommendation = str(
+            (grounding_contract.get("decision_summary") or {}).get(
+                "selected_dispatch_recommendation"
+            )
+            or ""
         )
-        dispatch_recommendation = next(
-            (str(output.get("dispatch_recommendation")) for output in pipeformer_outputs if output.get("dispatch_recommendation")),
+    quality_question = scenario_evidence_text(scenario, question)
+    csv_evidence = build_csv_evidence(
+        tool_calls,
+        tool_outputs,
+        answer,
+        scope_text=quality_question,
+    )
+    if csv_evidence:
+        evidence["csv_evidence"] = csv_evidence
+    topology_summary = topology_summary_from_tool_outputs(grounded_tool_outputs)
+    if topology_summary:
+        evidence["topology_summary"] = topology_summary
+    decision_summary = dict(grounding_contract.get("decision_summary") or {})
+    fallback_applied = False
+    answer_quality_flag, quality_issues = evaluate_teacher_quality(
+        answer=answer,
+        question=question,
+        pipeformer=pipeformer,
+        trace_status=trace.get("status"),
+        pipeformer_call_count=pipeformer_call_count,
+        pipeformer_outputs=pipeformer_outputs,
+        conversation_context=conversation_context,
+        tool_outputs=grounded_tool_outputs,
+        record_evidence=evidence,
+        grounding_contract=grounding_contract,
+    )
+    if (
+        grounding_contract.get("answer_mode") == "dispatch_comparison"
+        and quality_issues
+    ):
+        fallback_answer = grounded_fallback_answer(question, grounding_contract)
+        fallback_flag, fallback_issues = evaluate_teacher_quality(
+            answer=fallback_answer,
+            question=question,
+            pipeformer=pipeformer,
+            trace_status=trace.get("status"),
+            pipeformer_call_count=pipeformer_call_count,
+            pipeformer_outputs=pipeformer_outputs,
+            conversation_context=conversation_context,
+            tool_outputs=grounded_tool_outputs,
+            record_evidence=evidence,
+            grounding_contract=grounding_contract,
+        )
+        if len(fallback_issues) < len(quality_issues):
+            answer = fallback_answer
+            answer_quality_flag = fallback_flag
+            quality_issues = fallback_issues
+            fallback_applied = True
+    verified_numeric_claims = [
+        value
+        for value in dict.fromkeys(numeric_claim_values(answer))
+        if numeric_claims_are_grounded(
+            str(value),
             "",
+            {"pipeformer_outputs": pipeformer_outputs},
         )
+    ]
+    if verified_numeric_claims:
+        evidence["verified_numeric_claims"] = verified_numeric_claims
     if quality_issues:
         logger.warning("Teacher answer requires review: %s", ", ".join(quality_issues))
 
@@ -1076,6 +1435,9 @@ def _build_teacher_record(
         "turn_id": turn_id,
         "scenario_type": scenario.get("scenario_type"),
         "split": split,
+        "answer_mode": grounding_contract.get("answer_mode"),
+        "grounding_contract": projector.sanitize(grounding_contract),
+        "decision_summary": projector.sanitize(decision_summary),
         "conversation_context": projector.sanitize(conversation_context or []),
         "user_input": question,
         "parsed_task": projector.sanitize(parsed_task),
@@ -1092,6 +1454,25 @@ def _build_teacher_record(
         "quality_flag": answer_quality_flag,
         "quality_issues": quality_issues,
     }
+    if grounding_contract.get("decision_policy"):
+        record["decision_policy"] = projector.sanitize(
+            grounding_contract["decision_policy"]
+        )
+    if disclosure_repair_applied:
+        record["repair_provenance"] = {
+            "method": "deterministic_disturbance_disclosure",
+            "external_llm_calls": 0,
+            "reason": (
+                "Canonical applied-disturbance wording was prepended from stored "
+                "execution evidence without changing the model's substantive answer."
+            ),
+        }
+    elif fallback_applied:
+        record["repair_provenance"] = {
+            "method": "deterministic_grounding_contract",
+            "external_llm_calls": 0,
+            "reason": "Multi-candidate answer rebuilt from stored tool evidence.",
+        }
     native_quality = native_evaluator.evaluate(
         record,
         hard_issues=quality_issues,
@@ -1114,7 +1495,241 @@ def _turn_trace(full_trace: Dict[str, Any], message_start: int, tool_start: int)
     }
 
 
+def _pipeformer_history_summary(record: Dict[str, Any]) -> Dict[str, Any]:
+    prediction = dict(record.get("prediction_summary") or {})
+    verification = dict(record.get("constraint_check") or {})
+    evidence = dict(record.get("evidence") or {})
+    stored_contract = dict(record.get("grounding_contract") or {})
+    if (
+        stored_contract.get("answer_mode") == "dispatch_comparison"
+        and stored_contract.get("candidate_results")
+    ):
+        return _without_none_values({
+            "candidate_results": stored_contract.get("candidate_results") or [],
+            "decision_summary": stored_contract.get("decision_summary") or {},
+            "comparison_leaders": stored_contract.get("comparison_leaders") or {},
+            "applied_disturbances": (
+                stored_contract.get("applied_disturbances") or []
+            ),
+            "worst_case_risk_level": stored_contract.get(
+                "worst_case_risk_level"
+            ),
+            "worst_case_intervention_label": stored_contract.get(
+                "worst_case_intervention_label"
+            ),
+        })
+
+    def project(
+        candidate_prediction: Dict[str, Any],
+        candidate_verification: Dict[str, Any],
+        candidate_evidence: Dict[str, Any],
+        *,
+        include_record_decision: bool,
+    ) -> Dict[str, Any]:
+        summary = {
+            key: candidate_prediction.get(key)
+            for key in ("candidate_id", "tool_call_id", "forecast_mode", "case_id", "forecast_horizon_minutes")
+            if candidate_prediction.get(key) is not None
+        }
+        disturbance = _without_none_values({
+            "variable": candidate_prediction.get("disturbance_variable"),
+            "direction": candidate_prediction.get("disturbance_direction"),
+            "magnitude_percent": candidate_prediction.get("disturbance_magnitude_percent"),
+        })
+        applied_disturbances = (
+            list(stored_contract.get("applied_disturbances") or [])
+            if include_record_decision
+            else []
+        )
+        if applied_disturbances:
+            matching_disturbance = next(
+                (
+                    item
+                    for item in applied_disturbances
+                    if item.get("variable") == disturbance.get("variable")
+                ),
+                applied_disturbances[0],
+            )
+            if matching_disturbance.get("mode") == "setpoint":
+                disturbance["setpoint"] = matching_disturbance.get(
+                    "requested_value"
+                )
+        if disturbance:
+            summary["disturbance"] = disturbance
+        if applied_disturbances:
+            summary["applied_disturbances"] = applied_disturbances
+        counterfactual = dict(candidate_prediction.get("counterfactual_comparison") or {})
+        if counterfactual:
+            if counterfactual.get("top_impacted_variables"):
+                counterfactual["top_impacted_variables"] = list(counterfactual["top_impacted_variables"])[:5]
+            summary["counterfactual_comparison"] = counterfactual
+        summary.update(_without_none_values({
+            "category_status": candidate_verification.get("category_status"),
+            "verification_complete": candidate_verification.get("verification_complete"),
+            "risk_level": (
+                candidate_verification.get("risk_level")
+                or (record.get("risk_level") if include_record_decision else None)
+            ),
+            "human_intervention_label": (
+                candidate_verification.get("human_intervention_label")
+                or (record.get("manual_intervention_label") if include_record_decision else None)
+            ),
+        }))
+        comparable_metrics = dict(candidate_verification.get("comparable_metrics") or {})
+        if comparable_metrics:
+            summary["comparable_metrics"] = {
+                key: comparable_metrics[key]
+                for key in (*COMPACT_COMPARABLE_METRIC_KEYS, "energy_evaluation_status")
+                if key in comparable_metrics
+            }
+        findings = []
+        for finding in list(candidate_verification.get("priority_findings") or [])[:5]:
+            compact = {
+                key: finding.get(key)
+                for key in ("name", "category", "status", "flag", "priority", "affected_variables")
+                if finding.get(key) is not None
+            }
+            compact["evaluated_values"] = [
+                {
+                    key: item.get(key)
+                    for key in (
+                        "variable",
+                        "metric",
+                        "value",
+                        "status",
+                        "warning_threshold",
+                        "fail_threshold",
+                        "warning_margin",
+                        "fail_margin",
+                    )
+                    if item.get(key) is not None
+                }
+                for item in list(finding.get("evaluated_values") or [])[:3]
+            ]
+            findings.append(_without_none_values(compact))
+        if findings:
+            summary["priority_findings"] = findings
+        watches = []
+        for item in list(candidate_evidence.get("top_watch_variables") or [])[:3]:
+            watches.append({
+                key: item.get(key)
+                for key in (
+                    "variable",
+                    "role",
+                    "metric",
+                    "value",
+                    "status",
+                    "mean_prediction",
+                    "mean_abs_delta_vs_observed",
+                )
+                if item.get(key) is not None
+            })
+        if watches:
+            summary["top_watch_variables"] = watches
+        return summary
+
+    candidate_predictions = list(prediction.get("candidate_forecasts") or [])
+    if not candidate_predictions:
+        return project(prediction, verification, evidence, include_record_decision=True)
+
+    contract = GroundingContractBuilder().build(
+        str(record.get("user_input") or ""),
+        attach_tool_arguments(
+            record.get("tool_outputs") or [],
+            record.get("tool_calls") or [],
+        ),
+        decision_policy=dict(record.get("decision_policy") or {}) or None,
+    )
+    if contract.get("answer_mode") == "dispatch_comparison":
+        return _without_none_values({
+            "candidate_results": contract.get("candidate_results") or [],
+            "decision_summary": contract.get("decision_summary") or {},
+            "comparison_leaders": contract.get("comparison_leaders") or {},
+            "worst_case_risk_level": contract.get("worst_case_risk_level"),
+            "worst_case_intervention_label": contract.get(
+                "worst_case_intervention_label"
+            ),
+        })
+
+    candidate_checks = list(verification.get("candidate_forecasts") or [])
+    candidate_evidence = list(evidence.get("candidate_forecasts") or [])
+
+    def matching(items: List[Dict[str, Any]], candidate: Dict[str, Any]) -> Dict[str, Any]:
+        for item in items:
+            if any(
+                candidate.get(key) is not None and candidate.get(key) == item.get(key)
+                for key in ("tool_call_id", "candidate_id")
+            ):
+                return item
+        return {}
+
+    return _without_none_values({
+        "candidate_forecasts": [
+            project(
+                candidate,
+                matching(candidate_checks, candidate),
+                matching(candidate_evidence, candidate),
+                include_record_decision=False,
+            )
+            for candidate in candidate_predictions
+        ],
+        "worst_case_risk_level": record.get("risk_level"),
+        "worst_case_intervention_label": record.get("manual_intervention_label"),
+    })
+
+
 def _history_turn(record: Dict[str, Any]) -> Dict[str, Any]:
+    requested = requested_artifacts(str(record.get("user_input") or ""))
+    outputs = attach_tool_arguments(
+        record.get("tool_outputs") or [], record.get("tool_calls") or []
+    )
+    assessments = [
+        classify_tool_evidence(item, requested=requested)
+        for item in outputs
+    ]
+    evidence_artifacts = sorted({
+        artifact
+        for assessment in assessments if assessment.evidence_found
+        for artifact in assessment.matched_artifacts
+    })
+    evidence_found = any(assessment.evidence_found for assessment in assessments)
+    record_evidence = dict(record.get("evidence") or {})
+    verified_evidence_summary = {
+        key: record_evidence[key]
+        for key in ("csv_evidence", "topology_summary")
+        if evidence_found and record_evidence.get(key)
+    }
+    pipeformer_evidence_found = any(
+        assessment.evidence_found
+        and str(item.get("name") or "").casefold() == "run_pipeformer_forecast"
+        for item, assessment in zip(outputs, assessments)
+    )
+    stored_contract = dict(record.get("grounding_contract") or {})
+    stored_pipeformer_state = bool(
+        stored_contract.get("candidate_results")
+        and stored_contract.get("answer_mode")
+        in {"single_forecast", "dispatch_comparison"}
+    )
+    if pipeformer_evidence_found or stored_pipeformer_state:
+        pipeformer_summary = _pipeformer_history_summary(record)
+        if pipeformer_summary:
+            verified_evidence_summary["pipeformer"] = pipeformer_summary
+    compact_calls = [
+        {
+            "tool_call_id": item.get("tool_call_id"),
+            "name": item.get("name"),
+            "arguments": DEFAULT_PROJECTOR._compact_call_arguments(
+                item.get("arguments") or {},
+                pipeformer=item.get("name") == "run_pipeformer_forecast",
+            ),
+        }
+        for item in record.get("tool_calls") or []
+        if str(item.get("tool_call_id") or "") in {
+            str(output.get("tool_call_id") or "")
+            for output, assessment in zip(outputs, assessments)
+            if assessment.evidence_found
+        }
+    ]
     return _without_none_values(
         {
             "session_id": record["session_id"],
@@ -1122,6 +1737,14 @@ def _history_turn(record: Dict[str, Any]) -> Dict[str, Any]:
             "user_input": record["user_input"],
             "assistant_output": record.get("final_answer"),
             "quality_flag": record.get("quality_flag"),
+            "grounding_verified": (
+                record.get("quality_flag") == "pass"
+                and (evidence_found or stored_pipeformer_state)
+            ),
+            "evidence_artifacts": evidence_artifacts,
+            "verified_evidence_summary": verified_evidence_summary or None,
+            "parsed_task": compact_parsed_task(dict(record.get("parsed_task") or {})),
+            "tool_calls": compact_calls or None,
         }
     )
 
@@ -1200,6 +1823,7 @@ def run_backend_session(
         logger.info("Turn started: scenario=%s session=%s turn=%d question=%s", scenario_id, source_session_id, turn_id, short_text(question, 300))
         try:
             def validate_answer(answer: str, completed_calls: List[Dict[str, Any]]) -> List[str]:
+                history_state = DecisionTraceState.from_history(history)
                 outputs = [
                     item["output"]
                     for item in completed_calls
@@ -1207,16 +1831,36 @@ def run_backend_session(
                     and isinstance(item.get("output"), dict)
                     and item["output"].get("success")
                 ]
-                return answer_quality_issues(
+                issues = answer_quality_issues(
                     answer,
                     question,
                     outputs[0] if len(outputs) == 1 else None,
                     conversation_context=history,
                     tool_outputs=completed_calls,
+                    record_evidence={
+                        "topology_summary": topology_summary_from_tool_outputs(completed_calls)
+                    },
                 )
+                contract = GroundingContractBuilder().build(
+                    question,
+                    completed_calls,
+                    require_decision_policy=True,
+                    prior_candidate_results=history_state.candidate_results,
+                    prior_decision_policy=history_state.decision_policy,
+                    prior_decision_policy_source_question=(
+                        history_state.decision_policy_source_question
+                    ),
+                    prior_applied_disturbances=history_state.applied_disturbances,
+                )
+                issues.extend(comparison_answer_issues(answer, contract))
+                return list(dict.fromkeys(issues))
 
             result = orchestrator.run_agent(
-                AgentChatRequest(agent_id=args.agent_id, session_id=runtime_session_id, message=question),
+                AgentChatRequest(
+                    agent_id=args.agent_id,
+                    session_id=runtime_session_id,
+                    message=agent_turn_message(scenario, question, history),
+                ),
                 answer_validator=validate_answer,
             )
             trace_path = Path(result.trace_summary.trace_path)
@@ -1312,6 +1956,7 @@ def write_split_records(
         "tool_calls",
         "tool_outputs",
         "evidence",
+        "decision_summary",
         "final_answer",
     )
     written_count = 0
@@ -1321,11 +1966,7 @@ def write_split_records(
             if item.get("split") != split:
                 continue
             projected = {key: item[key] for key in sft_fields if key in item}
-            full_grounding_evidence = {
-                "conversation_context": projected.get("conversation_context", []),
-                "tool_outputs": projected.get("tool_outputs", []),
-                "evidence": projected.get("evidence", {}),
-            }
+            full_grounding_evidence = numeric_grounding_evidence(item)
             projected["tool_calls"], projected["tool_outputs"] = DEFAULT_PROJECTOR.compact_sft_trajectory(
                 list(projected.get("tool_calls") or []),
                 list(projected.get("tool_outputs") or []),
@@ -1348,11 +1989,7 @@ def write_split_records(
             if supporting_values:
                 projected_evidence["supporting_numeric_values"] = supporting_values
             projected["evidence"] = projected_evidence
-            compact_evidence = {
-                "conversation_context": projected.get("conversation_context", []),
-                "tool_outputs": projected["tool_outputs"],
-                "evidence": projected.get("evidence", {}),
-            }
+            compact_evidence = numeric_grounding_evidence(projected)
             if not numeric_claims_are_grounded(
                 str(projected.get("final_answer") or ""),
                 str(projected.get("user_input") or ""),
@@ -1387,6 +2024,17 @@ class TeacherTraceGenerator:
 
 def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceStore) -> int:
     configure_logging(args.log_level)
+    replacement_mode = bool(getattr(args, "replace_selected_scenario", False))
+    if replacement_mode:
+        if args.force:
+            raise ValueError("--replace-selected-scenario cannot be combined with --force.")
+        if not args.dataset_source or not args.scenario_id:
+            raise ValueError(
+                "--replace-selected-scenario requires both --dataset-source and --scenario-id."
+            )
+        if args.session_id:
+            raise ValueError("Scenario replacement must regenerate every session; omit --session-id.")
+
     scenario_files = list(args.scenario_file or default_scenario_files())
     all_sources = load_scenario_sources(scenario_files)
     selected_sources = [
@@ -1425,13 +2073,45 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
         existing_records = store.load_master()
         existing_session_records = store.load_sessions()
 
+    if replacement_mode:
+        missing_targets = []
+        target = {
+            "dataset_source": str(args.dataset_source),
+            "scenario_id": str(args.scenario_id),
+        }
+        if not store.contains_scenario(existing_records, **target):
+            missing_targets.append("master teacher trace")
+        if not store.contains_scenario(existing_session_records, **target):
+            missing_targets.append("session teacher trace")
+        if missing_targets:
+            raise ValueError(
+                "Cannot replace the selected scenario because it is absent from "
+                + " and ".join(missing_targets)
+                + "; no LLM calls were made."
+            )
     preflight_sources, missing_preflight_pairs = combined_preflight_sources(
         all_sources,
         selected_sources,
         existing_records,
     )
     preflight = validate_scenario_sources(preflight_sources or selected_sources, args.mapping_csv)
-    preflight["append_mode"] = not args.force
+    selected_preflight = validate_scenario_sources(selected_sources, args.mapping_csv)
+    preflight["selected_data_files"] = {
+        "required_data_file_count": selected_preflight["required_data_file_count"],
+        "required_data_files": selected_preflight["required_data_files"],
+        "missing_data_file_count": selected_preflight["missing_data_file_count"],
+        "missing_data_files": selected_preflight["missing_data_files"],
+    }
+    # Data availability blocks only the scenarios selected for this run. The
+    # broader report still audits existing sources for collisions and coverage.
+    preflight["supported"] = (
+        not preflight["unsupported_variables"]
+        and preflight["variable_registry"]["supported"]
+        and not selected_preflight["missing_data_files"]
+        and not selected_preflight.get("missing_target_mappings")
+    )
+    preflight["append_mode"] = not args.force and not replacement_mode
+    preflight["replacement_mode"] = replacement_mode
     preflight["existing_record_count"] = len(existing_records)
     preflight["unavailable_existing_scenarios"] = missing_preflight_pairs
     write_json(args.preflight_output, preflight, force=True)
@@ -1444,6 +2124,16 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
             problems.append(
                 "variables absent from mapping: "
                 + ", ".join(preflight["unsupported_variables"])
+            )
+        if selected_preflight["missing_data_files"]:
+            problems.append(
+                "pipeline data files not found: "
+                + ", ".join(selected_preflight["missing_data_files"])
+            )
+        if selected_preflight.get("missing_target_mappings"):
+            problems.append(
+                "consumer supply points missing canonical topology mappings: "
+                + ", ".join(selected_preflight["missing_target_mappings"])
             )
         problems.extend(preflight["variable_registry"]["errors"])
         raise ValueError("Scenario preflight failed; " + "; ".join(problems))
@@ -1474,7 +2164,8 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
         expected_sample_ids = store.sample_ids(scenario)
         expected_session_ids = store.session_ids(scenario)
         if (
-            expected_sample_ids
+            not replacement_mode
+            and expected_sample_ids
             and set(expected_sample_ids) <= existing_sample_ids
             and set(expected_session_ids) <= existing_session_ids
         ):
@@ -1502,17 +2193,58 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
             records.extend(turn_records)
             session_records.append(session_record)
 
-    combined_records, duplicate_record_count = store.merge_records(
-        existing_records,
-        records,
-        id_field="sample_id",
-    )
-    combined_session_records, updated_session_count = store.merge_sessions(
-        existing_session_records,
-        session_records,
-    )
+    failed_sessions = sum(not bool(item.get("complete")) for item in session_records)
+    removed_record_count = 0
+    removed_session_count = 0
+    if replacement_mode:
+        if failed_sessions:
+            raise RuntimeError(
+                "Scenario replacement was not written because at least one regenerated session failed."
+            )
+        selected_scenario = scenarios[0]
+        expected_sample_ids = set(store.sample_ids(selected_scenario))
+        expected_session_ids = set(store.session_ids(selected_scenario))
+        generated_sample_ids = {str(item.get("sample_id") or "") for item in records}
+        generated_session_ids = {
+            str(item.get("session_record_id") or "") for item in session_records
+        }
+        if generated_sample_ids != expected_sample_ids:
+            raise ValueError(
+                "Scenario replacement is incomplete: generated sample ids do not match the source definition."
+            )
+        if generated_session_ids != expected_session_ids:
+            raise ValueError(
+                "Scenario replacement is incomplete: generated session ids do not match the source definition."
+            )
+        combined_records, removed_record_count = store.replace_scenario(
+            existing_records,
+            records,
+            dataset_source=str(args.dataset_source),
+            scenario_id=str(args.scenario_id),
+            id_field="sample_id",
+        )
+        combined_session_records, removed_session_count = store.replace_scenario(
+            existing_session_records,
+            session_records,
+            dataset_source=str(args.dataset_source),
+            scenario_id=str(args.scenario_id),
+            id_field="session_record_id",
+        )
+        duplicate_record_count = 0
+        updated_session_count = 0
+        appended_record_count = 0
+    else:
+        combined_records, duplicate_record_count = store.merge_records(
+            existing_records,
+            records,
+            id_field="sample_id",
+        )
+        combined_session_records, updated_session_count = store.merge_sessions(
+            existing_session_records,
+            session_records,
+        )
+        appended_record_count = len(combined_records) - len(existing_records)
     store.validate_splits(combined_records)
-    appended_record_count = len(combined_records) - len(existing_records)
 
     logger.info("Writing combined JSONL output: %s", args.output_jsonl)
     logger.info("Writing pretty JSON output: %s", args.output_json)
@@ -1525,12 +2257,11 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
         combined_records,
         force=True,
     )
-    failed_sessions = sum(not bool(item.get("complete")) for item in session_records)
     total_failed_sessions = sum(not bool(item.get("complete")) for item in combined_session_records)
     quality_pass_records = sum(item.get("quality_flag") == "pass" for item in combined_records)
     if failed_sessions:
         run_status = "completed_with_errors"
-    elif not appended_record_count and existing_records:
+    elif not replacement_mode and not appended_record_count and existing_records:
         run_status = "no_changes"
     elif sft_record_count < len(combined_records):
         run_status = "completed_with_quality_issues"
@@ -1550,7 +2281,12 @@ def run_teacher_trace_generation(args: argparse.Namespace, store: TeacherTraceSt
         json.dumps(
             {
                 "status": run_status,
-                "append_mode": not args.force,
+                "append_mode": not args.force and not replacement_mode,
+                "replacement_mode": replacement_mode,
+                "replaced_dataset_source": args.dataset_source if replacement_mode else None,
+                "replaced_scenario_id": args.scenario_id if replacement_mode else None,
+                "removed_records": removed_record_count,
+                "removed_sessions": removed_session_count,
                 "records": len(combined_records),
                 "generated_records": len(records),
                 "appended_records": appended_record_count,

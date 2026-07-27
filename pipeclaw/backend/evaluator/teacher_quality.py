@@ -4,10 +4,25 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from .csv_evidence import build_csv_evidence
+from .grounding_contract import GroundingContractBuilder, comparison_answer_issues
+from .tool_evidence import (
+    DATA_FILE_REFERENCE,
+    ToolEvidenceState,
+    attach_tool_arguments,
+    classify_tool_evidence,
+    requested_artifacts,
+    tool_output_failed,
+)
+from .topology_evidence import (
+    topology_quality_issues,
+    topology_summary_from_tool_outputs,
+    topology_tool_required,
+)
 
 UNSUPPORTED_HISTORY_CLAIM = re.compile(
-    r"\b(?:reproduc(?:ed|ible|ibility|tion)?|previous runs?|prior runs?|stable across runs?|times stable)\b"
-    r"|复现|此前.*(?:结果|运行)|前(?:几|[一二三四五六七八九十\d]+)次.*一致|稳定.*(?:复现|运行)",
+    r"\b(?:reproduced (?:in|across|during)|reproducible across|previous runs?|prior runs?|stable across runs?|times stable)\b"
+    r"|(?:已|曾|多次|稳定|结果).{0,12}复现|此前.*(?:结果|运行)|前(?:几|[一二三四五六七八九十\d]+)次.*一致|稳定.*运行",
     re.IGNORECASE,
 )
 NO_DISPATCH_REQUEST = re.compile(
@@ -42,22 +57,62 @@ NO_IMPACT_COUNTERFACTUAL_CLAIM = re.compile(
 )
 NUMERIC_CLAIM = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
+    r"(?:[eE][-+]?\d+)?"
 )
-DATE_REFERENCE = re.compile(
-    r"(?<!\d)(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|\d{4}年\d{1,2}月\d{1,2}日)(?!\d)"
+NUMERIC_SIGN_TRANSLATION = str.maketrans({
+    "\u2212": "-",
+    "\ufe63": "-",
+    "\uff0d": "-",
+})
+CANDIDATE_IDENTIFIER = re.compile(
+    r"\bcandidate_[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*\b",
+    re.IGNORECASE,
+)
+TIME_RANGE = re.compile(
+    r"(?P<first>\d+(?:\.\d+)?)\s*(?:-|–|—|~|～|to|through|到|至)\s*"
+    r"(?P<second>\d+(?:\.\d+)?)\s*"
+    r"(?P<unit>hours?|hrs?|hr|h|小时|小時|minutes?|mins?|min|分钟|分鐘)",
+    re.IGNORECASE,
+)
+TIME_VALUE = re.compile(
+    r"(?P<value>\d+(?:\.\d+)?)\s*"
+    r"(?P<unit>hours?|hrs?|hr|h|小时|小時|minutes?|mins?|min|分钟|分鐘)",
+    re.IGNORECASE,
+)
+_FULL_DATE_PATTERN = (
+    r"(?:\d{4}[-/.]\d{1,2}[-/.]\d{1,2}|"
+    r"\d{4}\u5e74\d{1,2}\u6708\d{1,2}\u65e5)"
+)
+_SHORT_DATE_PATTERN = (
+    r"(?:\d{1,2}[-/.]\d{1,2}|\d{1,2}(?:\u65e5|\u53f7))"
+)
+DATE_RANGE_REFERENCE = re.compile(
+    rf"(?<!\d){_FULL_DATE_PATTERN}\s*"
+    r"(?:-|\u2013|\u2014|~|\uff5e|to|through|\u5230|\u81f3)\s*"
+    rf"(?:{_FULL_DATE_PATTERN}|{_SHORT_DATE_PATTERN})(?!\d)",
+    re.IGNORECASE,
+)
+DATE_REFERENCE = re.compile(rf"(?<!\d){_FULL_DATE_PATTERN}(?!\d)")
+COMPACT_DATE_REFERENCE = re.compile(
+    r"(?<!\d)(?:19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])(?!\d)"
 )
 YEAR_REFERENCE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?=年|[-/.]\d)")
-VARIABLE_REFERENCE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
+VARIABLE_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?(?![A-Za-z0-9_:])"
+)
 EVIDENCE_DESCRIPTION_TERM = re.compile(
     r"代理|调压器|压缩机|压缩比|流量|压力|管存|阀门|球阀|节点"
     r"|\b(?:proxy|regulator|compressor|compression ratio|flow|pressure|linepack|valve|node|segment)\b",
     re.IGNORECASE,
 )
 ANSWER_FORMAT_VIOLATION = re.compile(r"(?m)^\s*#{1,6}\s|```|^\s*\|.*\|\s*$")
-DATA_FILE_REFERENCE = re.compile(r"(?i)(?<![\w.-])[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)(?![\w.-])")
 OPERATIONAL_INFERENCE_CLAIM = re.compile(
     r"稳定承载|真实受限|(?:不|无|没有).{0,8}(?:瓶颈|受限)|(?:局部)?(?:量测|测量)(?:问题|故障)|供需平衡"
     r"|\b(?:stable operation|capacity bottleneck|measurement (?:issue|fault)|supply.demand balance)\b",
+    re.IGNORECASE,
+)
+SUPPLY_DEMAND_BALANCE_CLAIM = re.compile(
+    r"供需平衡|\bsupply.demand balance\b",
     re.IGNORECASE,
 )
 INFERENCE_QUALIFIER = re.compile(
@@ -65,6 +120,59 @@ INFERENCE_QUALIFIER = re.compile(
     r"|\b(?:cannot|insufficient|unresolved|preliminary|may|might|likely|appears?)\b",
     re.IGNORECASE,
 )
+UNSUPPORTED_UNIT_CLAIM = re.compile(
+    r"(?i)(?:万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)"
+)
+UNSUPPORTED_ABSOLUTE_ASSERTION = re.compile(
+    r"最敏感|不丢失(?:任何)?(?:关键)?信息|就能判断|必然(?:导致|说明)|"
+    r"合并为|整段已合并|"
+    r"\bmost sensitive\b|\b(?:lose|loses) no (?:important )?information\b|"
+    r"\bcan determine\b|\bmerged into\b|\bguarantees?\b",
+    re.IGNORECASE,
+)
+
+
+def _disturbance_assumption_magnitudes(pipeformer: Dict[str, Any]) -> List[float]:
+    magnitudes: List[float] = []
+
+    def collect(value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        assumption = value.get("disturbance_assumption")
+        if isinstance(assumption, dict) and assumption.get("source") == "llm_assumption":
+            magnitude = value.get("disturbance_magnitude_percent")
+            if magnitude is not None:
+                magnitudes.append(abs(float(magnitude)))
+
+    collect(pipeformer.get("parsed_task"))
+    collect(pipeformer.get("prediction_summary"))
+    collect(pipeformer.get("prediction"))
+    for candidate in pipeformer.get("candidate_forecasts") or []:
+        if not isinstance(candidate, dict):
+            continue
+        collect(candidate)
+        collect(candidate.get("parsed_task"))
+        collect(candidate.get("prediction_summary"))
+        collect(candidate.get("prediction"))
+    return list(dict.fromkeys(magnitudes))
+
+
+def _disturbance_assumption_is_disclosed(answer: str, pipeformer: Dict[str, Any]) -> bool:
+    magnitudes = _disturbance_assumption_magnitudes(pipeformer)
+    if not magnitudes:
+        return True
+    if not re.search(
+        r"(?:假设|临时假设|暂按|暂定|暂设|本次按|LLM假设|LLM暂定|LLM暂设|LLM临时假设"
+        r"|assum(?:e|ed|ption)|provisional)",
+        answer,
+        re.IGNORECASE,
+    ):
+        return False
+    answer_numbers = _numbers_in_text(answer)
+    return all(
+        any(abs(abs(claimed) - expected) < 1e-6 for claimed in answer_numbers)
+        for expected in magnitudes
+    )
 
 
 def answer_quality_issues(
@@ -81,6 +189,8 @@ def answer_quality_issues(
         issues.append("missing_llm_final_answer")
     if pipeformer and UNSUPPORTED_HISTORY_CLAIM.search(answer):
         issues.append("unsupported_execution_history_or_repeatability_claim")
+    if pipeformer and not _disturbance_assumption_is_disclosed(answer, pipeformer):
+        issues.append("undisclosed_disturbance_assumption")
     if NO_DISPATCH_REQUEST.search(question) and DISPATCH_ADVICE.search(answer):
         issues.append("unrequested_dispatch_recommendation")
     if pipeformer and safety_and_energy_checks_pass(pipeformer):
@@ -95,18 +205,16 @@ def answer_quality_issues(
         and not _counterfactual_supports_claim(answer, pipeformer)
     ):
         issues.append("unsupported_causal_or_propagation_claim")
-    trusted_context = [
-        {
-            key: value
-            for key, value in item.items()
-            if key != "assistant_output" or item.get("quality_flag") == "pass"
-        }
-        for item in conversation_context or []
-    ]
+    trusted_context = []
+    for item in conversation_context or []:
+        trusted = dict(item)
+        if item.get("grounding_verified") is not True:
+            trusted.pop("assistant_output", None)
+        trusted_context.append(trusted)
     trusted_tool_outputs = [
         item
         for item in tool_outputs or []
-        if not tool_output_failed(item.get("output"))
+        if not tool_output_failed(item)
     ]
     grounding_evidence: Any = {
         "pipeformer": pipeformer or {},
@@ -114,8 +222,18 @@ def answer_quality_issues(
         "tool_outputs": trusted_tool_outputs,
         "record_evidence": record_evidence or {},
     }
+    if not requested_data_retrieved(question, tool_outputs or [], conversation_context or []):
+        issues.append("requested_evidence_not_retrieved")
+    if topology_tool_required(question) and not topology_summary_from_tool_outputs(tool_outputs or []):
+        issues.append("required_topology_tool_not_called")
     if not numeric_claims_are_grounded(answer, question, grounding_evidence):
         issues.append("unsupported_numerical_claim")
+    issues.extend(
+        topology_quality_issues(
+            answer,
+            dict((record_evidence or {}).get("topology_summary") or {}),
+        )
+    )
     requested_files = {value.lower() for value in DATA_FILE_REFERENCE.findall(question)}
     answer_files = {value.lower() for value in DATA_FILE_REFERENCE.findall(answer)}
     if requested_files and answer_files - requested_files:
@@ -127,11 +245,52 @@ def answer_quality_issues(
         and not _operational_inference_is_grounded(answer, grounding_evidence)
     ):
         issues.append("unsupported_operational_inference_claim")
-    if pipeformer and not _variable_references_are_grounded(answer, pipeformer):
+    if not pipeformer and UNSUPPORTED_PROPAGATION_CLAIM.search(answer):
+        if not INFERENCE_QUALIFIER.search(answer) and not _operational_inference_is_grounded(answer, grounding_evidence):
+            issues.append("unsupported_causal_or_propagation_claim")
+    evidence_text = json.dumps(grounding_evidence, ensure_ascii=False).casefold()
+    if any(
+        match.group(0).casefold() not in evidence_text
+        for match in UNSUPPORTED_UNIT_CLAIM.finditer(answer)
+    ):
+        issues.append("unsupported_unit_claim")
+    if UNSUPPORTED_ABSOLUTE_ASSERTION.search(answer) and not _absolute_assertion_is_grounded(
+        answer, grounding_evidence
+    ):
+        issues.append("unsupported_absolute_or_topology_claim")
+    if pipeformer and not _variable_references_are_grounded(answer, grounding_evidence):
         issues.append("unsupported_variable_reference")
     if pipeformer and _has_unsupported_evidence_description(answer, pipeformer):
         issues.append("unsupported_evidence_variable_description")
-    if len(answer) > (500 if pipeformer else 1200):
+    has_forecast_result = bool(
+        pipeformer
+        and any(
+            pipeformer.get(key)
+            for key in (
+                "prediction",
+                "prediction_summary",
+                "verification",
+                "constraint_check",
+                "parsed_task",
+                "candidate_forecasts",
+            )
+        )
+    )
+    successful_forecast_count = sum(
+        item.get("name") == "run_pipeformer_forecast"
+        and isinstance(item.get("output"), dict)
+        and item["output"].get("success") is True
+        for item in tool_outputs or []
+    )
+    saved_candidates = list(dict(pipeformer or {}).get("candidate_forecasts") or [])
+    is_forecast_comparison = successful_forecast_count > 1 or len(saved_candidates) > 1
+    has_chinese = any("\u4e00" <= character <= "\u9fff" for character in answer)
+    if has_forecast_result or successful_forecast_count:
+        if has_chinese and len(answer) > (650 if is_forecast_comparison else 500):
+            issues.append("answer_too_long")
+        if not has_chinese and len(answer.split()) > 160:
+            issues.append("answer_too_long")
+    elif len(answer) > 1200:
         issues.append("answer_too_long")
     if pipeformer and (
         ANSWER_FORMAT_VIOLATION.search(answer)
@@ -151,6 +310,8 @@ def evaluate_teacher_quality(
     pipeformer_outputs: List[Dict[str, Any]],
     conversation_context: Optional[List[Dict[str, Any]]] = None,
     tool_outputs: Optional[List[Dict[str, Any]]] = None,
+    record_evidence: Optional[Dict[str, Any]] = None,
+    grounding_contract: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, List[str]]:
     outputs = tool_outputs or []
     issues = answer_quality_issues(
@@ -159,19 +320,23 @@ def evaluate_teacher_quality(
         pipeformer,
         conversation_context=conversation_context,
         tool_outputs=outputs,
+        record_evidence=record_evidence,
     )
-    failed_indices = [
-        index
-        for index, item in enumerate(outputs)
-        if tool_output_failed(item.get("output"))
-    ]
-    successful_outputs = [
-        item
-        for item in outputs
-        if not tool_output_failed(item.get("output"))
-    ]
-    if failed_indices and not successful_outputs:
-        issues.append("tool_execution_failed")
+    contract = (
+        dict(grounding_contract)
+        if grounding_contract is not None
+        else GroundingContractBuilder().build(question, outputs)
+    )
+    issues.extend(comparison_answer_issues(answer, contract))
+    assessments = [classify_tool_evidence(item) for item in outputs]
+    if assessments and not any(item.evidence_found for item in assessments):
+        if any(item.state is ToolEvidenceState.EXECUTION_FAILED for item in assessments):
+            issues.append("tool_execution_failed")
+        if any(
+            item.state in {ToolEvidenceState.NO_EVIDENCE, ToolEvidenceState.LOCATOR_ONLY}
+            for item in assessments
+        ):
+            issues.append("tool_evidence_unavailable")
     issues = list(dict.fromkeys(issues))
     forecasts_pass = (
         (pipeformer_call_count == 0 or bool(pipeformer_outputs))
@@ -209,8 +374,21 @@ def numeric_claims_are_grounded(answer: str, question: str, evidence: Dict[str, 
     claimed = _numbers_in_text(answer)
     supported = _numbers_in_text(question)
     supported.extend(_numbers_in_value(evidence))
+    claimed_times = _time_values_in_minutes(answer)
+    supported_times = [
+        minutes
+        for _, minutes in (
+            _time_values_in_minutes(question)
+            + _time_values_in_minutes(json.dumps(evidence, ensure_ascii=False))
+        )
+    ]
     return all(
-        any(abs(value - candidate) <= max(0.01, abs(candidate) * 0.005) for candidate in supported)
+        _number_is_supported(value, supported)
+        or any(
+            _numbers_match(value, raw_value)
+            and _number_is_supported(minutes, supported_times)
+            for raw_value, minutes in claimed_times
+        )
         for value in claimed
     )
 
@@ -220,22 +398,249 @@ def numeric_claim_values(answer: str) -> List[float]:
     return _numbers_in_text(answer)
 
 
-def tool_output_failed(output: Any) -> bool:
-    return isinstance(output, dict) and (
-        output.get("success") is False
-        or bool(output.get("error"))
-        or output.get("exit_code") not in (None, 0)
+def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
+    """Build the shared numeric-grounding view used by Task 1 and SFT export."""
+    question = str(record.get("user_input") or "")
+    requested = requested_artifacts(question)
+    outputs = attach_tool_arguments(
+        record.get("tool_outputs") or [],
+        record.get("tool_calls") or [],
     )
+    successful_outputs = [
+        item
+        for item in outputs
+        if classify_tool_evidence(item, requested=requested).evidence_found
+    ]
+    successful_call_ids = {
+        str(item.get("tool_call_id") or "")
+        for item in successful_outputs
+        if item.get("tool_call_id")
+    }
+    record_evidence = dict(record.get("evidence") or {})
+    rebuilt_csv_evidence = build_csv_evidence(
+        record.get("tool_calls") or [],
+        record.get("tool_outputs") or [],
+        str(record.get("final_answer") or ""),
+        scope_text=question,
+    )
+    if rebuilt_csv_evidence:
+        record_evidence["csv_evidence"] = {
+            **dict(record_evidence.get("csv_evidence") or {}),
+            **rebuilt_csv_evidence,
+        }
+    return {
+        "prediction_summary": record.get("prediction_summary") or {},
+        "constraint_check": record.get("constraint_check") or {},
+        "evidence": record_evidence,
+        "parsed_task": record.get("parsed_task") or {},
+        "decision_summary": record.get("decision_summary") or {},
+        "tool_calls": [
+            item
+            for item in record.get("tool_calls") or []
+            if str(item.get("tool_call_id") or "") in successful_call_ids
+        ],
+        "tool_outputs": successful_outputs,
+        "conversation_context": [
+            item
+            for item in record.get("conversation_context") or []
+            if item.get("grounding_verified") is True
+        ],
+    }
+
+
+def _numbers_match(value: float, candidate: float) -> bool:
+    return abs(value - candidate) <= max(0.01, abs(candidate) * 0.005)
+
+
+def _number_is_supported(value: float, supported: List[float]) -> bool:
+    return any(_numbers_match(value, candidate) for candidate in supported)
+
+
+def _time_values_in_minutes(value: str) -> List[tuple[float, float]]:
+    values: List[tuple[float, float]] = []
+
+    def append(raw_value: str, unit: str) -> None:
+        number = float(raw_value)
+        unit_key = unit.casefold()
+        multiplier = 60.0 if unit_key in {"hour", "hours", "hr", "hrs", "h", "小时", "小時"} else 1.0
+        values.append((number, number * multiplier))
+
+    for match in TIME_RANGE.finditer(value):
+        append(match.group("first"), match.group("unit"))
+        append(match.group("second"), match.group("unit"))
+    for match in TIME_VALUE.finditer(value):
+        append(match.group("value"), match.group("unit"))
+    return values
+
+
+def requested_data_retrieved(
+    question: str,
+    tool_outputs: List[Dict[str, Any]],
+    conversation_context: List[Dict[str, Any]],
+) -> bool:
+    requested = set(requested_artifacts(question))
+    if not requested:
+        return True
+
+    verified_artifacts = {
+        str(artifact).casefold()
+        for item in conversation_context
+        if item.get("grounding_verified") is True
+        for artifact in item.get("evidence_artifacts") or []
+    }
+    unresolved = requested - verified_artifacts
+    if not unresolved:
+        return True
+
+    for item in tool_outputs:
+        assessment = classify_tool_evidence(item, requested=unresolved)
+        if assessment.state is ToolEvidenceState.CONTENT_EVIDENCE:
+            unresolved -= set(assessment.matched_artifacts)
+    return not unresolved
+
+
+def _policy_unavailable_at_generation(record: Dict[str, Any]) -> bool:
+    """True when generation deliberately left the decision unsupported.
+
+    The runtime contract requires a successful set_decision_policy call before
+    ranking. When no priority wording existed, generation records
+    status='insufficient_evidence' with missing 'llm_decision_policy_tool_call'
+    and stores no decision_policy. Evaluation must respect that recorded state
+    instead of recomputing a default-policy selection the answer never made.
+    """
+    if record.get("decision_policy"):
+        return False
+    stored_decision = dict(record.get("decision_summary") or {})
+    if stored_decision.get("status") != "insufficient_evidence":
+        return False
+    missing = list(stored_decision.get("missing_metrics") or [])
+    return "llm_decision_policy_tool_call" in missing
+
+
+def record_quality_issues(record: Dict[str, Any]) -> List[str]:
+    """Recompute grounding from saved evidence instead of trusting an old flag."""
+    tool_outputs = attach_tool_arguments(
+        record.get("tool_outputs") or [],
+        record.get("tool_calls") or [],
+    )
+    contract = GroundingContractBuilder().build(
+        str(record.get("user_input") or ""),
+        tool_outputs,
+        decision_policy=dict(record.get("decision_policy") or {}) or None,
+        require_decision_policy=_policy_unavailable_at_generation(record),
+    )
+    contract_issues = comparison_answer_issues(
+        str(record.get("final_answer") or ""),
+        contract,
+    )
+    successful_pipeformer_outputs = [
+        dict(item.get("output") or {})
+        for item in tool_outputs
+        if item.get("name") == "run_pipeformer_forecast"
+        and not tool_output_failed(item)
+    ]
+    pipeformer = None
+    if successful_pipeformer_outputs:
+        pipeformer = dict(successful_pipeformer_outputs[0])
+        if len(successful_pipeformer_outputs) > 1:
+            pipeformer["candidate_forecasts"] = successful_pipeformer_outputs
+    if pipeformer is None and str(record.get("scenario_type") or "").casefold() == "pipeformer":
+        saved_pipeformer = {
+            "parsed_task": record.get("parsed_task") or {},
+            "prediction_summary": record.get("prediction_summary") or {},
+            "constraint_check": record.get("constraint_check") or {},
+            "evidence": record.get("evidence") or {},
+        }
+        pipeformer = saved_pipeformer
+
+    record_evidence = dict(record.get("evidence") or {})
+    if not record_evidence.get("topology_summary"):
+        topology_summary = topology_summary_from_tool_outputs(tool_outputs)
+        if topology_summary:
+            record_evidence["topology_summary"] = topology_summary
+
+    issues = answer_quality_issues(
+        str(record.get("final_answer") or ""),
+        str(record.get("user_input") or ""),
+        pipeformer,
+        conversation_context=list(record.get("conversation_context") or []),
+        tool_outputs=tool_outputs,
+        record_evidence=record_evidence,
+    )
+    issues.extend(contract_issues)
+    assessments = [classify_tool_evidence(item) for item in tool_outputs]
+    if assessments and not any(item.evidence_found for item in assessments):
+        if any(item.state is ToolEvidenceState.EXECUTION_FAILED for item in assessments):
+            issues.append("tool_execution_failed")
+        if any(
+            item.state in {ToolEvidenceState.NO_EVIDENCE, ToolEvidenceState.LOCATOR_ONLY}
+            for item in assessments
+        ):
+            issues.append("tool_evidence_unavailable")
+    return list(dict.fromkeys(issues))
+
+
+def _absolute_assertion_is_grounded(answer: str, evidence: Any) -> bool:
+    evidence_text = json.dumps(evidence, ensure_ascii=False).casefold()
+    return all(
+        match.group(0).casefold() in evidence_text
+        for match in UNSUPPORTED_ABSOLUTE_ASSERTION.finditer(answer)
+    )
+
+
+def _supply_demand_balance_claim_is_grounded(answer: str, evidence: Any) -> bool:
+    statuses: set[str] = set()
+
+    def collect(value: Any) -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key == "supply_demand_balance_status" and item is not None:
+                    statuses.add(str(item).casefold())
+                elif key == "supply_demand_balance" and isinstance(item, dict):
+                    status = item.get("status")
+                    if status is not None:
+                        statuses.add(str(status).casefold())
+                collect(item)
+        elif isinstance(value, list):
+            for item in value:
+                collect(item)
+
+    collect(evidence)
+    if not statuses:
+        return False
+
+    claim = SUPPLY_DEMAND_BALANCE_CLAIM.search(answer)
+    if not claim:
+        return False
+    nearby = answer[claim.start():claim.end() + 16].casefold()
+    if re.search(r"fail|violation|失败|失衡|不平衡", nearby):
+        return bool(statuses & {"fail", "violation"})
+    if re.search(r"warn|warning|告警|预警", nearby):
+        return bool(statuses & {"warning", "warn"})
+    if re.search(r"pass|通过|正常", nearby):
+        return "pass" in statuses
+    return True
 
 
 def _operational_inference_is_grounded(answer: str, evidence: Any) -> bool:
     evidence_text = json.dumps(evidence, ensure_ascii=False).casefold()
     claims = [match.group(0).casefold() for match in OPERATIONAL_INFERENCE_CLAIM.finditer(answer)]
-    return bool(claims) and all(claim in evidence_text for claim in claims)
+    if not claims:
+        return False
+    return all(
+        _supply_demand_balance_claim_is_grounded(answer, evidence)
+        if SUPPLY_DEMAND_BALANCE_CLAIM.fullmatch(claim)
+        else claim in evidence_text
+        for claim in claims
+    )
 
 
 def _counterfactual_supports_claim(answer: str, pipeformer: Dict[str, Any]) -> bool:
     comparison = pipeformer.get("counterfactual_comparison")
+    if not isinstance(comparison, dict):
+        comparison = dict(pipeformer.get("prediction") or {}).get(
+            "counterfactual_comparison"
+        )
     if not isinstance(comparison, dict):
         return False
     try:
@@ -286,11 +691,16 @@ def _proves_unique_nonpass_variable(pipeformer: Dict[str, Any]) -> bool:
 
 
 def _numbers_in_text(value: str) -> List[float]:
+    value = value.translate(NUMERIC_SIGN_TRANSLATION)
     numbers = []
-    date_spans = [match.span() for match in DATE_REFERENCE.finditer(value)]
-    date_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(value))
+    ignored_spans = [match.span() for match in DATE_RANGE_REFERENCE.finditer(value)]
+    ignored_spans.extend(match.span() for match in DATE_REFERENCE.finditer(value))
+    ignored_spans.extend(match.span() for match in COMPACT_DATE_REFERENCE.finditer(value))
+    ignored_spans.extend(match.span() for match in DATA_FILE_REFERENCE.finditer(value))
+    ignored_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(value))
+    ignored_spans.extend(match.span() for match in CANDIDATE_IDENTIFIER.finditer(value))
     for match in NUMERIC_CLAIM.finditer(value):
-        if any(start <= match.start() and match.end() <= end for start, end in date_spans):
+        if any(start <= match.start() and match.end() <= end for start, end in ignored_spans):
             continue
         previous = value[match.start() - 1:match.start()]
         following = value[match.end():match.end() + 1]
@@ -324,9 +734,11 @@ def _numbers_in_value(value: Any) -> List[float]:
     return []
 
 
-def _variable_references_are_grounded(answer: str, pipeformer: Dict[str, Any]) -> bool:
+def _variable_references_are_grounded(answer: str, grounding_evidence: Any) -> bool:
     claimed = set(VARIABLE_REFERENCE.findall(answer))
-    supported = set(VARIABLE_REFERENCE.findall(json.dumps(pipeformer, ensure_ascii=False)))
+    supported = set(
+        VARIABLE_REFERENCE.findall(json.dumps(grounding_evidence, ensure_ascii=False))
+    )
     return claimed <= supported
 
 

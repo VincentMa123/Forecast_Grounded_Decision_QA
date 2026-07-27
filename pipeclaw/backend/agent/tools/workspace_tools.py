@@ -76,10 +76,10 @@ class WorkspaceTools:
 
         @register_tool(
             name="read_file",
-            description="Read exactly one file. Each tool call must provide one complete JSON arguments object with path and optional offset or limit only; never concatenate JSON objects from multiple reads.",
+            description="Read one workspace file, approved skill file, or read-only pipeline_data/... file. Provide one complete JSON arguments object with path and optional offset or limit only.",
             parameters=create_json_schema_from_params(
                 properties={
-                    "path": {"type": "string", "description": "File path relative to WORKSPACE_ROOT, an absolute path under D:/ml_pro_master/chroes/fluid_model, or an absolute path under backend/agent/skills."},
+                    "path": {"type": "string", "description": "Path relative to WORKSPACE_ROOT, read-only under pipeline_data/, or an approved absolute skill/external path."},
                     "offset": {"type": "integer", "description": "1-based line number to start reading from."},
                     "limit": {"type": "integer", "description": "How many lines to return."},
                 },

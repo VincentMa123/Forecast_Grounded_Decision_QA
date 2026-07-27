@@ -223,6 +223,17 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                     for variable in pressure_nodes[:5]
                     if variable in pressure_margins
                 },
+                "minimum_lower_bound_margin": _minimum_pressure_margin(
+                    pressure_margins, "fail_lower_margin"
+                ),
+                "minimum_upper_bound_margin": _minimum_pressure_margin(
+                    pressure_margins, "fail_upper_margin"
+                ),
+                "minimum_operating_window_margin": _minimum_operating_window_margin(
+                    pressure_margins
+                ),
+                "violation_node_count": len(pressure.get("pressure_violation_nodes") or []),
+                "warning_node_count": len(pressure.get("pressure_warning_nodes") or []),
                 "maximum_continuous_pressure_violation_minutes": pressure.get(
                     "maximum_continuous_pressure_violation_minutes"
                 ),
@@ -242,6 +253,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "abnormal_flow_segments": flow.get("abnormal_flow_segments", []),
                 "flow_ramp_events": ramp_events,
                 "flow_capacity_excursion_episodes": capacity_episodes,
+                "flow_capacity_excursion_count": len(capacity_episodes),
                 "supply_demand_balance_status": balance.get("status"),
                 "supply_demand_balance": (balance.get("evaluated_values") or [None])[0],
             }
@@ -259,7 +271,11 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                     ),
                     default=0.0,
                 ),
+                "maximum_decline_from_start": _maximum_recovery_value(
+                    linepack.get("linepack_recovery"), "decline_from_start"
+                ),
                 "insufficient_recovery": insufficient_recovery,
+                "insufficient_recovery_count": len(insufficient_recovery),
                 "minimum_peak_shaving_reserve": _minimum_evaluated_value(
                     reserve, "reserve"
                 ),
@@ -296,6 +312,52 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
     return {key: item for key, item in value.items() if item is not None}
+
+
+def _minimum_pressure_margin(
+    margins: Dict[str, Dict[str, Any]], metric: str
+) -> Optional[Dict[str, Any]]:
+    candidates = [
+        (str(variable), float(values[metric]))
+        for variable, values in margins.items()
+        if values.get(metric) is not None
+    ]
+    if not candidates:
+        return None
+    variable, value = min(candidates, key=lambda item: item[1])
+    return {"variable": variable, "value": round(value, 6)}
+
+
+def _minimum_operating_window_margin(
+    margins: Dict[str, Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    candidates = [
+        (
+            str(variable),
+            min(float(values["fail_lower_margin"]), float(values["fail_upper_margin"])),
+        )
+        for variable, values in margins.items()
+        if values.get("fail_lower_margin") is not None
+        and values.get("fail_upper_margin") is not None
+    ]
+    if not candidates:
+        return None
+    variable, value = min(candidates, key=lambda item: item[1])
+    return {"variable": variable, "value": round(value, 6)}
+
+
+def _maximum_recovery_value(
+    recovery: Any, metric: str
+) -> Optional[Dict[str, Any]]:
+    candidates = [
+        (str(variable), float(values[metric]))
+        for variable, values in dict(recovery or {}).items()
+        if values.get(metric) is not None
+    ]
+    if not candidates:
+        return None
+    variable, value = max(candidates, key=lambda item: item[1])
+    return {"variable": variable, "value": round(value, 6)}
 
 
 def _maximum_mapping_value(values: Any) -> Optional[Dict[str, Any]]:

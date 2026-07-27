@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
+from .teacher_quality import record_quality_issues
+from .tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from pipeline.forecast_registry_contract import authorize_forecast_registry
+
 
 DEFAULT_MINIMUM_SCORE = 85.0
 DEFAULT_MAX_RECORD_CHARS = 24_000
@@ -36,6 +40,7 @@ CRITICAL_PIPEFORMER_CHECKS = {
     "requested_constraints_executed",
     "verification_complete",
     "answer_grounded",
+    "registry_search_precedes_forecast",
 }
 
 
@@ -110,7 +115,10 @@ def _evaluate_native_record(
         # Legacy records did not persist trace_status. Preserve an earlier
         # execution-status failure instead of silently upgrading it to pass.
         trace_status = "unknown"
-    issues = list(dict.fromkeys(str(item) for item in (hard_issues or record.get("quality_issues") or [])))
+    source_issues = (
+        record_quality_issues(record) if hard_issues is None else list(hard_issues)
+    )
+    issues = list(dict.fromkeys(str(item) for item in source_issues))
     pipeformer_calls = [
         item
         for item in record.get("tool_calls") or []
@@ -194,9 +202,17 @@ def _pipeformer_checks(
     trace_status: Optional[str],
     max_record_chars: int,
 ) -> List[Dict[str, Any]]:
-    all_tool_outputs = _pipeformer_outputs(record)
-    tool_outputs = [item for item in all_tool_outputs if item.get("success") is True]
     tasks = _task_views(record.get("parsed_task") or {})
+    referenced_call_ids = [
+        str(task.get("tool_call_id") or "")
+        for task in tasks
+        if task.get("tool_call_id")
+    ]
+    all_tool_outputs = _pipeformer_outputs(
+        record,
+        referenced_call_ids=referenced_call_ids,
+    )
+    tool_outputs = [item for item in all_tool_outputs if item.get("success") is True]
     predictions = [dict(item.get("prediction") or {}) for item in tool_outputs]
     verifications = [dict(item.get("verification") or {}) for item in tool_outputs]
 
@@ -226,8 +242,9 @@ def _pipeformer_checks(
         for verification in verifications
     )
     record_chars, compact_ok, missing_fields = _record_contract(record, max_record_chars)
+    registry_search_ok, registry_search_required = _registry_search_precedes_forecast(record, len(tool_outputs))
     return [
-        _check("parsed_task_correct", 15.0, parsed_ok, task_count=len(tasks)),
+        _check("parsed_task_correct", 10.0, parsed_ok, task_count=len(tasks)),
         _check(
             "forecast_tool_succeeded",
             15.0,
@@ -240,6 +257,12 @@ def _pipeformer_checks(
         _check("forecast_horizon_consistent", 10.0, horizon_ok),
         _check("requested_constraints_executed", 10.0, constraints_ok),
         _check("verification_complete", 10.0, complete_ok),
+        _check(
+            "registry_search_precedes_forecast",
+            5.0,
+            registry_search_ok,
+            required=registry_search_required,
+        ),
         _check("answer_grounded", 10.0, not issues, issues=issues),
         _check(
             "compact_record_contract",
@@ -252,24 +275,63 @@ def _pipeformer_checks(
     ]
 
 
+def _registry_search_precedes_forecast(
+    record: Dict[str, Any], successful_forecast_count: int
+) -> tuple[bool, bool]:
+    del successful_forecast_count
+    calls = list(record.get("tool_calls") or [])
+    forecast_indices = [
+        index for index, call in enumerate(calls) if call.get("name") == PIPEFORMER_TOOL
+    ]
+    if not forecast_indices:
+        return False, True
+    outputs_by_call_id = {
+        str(item.get("tool_call_id") or ""): item.get("output")
+        for item in record.get("tool_outputs") or []
+    }
+    for forecast_index in forecast_indices:
+        preceding_calls = []
+        for call in calls[:forecast_index]:
+            call_id = str(call.get("tool_call_id") or "")
+            preceding_calls.append(
+                {
+                    "tool_call_id": call_id,
+                    "name": call.get("name"),
+                    "arguments": dict(call.get("arguments") or {}),
+                    "output": outputs_by_call_id.get(call_id),
+                }
+            )
+        authorization = authorize_forecast_registry(
+            dict(calls[forecast_index].get("arguments") or {}),
+            preceding_calls,
+        )
+        if not authorization["authorized"]:
+            return False, True
+    return True, True
+
+
 def _generic_checks(
     record: Dict[str, Any],
     issues: List[str],
     trace_status: Optional[str],
     max_record_chars: int,
 ) -> List[Dict[str, Any]]:
-    outputs = list(record.get("tool_outputs") or [])
-    failed_indices = [
-        index
-        for index, item in enumerate(outputs)
-        if _tool_output_failed(item.get("output"))
-    ]
-    successful_output_count = sum(
-        1
-        for item in outputs
-        if not _tool_output_failed(item.get("output"))
+    outputs = attach_tool_arguments(
+        record.get("tool_outputs") or [],
+        record.get("tool_calls") or [],
     )
-    unresolved_failure = bool(failed_indices and not successful_output_count)
+    requested = requested_artifacts(str(record.get("user_input") or ""))
+    assessments = [
+        classify_tool_evidence(item, requested=requested)
+        for item in outputs
+    ]
+    failed_indices = [
+        index for index, assessment in enumerate(assessments)
+        if not assessment.evidence_found
+    ]
+    successful_output_count = sum(assessment.evidence_found for assessment in assessments)
+    requested_evidence_ok = "requested_evidence_not_retrieved" not in issues
+    unresolved_failure = bool(failed_indices and not successful_output_count) or not requested_evidence_ok
     record_chars, compact_ok, missing_fields = _record_contract(record, max_record_chars)
     completed = trace_status in (None, "completed")
     return [
@@ -281,6 +343,9 @@ def _generic_checks(
             not unresolved_failure,
             failed_tool_count=len(failed_indices),
             successful_tool_count=successful_output_count,
+            requested_artifacts=list(requested),
+            evidence_states=[item.state.value for item in assessments],
+            evidence_reasons=[item.reason for item in assessments],
             recovered=bool(failed_indices) and not unresolved_failure,
         ),
         _check("answer_grounded", 20.0, not issues, issues=issues),
@@ -295,18 +360,33 @@ def _generic_checks(
     ]
 
 
-def _pipeformer_outputs(record: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _pipeformer_outputs(
+    record: Dict[str, Any],
+    *,
+    referenced_call_ids: Optional[List[str]] = None,
+) -> List[Dict[str, Any]]:
     call_ids = {
         str(item.get("tool_call_id") or "")
         for item in record.get("tool_calls") or []
         if item.get("name") == PIPEFORMER_TOOL
     }
-    return [
-        dict(item.get("output") or {})
+    matching_outputs = [
+        item
         for item in record.get("tool_outputs") or []
         if item.get("name") == PIPEFORMER_TOOL
         or str(item.get("tool_call_id") or "") in call_ids
     ]
+    if referenced_call_ids:
+        outputs_by_call_id = {
+            str(item.get("tool_call_id") or ""): dict(item.get("output") or {})
+            for item in matching_outputs
+        }
+        return [
+            outputs_by_call_id[call_id]
+            for call_id in referenced_call_ids
+            if call_id in outputs_by_call_id
+        ]
+    return [dict(item.get("output") or {}) for item in matching_outputs]
 
 
 def _task_views(parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -325,15 +405,18 @@ def _task_is_complete(task: Dict[str, Any]) -> bool:
         or variable in dict(boundary.get("percentage_changes") or {})
     )
     resolved_output_count = task.get("resolved_output_variable_count")
+    unresolved_attention = list(task.get("unresolved_attention_targets") or [])
+    unresolved_outputs = list(task.get("unresolved_output_state_variables") or [])
+    invalid_normalized_variables = list(task.get("invalid_normalized_variables") or [])
     return bool(
         task.get("case_id")
         and variable
         and has_change
         and task.get("forecast_horizon_minutes")
         and task.get("constraint_verification_types")
-        # Descriptive aliases can remain unresolved while concrete model output
-        # variables are still resolved. The unresolved labels are retained for
-        # audit, but they must not reject an otherwise executable forecast.
+        and not unresolved_attention
+        and not unresolved_outputs
+        and not invalid_normalized_variables
         and (
             resolved_output_count is None
             or int(resolved_output_count or 0) > 0
@@ -440,7 +523,10 @@ def _requested_constraints_executed(verification: Dict[str, Any]) -> bool:
 def _record_contract(record: Dict[str, Any], max_record_chars: int) -> tuple[int, bool, List[str]]:
     missing = [key for key in REQUIRED_RECORD_FIELDS if key not in record]
     size = len(json.dumps(record, ensure_ascii=False, separators=(",", ":")))
-    return size, not missing and size <= max_record_chars, missing
+    # The master record is an audit artifact and intentionally retains the full
+    # tool trajectory. Its size must not be judged against the compact SFT
+    # projection limit; write_split_records enforces that limit after projection.
+    return size, not missing, missing
 
 
 def _check(name: str, weight: float, passed: bool, **details: Any) -> Dict[str, Any]:
@@ -450,11 +536,3 @@ def _check(name: str, weight: float, passed: bool, **details: Any) -> Dict[str, 
         "status": "pass" if passed else "fail",
         **details,
     }
-
-
-def _tool_output_failed(output: Any) -> bool:
-    return isinstance(output, dict) and (
-        output.get("success") is False
-        or bool(output.get("error"))
-        or output.get("exit_code") not in (None, 0)
-    )
