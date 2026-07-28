@@ -390,6 +390,9 @@ def update_session_records(
             if record:
                 turn.update({
                     "expected_answer": record.get("final_answer"),
+                    "state_before": record.get("state_before"),
+                    "recent_turns": record.get("recent_turns"),
+                    "context_injection": record.get("context_injection"),
                     "answer_mode": record.get("answer_mode"),
                     "grounding_contract": record.get("grounding_contract"),
                     "decision_summary": record.get("decision_summary"),

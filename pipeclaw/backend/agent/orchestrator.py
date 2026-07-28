@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from .schemas import AgentChatRequest, AgentChatResponse, OneTurnAfterRunAgent, TraceSummary
 from .llm_provider import LLMProvider, LLMProviderSettings
-from .services import MemoryAssembler, MemoryManager
+from .services import MemoryAssembler, MemoryManager, VerifiedStateManager
 from .agent_workspace_manager import AgentWorkspaceManager
 from .prompt_builder import PromptBuilder
 from .trace_writer import TraceWriter
@@ -22,12 +22,46 @@ from .tools.registry import tool_registry
 from .skills.skill_manager import SkillManager
 from executor.runner import get_runner
 from evaluator.decision_policy import METRIC_CATALOG
-from evaluator.grounding_contract import candidate_contract_message
+from evaluator.decision_trace_state import (
+    VerifiedDecisionState,
+    bounded_recent_turns,
+    serialize_verified_decision_state,
+)
+from evaluator.grounding_contract import (
+    GroundingContractBuilder,
+    candidate_contract_message,
+    finalize_applied_disturbance_disclosure,
+)
 from pipeline.forecast_registry_contract import forecast_registry_failure_result
 
 logger = logging.getLogger(__name__)
 
 AnswerValidator = Callable[[str, List[Dict[str, Any]]], List[str]]
+
+
+def finalize_runtime_answer(
+    answer: str,
+    question: str,
+    completed_tool_calls: List[Dict[str, Any]],
+    *,
+    prior_state: Optional[VerifiedDecisionState] = None,
+) -> str:
+    """Apply the canonical disclosure from current and prior verified evidence."""
+    state = prior_state or VerifiedDecisionState()
+    contract = GroundingContractBuilder().build(
+        question,
+        completed_tool_calls,
+        require_decision_policy=True,
+        prior_candidate_results=state.candidates,
+        prior_decision_policy=state.decision_policy,
+        prior_decision_policy_source_question=(
+            state.decision_policy_source_question
+        ),
+        prior_applied_disturbances=state.applied_disturbances,
+    )
+    if not contract.get("applied_disturbances") and state.applied_disturbances:
+        contract["applied_disturbances"] = state.applied_disturbances
+    return finalize_applied_disturbance_disclosure(answer, contract)
 
 
 def _canonical_forecast_value(value: Any) -> Any:
@@ -203,6 +237,7 @@ class AgentOrchestrator:
         self.trace_writer = TraceWriter(self.workspace_manager.trace_root, self.agent_id, self.workspace_manager.plan_path)
         self.memory_manager = MemoryManager(self.workspace_dir)
         self.memory_assembler = MemoryAssembler(self.workspace_dir)
+        self.verified_state_manager = VerifiedStateManager(self.workspace_dir)
         self.prompt_builder = PromptBuilder(self.workspace_dir)
         self.skill_manager = SkillManager(self.backend_root / "agent" / "skills") if self.enable_skills else None
         runner = get_runner()
@@ -216,19 +251,36 @@ class AgentOrchestrator:
         WorkspaceTools(self.session_id)
         register_pipeformer_tools(self.backend_root)
 
-    def _build_history_block(self, trace_messages: List[Dict[str, Any]]) -> str:
-        lines: List[str] = []
-        for item in trace_messages[-12:]:
+    def _recent_dialogue_turns(
+        self,
+        trace_messages: List[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        turns: List[Dict[str, Any]] = []
+        pending_user: Optional[str] = None
+        for item in trace_messages:
             role = str(item.get("role", "")).lower()
-            if role not in {"user", "assistant"}:
-                continue
             content = str(item.get("content", "")).strip()
             if not content:
                 continue
-            lines.append(f"{role.upper()}: {content}")
-        return "\n".join(lines)
+            if role == "user":
+                if pending_user:
+                    turns.append({"user_input": pending_user})
+                pending_user = content
+            elif role == "assistant" and pending_user:
+                turns.append(
+                    {
+                        "user_input": pending_user,
+                        "assistant_output": content,
+                    }
+                )
+                pending_user = None
+        return bounded_recent_turns(
+            turns,
+            max_turns=2,
+            max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+        )
 
-    def _build_user_context(self, request: AgentChatRequest, trace_payload: Dict[str, Any]) -> str:
+    def _build_user_context(self, request: AgentChatRequest) -> str:
         parts: List[str] = []
         if request.ui_context:
             parts.append("## UI Context")
@@ -236,10 +288,6 @@ class AgentOrchestrator:
                 parts.append(f"- date: {request.ui_context.date}")
             if request.ui_context.selected:
                 parts.append(f"- selected: {request.ui_context.selected.get('type')} {request.ui_context.selected.get('id')}")
-        history = self._build_history_block(trace_payload.get("messages", []))
-        if history:
-            parts.append("\n## Trace History")
-            parts.append(history)
         parts.append("\n## Current User Request")
         parts.append(request.message)
         return "\n".join(parts).strip()
@@ -290,6 +338,7 @@ class AgentOrchestrator:
         event_time: Optional[str] = None,
         answer_validator: Optional[AnswerValidator] = None,
         current_user_request: str = "",
+        prior_state: Optional[VerifiedDecisionState] = None,
     ):
         missing_key_message = self.llm_provider.missing_key_message()
         if missing_key_message:
@@ -297,7 +346,7 @@ class AgentOrchestrator:
             timestamp = event_time or datetime.now().isoformat()
             self.trace_writer.append_message(self.session_id, role="assistant", content=message, timestamp=timestamp)
             yield {"event": "assistant_message", "data": {"content": message, "timestamp": timestamp, "final": True}}
-            return message, "error"
+            return message, "error", []
 
         client = self.llm_provider.create_client()
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_context}]
@@ -311,6 +360,22 @@ class AgentOrchestrator:
                 contract_message = candidate_contract_message(
                     user_context,
                     completed_tool_calls,
+                    prior_candidate_results=(
+                        prior_state.candidates if prior_state else None
+                    ),
+                    prior_decision_policy=(
+                        prior_state.decision_policy if prior_state else None
+                    ),
+                    prior_decision_policy_source_question=(
+                        prior_state.decision_policy_source_question
+                        if prior_state
+                        else None
+                    ),
+                    prior_applied_disturbances=(
+                        prior_state.applied_disturbances
+                        if prior_state
+                        else None
+                    ),
                 )
                 request_messages = list(messages)
                 if contract_message:
@@ -411,6 +476,12 @@ class AgentOrchestrator:
                     if not final_text:
                         final_text = "Model did not return any displayable content."
 
+                    final_text = finalize_runtime_answer(
+                        final_text,
+                        current_user_request or user_context,
+                        completed_tool_calls,
+                        prior_state=prior_state,
+                    )
                     quality_issues = answer_validator(final_text, completed_tool_calls) if answer_validator else []
                     if quality_issues:
                         repair_messages = request_messages + [
@@ -440,6 +511,13 @@ class AgentOrchestrator:
                             repair_response = client.chat.completions.create(**repair_payload)
                             repair_choice = repair_response.choices[0]
                             repaired_text = (repair_choice.message.content or "").strip()
+                            if repaired_text:
+                                repaired_text = finalize_runtime_answer(
+                                    repaired_text,
+                                    current_user_request or user_context,
+                                    completed_tool_calls,
+                                    prior_state=prior_state,
+                                )
                             repaired_issues = (
                                 answer_validator(repaired_text, completed_tool_calls)
                                 if repaired_text and answer_validator
@@ -485,7 +563,7 @@ class AgentOrchestrator:
                         },
                     }
                     self.trace_writer.append_message(self.session_id, role="assistant", content=final_text, timestamp=event_time)
-                    return final_text, "completed"
+                    return final_text, "completed", completed_tool_calls
 
                 assistant_tool_calls = [
                     {
@@ -601,6 +679,13 @@ class AgentOrchestrator:
                             timestamp=event_time,
                         )
                     else:
+                        self.trace_writer.append_audit_tool_call(
+                            self.session_id,
+                            call.function.name,
+                            args or {},
+                            result,
+                            timestamp=event_time,
+                        )
                         logger.info(
                             "Tool call retained as internal planning correction: "
                             "session_id=%s tool=%s call_id=%s error_code=%s",
@@ -629,7 +714,7 @@ class AgentOrchestrator:
             logger.exception("LLM tool loop failed")
             self.trace_writer.append_message(self.session_id, role="assistant", content=error_message, timestamp=event_time)
             yield {"event": "error", "data": {"message": error_message, "timestamp": event_time or datetime.now().isoformat(), "last_request_path": last_request_path}}
-            return error_message, "error"
+            return error_message, "error", completed_tool_calls
 
         timeout_message = "Tool-call step limit reached; workflow stopped."
         timeout_timestamp = event_time or datetime.now().isoformat()
@@ -642,7 +727,7 @@ class AgentOrchestrator:
                 "final": True,
             },
         }
-        return timeout_message, "timeout"
+        return timeout_message, "timeout", completed_tool_calls
 
     def run_agent(
         self,
@@ -683,20 +768,55 @@ class AgentOrchestrator:
 
         trace_payload = self.trace_writer.load_trace(self.session_id)
         memory_payload = self.memory_assembler.build(self.session_id)
+        prior_state = self.verified_state_manager.load(self.session_id)
+        state_payload = serialize_verified_decision_state(
+            prior_state,
+            max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+        )
+        trace_messages = list(trace_payload.get("messages") or [])
+        if (
+            trace_messages
+            and str(trace_messages[-1].get("role") or "").casefold() == "user"
+        ):
+            trace_messages = trace_messages[:-1]
+        recent_turns = self._recent_dialogue_turns(trace_messages)
         self.trace_writer.set_context_injection(
             self.session_id,
             {
                 "control_files": [item["name"] for item in memory_payload.get("control_files", [])],
-                "memory_files": [item["name"] for item in memory_payload.get("memory_content_blocks", [])],
                 "assets": [item["path"] for item in memory_payload.get("assets", [])],
-                "notes": "full memory concatenation",
+                "verified_state_schema": state_payload.get("schema_version"),
+                "verified_state_snapshot": (
+                    self.verified_state_manager.snapshot_path(
+                        self.session_id
+                    ).as_posix()
+                ),
+                "verified_state_chars": len(
+                    json.dumps(
+                        state_payload,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        default=str,
+                    )
+                ),
+                "recent_dialogue_turns": len(recent_turns),
+                "history_policy": (
+                    "one verified_decision_state_v1 snapshot plus at most two "
+                    "bounded recent dialogue turns; timeline and context trace "
+                    "are audit-only"
+                ),
             },
             timestamp=event_time,
         )
         skills_section = self.skill_manager.render_skills_section() if self.skill_manager else ""
-        system_prompt = self.prompt_builder.build(memory_payload=memory_payload, skills_section=skills_section)
-        user_context = self._build_user_context(request, trace_payload)
-        assistant_message, final_status = yield from self._tool_loop_stream(
+        system_prompt = self.prompt_builder.build(
+            memory_payload=memory_payload,
+            skills_section=skills_section,
+            verified_state=state_payload,
+            recent_turns=recent_turns,
+        )
+        user_context = self._build_user_context(request)
+        assistant_message, final_status, completed_tool_calls = yield from self._tool_loop_stream(
             system_prompt,
             user_context,
             event_time=event_time,
@@ -706,6 +826,26 @@ class AgentOrchestrator:
                 if "Current user request:" in request.message
                 else request.message
             ),
+            prior_state=prior_state,
+        )
+        turn_number = sum(
+            1
+            for item in trace_payload.get("messages") or []
+            if str(item.get("role") or "").casefold() == "user"
+        )
+        next_state = prior_state.updated_from_tool_results(
+            self.session_id,
+            turn_number,
+            (
+                request.message.rsplit("Current user request:", 1)[-1].strip()
+                if "Current user request:" in request.message
+                else request.message
+            ),
+            completed_tool_calls,
+        )
+        state_commit = self.verified_state_manager.commit(
+            self.session_id,
+            next_state,
         )
         memory_commit = self.memory_manager.commit_turn(
             session_id=self.session_id,
@@ -713,7 +853,11 @@ class AgentOrchestrator:
             assistant_message=assistant_message,
             event_time=event_time,
         )
-        memory_updates = [memory_commit["memory_commit_path"]]
+        memory_updates = [
+            memory_commit["memory_commit_path"],
+            state_commit["state_snapshot_path"],
+            state_commit["state_event_path"],
+        ]
         self.trace_writer.extend_memory_commits(self.session_id, memory_updates, timestamp=event_time)
         self.trace_writer.append_decision(self.session_id, summary=assistant_message[:500], artifact_paths=[], timestamp=event_time)
         self.trace_writer.set_status(self.session_id, final_status, timestamp=event_time)

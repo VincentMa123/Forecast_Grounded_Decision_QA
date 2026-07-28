@@ -68,6 +68,28 @@ CANDIDATE_IDENTIFIER = re.compile(
     r"\bcandidate_[A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*\b",
     re.IGNORECASE,
 )
+CHINESE_ORDINAL_REFERENCE = re.compile(
+    r"第\s*\d+(?:\s*[、,，/]\s*\d+)*\s*"
+    r"(?:名|位|段|个|项|条|种|组|候选|方案|动作|管段|用户)?"
+)
+ENGLISH_ORDINAL_REFERENCE = re.compile(
+    r"(?<![A-Za-z0-9_])\d+(?:st|nd|rd|th)\b",
+    re.IGNORECASE,
+)
+ENGLISH_RANK_REFERENCE = re.compile(
+    r"\b(?:rank(?:ed)?|position)\s*(?:#|no\.?\s*)?"
+    r"\d+(?:\s*[/,]\s*\d+)*",
+    re.IGNORECASE,
+)
+NEGATED_NUMERIC_REFERENCE = re.compile(
+    r"(?:不是|并非|不应为|\bnot\b|\bis\s+not\b)"
+    r"[\s:*_`]{0,12}[-+]?\d+(?:\.\d+)?%?",
+    re.IGNORECASE,
+)
+CASE_IDENTIFIER_NUMBER = re.compile(
+    r"(?:mock_test|case)[_-]0*(\d+)\b",
+    re.IGNORECASE,
+)
 TIME_RANGE = re.compile(
     r"(?P<first>\d+(?:\.\d+)?)\s*(?:-|–|—|~|～|to|through|到|至)\s*"
     r"(?P<second>\d+(?:\.\d+)?)\s*"
@@ -370,10 +392,16 @@ def safety_and_energy_checks_pass(pipeformer: Optional[Dict[str, Any]]) -> bool:
     )
 
 
-def numeric_claims_are_grounded(answer: str, question: str, evidence: Dict[str, Any]) -> bool:
+def grounded_numeric_claim_values(
+    answer: str,
+    question: str,
+    evidence: Dict[str, Any],
+) -> List[float]:
+    """Return supported claims after scanning the evidence exactly once."""
     claimed = _numbers_in_text(answer)
     supported = _numbers_in_text(question)
     supported.extend(_numbers_in_value(evidence))
+    supported.extend(_derived_numbers_in_value(evidence))
     claimed_times = _time_values_in_minutes(answer)
     supported_times = [
         minutes
@@ -382,15 +410,25 @@ def numeric_claims_are_grounded(answer: str, question: str, evidence: Dict[str, 
             + _time_values_in_minutes(json.dumps(evidence, ensure_ascii=False))
         )
     ]
-    return all(
-        _number_is_supported(value, supported)
+    return [
+        value
+        for value in claimed
+        if (
+            _number_is_supported(value, supported)
+            or _number_is_deterministically_derived(value, supported)
+        )
         or any(
             _numbers_match(value, raw_value)
             and _number_is_supported(minutes, supported_times)
             for raw_value, minutes in claimed_times
         )
-        for value in claimed
-    )
+    ]
+
+
+def numeric_claims_are_grounded(answer: str, question: str, evidence: Dict[str, Any]) -> bool:
+    claimed = _numbers_in_text(answer)
+    grounded = grounded_numeric_claim_values(answer, question, evidence)
+    return len(grounded) == len(claimed)
 
 
 def numeric_claim_values(answer: str) -> List[float]:
@@ -428,6 +466,23 @@ def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
             **dict(record_evidence.get("csv_evidence") or {}),
             **rebuilt_csv_evidence,
         }
+    trusted_context = []
+    for item in record.get("conversation_context") or []:
+        if item.get("grounding_verified") is True:
+            trusted_context.append(item)
+            continue
+        summary = item.get("verified_evidence_summary")
+        legacy_verified_summary = (
+            "tool_evidence_verified" not in item
+            and isinstance(summary, dict)
+            and bool(summary)
+        )
+        if item.get("tool_evidence_verified") is True or legacy_verified_summary:
+            trusted_context.append({
+                "tool_evidence_verified": True,
+                "evidence_artifacts": list(item.get("evidence_artifacts") or []),
+                "verified_evidence_summary": summary,
+            })
     return {
         "prediction_summary": record.get("prediction_summary") or {},
         "constraint_check": record.get("constraint_check") or {},
@@ -440,11 +495,7 @@ def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
             if str(item.get("tool_call_id") or "") in successful_call_ids
         ],
         "tool_outputs": successful_outputs,
-        "conversation_context": [
-            item
-            for item in record.get("conversation_context") or []
-            if item.get("grounding_verified") is True
-        ],
+        "conversation_context": trusted_context,
     }
 
 
@@ -454,6 +505,42 @@ def _numbers_match(value: float, candidate: float) -> bool:
 
 def _number_is_supported(value: float, supported: List[float]) -> bool:
     return any(_numbers_match(value, candidate) for candidate in supported)
+
+
+def _number_is_deterministically_derived(
+    value: float,
+    supported: List[float],
+) -> bool:
+    """Recognize sign changes and simple sums/differences using bounded evidence."""
+    if _number_is_supported(-value, supported):
+        return True
+    bounded = supported[:2_000]
+    rounded_counts: Dict[float, int] = {}
+    for candidate in bounded:
+        key = round(candidate, 6)
+        rounded_counts[key] = rounded_counts.get(key, 0) + 1
+
+    def has_two_operands(first: float, second: float) -> bool:
+        first_key = round(first, 6)
+        second_key = round(second, 6)
+        if second_key not in rounded_counts:
+            return False
+        return (
+            first_key != second_key
+            or rounded_counts.get(first_key, 0) >= 2
+        )
+
+    for candidate in dict.fromkeys(bounded):
+        if has_two_operands(candidate, value - candidate):
+            return True
+        if has_two_operands(candidate, candidate - value):
+            return True
+        if value and has_two_operands(
+            candidate,
+            candidate * 100.0 / value,
+        ):
+            return True
+    return False
 
 
 def _time_values_in_minutes(value: str) -> List[tuple[float, float]]:
@@ -485,7 +572,10 @@ def requested_data_retrieved(
     verified_artifacts = {
         str(artifact).casefold()
         for item in conversation_context
-        if item.get("grounding_verified") is True
+        if (
+            item.get("grounding_verified") is True
+            or item.get("tool_evidence_verified") is True
+        )
         for artifact in item.get("evidence_artifacts") or []
     }
     unresolved = requested - verified_artifacts
@@ -699,6 +789,18 @@ def _numbers_in_text(value: str) -> List[float]:
     ignored_spans.extend(match.span() for match in DATA_FILE_REFERENCE.finditer(value))
     ignored_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(value))
     ignored_spans.extend(match.span() for match in CANDIDATE_IDENTIFIER.finditer(value))
+    ignored_spans.extend(
+        match.span() for match in CHINESE_ORDINAL_REFERENCE.finditer(value)
+    )
+    ignored_spans.extend(
+        match.span() for match in ENGLISH_ORDINAL_REFERENCE.finditer(value)
+    )
+    ignored_spans.extend(
+        match.span() for match in ENGLISH_RANK_REFERENCE.finditer(value)
+    )
+    ignored_spans.extend(
+        match.span() for match in NEGATED_NUMERIC_REFERENCE.finditer(value)
+    )
     for match in NUMERIC_CLAIM.finditer(value):
         if any(start <= match.start() and match.end() <= end for start, end in ignored_spans):
             continue
@@ -726,12 +828,75 @@ def _numbers_in_value(value: Any) -> List[float]:
     if isinstance(value, (int, float)):
         return [float(value)]
     if isinstance(value, str):
-        return _numbers_in_text(value)
+        values = _numbers_in_text(value)
+        values.extend(
+            float(match.group(1))
+            for match in CASE_IDENTIFIER_NUMBER.finditer(value)
+        )
+        return values
     if isinstance(value, dict):
         return [number for item in value.values() for number in _numbers_in_value(item)]
     if isinstance(value, list):
         return [number for item in value for number in _numbers_in_value(item)]
     return []
+
+
+def _derived_numbers_in_value(value: Any) -> List[float]:
+    """Compute bounded counts and grouped scalar sums from structured evidence."""
+    derived: List[float] = []
+    if isinstance(value, dict):
+        for item in value.values():
+            derived.extend(_derived_numbers_in_value(item))
+        return derived
+    if not isinstance(value, list):
+        return derived
+    derived.append(float(len(value)))
+    rows = [dict(item) for item in value if isinstance(item, dict)]
+    if rows and len(rows) <= 2_000:
+        keys = sorted({key for row in rows for key in row})[:40]
+        numeric_keys = [
+            key
+            for key in keys
+            if any(
+                isinstance(row.get(key), (int, float))
+                and not isinstance(row.get(key), bool)
+                for row in rows
+            )
+        ]
+        category_keys = [
+            key
+            for key in keys
+            if any(isinstance(row.get(key), str) for row in rows)
+        ][:8]
+        for numeric_key in numeric_keys:
+            values = [
+                float(row[numeric_key])
+                for row in rows
+                if isinstance(row.get(numeric_key), (int, float))
+                and not isinstance(row.get(numeric_key), bool)
+            ]
+            if values:
+                derived.append(sum(values))
+                derived.append(float(sum(number > 0 for number in values)))
+            for category_key in category_keys:
+                grouped: Dict[str, float] = {}
+                for row in rows:
+                    category = row.get(category_key)
+                    number = row.get(numeric_key)
+                    if (
+                        not isinstance(category, str)
+                        or not isinstance(number, (int, float))
+                        or isinstance(number, bool)
+                    ):
+                        continue
+                    grouped[category] = (
+                        grouped.get(category, 0.0) + float(number)
+                    )
+                if len(grouped) <= 200:
+                    derived.extend(grouped.values())
+    for item in value:
+        derived.extend(_derived_numbers_in_value(item))
+    return derived
 
 
 def _variable_references_are_grounded(answer: str, grounding_evidence: Any) -> bool:

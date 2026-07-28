@@ -18,7 +18,9 @@ MAX_COMPUTED_RESULTS = 1
 MAX_EVIDENCE_FIELDS = 10
 MAX_VALUE_CHARS = 160
 MAX_COMPUTED_OUTPUT_CHARS = 8_000
-NUMBER_RE = re.compile(r"(?<![\w.])[-+]?\d+(?:\.\d+)?(?![\w.])")
+NUMBER_RE = re.compile(
+    r"(?<![A-Za-z0-9_.])[-+]?\d+(?:\.\d+)?(?![A-Za-z0-9_.])"
+)
 CSV_FILE_RE = re.compile(r"(?i)(?<![\w.-])[\w.-]+\.csv(?![\w.-])")
 ANSWER_TOKEN_RE = re.compile(r"[\u4e00-\u9fffA-Za-z_]{2,}")
 GENERIC_TEXT_VALUES = {
@@ -57,6 +59,7 @@ def build_csv_evidence(
     folded_scope = scope_text.casefold()
     scope_numbers = {_normalized_number(value) for value in NUMBER_RE.findall(scope_text)}
     candidates: List[tuple[int, int, str, Dict[str, Any]]] = []
+    scoped_rows: List[tuple[str, Dict[str, Any]]] = []
     source_files: List[str] = []
     seen_source_files = set()
     seen_rows = set()
@@ -82,6 +85,7 @@ def build_csv_evidence(
             if signature in seen_rows:
                 continue
             seen_rows.add(signature)
+            scoped_rows.append((source_file, row))
             answer_score = _row_relevance(row, answer_text, answer_numbers)
             scope_score = _row_relevance(row, folded_scope, scope_numbers)
             score = answer_score * 2 + scope_score
@@ -138,8 +142,13 @@ def build_csv_evidence(
         selection_summary = _selection_summary(selected_rows)
         if selection_summary:
             evidence["selection_summary"] = selection_summary
-        derived_results = _derived_aggregate_results(
+        aggregation_rows = _named_scope_aggregation_rows(
+            scoped_rows,
             selected_rows,
+            combined_text=scope_text,
+        )
+        derived_results = _derived_aggregate_results(
+            aggregation_rows,
             answer_text=answer_text,
             answer_numbers=answer_numbers,
             scope_text=folded_scope,
@@ -177,6 +186,43 @@ def _selection_summary(
     return summary
 
 
+def _named_scope_aggregation_rows(
+    scoped_rows: List[tuple[str, Dict[str, Any]]],
+    selected_rows: List[tuple[str, Dict[str, Any]]],
+    *,
+    combined_text: str,
+) -> List[tuple[str, Dict[str, Any]]]:
+    """Expand aggregates to a complete, explicitly named categorical scope."""
+    if not AGGREGATION_RE.search(combined_text):
+        return selected_rows
+    folded = combined_text.casefold()
+    filters: Dict[str, set[str]] = {}
+    for _, row in scoped_rows:
+        for column, raw_value in row.items():
+            value = str(raw_value or "").strip()
+            if (
+                len(value) < 2
+                or value in GENERIC_TEXT_VALUES
+                or _decimal_value(value) is not None
+                or value.casefold() not in folded
+            ):
+                continue
+            filters.setdefault(column, set()).add(value)
+    if not filters:
+        return selected_rows
+    matched = [
+        (source_file, row)
+        for source_file, row in scoped_rows
+        if all(
+            str(row.get(column) or "").strip() in values
+            for column, values in filters.items()
+        )
+    ]
+    if not matched or len(matched) > MAX_EVIDENCE_ROWS:
+        return selected_rows
+    return matched
+
+
 def _derived_aggregate_results(
     selected_rows: List[tuple[str, Dict[str, Any]]],
     *,
@@ -212,13 +258,23 @@ def _derived_aggregate_results(
         )
         if not values or not _decimal_is_claimed(total, answer_numbers):
             return []
+        row_count = len(values)
+        nonzero_row_count = sum(value != 0 for _, value in values)
+        zero_row_count = sum(value == 0 for _, value in values)
+        claimed_ratios = _claimed_count_ratios(
+            row_count=row_count,
+            nonzero_row_count=nonzero_row_count,
+            zero_row_count=zero_row_count,
+            answer_numbers=answer_numbers,
+        )
         return [
             {
                 "operation": "sum_abs" if use_absolute else "sum",
                 "measure": measure_column,
-                "row_count": len(values),
-                "nonzero_row_count": sum(value != 0 for _, value in values),
-                "zero_row_count": sum(value == 0 for _, value in values),
+                "row_count": row_count,
+                "nonzero_row_count": nonzero_row_count,
+                "zero_row_count": zero_row_count,
+                **claimed_ratios,
                 "source_files": list(
                     dict.fromkeys(source_file for source_file, _ in values)
                 ),
@@ -270,6 +326,26 @@ def _derived_aggregate_results(
                 }
             )
     return results
+
+
+def _claimed_count_ratios(
+    *,
+    row_count: int,
+    nonzero_row_count: int,
+    zero_row_count: int,
+    answer_numbers: set[str],
+) -> Dict[str, int | float]:
+    if row_count <= 0:
+        return {}
+    ratios = {}
+    for key, count in (
+        ("nonzero_row_percentage", nonzero_row_count),
+        ("zero_row_percentage", zero_row_count),
+    ):
+        percentage = Decimal(count) * Decimal("100") / Decimal(row_count)
+        if _decimal_is_claimed(percentage, answer_numbers):
+            ratios[key] = _decimal_to_number(percentage)
+    return ratios
 
 
 def _named_group_column(

@@ -21,7 +21,7 @@ from evaluator.reviewer_annotations import (
 )
 from evaluator.teacher_quality import numeric_claims_are_grounded, numeric_grounding_evidence
 from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
-from generate_teacher_trace import write_split_records
+from generate_teacher_trace import _history_turn, write_split_records
 
 
 BACKEND_ROOT = Path(__file__).resolve().parent
@@ -329,6 +329,10 @@ class TeacherTraceEvaluationRunner:
                 native.get("quality_flag") == "pass"
                 and any(assessment.evidence_found for assessment in assessments)
             )
+            history_projection = _history_turn(record)
+            tool_evidence_verified = bool(
+                history_projection.get("tool_evidence_verified")
+            )
             current_key = (
                 dataset_source,
                 str(record.get("session_id") or ""),
@@ -337,13 +341,14 @@ class TeacherTraceEvaluationRunner:
             provenance_entry: dict[str, object] = {
                 "assistant_output": str(record.get("final_answer") or ""),
                 "grounding_verified": grounding_verified,
+                "tool_evidence_verified": tool_evidence_verified,
                 "evidence_artifacts": evidence_artifacts,
             }
-            verified_evidence_summary = {
-                key: (record.get("evidence") or {}).get(key)
-                for key in ("csv_evidence", "topology_summary")
-                if grounding_verified and (record.get("evidence") or {}).get(key)
-            }
+            verified_evidence_summary = (
+                dict(history_projection.get("verified_evidence_summary") or {})
+                if tool_evidence_verified
+                else {}
+            )
             if verified_evidence_summary:
                 provenance_entry["verified_evidence_summary"] = verified_evidence_summary
             provenance[current_key] = provenance_entry

@@ -35,6 +35,7 @@ class TraceWriter:
                 "status": "active",
                 "messages": [],
                 "tool_calls": [],
+                "audit_tool_calls": [],
                 "llm_calls": [],
                 "context_injection": {
                     "control_files": [],
@@ -91,6 +92,34 @@ class TraceWriter:
             record.update(extra)
         payload.setdefault("tool_calls", []).append(record)
         self.save_trace(session_id, payload, updated_at=resolved_timestamp)
+        return payload
+
+    def append_audit_tool_call(
+        self,
+        session_id: str,
+        tool_name: str,
+        args: Dict[str, Any],
+        result: Any,
+        *,
+        timestamp: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Retain failed/internal calls for audit without exporting them to SFT."""
+        payload = self.load_trace(session_id)
+        resolved_timestamp = _resolve_timestamp(timestamp)
+        payload.setdefault("audit_tool_calls", []).append(
+            {
+                "tool_name": tool_name,
+                "args": args,
+                "result": result,
+                "timestamp": resolved_timestamp,
+                "teacher_trace_eligible": False,
+            }
+        )
+        self.save_trace(
+            session_id,
+            payload,
+            updated_at=resolved_timestamp,
+        )
         return payload
 
     def append_llm_call(

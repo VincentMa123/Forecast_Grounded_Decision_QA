@@ -262,8 +262,8 @@ class GroundingContractBuilder:
         assumptions = self._provisional_assumptions(results)
         if assumptions:
             contract["provisional_assumptions"] = assumptions
-        applied_disturbances: Dict[tuple[str, str], Dict[str, Any]] = {}
-        applied_order: List[tuple[str, str]] = []
+        applied_disturbances: List[Dict[str, Any]] = []
+        applied_seen = set()
         for disturbance in [
             *prior_applied_disturbances,
             *self._applied_disturbances(results),
@@ -272,14 +272,19 @@ class GroundingContractBuilder:
             mode = str(disturbance.get("mode") or "")
             if not variable or not mode:
                 continue
-            key = (variable.casefold(), mode.casefold())
-            if key not in applied_disturbances:
-                applied_order.append(key)
-            applied_disturbances[key] = disturbance
-        if applied_order:
-            contract["applied_disturbances"] = [
-                applied_disturbances[key] for key in applied_order
-            ]
+            key = json.dumps(
+                disturbance,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                default=str,
+            )
+            if key in applied_seen:
+                continue
+            applied_seen.add(key)
+            applied_disturbances.append(dict(disturbance))
+        if applied_disturbances:
+            contract["applied_disturbances"] = applied_disturbances
         return contract
 
     @staticmethod
@@ -481,6 +486,15 @@ class GroundingContractBuilder:
                 "variable": variable,
                 "mode": mode,
                 "requested_value": requested_value,
+                "direction": (
+                    arguments.get("disturbance_direction")
+                    or dict(output.get("prediction") or {}).get(
+                        "disturbance_direction"
+                    )
+                    or dict(output.get("parsed_task") or {}).get(
+                        "disturbance_direction"
+                    )
+                ),
                 "input_values_before": before,
                 "input_values_applied": applied,
                 "verified": verified,
@@ -988,6 +1002,10 @@ def candidate_contract_message(
     tool_results: Iterable[Dict[str, Any]],
     *,
     decision_policy: Optional[Dict[str, Any]] = None,
+    prior_candidate_results: Optional[Iterable[Dict[str, Any]]] = None,
+    prior_decision_policy: Optional[Dict[str, Any]] = None,
+    prior_decision_policy_source_question: Optional[str] = None,
+    prior_applied_disturbances: Optional[Iterable[Dict[str, Any]]] = None,
 ) -> Optional[str]:
     """Render accumulated multi-candidate facts for the next model request."""
     results = [dict(item) for item in tool_results]
@@ -996,6 +1014,12 @@ def candidate_contract_message(
         results,
         decision_policy=decision_policy,
         require_decision_policy=True,
+        prior_candidate_results=prior_candidate_results,
+        prior_decision_policy=prior_decision_policy,
+        prior_decision_policy_source_question=(
+            prior_decision_policy_source_question
+        ),
+        prior_applied_disturbances=prior_applied_disturbances,
     )
     if contract.get("answer_mode") == "single_forecast":
         successful_forecasts = [
@@ -1057,6 +1081,10 @@ def candidate_contract_message(
         "candidate_results": candidates,
         "decision_summary": decision_summary,
         "comparison_leaders": contract.get("comparison_leaders") or {},
+        "required_application_disclosure": applied_disturbance_disclosure(
+            question,
+            contract,
+        ),
         "worst_case_risk_level": contract.get("worst_case_risk_level"),
         "worst_case_intervention_label": contract.get(
             "worst_case_intervention_label"
@@ -1078,6 +1106,7 @@ def candidate_contract_message(
         "CURRENT PIPEFORMER CANDIDATE CONTRACT\n"
         + json.dumps(payload, ensure_ascii=False, indent=2)
         + "\nUse only these successful candidates and their recorded facts in the final comparison. "
+        "Copy required_application_disclosure verbatim at the start of the answer. "
         "Mention every candidate_id and action, report the ordered objective evidence for every "
         "viable candidate, state hard-constraint and audit outcomes, and do not invent rankings "
         "or effects. Copy every canonical variable ID exactly; never abbreviate it. Continue "
@@ -1120,38 +1149,159 @@ def _contains_bare_action_prefix(answer: str, action_variables: Iterable[str]) -
     return False
 
 
+def _canonical_number(value: Any) -> str:
+    try:
+        number = Decimal(str(value).strip())
+    except Exception:
+        return str(value)
+    if not number.is_finite():
+        return str(value)
+    if number == 0:
+        return "0"
+    rendered = format(number, "f")
+    if "." in rendered:
+        rendered = rendered.rstrip("0").rstrip(".")
+    return rendered
+
+
+_CANONICAL_DISCLOSURE_PREFIXES = (
+    "Applied disturbance:",
+    "Applied setpoint:",
+    "Application status:",
+)
+
+
+def _canonical_sequence_value(values: Any, fallback: Any) -> str:
+    items = list(values or [])
+    if not items:
+        return _canonical_number(fallback)
+    rendered = [_canonical_number(item) for item in items]
+    if len(set(rendered)) == 1:
+        return rendered[0]
+    return json.dumps(rendered, ensure_ascii=False, separators=(",", ":"))
+
+
+def _canonical_applied_disturbance_lines(
+    contract: Dict[str, Any],
+) -> List[str]:
+    lines: List[str] = []
+    seen = set()
+    for raw_item in contract.get("applied_disturbances") or []:
+        item = dict(raw_item or {})
+        variable = str(item.get("variable") or "")
+        mode = str(item.get("mode") or "")
+        if not variable or not mode or item.get("verified") is not True:
+            continue
+        requested = item.get("requested_value")
+        if mode == "percent_change":
+            try:
+                number = Decimal(str(requested).strip())
+            except Exception:
+                number = None
+            direction = str(item.get("direction") or "").casefold()
+            if number is not None and number.is_finite():
+                if direction == "down":
+                    number = -abs(number)
+                elif direction == "up":
+                    number = abs(number)
+                value = _canonical_number(number)
+                if number > 0:
+                    value = f"+{value}"
+            else:
+                value = _canonical_number(requested)
+            primary = f"Applied disturbance: {variable}={value}%"
+        elif mode == "setpoint":
+            primary = (
+                f"Applied setpoint: {variable}="
+                f"{_canonical_number(requested)}"
+            )
+        else:
+            primary = (
+                f"Applied disturbance: {variable}="
+                f"{_canonical_number(requested)}"
+            )
+        if primary not in seen:
+            seen.add(primary)
+            lines.append(primary)
+
+        if item.get("verified") is True and item.get("no_op") is True:
+            prior = _canonical_sequence_value(
+                item.get("input_values_before"), requested
+            )
+            applied = _canonical_sequence_value(
+                item.get("input_values_applied"), requested
+            )
+            status = (
+                f"Application status: {variable}=no-op; "
+                f"prior={prior}; applied={applied}"
+            )
+            if status not in seen:
+                seen.add(status)
+                lines.append(status)
+    return lines
+
+
+def _canonical_disclosure_lines_in_answer(answer: str) -> List[str]:
+    return [
+        line.strip()
+        for line in answer.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if line.strip().startswith(_CANONICAL_DISCLOSURE_PREFIXES)
+    ]
+
+
+def finalize_applied_disturbance_disclosure(
+    answer: str,
+    contract: Dict[str, Any],
+) -> str:
+    """Serialize the canonical application block without rewriting prose."""
+    required = _canonical_applied_disturbance_lines(contract)
+    remaining = [
+        line
+        for line in answer.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if not line.strip().startswith(_CANONICAL_DISCLOSURE_PREFIXES)
+    ]
+    prose = "\n".join(remaining).strip()
+    disclosure = "\n".join(required)
+    if disclosure and prose:
+        return f"{disclosure}\n{prose}"
+    return disclosure or prose
+
+
 def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]:
     """Validate semantic comparison coverage and the typed selection claim."""
     action_variables = _contract_action_variables(contract)
     issues: List[str] = []
     if _contains_bare_action_prefix(answer, action_variables):
         issues.append("canonical_action_variable_abbreviated")
-    answer_folded_full = answer.casefold()
-    for disturbance in contract.get("applied_disturbances") or []:
-        variable = str(disturbance.get("variable") or "")
-        mode = str(disturbance.get("mode") or "")
-        value = _format_number(disturbance.get("requested_value"))
-        if mode == "setpoint":
-            token = f"{variable}={value}"
-        elif mode == "percent_change":
-            try:
-                token = (
-                    f"{variable}"
-                    f"{float(disturbance.get('requested_value')):+g}%"
-                )
-            except (TypeError, ValueError):
-                token = f"{variable}={value}%"
-        else:
-            token = f"{variable}={value}"
-        if token.casefold() not in answer_folded_full:
-            issues.append("applied_disturbance_disclosure_missing")
-        if disturbance.get("no_op") is True and not re.search(
-            r"原值也是|已经是|保持(?:该状态|关闭|开启)|already|no[- ]?op|"
-            r"不能证明|does not establish",
-            answer,
-            re.IGNORECASE,
-        ):
-            issues.append("disturbance_no_op_disclosure_missing")
+    required_disclosure = _canonical_applied_disturbance_lines(contract)
+    actual_disclosure = _canonical_disclosure_lines_in_answer(answer)
+    normalized_answer_lines = [
+        line.strip()
+        for line in answer.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if line.strip()
+    ]
+    required_primary = [
+        line
+        for line in required_disclosure
+        if not line.startswith("Application status:")
+    ]
+    required_status = [
+        line
+        for line in required_disclosure
+        if line.startswith("Application status:")
+    ]
+    if any(line not in actual_disclosure for line in required_primary):
+        issues.append("applied_disturbance_disclosure_missing")
+    if any(line not in actual_disclosure for line in required_status):
+        issues.append("disturbance_no_op_disclosure_missing")
+    if actual_disclosure != required_disclosure and actual_disclosure:
+        issues.append("unexpected_applied_disturbance_disclosure")
+    if (
+        required_disclosure
+        and normalized_answer_lines[: len(required_disclosure)]
+        != required_disclosure
+    ):
+        issues.append("canonical_disclosure_block_not_at_start")
     if contract.get("answer_mode") != "dispatch_comparison":
         return list(dict.fromkeys(issues))
     candidates = [
@@ -1310,48 +1460,17 @@ def _applied_disturbance_lines(
     contract: Dict[str, Any],
     chinese: bool,
 ) -> List[str]:
-    lines: List[str] = []
-    for item in contract.get("applied_disturbances") or []:
-        variable = str(item.get("variable") or "disturbance")
-        mode = str(item.get("mode") or "")
-        value = _format_number(item.get("requested_value"))
-        if mode == "setpoint":
-            token = f"{variable}={value}"
-        elif mode == "percent_change":
-            try:
-                token = f"{variable}{float(item.get('requested_value')):+g}%"
-            except (TypeError, ValueError):
-                token = f"{variable}={value}%"
-        else:
-            token = f"{variable}={value}"
-        if item.get("no_op") is True:
-            if chinese:
-                lines.append(
-                    f"受扰边界：{token}；原值也是{value}，本次为保持该状态，"
-                    "不能证明1→0切换效应。"
-                )
-            else:
-                lines.append(
-                    f"Disturbance: {token}; the prior value was already {value}, "
-                    "so this run preserves that state and does not establish a "
-                    "1-to-0 transition effect."
-                )
-        else:
-            lines.append(
-                f"受扰边界：{token}。"
-                if chinese
-                else f"Disturbance: {token}."
-            )
-    return lines
+    del chinese
+    return _canonical_applied_disturbance_lines(contract)
 
 
 def applied_disturbance_disclosure(
     question: str,
     contract: Dict[str, Any],
 ) -> str:
-    """Return the exact human-readable disturbance evidence an answer must copy."""
-    chinese = any("\u4e00" <= character <= "\u9fff" for character in question)
-    return "\n".join(_applied_disturbance_lines(contract, chinese))
+    """Return the exact machine-verifiable application evidence block."""
+    del question
+    return "\n".join(_canonical_applied_disturbance_lines(contract))
 
 
 def _compact_assumption_lines(

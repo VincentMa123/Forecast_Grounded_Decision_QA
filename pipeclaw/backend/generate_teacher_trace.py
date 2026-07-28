@@ -11,16 +11,21 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from evaluator.csv_evidence import build_csv_evidence
-from evaluator.decision_trace_state import DecisionTraceState
+from evaluator.decision_trace_state import (
+    DecisionTraceState,
+    bounded_recent_turns,
+    serialize_verified_decision_state,
+)
 from evaluator.grounding_contract import (
     GroundingContractBuilder,
-    applied_disturbance_disclosure,
     comparison_answer_issues,
+    finalize_applied_disturbance_disclosure,
     grounded_fallback_answer,
 )
 from evaluator.teacher_quality import (
     answer_quality_issues,
     evaluate_teacher_quality,
+    grounded_numeric_claim_values,
     llm_answer_quality_issues,
     numeric_claim_values,
     numeric_claims_are_grounded,
@@ -73,36 +78,6 @@ SFT_OMITTED_TOOL_KEYS = {
     "timestamp",
     "workspace",
 }
-AGENT_CANDIDATE_STATE_KEYS = (
-    "candidate_id",
-    "tool_call_id",
-    "action",
-    "failure_count",
-    "warning_count",
-    "risk_level",
-    "manual_intervention_label",
-    "failed_rule_ids",
-    "warning_rule_ids",
-    "category_status",
-    "elimination_reasons",
-    "energy_consumption",
-    "nonzero_impacted_variable_count",
-    "pressure_metrics",
-    "linepack_metrics",
-    "flow_metrics",
-    "compressor_metrics",
-    "energy_metrics",
-    "baseline_reference",
-)
-AGENT_PIPEFORMER_STATE_KEYS = (
-    "decision_summary",
-    "comparison_leaders",
-    "applied_disturbances",
-    "worst_case_risk_level",
-    "worst_case_intervention_label",
-)
-
-
 def backend_root() -> Path:
     return Path(__file__).resolve().parent
 
@@ -209,67 +184,18 @@ def scenario_evidence_text(scenario: Dict[str, Any], question: str) -> str:
     return "\n".join(value for value in (description, question) if value)
 
 
-def _verified_evidence_for_agent(
-    history: List[Dict[str, Any]],
-) -> List[Dict[str, Any]]:
-    """Project verified history to the decision state needed by the next turn."""
-    projected_summaries: List[Dict[str, Any]] = []
-    for item in history:
-        if item.get("grounding_verified") is not True:
-            continue
-        summary = item.get("verified_evidence_summary")
-        if not isinstance(summary, dict) or not summary:
-            continue
-        projected = {
-            key: value
-            for key, value in summary.items()
-            if key != "pipeformer"
-        }
-        pipeformer = summary.get("pipeformer")
-        if isinstance(pipeformer, dict) and pipeformer:
-            candidate_results = list(pipeformer.get("candidate_results") or [])
-            if candidate_results:
-                compact_pipeformer = {
-                    key: pipeformer[key]
-                    for key in AGENT_PIPEFORMER_STATE_KEYS
-                    if pipeformer.get(key) not in (None, "", [], {})
-                }
-                compact_pipeformer["candidate_results"] = [
-                    {
-                        key: candidate[key]
-                        for key in AGENT_CANDIDATE_STATE_KEYS
-                        if candidate.get(key) not in (None, "", [], {})
-                    }
-                    for candidate in candidate_results
-                    if isinstance(candidate, dict)
-                ]
-                projected["pipeformer"] = compact_pipeformer
-            else:
-                projected["pipeformer"] = pipeformer
-        if projected:
-            projected_summaries.append(projected)
-    return projected_summaries[-3:]
-
-
 def agent_turn_message(
     scenario: Dict[str, Any],
     question: str,
     history: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
+    del history  # Prior verified state is injected by the runtime state manager.
     description = str(scenario.get("scenario_description") or "").strip()
     parts = []
     if description:
         parts.extend([
             "Scenario context (scope and task intent only; verify factual claims with tools):",
             description,
-        ])
-    verified = _verified_evidence_for_agent(history or [])
-    if verified:
-        parts.extend([
-            "Previously verified evidence summaries may be reused without rereading their source files. "
-            "Only the structured facts below are verified; prior assistant wording is not evidence. "
-            "Do not claim a listed source file was unread merely because this turn made no tool call:",
-            json.dumps(verified, ensure_ascii=False, separators=(",", ":")),
         ])
     parts.extend(["Current user request:", question])
     return "\n\n".join(parts)
@@ -1231,24 +1157,9 @@ def _ensure_applied_disturbance_disclosure(
     question: str,
     grounding_contract: Dict[str, Any],
 ) -> str:
-    """Prepend missing canonical disturbance evidence without rewriting the answer."""
-    if grounding_contract.get("answer_mode") != "single_forecast":
-        return answer
-    issues = set(comparison_answer_issues(answer, grounding_contract))
-    required_issues = {
-        "applied_disturbance_disclosure_missing",
-        "disturbance_no_op_disclosure_missing",
-    }
-    if not issues.intersection(required_issues):
-        return answer
-    disclosure = applied_disturbance_disclosure(
-        question,
-        grounding_contract,
-    ).strip()
-    if not disclosure:
-        return answer
-    stripped_answer = answer.strip()
-    return disclosure + (f"\n{stripped_answer}" if stripped_answer else "")
+    """Apply the exact machine-generated disclosure block to any forecast answer."""
+    del question  # Kept in the public helper signature for existing callers.
+    return finalize_applied_disturbance_disclosure(answer, grounding_contract)
 
 
 def _build_teacher_record(
@@ -1273,6 +1184,15 @@ def _build_teacher_record(
     )
     grounded_tool_outputs = attach_tool_arguments(tool_outputs, tool_calls)
     history_state = DecisionTraceState.from_history(conversation_context or [])
+    state_before = serialize_verified_decision_state(
+        history_state,
+        max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+    )
+    recent_turns = bounded_recent_turns(
+        conversation_context or [],
+        max_turns=2,
+        max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+    )
     grounding_contract = GroundingContractBuilder().build(
         question,
         grounded_tool_outputs,
@@ -1439,6 +1359,8 @@ def _build_teacher_record(
         "grounding_contract": projector.sanitize(grounding_contract),
         "decision_summary": projector.sanitize(decision_summary),
         "conversation_context": projector.sanitize(conversation_context or []),
+        "state_before": projector.sanitize(state_before),
+        "recent_turns": projector.sanitize(recent_turns),
         "user_input": question,
         "parsed_task": projector.sanitize(parsed_task),
         "tool_calls": tool_calls,
@@ -1504,13 +1426,48 @@ def _pipeformer_history_summary(record: Dict[str, Any]) -> Dict[str, Any]:
         stored_contract.get("answer_mode") == "dispatch_comparison"
         and stored_contract.get("candidate_results")
     ):
+        forecast_arguments = {
+            str(item.get("tool_call_id") or ""): dict(
+                item.get("arguments") or {}
+            )
+            for item in record.get("tool_calls") or []
+            if item.get("name") == "run_pipeformer_forecast"
+        }
+        applied_disturbances = list(
+            stored_contract.get("applied_disturbances") or []
+        )
+        scoped_candidates = []
+        for source_candidate in stored_contract.get("candidate_results") or []:
+            candidate = dict(source_candidate)
+            arguments = forecast_arguments.get(
+                str(candidate.get("tool_call_id") or ""),
+                {},
+            )
+            if arguments:
+                candidate["case_id"] = arguments.get("case_id")
+                candidate["forecast_horizon_minutes"] = arguments.get(
+                    "forecast_horizon_minutes"
+                )
+                disturbance_variable = str(
+                    arguments.get("disturbance_variable") or ""
+                )
+                matching = next(
+                    (
+                        dict(item)
+                        for item in applied_disturbances
+                        if str(dict(item).get("variable") or "")
+                        == disturbance_variable
+                    ),
+                    {},
+                )
+                if matching:
+                    candidate["disturbance"] = matching
+            scoped_candidates.append(_without_none_values(candidate))
         return _without_none_values({
-            "candidate_results": stored_contract.get("candidate_results") or [],
+            "candidate_results": scoped_candidates,
             "decision_summary": stored_contract.get("decision_summary") or {},
             "comparison_leaders": stored_contract.get("comparison_leaders") or {},
-            "applied_disturbances": (
-                stored_contract.get("applied_disturbances") or []
-            ),
+            "applied_disturbances": applied_disturbances,
             "worst_case_risk_level": stored_contract.get(
                 "worst_case_risk_level"
             ),
@@ -1699,18 +1656,66 @@ def _history_turn(record: Dict[str, Any]) -> Dict[str, Any]:
         for key in ("csv_evidence", "topology_summary")
         if evidence_found and record_evidence.get(key)
     }
+    registry_variables: List[Dict[str, Any]] = []
+    for item in outputs:
+        if str(item.get("name") or "").casefold() != "search_pipeformer_registry":
+            continue
+        output = dict(item.get("output") or {})
+        if output.get("success") is not True or output.get("error"):
+            continue
+        arguments = dict(item.get("arguments") or {})
+        for variable in output.get("variables") or []:
+            if not isinstance(variable, dict) or not variable.get("variable"):
+                continue
+            registry_variables.append(
+                {
+                    **dict(variable),
+                    "provenance": {
+                        "tool_call_id": item.get("tool_call_id"),
+                        "query": arguments.get("query"),
+                        "role": arguments.get("role"),
+                        "controllable": arguments.get("controllable"),
+                    },
+                    "execution_authorization": False,
+                }
+            )
+    if registry_variables:
+        verified_evidence_summary["registry_variables"] = registry_variables
     pipeformer_evidence_found = any(
         assessment.evidence_found
         and str(item.get("name") or "").casefold() == "run_pipeformer_forecast"
         for item, assessment in zip(outputs, assessments)
     )
-    stored_contract = dict(record.get("grounding_contract") or {})
-    stored_pipeformer_state = bool(
-        stored_contract.get("candidate_results")
-        and stored_contract.get("answer_mode")
-        in {"single_forecast", "dispatch_comparison"}
+    forecast_outputs = [
+        dict(item.get("output") or {})
+        for item in outputs
+        if str(item.get("name") or "").casefold()
+        == "run_pipeformer_forecast"
+    ]
+    verified_forecast_outputs = bool(forecast_outputs) and all(
+        output.get("success") is True
+        and dict(
+            output.get("verification")
+            or output.get("constraint_check")
+            or {}
+        ).get("verification_complete")
+        is True
+        and bool(
+            dict(output.get("evidence") or {}).get(
+                "boundary_application_evidence"
+            )
+        )
+        and all(
+            isinstance(application, dict)
+            and application.get("verified") is True
+            for application in dict(output.get("evidence") or {}).get(
+                "boundary_application_evidence"
+            )
+            or []
+        )
+        for output in forecast_outputs
     )
-    if pipeformer_evidence_found or stored_pipeformer_state:
+    if pipeformer_evidence_found and verified_forecast_outputs:
         pipeformer_summary = _pipeformer_history_summary(record)
         if pipeformer_summary:
             verified_evidence_summary["pipeformer"] = pipeformer_summary
@@ -1737,9 +1742,13 @@ def _history_turn(record: Dict[str, Any]) -> Dict[str, Any]:
             "user_input": record["user_input"],
             "assistant_output": record.get("final_answer"),
             "quality_flag": record.get("quality_flag"),
+            "verified_state_eligible": bool(verified_evidence_summary),
             "grounding_verified": (
                 record.get("quality_flag") == "pass"
-                and (evidence_found or stored_pipeformer_state)
+                and bool(verified_evidence_summary)
+            ),
+            "tool_evidence_verified": (
+                bool(verified_evidence_summary)
             ),
             "evidence_artifacts": evidence_artifacts,
             "verified_evidence_summary": verified_evidence_summary or None,
@@ -1808,6 +1817,10 @@ def run_backend_session(
         session_id=runtime_session_id,
         enable_skills=False,
         workspace_root_base=backend_root() / ".openclaw" / "tt_runs" / run_namespace,
+    )
+    orchestrator.verified_state_manager.commit(
+        runtime_session_id,
+        DecisionTraceState.from_history(scenario_history),
     )
     records: List[Dict[str, Any]] = []
     history = scenario_history
@@ -1910,6 +1923,8 @@ def run_backend_session(
                 "turn_id": record["turn_id"],
                 "user_input": record["user_input"],
                 "expected_answer": record["final_answer"],
+                "state_before": record.get("state_before"),
+                "recent_turns": record.get("recent_turns"),
                 "tool_calls": record["tool_calls"],
                 "tool_outputs": record["tool_outputs"],
                 "quality_flag": record["quality_flag"],
@@ -1950,7 +1965,8 @@ def write_split_records(
         "session_id",
         "turn_id",
         "scenario_type",
-        "conversation_context",
+        "state_before",
+        "recent_turns",
         "user_input",
         "parsed_task",
         "tool_calls",
@@ -1966,6 +1982,23 @@ def write_split_records(
             if item.get("split") != split:
                 continue
             projected = {key: item[key] for key in sft_fields if key in item}
+            if "state_before" not in projected:
+                projected["state_before"] = serialize_verified_decision_state(
+                    DecisionTraceState.from_history(
+                        item.get("conversation_context") or []
+                    ),
+                    max_chars=int(
+                        os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")
+                    ),
+                )
+            if "recent_turns" not in projected:
+                projected["recent_turns"] = bounded_recent_turns(
+                    item.get("conversation_context") or [],
+                    max_turns=2,
+                    max_chars=int(
+                        os.getenv("RECENT_TURNS_MAX_CHARS", "4000")
+                    ),
+                )
             full_grounding_evidence = numeric_grounding_evidence(item)
             projected["tool_calls"], projected["tool_outputs"] = DEFAULT_PROJECTOR.compact_sft_trajectory(
                 list(projected.get("tool_calls") or []),
@@ -1975,17 +2008,14 @@ def write_split_records(
             projected_evidence = DEFAULT_PROJECTOR.compact_record_evidence(
                 dict(projected.get("evidence") or {})
             )
-            supporting_values = []
             answer_text = str(projected.get("final_answer") or "")
-            for value in numeric_claim_values(answer_text):
-                token = str(value)
-                if numeric_claims_are_grounded(
-                    token,
+            supporting_values = list(dict.fromkeys(
+                grounded_numeric_claim_values(
+                    answer_text,
                     str(projected.get("user_input") or ""),
                     full_grounding_evidence,
-                ):
-                    if value not in supporting_values:
-                        supporting_values.append(value)
+                )
+            ))
             if supporting_values:
                 projected_evidence["supporting_numeric_values"] = supporting_values
             projected["evidence"] = projected_evidence
