@@ -7,14 +7,29 @@ from pathlib import Path
 import re
 from typing import Any, Dict, Iterable, List, Sequence
 
+from .answer_limits import (
+    CHINESE_SINGLE_FORECAST_MAX_CHARS,
+    chinese_comparison_max_chars,
+)
 from .csv_evidence import build_csv_evidence
-from .grounding_contract import GroundingContractBuilder, grounded_fallback_answer
+from .grounding_contract import (
+    GroundingContractBuilder,
+    _compact_answer,
+    answer_without_machine_disclosure,
+    decision_policy_source_has_priority_signal,
+    finalize_applied_disturbance_disclosure,
+    grounded_fallback_answer,
+    repair_grounded_record,
+)
 from .scorer import NativeEvaluationConfig, NativeTraceEvaluator
 from .teacher_quality import (
+    UNSUPPORTED_PROPAGATION_CLAIM,
     VARIABLE_REFERENCE,
     numeric_claim_values,
     numeric_claims_are_grounded,
     numeric_grounding_evidence,
+    record_quality_issues,
+    record_grounding_contract,
 )
 from .tool_evidence import attach_tool_arguments
 
@@ -99,6 +114,130 @@ STAGED_DETERMINISTIC_REPAIR_SAMPLE_IDS = (
     | STAGED_CANDIDATE_REPAIR_SAMPLE_IDS
     | set(STAGED_TEXT_REPLACEMENTS)
 )
+REPAIRABLE_COMPARISON_ISSUES = {
+    "candidate_comparison_incomplete",
+    "candidate_selection_missing",
+    "candidate_selection_contradicts_contract",
+    "decision_objective_evidence_incomplete",
+    "candidate_action_mapping_incomplete",
+    "candidate_audit_evidence_incomplete",
+    "hard_constraint_outcome_missing",
+    "candidate_rejection_reason_missing",
+    "unknown_candidate_reference",
+}
+
+# A schema request asks how verified output should be represented, not for a
+# new dispatch decision.  Pair the bounded language signals with the absence
+# of a current forecast or selection request so this remains a generic
+# follow-up class rather than a scenario-ID exception.
+_OUTPUT_SCHEMA_REQUEST = re.compile(
+    r"(?:\bschema\b|\bfields?\b|\blayers?\b|\boutput\s+format\b|"
+    r"\bpayload\b|\bautomated?\s+validation\b|"
+    r"字段|层次|输出拆分|输出结构|输出格式|自动化验证|最少保留)",
+    re.IGNORECASE,
+)
+_SELECTION_REQUEST = re.compile(
+    r"\b(?:recommend|select|choose|rank|prioriti[sz]e)\b",
+    re.IGNORECASE,
+)
+_CHINESE_CANDIDATE_SELECTION_REQUEST = re.compile(
+    r"(?:推荐|选择|排序|优先).{0,20}(?:候选|candidate|方案|动作)",
+    re.IGNORECASE,
+)
+_CANDIDATE_ID_REFERENCE = re.compile(r"\bcandidate_[A-Za-z0-9_-]+\b", re.IGNORECASE)
+
+
+def _remove_unsupported_mechanism_claims(answer: str) -> str:
+    """Drop only unsupported mechanism sentences and retain grounded observations."""
+    retained: List[str] = []
+    removed = False
+    for line in answer.splitlines():
+        parts = re.split(r"(?<=[。！？.!?])", line)
+        kept_parts = []
+        for part in parts:
+            if UNSUPPORTED_PROPAGATION_CLAIM.search(part):
+                removed = True
+                continue
+            kept_parts.append(part)
+        kept_line = "".join(kept_parts).strip()
+        if kept_line:
+            retained.append(kept_line)
+    if not removed:
+        return answer
+    notice = (
+        "已存预测仅支持数值与约束状态，不能证明所述机制。"
+        if re.search(r"[\u4e00-\u9fff]", answer)
+        else (
+            "Stored forecasts support only numeric and constraint-status "
+            "observations; the stated mechanism is not established."
+        )
+    )
+    canonical_prefixes = (
+        "Applied disturbance:",
+        "Applied setpoint:",
+        "Application status:",
+        "Assumption source:",
+    )
+    prefix_lines = []
+    while retained and retained[0].startswith(canonical_prefixes):
+        prefix_lines.append(retained.pop(0))
+    return "\n".join([*prefix_lines, notice, *retained]).strip()
+
+
+def _is_output_schema_follow_up(record: Dict[str, Any]) -> bool:
+    """Identify a non-operational request for a reusable result schema."""
+    question = str(record.get("user_input") or "")
+    if not _OUTPUT_SCHEMA_REQUEST.search(question):
+        return False
+    if (
+        _SELECTION_REQUEST.search(question)
+        or _CHINESE_CANDIDATE_SELECTION_REQUEST.search(question)
+    ):
+        return False
+    return not any(
+        str(call.get("name") or "") == "run_pipeformer_forecast"
+        for call in record.get("tool_calls") or []
+    )
+
+
+def _output_schema_answer(question: str, contract: Dict[str, Any]) -> str:
+    """Render a compact, evidence-neutral schema answer for meta follow-ups."""
+    chinese = bool(re.search(r"[\u4e00-\u9fff]", question))
+    if chinese:
+        body = "\n".join(
+            [
+                "建议按四层保留，且所有变量 ID 使用完整规范形式：",
+                "1. 候选动作层：candidate_id、完整 action、动作指纹、case/horizon。",
+                "2. 预测结果层：forecast_id、风险级别、关键指标值/单位/观测变量与时间点。",
+                "3. 规则审计层：failure_count、warning_count、规则 ID、audit_status、人工干预标签。",
+                "4. 最终排序层：decision_policy、ranked_candidate_ids、selected_candidate_id、目标证据与未选原因。",
+            ]
+        )
+    else:
+        body = "\n".join(
+            [
+                "Preserve four layers and keep every variable ID canonical:",
+                "1. Candidate action: candidate_id, full action, action fingerprint, case/horizon.",
+                "2. Forecast result: forecast_id, risk, key values/units, observation variable and timestamp.",
+                "3. Rule audit: failure_count, warning_count, rule IDs, audit_status, intervention label.",
+                "4. Final ranking: decision_policy, ranked_candidate_ids, selected_candidate_id, objective evidence, and non-selection reason.",
+            ]
+        )
+    return finalize_applied_disturbance_disclosure(body, contract)
+
+
+def _has_trusted_forecast_evidence(record: Dict[str, Any]) -> bool:
+    state = dict(record.get("state_before") or {})
+    if dict(state.get("verified_evidence") or {}).get(
+        "single_forecast_snapshot"
+    ):
+        return True
+    return any(
+        str(item.get("tool_name") or "") in {"forecast_with_pipeformer", "run_pipeformer"}
+        and not item.get("error")
+        for item in record.get("tool_outputs") or []
+        if isinstance(item, dict)
+    )
 
 
 def apply_deterministic_repairs(
@@ -271,6 +410,127 @@ def apply_staged_answer_repairs(
     for record in repaired:
         if record.get("scenario_type") != "pipeformer":
             continue
+        if not _is_output_schema_follow_up(record):
+            continue
+        answer = str(record.get("final_answer") or "")
+        initial_issues = set(record_quality_issues(record))
+        comparison_ids = set(_CANDIDATE_ID_REFERENCE.findall(answer))
+        if (
+            len(comparison_ids) < 2
+            and "unsupported_variable_reference" not in initial_issues
+            and "answer_too_long" not in initial_issues
+        ):
+            continue
+        contract = record_grounding_contract(record)
+        proposed_answer = _output_schema_answer(
+            str(record.get("user_input") or ""),
+            contract,
+        )
+        proposed = dict(record)
+        proposed["final_answer"] = proposed_answer
+        proposed["answer_mode"] = contract.get("answer_mode")
+        proposed["grounding_contract"] = contract
+        proposed["decision_summary"] = dict(
+            contract.get("decision_summary") or {}
+        )
+        proposed_issues = set(record_quality_issues(proposed))
+        if proposed_issues or proposed_issues - initial_issues:
+            skipped[str(record.get("sample_id") or "")] = (
+                "output_schema_repair_not_grounded:"
+                + ",".join(sorted(proposed_issues))
+            )
+            continue
+        evidence = dict(record.get("evidence") or {})
+        evidence["repair_contract"] = {
+            "repair_type": "output_schema_follow_up",
+            "source": "verified_decision_state_v1",
+            "layers": [
+                "candidate_action",
+                "forecast_result",
+                "rule_audit",
+                "final_ranking",
+            ],
+        }
+        record["final_answer"] = proposed_answer
+        record["answer_mode"] = contract.get("answer_mode")
+        record["grounding_contract"] = contract
+        record["decision_summary"] = dict(
+            contract.get("decision_summary") or {}
+        )
+        record["evidence"] = evidence
+        record["repair_provenance"] = {
+            "method": "deterministic_output_schema_repair",
+            "external_llm_calls": 0,
+            "reason": (
+                "The meta-level output-schema request was answered from the "
+                "bounded verified state without replaying a prior comparison."
+            ),
+        }
+        sample_id = str(record.get("sample_id") or "")
+        if sample_id not in repaired_ids:
+            repaired_ids.append(sample_id)
+
+    for record in repaired:
+        if record.get("scenario_type") != "pipeformer":
+            continue
+        initial_issues = set(record_quality_issues(record))
+        if "answer_too_long" not in initial_issues:
+            continue
+        state_contract = record_grounding_contract(record)
+        maximum_chars = (
+            chinese_comparison_max_chars(
+                len(state_contract.get("candidate_results") or [])
+            )
+            if state_contract.get("answer_mode") == "dispatch_comparison"
+            else CHINESE_SINGLE_FORECAST_MAX_CHARS
+        )
+        disclosure = finalize_applied_disturbance_disclosure("", state_contract)
+        body_budget = maximum_chars - len(disclosure) - (1 if disclosure else 0)
+        if body_budget < 1:
+            skipped[str(record.get("sample_id") or "")] = (
+                "answer_compaction_disclosure_exceeds_budget"
+            )
+            continue
+        stateful_answer = finalize_applied_disturbance_disclosure(
+            _compact_answer(
+                answer_without_machine_disclosure(
+                    str(record.get("final_answer") or "")
+                ),
+                body_budget,
+            ),
+            state_contract,
+        )
+        proposed = dict(record)
+        proposed["final_answer"] = stateful_answer
+        proposed["answer_mode"] = state_contract.get("answer_mode")
+        proposed["grounding_contract"] = state_contract
+        proposed["decision_summary"] = dict(
+            state_contract.get("decision_summary") or {}
+        )
+        proposed_issues = set(record_quality_issues(proposed))
+        if proposed_issues and _successful_pipeformer_results(record):
+            candidate = dict(record)
+            # repair_grounded_record intentionally keys off stored quality
+            # issues; use the freshly recomputed value rather than a stale
+            # manifest.  It can produce a smaller forecast-specific answer.
+            candidate["quality_issues"] = sorted(initial_issues)
+            proposed = repair_grounded_record(candidate)
+            proposed_issues = set(record_quality_issues(proposed))
+        if proposed_issues:
+            skipped[str(record.get("sample_id") or "")] = (
+                "answer_compaction_not_grounded:"
+                + ",".join(sorted(proposed_issues))
+            )
+            continue
+        record.clear()
+        record.update(proposed)
+        sample_id = str(record.get("sample_id") or "")
+        if sample_id not in repaired_ids:
+            repaired_ids.append(sample_id)
+
+    for record in repaired:
+        if record.get("scenario_type") != "pipeformer":
+            continue
         sample_id = str(record.get("sample_id") or "")
         answer = str(record.get("final_answer") or "")
         claimed = set(VARIABLE_REFERENCE.findall(answer))
@@ -356,6 +616,125 @@ def apply_staged_answer_repairs(
             ),
         }
         repaired_ids.append(sample_id)
+
+    for index, record in enumerate(repaired):
+        if record.get("scenario_type") != "pipeformer":
+            continue
+        sample_id = str(record.get("sample_id") or "")
+        initial_issues = set(record_quality_issues(record))
+        if not (initial_issues & REPAIRABLE_COMPARISON_ISSUES):
+            continue
+        try:
+            answer, contract = _candidate_answer(repaired, index)
+        except ValueError as error:
+            skipped.setdefault(sample_id, str(error))
+            continue
+        if contract.get("answer_render_status") == "answer_budget_insufficient":
+            skipped.setdefault(sample_id, "comparison_repair_exceeds_answer_limit")
+            continue
+        repair_contract = _compact_repair_contract(contract)
+        proposed = dict(record)
+        proposed["final_answer"] = answer
+        proposed["answer_mode"] = repair_contract.get("answer_mode")
+        proposed["grounding_contract"] = repair_contract
+        proposed["decision_summary"] = dict(
+            contract.get("decision_summary") or {}
+        )
+        proposed_issues = set(record_quality_issues(proposed))
+        if proposed_issues - initial_issues:
+            skipped.setdefault(
+                sample_id,
+                "comparison_repair_introduced:"
+                + ",".join(sorted(proposed_issues - initial_issues)),
+            )
+            continue
+        evidence = dict(record.get("evidence") or {})
+        evidence["repair_contract"] = repair_contract
+        record["answer_mode"] = repair_contract.get("answer_mode")
+        record["grounding_contract"] = repair_contract
+        record["decision_summary"] = dict(contract.get("decision_summary") or {})
+        record["evidence"] = evidence
+        record["final_answer"] = answer
+        record["repair_provenance"] = {
+            "method": "deterministic_comparison_repair",
+            "external_llm_calls": 0,
+            "reason": (
+                "The answer was rebuilt from successful stored forecasts and "
+                "the latest verified decision policy; no policy was inferred "
+                "when the user supplied only audit categories."
+            ),
+        }
+        if sample_id not in repaired_ids:
+            repaired_ids.append(sample_id)
+
+    for record in repaired:
+        if record.get("scenario_type") != "pipeformer":
+            continue
+        initial_issues = set(record_quality_issues(record))
+        if (
+            "unsupported_causal_or_propagation_claim" not in initial_issues
+            or not _has_trusted_forecast_evidence(record)
+        ):
+            continue
+        answer = str(record.get("final_answer") or "")
+        proposed_answer = _remove_unsupported_mechanism_claims(answer)
+        if proposed_answer == answer:
+            continue
+        proposed_record = dict(record)
+        proposed_record["final_answer"] = proposed_answer
+        proposed_issues = set(record_quality_issues(proposed_record))
+        if "unsupported_causal_or_propagation_claim" in proposed_issues:
+            skipped[str(record.get("sample_id") or "")] = (
+                "unsupported_mechanism_claim_could_not_be_isolated"
+            )
+            continue
+        new_issues = proposed_issues - initial_issues
+        if new_issues:
+            skipped[str(record.get("sample_id") or "")] = (
+                "mechanism_repair_introduced:" + ",".join(sorted(new_issues))
+            )
+            continue
+        record["final_answer"] = proposed_answer
+        record["repair_provenance"] = {
+            "method": "deterministic_unsupported_mechanism_repair",
+            "external_llm_calls": 0,
+            "reason": (
+                "An unsupported mechanism sentence was removed while preserving "
+                "the stored forecast's numeric and constraint-status observations."
+            ),
+        }
+        sample_id = str(record.get("sample_id") or "")
+        if sample_id not in repaired_ids:
+            repaired_ids.append(sample_id)
+
+    for record in repaired:
+        if record.get("scenario_type") != "pipeformer":
+            continue
+        answer = str(record.get("final_answer") or "")
+        contract = record_grounding_contract(record)
+        finalized = finalize_applied_disturbance_disclosure(
+            answer,
+            contract,
+        )
+        if finalized == answer:
+            continue
+        record["final_answer"] = finalized
+        record["answer_mode"] = contract.get("answer_mode")
+        record["grounding_contract"] = contract
+        record["decision_summary"] = dict(
+            contract.get("decision_summary") or {}
+        )
+        record["repair_provenance"] = {
+            "method": "deterministic_disclosure_finalization",
+            "external_llm_calls": 0,
+            "reason": (
+                "Canonical application and provisional-assumption metadata "
+                "were rebuilt from verified current-turn tools and state_before."
+            ),
+        }
+        sample_id = str(record.get("sample_id") or "")
+        if sample_id not in repaired_ids:
+            repaired_ids.append(sample_id)
 
     if repaired_ids:
         _refresh_quality_and_context(repaired)
@@ -518,6 +897,15 @@ def _candidate_answer(
         and item.get("scenario_id") == target.get("scenario_id")
     ]
     current_results = _successful_pipeformer_results(target)
+    if not current_results:
+        contract = record_grounding_contract(target)
+        if contract.get("answer_mode") != "dispatch_comparison":
+            raise ValueError(
+                f"Verified state does not contain a comparison for {target.get('sample_id')}"
+            )
+        return grounded_fallback_answer(
+            str(target.get("user_input") or ""), contract
+        ), contract
     if len(current_results) >= 2:
         tool_results = current_results
     else:
@@ -525,16 +913,57 @@ def _candidate_answer(
         for item in relevant:
             tool_results.extend(_successful_pipeformer_results(item))
     priority_question = _latest_priority_question(relevant, target)
+    decision_policy = _candidate_repair_policy(target)
     contract = GroundingContractBuilder().build(
         priority_question,
         tool_results,
-        decision_policy=dict(target.get("decision_policy") or {}) or None,
+        decision_policy=decision_policy,
+        require_decision_policy=True,
     )
     if contract.get("answer_mode") != "dispatch_comparison":
         raise ValueError(
             f"Stored evidence does not contain a multi-candidate comparison for {target.get('sample_id')}"
         )
     return grounded_fallback_answer(str(target.get("user_input") or ""), contract), contract
+
+
+def _candidate_repair_policy(
+    record: Dict[str, Any],
+) -> Dict[str, Any] | None:
+    """Use policy already verified before this turn, never infer one in repair."""
+    state_policy = dict(
+        dict(record.get("state_before") or {}).get("decision_policy") or {}
+    )
+    if (
+        state_policy.get("source") == "llm_tool"
+        and state_policy.get("objectives")
+    ):
+        return state_policy
+
+    current_policy = dict(record.get("decision_policy") or {})
+    objectives = [
+        dict(item)
+        for item in current_policy.get("objectives") or []
+        if isinstance(item, dict)
+    ]
+    question = " ".join(str(record.get("user_input") or "").split()).casefold()
+    if (
+        current_policy.get("source") != "llm_tool"
+        or not objectives
+        or not question
+    ):
+        return None
+    for objective in objectives:
+        excerpt = " ".join(
+            str(objective.get("source_excerpt") or "").split()
+        ).casefold()
+        if (
+            len(excerpt) < 4
+            or excerpt not in question
+            or not decision_policy_source_has_priority_signal(excerpt)
+        ):
+            return None
+    return current_policy
 
 
 def _successful_pipeformer_results(record: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -595,6 +1024,11 @@ def _compact_repair_contract(contract: Dict[str, Any]) -> Dict[str, Any]:
                 "ranking_policy",
                 "ranked_candidate_ids",
                 "eliminated_candidates",
+                # This is contract state, not optional presentation detail.
+                # In particular, retaining llm_decision_policy_tool_call
+                # prevents a later memory rebuild from silently replacing an
+                # evidence-insufficient decision with a default ranking.
+                "missing_metrics",
             )
         },
         "comparison_leaders": contract.get("comparison_leaders") or {},

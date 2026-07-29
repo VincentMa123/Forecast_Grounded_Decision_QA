@@ -8,6 +8,7 @@ import queue
 import shutil
 import subprocess
 import sys
+import tempfile
 import threading
 import time
 from copy import deepcopy
@@ -68,39 +69,70 @@ DEFAULT_STAGING = GENERATED_ROOT / "repair_staging"
 
 
 REGENERATION_TARGETS = (
-    ("pipeclaw_dataset_v2", "scenario_openclaw_013"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_014"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_015"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_016"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_021"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_022"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_023"),
-    ("pipeclaw_dataset_v2", "scenario_openclaw_024"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_003"),
+    # ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_001"),
+    # ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_002"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_004"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_005"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_007"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_006"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_008"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_009"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_010"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_011"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_012"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_013"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_014"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_015"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_019"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_012"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_015"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_004"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_016"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_017"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_018"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_dispatch_020"),
+
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_001"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_002"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_003"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_004"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_005"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_006"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_007"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_008"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_009"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_010"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_011"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_013"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_014"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_016"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_017"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_018"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_019"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v4", "scenario_pipeformer_prediction_020"),
+
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_001"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_002"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_003"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_005"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_006"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_007"),
     ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_008"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_011"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_012"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_014"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_015"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_020"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_012"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_015"),
-    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_016"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_009"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_010"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_013"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_016"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_017"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_018"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_dispatch_019"),
+
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_001"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_002"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_003"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_004"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_005"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_006"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_007"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_008"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_009"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_010"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_011"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_013"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_014"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_017"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_018"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_019"),
+    ("Pipeline_Full_Life_Cycle_Test_Dataset-v7", "scenario_pipeformer_prediction_020"),
 )
 AMBIGUOUS_RELEVANCE_TARGETS = {
     ("pipeclaw_dataset_v2", f"scenario_openclaw_{number:03d}")
@@ -108,6 +140,8 @@ AMBIGUOUS_RELEVANCE_TARGETS = {
 }
 PLANNED_TARGETS_SCHEMA_VERSION = "teacher_trace_regeneration_plan_v1"
 PLANNED_TARGETS_FILENAME = "planned_targets.json"
+FORCED_TARGETS_SCHEMA_VERSION = "teacher_trace_forced_targets_v1"
+FORCED_TARGETS_FILENAME = "forced_targets.json"
 CHILD_HEARTBEAT_SECONDS = 30.0
 CHILD_OUTPUT_TAIL_CHARS = 4_000
 _LIVE_LOG_PRINT_LOCK = threading.Lock()
@@ -364,6 +398,77 @@ def _freeze_planned_targets(
     return payload
 
 
+def _validate_forced_target_pairs(
+    targets: Sequence[tuple[str, str]],
+) -> List[tuple[str, str]]:
+    known_pairs = {
+        (
+            str(source.get("dataset_source") or ""),
+            str(scenario.get("scenario_id") or ""),
+        )
+        for source in load_scenario_sources(default_scenario_files())
+        for scenario in source.get("scenarios") or []
+    }
+    requested = sorted(set(targets))
+    missing = [pair for pair in requested if pair not in known_pairs]
+    if missing:
+        raise ValueError(
+            "Scenario source not found: "
+            + ", ".join(
+                f"{dataset}:{scenario}" for dataset, scenario in missing
+            )
+        )
+    return requested
+
+
+def _freeze_forced_targets(
+    staging_root: Path,
+    master_json: Path,
+    targets: Sequence[tuple[str, str]],
+) -> Dict[str, Any]:
+    requested = _validate_forced_target_pairs(targets)
+    staging_root = Path(staging_root)
+    staging_root.mkdir(parents=True, exist_ok=True)
+    path = staging_root / FORCED_TARGETS_FILENAME
+    master_hash = _master_sha256(master_json)
+    existing_pairs: set[tuple[str, str]] = set()
+    if path.is_file():
+        existing = json.loads(path.read_text(encoding="utf-8-sig"))
+        if existing.get("schema_version") != FORCED_TARGETS_SCHEMA_VERSION:
+            raise ValueError(f"Unsupported forced-target manifest: {path}")
+        if existing.get("master_sha256") != master_hash:
+            raise ValueError(
+                "The existing forced_targets.json has a different master "
+                "hash. Use a new --staging-root."
+            )
+        existing_pairs = {
+            (
+                str(item.get("dataset_source") or ""),
+                str(item.get("scenario_id") or ""),
+            )
+            for item in existing.get("targets") or []
+            if isinstance(item, dict)
+        }
+    combined = sorted(existing_pairs | set(requested))
+    target_items = [
+        {
+            "dataset_source": dataset_source,
+            "scenario_id": scenario_id,
+            "reasons": ["manual:force_target"],
+        }
+        for dataset_source, scenario_id in combined
+    ]
+    payload = {
+        "schema_version": FORCED_TARGETS_SCHEMA_VERSION,
+        "master_path": Path(master_json).resolve().as_posix(),
+        "master_sha256": master_hash,
+        "target_count": len(target_items),
+        "targets": target_items,
+    }
+    write_json(path, payload, force=True)
+    return payload
+
+
 def _positive_int(value: str) -> int:
     parsed = int(value)
     if parsed < 1:
@@ -386,11 +491,36 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--repair-current-quality",
+        action="store_true",
+        help=(
+            "Deterministically repair evidence-complete quality failures in "
+            "the current master, rebuild verified memory, and transactionally "
+            "re-export every SFT record without calling an LLM."
+        ),
+    )
+    parser.add_argument(
         "--list-regeneration-targets",
         action="store_true",
         help="Discover and print trajectory defects without generating.",
     )
     parser.add_argument("--stage-regeneration", action="store_true")
+    parser.add_argument(
+        "--reevaluate-staging",
+        action="store_true",
+        help=(
+            "Rebuild verified memory and reevaluate existing staged outputs "
+            "without running generation. Requires one or more --target values."
+        ),
+    )
+    parser.add_argument(
+        "--reevaluate-all-staging",
+        action="store_true",
+        help=(
+            "Deterministically migrate and reevaluate every complete staged "
+            "scenario without generation or external calls."
+        ),
+    )
     parser.add_argument(
         "--target-profile",
         choices=("registry-contract", "reviewer"),
@@ -405,6 +535,17 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Restrict the discovered profile. Repeat for one-at-a-time or "
             "small-batch regeneration."
+        ),
+    )
+    parser.add_argument(
+        "--force-target",
+        action="append",
+        type=_parse_target,
+        default=[],
+        metavar="DATASET_SOURCE::SCENARIO_ID",
+        help=(
+            "Explicitly stage an existing scenario even when it is absent "
+            "from the frozen target profile. Repeat for a small batch."
         ),
     )
     parser.add_argument(
@@ -442,13 +583,26 @@ def main() -> int:
         args.export_annotations,
         args.apply_deterministic,
         args.migrate_memory_and_disclosures,
+        args.repair_current_quality,
         args.list_regeneration_targets,
         args.stage_regeneration,
+        args.reevaluate_staging,
+        args.reevaluate_all_staging,
         args.merge_approved,
     )):
         raise ValueError("Choose at least one repair action.")
     if args.attempts < 1 or args.attempts > 3:
         raise ValueError("--attempts must be between 1 and 3.")
+    if args.reevaluate_staging and not args.target:
+        raise ValueError("--reevaluate-staging requires at least one --target.")
+    if args.reevaluate_all_staging and args.target:
+        raise ValueError("--reevaluate-all-staging cannot be combined with --target.")
+    if args.reevaluate_staging and args.reevaluate_all_staging:
+        raise ValueError(
+            "Choose either --reevaluate-staging or --reevaluate-all-staging."
+        )
+    if args.force_target and not args.stage_regeneration:
+        raise ValueError("--force-target requires --stage-regeneration.")
     results: Dict[str, Any] = {}
     if args.export_annotations:
         results["annotation_export"] = export_reviewer_annotations(
@@ -460,18 +614,33 @@ def main() -> int:
         results["deterministic"] = _apply_deterministic(args)
     if args.migrate_memory_and_disclosures:
         results["migration"] = _migrate_memory_and_disclosures(args)
+    if args.repair_current_quality:
+        results["current_quality_repair"] = _repair_current_quality(args)
     if args.list_regeneration_targets:
+        master_records = _store(args).load_master()
         targets = _selected_discovered_targets(args)
         results["regeneration_targets"] = {
             "target_profile": args.target_profile,
             "target_count": len(targets),
             "targets": targets,
+            "quality_projection": _quality_projection_summary(
+                master_records
+            ),
         }
     if args.stage_regeneration:
         results["regeneration"] = _stage_regeneration(args)
+    if args.reevaluate_staging or args.reevaluate_all_staging:
+        results["staging_reevaluation"] = _reevaluate_staging(args)
     if args.merge_approved:
         results["merge"] = _merge_approved(args, args.merge_approved)
-    print(json.dumps(results, ensure_ascii=False, indent=2))
+    rendered = json.dumps(results, ensure_ascii=False, indent=2)
+    try:
+        print(rendered)
+    except UnicodeEncodeError:
+        # Windows terminals may use a legacy code page even when files are
+        # UTF-8. Escaping only the terminal rendering keeps the completed
+        # repair action from being reported as a process failure.
+        print(json.dumps(results, ensure_ascii=True, indent=2))
     return 0
 
 
@@ -483,6 +652,37 @@ def _store(args: argparse.Namespace) -> TeacherTraceStore:
             session_output_jsonl=args.sessions_jsonl,
         )
     )
+
+
+def _quality_projection_summary(
+    records: Sequence[Dict[str, Any]],
+) -> Dict[str, int]:
+    """Explain why master records are or are not projected into SFT."""
+    direct_quality_exclusions = 0
+    dependent_context_exclusions = 0
+    explicit_sft_exclusions = 0
+    projected_sft_records = 0
+    for record in records:
+        if record.get("quality_flag") != "pass":
+            direct_quality_exclusions += 1
+            continue
+        if record.get("sft_exclusion_reason"):
+            explicit_sft_exclusions += 1
+            continue
+        if any(
+            turn.get("quality_flag") != "pass"
+            for turn in record.get("conversation_context") or []
+        ):
+            dependent_context_exclusions += 1
+            continue
+        projected_sft_records += 1
+    return {
+        "master_record_count": len(records),
+        "direct_quality_exclusion_count": direct_quality_exclusions,
+        "dependent_context_exclusion_count": dependent_context_exclusions,
+        "explicit_sft_exclusion_count": explicit_sft_exclusions,
+        "projected_sft_record_count": projected_sft_records,
+    }
 
 
 def _selected_discovered_targets(
@@ -534,10 +734,56 @@ def _filter_planned_targets(
     return [by_pair[pair] for pair in sorted(requested)]
 
 
+def _select_stage_targets(
+    planned_targets: Sequence[Dict[str, Any]],
+    requested_targets: Sequence[tuple[str, str]],
+    forced_targets: Sequence[tuple[str, str]],
+) -> List[Dict[str, Any]]:
+    if forced_targets and not requested_targets:
+        selected: List[Dict[str, Any]] = []
+    else:
+        selected = _filter_planned_targets(
+            planned_targets,
+            requested_targets,
+        )
+    by_pair: Dict[tuple[str, str], Dict[str, Any]] = {
+        (
+            str(item.get("dataset_source") or ""),
+            str(item.get("scenario_id") or ""),
+        ): dict(item)
+        for item in selected
+    }
+    for pair in forced_targets:
+        item = by_pair.setdefault(
+            pair,
+            {
+                "dataset_source": pair[0],
+                "scenario_id": pair[1],
+                "reasons": [],
+            },
+        )
+        reasons = list(item.get("reasons") or [])
+        if "manual:force_target" not in reasons:
+            reasons.append("manual:force_target")
+        item["reasons"] = sorted(reasons)
+    return [by_pair[pair] for pair in sorted(by_pair)]
+
+
+def _authoritative_conversation_context(
+    record: Dict[str, Any],
+    migrated_history: Sequence[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Replace stale copied turns with the already-migrated history."""
+    if not record.get("conversation_context") and not migrated_history:
+        return []
+    return deepcopy([dict(turn) for turn in migrated_history])
+
+
 def _migrate_records(
     records: Sequence[Dict[str, Any]],
 ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
     histories: Dict[tuple[str, str], List[Dict[str, Any]]] = {}
+    states: Dict[tuple[str, str], DecisionTraceState] = {}
     migrated: List[Dict[str, Any]] = []
     disclosure_changes = 0
     native_evaluator = NativeTraceEvaluator(NativeEvaluationConfig())
@@ -552,7 +798,10 @@ def _migrate_records(
             ),
         )
         history = histories.setdefault(pair, [])
-        state = DecisionTraceState.from_history(history)
+        state = states.setdefault(pair, DecisionTraceState())
+        record["conversation_context"] = (
+            _authoritative_conversation_context(record, history)
+        )
         try:
             state_before = serialize_verified_decision_state(
                 state,
@@ -644,6 +893,12 @@ def _migrate_records(
         record["quality_issues"] = native["quality_issues"]
         migrated.append(record)
         history.append(_history_turn(record))
+        states[pair] = state.updated_from_tool_results(
+            str(record.get("session_id") or ""),
+            int(record.get("turn_id") or 0),
+            str(record.get("user_input") or ""),
+            tool_results,
+        )
     return migrated, {
         "record_count": len(migrated),
         "canonical_disclosure_change_count": disclosure_changes,
@@ -671,6 +926,58 @@ def _migrate_memory_and_disclosures(args: argparse.Namespace) -> Dict[str, Any]:
         force=True,
     )
     return result
+
+
+def _repair_current_quality(args: argparse.Namespace) -> Dict[str, Any]:
+    """Repair stored-evidence quality defects and export all records atomically."""
+    store = _store(args)
+    original = store.load_master()
+    original_ids = [str(item.get("sample_id") or "") for item in original]
+    original_splits = {
+        str(item.get("sample_id") or ""): item.get("split")
+        for item in original
+    }
+    before_projection = _quality_projection_summary(original)
+    repaired, repair_result = apply_staged_answer_repairs(original)
+    migrated, migration_result = _migrate_records(repaired)
+    _assert_master_invariants(original_ids, original_splits, migrated)
+    after_projection = _quality_projection_summary(migrated)
+    if after_projection["projected_sft_record_count"] != len(migrated):
+        unresolved = [
+            str(item.get("sample_id") or "")
+            for item in migrated
+            if (
+                item.get("quality_flag") != "pass"
+                or item.get("sft_exclusion_reason")
+                or any(
+                    turn.get("quality_flag") != "pass"
+                    for turn in item.get("conversation_context") or []
+                )
+            )
+        ]
+        raise ValueError(
+            "Deterministic current-quality repair did not make every master "
+            "record SFT-eligible; no files were changed. Remaining sample IDs: "
+            + ", ".join(unresolved[:20])
+        )
+    sessions = update_session_records(store.load_sessions(), migrated)
+    reset_ids = set(_load_reset_ids(args.reset_review_sample_ids))
+    reset_ids.update(repair_result.get("repaired_sample_ids") or [])
+    sft_record_count = _write_merged_outputs_transactionally(
+        args,
+        migrated,
+        sessions,
+        reset_ids,
+        expected_sft_record_count=len(migrated),
+    )
+    return {
+        "before": before_projection,
+        "after": after_projection,
+        "deterministic_repairs": repair_result,
+        "migration": migration_result,
+        "sft_record_count": sft_record_count,
+        "external_llm_calls": 0,
+    }
 
 
 def _apply_deterministic(args: argparse.Namespace) -> Dict[str, Any]:
@@ -739,7 +1046,15 @@ def _generation_finish_message(
 
 def _print_live_log(message: str) -> None:
     with _LIVE_LOG_PRINT_LOCK:
-        print(message, flush=True)
+        try:
+            print(message, flush=True)
+        except UnicodeEncodeError:
+            encoding = sys.stdout.encoding or "utf-8"
+            safe_message = message.encode(
+                encoding,
+                errors="backslashreplace",
+            ).decode(encoding)
+            print(safe_message, flush=True)
 
 
 def _run_child_process_with_live_logs(
@@ -1015,9 +1330,20 @@ def _stage_regeneration(args: argparse.Namespace) -> Dict[str, Any]:
             args.target_profile,
             discovered,
         )
-    targets = _filter_planned_targets(
+    forced_pairs = _validate_forced_target_pairs(args.force_target or [])
+    forced_manifest = (
+        _freeze_forced_targets(
+            args.staging_root,
+            args.master_json,
+            forced_pairs,
+        )
+        if forced_pairs
+        else None
+    )
+    targets = _select_stage_targets(
         list(planned.get("targets") or []),
         args.target or [],
+        forced_pairs,
     )
     summaries = _run_regeneration_targets(args, annotations, targets)
     summary_path = args.staging_root / "staging_summary.json"
@@ -1032,8 +1358,140 @@ def _stage_regeneration(args: argparse.Namespace) -> Dict[str, Any]:
     ).as_posix()
     summary["target_profile"] = args.target_profile
     summary["master_sha256"] = planned["master_sha256"]
+    if forced_manifest is not None:
+        summary["forced_targets_path"] = (
+            args.staging_root / FORCED_TARGETS_FILENAME
+        ).as_posix()
     write_json(summary_path, summary, force=True)
     return summary
+
+
+def _migrate_staged_attempt(paths: AttemptPaths) -> Dict[str, Any]:
+    records = TeacherTraceStore.load(paths.records_jsonl)
+    sessions = TeacherTraceStore.load(paths.sessions_jsonl)
+    original_ids = [str(item.get("sample_id") or "") for item in records]
+    original_splits = {
+        str(item.get("sample_id") or ""): item.get("split")
+        for item in records
+    }
+    migrated, result = _migrate_records(records)
+    migrated_ids = [str(item.get("sample_id") or "") for item in migrated]
+    if (
+        len(migrated_ids) != len(original_ids)
+        or set(migrated_ids) != set(original_ids)
+        or len(migrated_ids) != len(set(migrated_ids))
+    ):
+        raise ValueError(
+            "Staged migration changed the sample-ID set or introduced duplicates."
+        )
+    for record in migrated:
+        sample_id = str(record.get("sample_id") or "")
+        if original_splits.get(sample_id) != record.get("split"):
+            raise ValueError(
+                f"Staged migration changed split assignment for {sample_id}."
+            )
+    staging_store = TeacherTraceStore(
+        TeacherTracePaths(
+            output_jsonl=paths.records_jsonl,
+            output_json=paths.records_json,
+            session_output_jsonl=paths.sessions_jsonl,
+        )
+    )
+    staging_store.write_master(migrated)
+    staging_store.write_sessions(update_session_records(sessions, migrated))
+    result["sft_record_count"] = write_split_records(
+        paths.splits,
+        migrated,
+        force=True,
+    )
+    return result
+
+
+def _reevaluate_staging(args: argparse.Namespace) -> Dict[str, Any]:
+    summaries = []
+    targets = _reevaluation_target_pairs(args)
+    total = len(targets)
+    for position, (dataset_source, scenario_id) in enumerate(targets, 1):
+        generated = _generated_staged_scenario(
+            args.staging_root,
+            dataset_source,
+            scenario_id,
+        )
+        if generated is None:
+            raise ValueError(
+                "No complete staged outputs found for "
+                f"{dataset_source}::{scenario_id}."
+            )
+        attempt = int(generated["candidate_attempt"])
+        paths = _attempt_paths(
+            args.staging_root,
+            dataset_source,
+            scenario_id,
+            attempt,
+        )
+        _print_live_log(
+            f"[{position}/{total}] REEVALUATE START "
+            f"{dataset_source}:{scenario_id} attempt={attempt}"
+        )
+        started_at = time.monotonic()
+        migration = _migrate_staged_attempt(paths)
+        evaluation = _evaluate_attempt(dataset_source, scenario_id, paths)
+        existing_manifest = (
+            json.loads(paths.manifest.read_text(encoding="utf-8-sig"))
+            if paths.manifest.is_file()
+            else {}
+        )
+        attempt_result = {
+            **existing_manifest,
+            **evaluation,
+            "attempt": attempt,
+            "root": paths.root.as_posix(),
+            "memory_migration": migration,
+            "reevaluated_without_generation": True,
+            "reevaluation_external_llm_calls": 0,
+            "manual_review_required": True,
+        }
+        write_json(paths.manifest, attempt_result, force=True)
+        status = (
+            "pending_human_review"
+            if attempt_result.get("automatic_pass") is True
+            else "generated_needs_review"
+        )
+        summary = {
+            "dataset_source": dataset_source,
+            "scenario_id": scenario_id,
+            "status": status,
+            "candidate_attempt": attempt,
+            "attempts": [attempt_result],
+            "resume_action": "reevaluated_existing_outputs",
+        }
+        summaries.append(summary)
+        _print_live_log(
+            f"[{position}/{total}] REEVALUATE "
+            f"{'DONE' if attempt_result.get('automatic_pass') else 'FAILED'} "
+            f"{dataset_source}:{scenario_id} attempt={attempt} "
+            f"automatic_pass="
+            f"{str(attempt_result.get('automatic_pass') is True).lower()} "
+            f"elapsed={time.monotonic() - started_at:.1f}s"
+        )
+
+    summary_path = args.staging_root / "staging_summary.json"
+    previous = (
+        json.loads(summary_path.read_text(encoding="utf-8-sig"))
+        if summary_path.is_file()
+        else {}
+    )
+    merged = _merge_staging_summary(previous, summaries)
+    for key in ("planned_targets_path", "target_profile", "master_sha256"):
+        if key in previous:
+            merged[key] = previous[key]
+    write_json(summary_path, merged, force=True)
+    return {
+        "scenario_count": len(summaries),
+        "external_llm_calls": 0,
+        "all_complete_staged_attempts": bool(args.reevaluate_all_staging),
+        "scenarios": summaries,
+    }
 
 
 def _merge_staging_summary(
@@ -1080,7 +1538,7 @@ def _generated_staged_scenario(
         / dataset_source.replace("/", "_").replace("\\", "_")
         / scenario_id
     )
-    for attempt_root in sorted(scenario_root.glob("attempt_*")):
+    for attempt_root in sorted(scenario_root.glob("attempt_*"), reverse=True):
         attempt = int(attempt_root.name.rsplit("_", 1)[-1])
         paths = _attempt_paths(staging_root, dataset_source, scenario_id, attempt)
         generated_outputs = (
@@ -1110,6 +1568,54 @@ def _generated_staged_scenario(
             "resume_action": "skipped_generated_outputs",
         }
     return None
+
+
+def _discover_complete_staged_targets(
+    staging_root: Path,
+) -> List[tuple[str, str]]:
+    """Return one source/scenario pair for each latest complete attempt."""
+    pairs: set[tuple[str, str]] = set()
+    staging_root = Path(staging_root)
+    for dataset_root in sorted(staging_root.iterdir() if staging_root.is_dir() else []):
+        if not dataset_root.is_dir():
+            continue
+        for scenario_root in sorted(dataset_root.iterdir()):
+            if not scenario_root.is_dir():
+                continue
+            complete_attempts = sorted(
+                scenario_root.glob("attempt_*"),
+                reverse=True,
+            )
+            for attempt_root in complete_attempts:
+                required = (
+                    attempt_root / "teacher_trace.json",
+                    attempt_root / "teacher_trace.jsonl",
+                    attempt_root / "teacher_trace_sessions.jsonl",
+                )
+                if not all(path.is_file() and path.stat().st_size > 0 for path in required):
+                    continue
+                records = TeacherTraceStore.load(required[1])
+                if not records:
+                    continue
+                first = dict(records[0])
+                dataset_source = str(first.get("dataset_source") or "")
+                scenario_id = str(
+                    first.get("source_scenario_id")
+                    or first.get("scenario_id")
+                    or ""
+                )
+                if dataset_source and scenario_id:
+                    pairs.add((dataset_source, scenario_id))
+                break
+    return sorted(pairs)
+
+
+def _reevaluation_target_pairs(
+    args: argparse.Namespace,
+) -> List[tuple[str, str]]:
+    if args.reevaluate_all_staging:
+        return _discover_complete_staged_targets(args.staging_root)
+    return sorted(set(args.target or []))
 
 
 def _planned_regeneration_targets(args: argparse.Namespace) -> List[tuple[str, str]]:
@@ -1229,9 +1735,12 @@ def _parsing_and_verification_failures(record: Dict[str, Any]) -> List[str]:
     return failures
 
 
-def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, Any]:
-    approvals = _load_approvals(approval_path)
-    planned_path = args.staging_root / PLANNED_TARGETS_FILENAME
+def _authorized_target_pairs(
+    staging_root: Path,
+    master_json: Path,
+) -> set[tuple[str, str]]:
+    staging_root = Path(staging_root)
+    planned_path = staging_root / PLANNED_TARGETS_FILENAME
     if not planned_path.is_file():
         raise ValueError(
             "Missing frozen planned_targets.json. Run --stage-regeneration "
@@ -1240,13 +1749,13 @@ def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, 
     planned = json.loads(planned_path.read_text(encoding="utf-8-sig"))
     if planned.get("schema_version") != PLANNED_TARGETS_SCHEMA_VERSION:
         raise ValueError(f"Unsupported planned-target manifest: {planned_path}")
-    current_master_hash = _master_sha256(args.master_json)
+    current_master_hash = _master_sha256(master_json)
     if current_master_hash != planned.get("master_sha256"):
         raise ValueError(
             "Master teacher trace changed after regeneration targets were "
             "frozen; refusing to merge approvals against stale inputs."
         )
-    planned_pairs = {
+    authorized_pairs = {
         (
             str(item.get("dataset_source") or ""),
             str(item.get("scenario_id") or ""),
@@ -1254,6 +1763,36 @@ def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, 
         for item in planned.get("targets") or []
         if isinstance(item, dict)
     }
+    forced_path = staging_root / FORCED_TARGETS_FILENAME
+    if forced_path.is_file():
+        forced = json.loads(forced_path.read_text(encoding="utf-8-sig"))
+        if forced.get("schema_version") != FORCED_TARGETS_SCHEMA_VERSION:
+            raise ValueError(
+                f"Unsupported forced-target manifest: {forced_path}"
+            )
+        if current_master_hash != forced.get("master_sha256"):
+            raise ValueError(
+                "Master teacher trace changed after forced regeneration "
+                "targets were recorded; refusing to merge approvals against "
+                "stale inputs."
+            )
+        authorized_pairs.update(
+            (
+                str(item.get("dataset_source") or ""),
+                str(item.get("scenario_id") or ""),
+            )
+            for item in forced.get("targets") or []
+            if isinstance(item, dict)
+        )
+    return authorized_pairs
+
+
+def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, Any]:
+    approvals = _load_approvals(approval_path)
+    authorized_pairs = _authorized_target_pairs(
+        args.staging_root,
+        args.master_json,
+    )
     store = _store(args)
     original = store.load_master()
     original_sessions = store.load_sessions()
@@ -1267,7 +1806,7 @@ def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, 
         dataset_source = str(approval["dataset_source"])
         scenario_id = str(approval["scenario_id"])
         attempt = int(approval["attempt"])
-        if (dataset_source, scenario_id) not in planned_pairs:
+        if (dataset_source, scenario_id) not in authorized_pairs:
             raise ValueError(f"Approval contains an unplanned scenario: {dataset_source}:{scenario_id}")
         paths = _attempt_paths(args.staging_root, dataset_source, scenario_id, attempt)
         manifest = json.loads(paths.manifest.read_text(encoding="utf-8-sig"))
@@ -1296,11 +1835,113 @@ def _merge_approved(args: argparse.Namespace, approval_path: Path) -> Dict[str, 
         reset_ids.update(str(item.get("sample_id") or "") for item in generated)
         merged.append({"dataset_source": dataset_source, "scenario_id": scenario_id, "attempt": attempt})
     _assert_master_invariants(original_ids, original_splits, combined)
-    store.write_master(combined)
-    store.write_sessions(combined_sessions)
-    write_split_records(args.split_dir, combined, force=True)
-    write_json(args.reset_review_sample_ids, {"sample_ids": sorted(reset_ids)}, force=True)
+    _write_merged_outputs_transactionally(
+        args,
+        combined,
+        combined_sessions,
+        reset_ids,
+    )
     return {"merged_scenario_count": len(merged), "merged": merged}
+
+
+def _write_merged_outputs_transactionally(
+    args: argparse.Namespace,
+    records: List[Dict[str, Any]],
+    sessions: List[Dict[str, Any]],
+    reset_ids: Iterable[str],
+    *,
+    expected_sft_record_count: int | None = None,
+) -> int:
+    """Preflight every merge artifact, then commit with exception rollback."""
+    destination_root = Path(args.master_json).parent
+    destination_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix=".teacher_trace_merge_",
+        dir=str(destination_root),
+    ) as temporary_directory:
+        stage_root = Path(temporary_directory)
+        staged_paths = TeacherTracePaths(
+            output_jsonl=stage_root / "teacher_trace.jsonl",
+            output_json=stage_root / "teacher_trace.json",
+            session_output_jsonl=stage_root / "teacher_trace_sessions.jsonl",
+        )
+        staged_store = TeacherTraceStore(staged_paths)
+        staged_store.write_master(records)
+        staged_store.write_sessions(sessions)
+        staged_split_dir = stage_root / "splits"
+        sft_record_count = write_split_records(
+            staged_split_dir,
+            records,
+            force=True,
+        )
+        if (
+            expected_sft_record_count is not None
+            and sft_record_count != expected_sft_record_count
+        ):
+            raise ValueError(
+                "SFT preflight count mismatch: "
+                f"expected {expected_sft_record_count}, "
+                f"projected {sft_record_count}. No files were changed."
+            )
+        staged_reset_ids = stage_root / "repaired_sample_ids.json"
+        write_json(
+            staged_reset_ids,
+            {"sample_ids": sorted(set(reset_ids))},
+            force=True,
+        )
+
+        artifacts = [
+            (
+                staged_split_dir / f"teacher_trace_{split}.jsonl",
+                Path(args.split_dir) / f"teacher_trace_{split}.jsonl",
+            )
+            for split in ("train", "valid", "test")
+        ]
+        artifacts.extend(
+            [
+                (staged_reset_ids, Path(args.reset_review_sample_ids)),
+                (staged_paths.session_output_jsonl, Path(args.sessions_jsonl)),
+                (staged_paths.output_jsonl, Path(args.master_jsonl)),
+                (staged_paths.output_json, Path(args.master_json)),
+            ]
+        )
+        rollback_root = stage_root / "rollback"
+        rollback_root.mkdir()
+        backups: Dict[Path, Path | None] = {}
+        committed: List[Path] = []
+        try:
+            for position, (staged, destination) in enumerate(artifacts):
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                backup = None
+                if destination.is_file():
+                    backup = rollback_root / f"{position:02d}.backup"
+                    shutil.copy2(destination, backup)
+                backups[destination] = backup
+                if backup is None:
+                    os.replace(staged, destination)
+                else:
+                    shutil.copyfile(staged, destination)
+                committed.append(destination)
+        except Exception:
+            rollback_failures = []
+            for destination in reversed(committed):
+                backup = backups[destination]
+                try:
+                    if backup is None:
+                        destination.unlink(missing_ok=True)
+                    else:
+                        shutil.copyfile(backup, destination)
+                except Exception as rollback_error:
+                    rollback_failures.append(
+                        f"{destination}: {rollback_error}"
+                    )
+            if rollback_failures:
+                raise RuntimeError(
+                    "Merge commit failed and rollback was incomplete: "
+                    + "; ".join(rollback_failures)
+                )
+            raise
+        return sft_record_count
 
 
 def _generation_command(

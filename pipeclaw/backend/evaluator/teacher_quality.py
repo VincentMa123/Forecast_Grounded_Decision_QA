@@ -4,8 +4,19 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
+from .answer_limits import (
+    CHINESE_SINGLE_FORECAST_MAX_CHARS,
+    ENGLISH_MAX_WORDS,
+    GENERIC_MAX_CHARS,
+    chinese_comparison_max_chars,
+)
 from .csv_evidence import build_csv_evidence
-from .grounding_contract import GroundingContractBuilder, comparison_answer_issues
+from .decision_trace_state import VerifiedDecisionState
+from .grounding_contract import (
+    GroundingContractBuilder,
+    answer_without_machine_disclosure,
+    comparison_answer_issues,
+)
 from .tool_evidence import (
     DATA_FILE_REFERENCE,
     ToolEvidenceState,
@@ -138,7 +149,7 @@ SUPPLY_DEMAND_BALANCE_CLAIM = re.compile(
     re.IGNORECASE,
 )
 INFERENCE_QUALIFIER = re.compile(
-    r"仅凭|单凭|不足以|不能|无法|尚不能|待核实|待验证|初步|倾向|更像|可能"
+    r"仅凭|单凭|不足以|不能|无法|尚不能|不代表|待核实|待验证|初步|倾向|更像|可能"
     r"|\b(?:cannot|insufficient|unresolved|preliminary|may|might|likely|appears?)\b",
     re.IGNORECASE,
 )
@@ -304,15 +315,29 @@ def answer_quality_issues(
         and item["output"].get("success") is True
         for item in tool_outputs or []
     )
-    saved_candidates = list(dict(pipeformer or {}).get("candidate_forecasts") or [])
-    is_forecast_comparison = successful_forecast_count > 1 or len(saved_candidates) > 1
-    has_chinese = any("\u4e00" <= character <= "\u9fff" for character in answer)
+    saved_candidates = list(
+        dict(pipeformer or {}).get("candidate_forecasts") or []
+    )
+    comparison_candidate_count = max(
+        successful_forecast_count,
+        len(saved_candidates),
+    )
+    is_forecast_comparison = comparison_candidate_count > 1
+    budgeted_answer = answer_without_machine_disclosure(answer)
+    has_chinese = any(
+        "\u4e00" <= character <= "\u9fff"
+        for character in budgeted_answer
+    )
     if has_forecast_result or successful_forecast_count:
-        if has_chinese and len(answer) > (650 if is_forecast_comparison else 500):
+        if has_chinese and len(budgeted_answer) > (
+            chinese_comparison_max_chars(comparison_candidate_count)
+            if is_forecast_comparison
+            else CHINESE_SINGLE_FORECAST_MAX_CHARS
+        ):
             issues.append("answer_too_long")
-        if not has_chinese and len(answer.split()) > 160:
+        if not has_chinese and len(budgeted_answer.split()) > ENGLISH_MAX_WORDS:
             issues.append("answer_too_long")
-    elif len(answer) > 1200:
+    elif len(budgeted_answer) > GENERIC_MAX_CHARS:
         issues.append("answer_too_long")
     if pipeformer and (
         ANSWER_FORMAT_VIOLATION.search(answer)
@@ -466,6 +491,9 @@ def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
             **dict(record_evidence.get("csv_evidence") or {}),
             **rebuilt_csv_evidence,
         }
+    verified_state = VerifiedDecisionState.from_dict(
+        dict(record.get("state_before") or {})
+    )
     trusted_context = []
     for item in record.get("conversation_context") or []:
         if item.get("grounding_verified") is True:
@@ -496,6 +524,11 @@ def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
         ],
         "tool_outputs": successful_outputs,
         "conversation_context": trusted_context,
+        # Follow-up turns can legitimately cite a candidate action or a
+        # forecast observation obtained on an earlier turn.  The bounded
+        # VerifiedDecisionState is the verified source for that evidence;
+        # raw conversation history is deliberately not reintroduced here.
+        "verified_state": verified_state.to_dict(),
     }
 
 
@@ -578,6 +611,19 @@ def requested_data_retrieved(
         )
         for artifact in item.get("evidence_artifacts") or []
     }
+    for item in conversation_context:
+        if not (
+            item.get("grounding_verified") is True
+            or item.get("tool_evidence_verified") is True
+        ):
+            continue
+        summary = dict(item.get("verified_evidence_summary") or {})
+        csv_evidence = dict(summary.get("csv_evidence") or {})
+        verified_artifacts.update(
+            str(source_file).casefold()
+            for source_file in csv_evidence.get("source_files") or []
+            if source_file
+        )
     unresolved = requested - verified_artifacts
     if not unresolved:
         return True
@@ -607,18 +653,52 @@ def _policy_unavailable_at_generation(record: Dict[str, Any]) -> bool:
     return "llm_decision_policy_tool_call" in missing
 
 
+def record_grounding_contract(
+    record: Dict[str, Any],
+    tool_outputs: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Rebuild the current-turn contract from tools plus verified prior state."""
+    outputs = (
+        list(tool_outputs)
+        if tool_outputs is not None
+        else attach_tool_arguments(
+            record.get("tool_outputs") or [],
+            record.get("tool_calls") or [],
+        )
+    )
+    state = VerifiedDecisionState.from_dict(
+        dict(record.get("state_before") or {})
+    )
+    # ``decision_policy`` is also projected onto follow-up records for
+    # convenience.  It is not a new policy declaration on those turns.
+    # Prefer the state-carried policy so its original source question is used
+    # for provenance validation.  Current set_decision_policy results are
+    # discovered directly from ``outputs`` by GroundingContractBuilder.
+    stored_policy = dict(record.get("decision_policy") or {}) or None
+    explicit_legacy_policy = (
+        stored_policy if not state.decision_policy else None
+    )
+    return GroundingContractBuilder().build(
+        str(record.get("user_input") or ""),
+        outputs,
+        decision_policy=explicit_legacy_policy,
+        require_decision_policy=_policy_unavailable_at_generation(record),
+        prior_candidate_results=state.candidates,
+        prior_decision_policy=state.decision_policy,
+        prior_decision_policy_source_question=(
+            state.decision_policy_source_question
+        ),
+        prior_applied_disturbances=state.applied_disturbances,
+    )
+
+
 def record_quality_issues(record: Dict[str, Any]) -> List[str]:
     """Recompute grounding from saved evidence instead of trusting an old flag."""
     tool_outputs = attach_tool_arguments(
         record.get("tool_outputs") or [],
         record.get("tool_calls") or [],
     )
-    contract = GroundingContractBuilder().build(
-        str(record.get("user_input") or ""),
-        tool_outputs,
-        decision_policy=dict(record.get("decision_policy") or {}) or None,
-        require_decision_policy=_policy_unavailable_at_generation(record),
-    )
+    contract = record_grounding_contract(record, tool_outputs)
     contract_issues = comparison_answer_issues(
         str(record.get("final_answer") or ""),
         contract,
@@ -629,6 +709,9 @@ def record_quality_issues(record: Dict[str, Any]) -> List[str]:
         if item.get("name") == "run_pipeformer_forecast"
         and not tool_output_failed(item)
     ]
+    state = VerifiedDecisionState.from_dict(
+        dict(record.get("state_before") or {})
+    )
     pipeformer = None
     if successful_pipeformer_outputs:
         pipeformer = dict(successful_pipeformer_outputs[0])
@@ -641,9 +724,26 @@ def record_quality_issues(record: Dict[str, Any]) -> List[str]:
             "constraint_check": record.get("constraint_check") or {},
             "evidence": record.get("evidence") or {},
         }
+        if state.candidates:
+            # Candidate actions and their compact metrics are verified output
+            # from prior successful forecasts, not unverified prose.
+            saved_pipeformer["candidate_forecasts"] = state.candidates
         pipeformer = saved_pipeformer
+    contract_candidates = list(contract.get("candidate_results") or [])
+    if pipeformer is not None and len(contract_candidates) > 1:
+        # A multi-turn comparison may execute only one new forecast in the
+        # current turn.  The contract's candidates are verified state, so
+        # answer budgeting and grounding must still treat it as a comparison.
+        pipeformer["candidate_forecasts"] = contract_candidates
 
     record_evidence = dict(record.get("evidence") or {})
+    single_forecast_snapshot = dict(
+        state.verified_evidence.get("single_forecast_snapshot") or {}
+    )
+    if single_forecast_snapshot:
+        record_evidence["single_forecast_snapshot"] = (
+            single_forecast_snapshot
+        )
     if not record_evidence.get("topology_summary"):
         topology_summary = topology_summary_from_tool_outputs(tool_outputs)
         if topology_summary:
@@ -907,7 +1007,10 @@ def _variable_references_are_grounded(answer: str, grounding_evidence: Any) -> b
     return claimed <= supported
 
 
-def _has_unsupported_evidence_description(answer: str, pipeformer: Dict[str, Any]) -> bool:
+def _legacy_unsupported_evidence_description(
+    answer: str,
+    pipeformer: Dict[str, Any],
+) -> bool:
     evidence = pipeformer.get("evidence") or {}
     finding_variables = {
         str(value.get("variable"))
@@ -926,6 +1029,109 @@ def _has_unsupported_evidence_description(answer: str, pipeformer: Dict[str, Any
         description = re.compile(rf"`?{re.escape(variable)}`?\s*[（(]([^）)\n]*)[）)]")
         if any(EVIDENCE_DESCRIPTION_TERM.search(match.group(1)) for match in description.finditer(answer)):
             return True
+    return False
+
+
+def _has_unsupported_evidence_description(
+    answer: str,
+    pipeformer: Dict[str, Any],
+) -> bool:
+    """Validate typed variable descriptions across all candidate forecasts."""
+    forecasts = [
+        pipeformer,
+        *[
+            dict(item)
+            for item in pipeformer.get("candidate_forecasts") or []
+            if isinstance(item, dict)
+        ],
+    ]
+    typed_categories: Dict[str, set[str]] = {}
+    contextual_variables: set[str] = set()
+    finding_variables: set[str] = set()
+    disturbance_variables: set[str] = set()
+    for forecast in forecasts:
+        verification = dict(
+            forecast.get("verification")
+            or forecast.get("constraint_check")
+            or {}
+        )
+        engineering = dict(
+            verification.get("engineering_evidence") or {}
+        )
+        for category, payload in engineering.items():
+            for variable in VARIABLE_REFERENCE.findall(
+                json.dumps(payload, ensure_ascii=False)
+            ):
+                typed_categories.setdefault(variable, set()).add(
+                    str(category)
+                )
+        for finding in verification.get("priority_findings") or []:
+            finding_item = dict(finding or {})
+            for value in [
+                *list(finding_item.get("evaluated_values") or []),
+                *list(finding_item.get("offending_values") or []),
+            ]:
+                variable = str(dict(value or {}).get("variable") or "")
+                if variable:
+                    finding_variables.add(variable)
+        evidence = dict(forecast.get("evidence") or {})
+        for key in ("top_watch_variables", "key_observation_variables"):
+            for item in evidence.get(key) or []:
+                variable = str(dict(item or {}).get("variable") or "")
+                if variable:
+                    contextual_variables.add(variable)
+        parsed_task = dict(forecast.get("parsed_task") or {})
+        disturbance = str(
+            parsed_task.get("disturbance_variable") or ""
+        )
+        if disturbance:
+            disturbance_variables.add(disturbance)
+        for application in evidence.get(
+            "boundary_application_evidence"
+        ) or []:
+            variable = str(dict(application or {}).get("variable") or "")
+            if variable:
+                disturbance_variables.add(variable)
+
+    category_terms = {
+        "pressure": re.compile(r"压力|\bpressure\b", re.IGNORECASE),
+        "flow": re.compile(r"流量|\bflow\b", re.IGNORECASE),
+        "linepack": re.compile(r"管存|\blinepack\b", re.IGNORECASE),
+        "compressor": re.compile(
+            r"压缩机|压缩比|\bcompressor\b|\bcompression ratio\b",
+            re.IGNORECASE,
+        ),
+        "equipment_regulation": re.compile(
+            r"调压器|阀门|球阀|\bregulator\b|\bvalve\b",
+            re.IGNORECASE,
+        ),
+    }
+    variables = contextual_variables | set(typed_categories)
+    for variable in variables:
+        description = re.compile(
+            rf"`?{re.escape(variable)}`?\s*[（(]([^）)\n]*)[）)]"
+        )
+        for match in description.finditer(answer):
+            text = match.group(1)
+            mentioned_categories = {
+                category
+                for category, pattern in category_terms.items()
+                if pattern.search(text)
+            }
+            if not mentioned_categories:
+                if (
+                    EVIDENCE_DESCRIPTION_TERM.search(text)
+                    and variable not in finding_variables
+                    and variable not in disturbance_variables
+                    and variable not in typed_categories
+                ):
+                    return True
+                continue
+            if not (
+                mentioned_categories
+                & typed_categories.get(variable, set())
+            ):
+                return True
     return False
 
 

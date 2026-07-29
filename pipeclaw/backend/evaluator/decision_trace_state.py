@@ -55,6 +55,14 @@ def _action_fingerprint(
     return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()[:20]
 
 
+def _has_boundary_action(candidate: Dict[str, Any]) -> bool:
+    action = dict(candidate.get("action") or {})
+    return bool(
+        dict(action.get("percentage_changes") or {})
+        or dict(action.get("setpoints") or {})
+    )
+
+
 def _normalized_disturbance(value: Any) -> Dict[str, Any]:
     item = dict(value or {})
     if item.get("requested_value") is None:
@@ -324,6 +332,130 @@ def _forecast_scope(
     }
 
 
+_SINGLE_FORECAST_ENGINEERING_FIELDS = {
+    "pressure": (
+        "maximum_pressure",
+        "minimum_pressure",
+        "minimum_lower_bound_margin",
+        "minimum_upper_bound_margin",
+        "minimum_operating_window_margin",
+        "violation_node_count",
+        "warning_node_count",
+        "maximum_continuous_pressure_violation_minutes",
+    ),
+    "flow": (
+        "maximum_segment_flow_change",
+        "maximum_boundary_flow_change_rate",
+        "flow_capacity_excursion_count",
+        "supply_demand_balance_status",
+        "supply_demand_balance",
+    ),
+    "linepack": (
+        "minimum_linepack",
+        "maximum_decline_from_start",
+        "maximum_continuous_decline_minutes",
+        "minimum_peak_shaving_reserve",
+        "insufficient_recovery_count",
+        "linepack_warning_status",
+    ),
+    "compressor": (
+        "operating_envelope_status",
+        "maximum_load",
+        "maximum_compression_ratio",
+        "maximum_rotational_speed",
+        "maximum_power_change",
+    ),
+}
+
+
+def _compact_single_forecast_snapshot(
+    call: Dict[str, Any],
+    *,
+    scope: Dict[str, Any],
+    applied_disturbances: List[Dict[str, Any]],
+    source_turn_id: str,
+) -> Dict[str, Any]:
+    """Project one verified forecast into bounded cross-turn evidence."""
+    arguments = dict(call.get("arguments") or {})
+    output = dict(call.get("output") or {})
+    verification = dict(
+        output.get("verification") or output.get("constraint_check") or {}
+    )
+    engineering = dict(verification.get("engineering_evidence") or {})
+    comparable = dict(verification.get("comparable_metrics") or {})
+    evidence = dict(output.get("evidence") or {})
+    snapshot: Dict[str, Any] = {
+        "scope": deepcopy(scope),
+        "candidate_role": (
+            output.get("candidate_role")
+            or arguments.get("candidate_role")
+            or "single_forecast"
+        ),
+        "applied_disturbance": (
+            deepcopy(applied_disturbances[-1])
+            if applied_disturbances
+            else {}
+        ),
+        "audit": {
+            "overall_status": verification.get("overall_status"),
+            "failure_count": verification.get("failure_count"),
+            "warning_count": verification.get("warning_count"),
+            "failed_rule_ids": deepcopy(
+                verification.get("failed_rule_ids") or []
+            ),
+            "warning_rule_ids": deepcopy(
+                verification.get("warning_rule_ids") or []
+            ),
+            "category_status": deepcopy(
+                dict(verification.get("category_status") or {})
+            ),
+        },
+        "risk": {
+            "risk_level": (
+                output.get("risk_level") or verification.get("risk_level")
+            ),
+            "manual_intervention_label": (
+                output.get("manual_intervention_label")
+                or verification.get("human_intervention_label")
+            ),
+            "dispatch_recommendation": (
+                output.get("dispatch_recommendation")
+                or verification.get("dispatch_recommendation")
+            ),
+        },
+        "energy": {
+            "total": comparable.get("energy_consumption"),
+            "delta_vs_baseline": comparable.get(
+                "energy_consumption_delta"
+            ),
+            "unit": comparable.get("energy_unit"),
+            "variable_count": comparable.get("energy_variable_count"),
+            "evaluation_status": comparable.get(
+                "energy_evaluation_status"
+            ),
+            "baseline_reference": comparable.get("baseline_reference"),
+        },
+        "top_watch_variables": deepcopy(
+            list(evidence.get("top_watch_variables") or [])[:8]
+        ),
+        "key_observation_variables": deepcopy(
+            list(evidence.get("key_observation_variables") or [])[:8]
+        ),
+        "provenance": {
+            "source_turn_id": source_turn_id,
+            "source_tool_call_id": str(call.get("tool_call_id") or ""),
+        },
+    }
+    for category, fields in _SINGLE_FORECAST_ENGINEERING_FIELDS.items():
+        category_evidence = dict(engineering.get(category) or {})
+        snapshot[category] = {
+            field: deepcopy(category_evidence[field])
+            for field in fields
+            if category_evidence.get(field) is not None
+        }
+    return snapshot
+
+
 def bounded_recent_turns(
     turns: Iterable[Dict[str, Any]],
     *,
@@ -492,6 +624,9 @@ class VerifiedDecisionState:
                 state.candidates = []
                 state.decision_policy = None
                 state.applied_disturbances = []
+                state.verified_evidence.pop(
+                    "single_forecast_snapshot", None
+                )
                 state.provenance.pop("decision_policy_source_question", None)
         contract = GroundingContractBuilder().build(
             question,
@@ -524,6 +659,9 @@ class VerifiedDecisionState:
                 state.candidates = []
                 state.decision_policy = None
                 state.applied_disturbances = []
+                state.verified_evidence.pop(
+                    "single_forecast_snapshot", None
+                )
                 state.provenance.pop("decision_policy_source_question", None)
             state.scope = next_scope
 
@@ -560,6 +698,24 @@ class VerifiedDecisionState:
                     state.registry_variables.append(item)
 
         if contract.get("candidate_results"):
+            incoming_candidates = [
+                dict(candidate)
+                for candidate in contract.get("candidate_results") or []
+                if isinstance(candidate, dict)
+            ]
+            if any(_has_boundary_action(candidate) for candidate in incoming_candidates):
+                # An actionless snapshot is a prior forecast, not a third
+                # action in a later explicit control comparison.
+                state.candidates = [
+                    candidate
+                    for candidate in state.candidates
+                    if _has_boundary_action(candidate)
+                ]
+                incoming_candidates = [
+                    candidate
+                    for candidate in incoming_candidates
+                    if _has_boundary_action(candidate)
+                ]
             current_by_id = {}
             for call in current_forecasts:
                 arguments = dict(call.get("arguments") or {})
@@ -577,10 +733,8 @@ class VerifiedDecisionState:
                 )): index
                 for index, item in enumerate(state.candidates)
             }
-            for candidate in contract.get("candidate_results") or []:
-                if not isinstance(candidate, dict):
-                    continue
-                item = deepcopy(dict(candidate))
+            for candidate in incoming_candidates:
+                item = deepcopy(candidate)
                 candidate_id = str(item.get("candidate_id") or "")
                 item.setdefault(
                     "audit_status",
@@ -664,6 +818,24 @@ class VerifiedDecisionState:
             else:
                 disturbance_positions[key] = len(state.applied_disturbances)
                 state.applied_disturbances.append(disturbance)
+
+        current_candidate_calls = [
+            call
+            for call in current_forecasts
+            if dict(call.get("arguments") or {}).get("candidate_id")
+        ]
+        if current_candidate_calls:
+            state.verified_evidence.pop("single_forecast_snapshot", None)
+        elif len(current_forecasts) == 1:
+            turn_key = f"{session_id}::turn_{int(turn_id):03d}"
+            state.verified_evidence["single_forecast_snapshot"] = (
+                _compact_single_forecast_snapshot(
+                    current_forecasts[0],
+                    scope=state.scope,
+                    applied_disturbances=state.applied_disturbances,
+                    source_turn_id=turn_key,
+                )
+            )
 
         for call in successful:
             output = dict(call.get("output") or {})
@@ -777,6 +949,14 @@ class VerifiedDecisionState:
                         summary[evidence_key]
                     )
 
+            single_forecast_snapshot = dict(
+                summary.get("single_forecast_snapshot") or {}
+            )
+            if single_forecast_snapshot:
+                state.verified_evidence["single_forecast_snapshot"] = (
+                    deepcopy(single_forecast_snapshot)
+                )
+
             for registry in summary.get("registry_variables") or []:
                 if not isinstance(registry, dict):
                     continue
@@ -791,10 +971,32 @@ class VerifiedDecisionState:
                     registry_positions[key] = len(state.registry_variables)
                     state.registry_variables.append(item)
 
-            for candidate in pipeformer.get("candidate_results") or []:
-                if not isinstance(candidate, dict):
-                    continue
-                item = deepcopy(dict(candidate))
+            incoming_candidates = [
+                dict(candidate)
+                for candidate in pipeformer.get("candidate_results") or []
+                if isinstance(candidate, dict)
+            ]
+            if any(_has_boundary_action(candidate) for candidate in incoming_candidates):
+                state.candidates = [
+                    candidate
+                    for candidate in state.candidates
+                    if _has_boundary_action(candidate)
+                ]
+                candidate_positions = {
+                    str(
+                        candidate.get("action_fingerprint")
+                        or _action_fingerprint(candidate, state.scope)
+                    ): index
+                    for index, candidate in enumerate(state.candidates)
+                }
+                incoming_candidates = [
+                    candidate
+                    for candidate in incoming_candidates
+                    if _has_boundary_action(candidate)
+                ]
+
+            for candidate in incoming_candidates:
+                item = deepcopy(candidate)
                 candidate_id = str(item.get("candidate_id") or "")
                 if not candidate_id:
                     continue
@@ -843,6 +1045,9 @@ class VerifiedDecisionState:
                 else:
                     candidate_positions[fingerprint] = len(state.candidates)
                     state.candidates.append(item)
+
+            if pipeformer.get("candidate_results"):
+                state.verified_evidence.pop("single_forecast_snapshot", None)
 
             decision = dict(pipeformer.get("decision_summary") or {})
             missing = {

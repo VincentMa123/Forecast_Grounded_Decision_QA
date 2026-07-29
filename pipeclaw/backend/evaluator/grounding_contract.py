@@ -6,6 +6,13 @@ import re
 from decimal import Decimal
 from typing import Any, Dict, Iterable, List, Optional
 
+from .answer_limits import (
+    CHINESE_SINGLE_FORECAST_MAX_CHARS,
+    ENGLISH_COMPARISON_MAX_CHARS,
+    ENGLISH_MAX_WORDS,
+    GENERIC_MAX_CHARS,
+    chinese_comparison_max_chars,
+)
 from .decision_policy import (
     collect_objective_evidence,
     normalize_decision_policy,
@@ -21,6 +28,18 @@ INTERVENTION_RANK = {
     "operator_attention_required": 2,
     "immediate_intervention_required": 3,
 }
+
+_DECISION_PRIORITY_SIGNAL = re.compile(
+    r"(?:\b(?:priority|prioritize|first|primary|secondary|most|least|"
+    r"focus|reduce|increase|maintain|preserve|avoid|minimi[sz]e|maximi[sz]e)\b"
+    r"|优先|首先|第一|最(?:大|小|低|高|少|多)|重点|关注|降低|减少|提高|增加|保持|避免)",
+    re.IGNORECASE,
+)
+
+
+def decision_policy_source_has_priority_signal(source_excerpt: str) -> bool:
+    """Return whether a source excerpt actually expresses a preference."""
+    return bool(_DECISION_PRIORITY_SIGNAL.search(str(source_excerpt or "")))
 @dataclass(frozen=True)
 class CandidateResult:
     candidate_id: str
@@ -165,7 +184,12 @@ class GroundingContractBuilder:
             for item in prior_candidate_results or []
             if dict(item or {}).get("candidate_id")
         ]
-        if pipeformer or prior_candidates:
+        prior_applied = [
+            dict(item)
+            for item in prior_applied_disturbances or []
+            if isinstance(item, dict)
+        ]
+        if pipeformer or prior_candidates or prior_applied:
             return self._pipeformer_contract(
                 pipeformer,
                 question,
@@ -173,9 +197,7 @@ class GroundingContractBuilder:
                 decision_policy_question=decision_policy_question,
                 require_decision_policy=require_decision_policy,
                 prior_candidate_results=prior_candidates,
-                prior_applied_disturbances=[
-                    dict(item) for item in prior_applied_disturbances or []
-                ],
+                prior_applied_disturbances=prior_applied,
             )
         return self._generic_contract(question, results)
 
@@ -213,12 +235,21 @@ class GroundingContractBuilder:
             ]
         )
 
+        current_action_candidates = any(
+            self._candidate_action(dict(item.get("arguments") or {}))
+            for item in candidates
+        )
         parsed_by_id: Dict[str, CandidateResult] = {}
         parsed_order: List[str] = []
         for value in prior_candidate_results:
             candidate = CandidateResult.from_compact(value)
             key = candidate.candidate_id.casefold()
             if not key:
+                continue
+            if (
+                current_action_candidates
+                and not self._candidate_has_boundary_action(candidate)
+            ):
                 continue
             if key not in parsed_by_id:
                 parsed_order.append(key)
@@ -234,6 +265,11 @@ class GroundingContractBuilder:
         )
         contract: Dict[str, Any] = {
             "answer_mode": "dispatch_comparison" if len(parsed) > 1 else "single_forecast",
+            "current_candidate_forecast_count": len(candidates),
+            "current_decision_policy_call_count": sum(
+                item.get("name") == "set_decision_policy"
+                for item in results
+            ),
             "candidate_results": [item.compact() for item in parsed],
             "worst_case_risk_level": self._worst(
                 (item.risk_level for item in parsed), RISK_RANK, "low"
@@ -727,6 +763,14 @@ class GroundingContractBuilder:
             signed = abs(signed)
         return {"percentage_changes": {str(variable): signed}}
 
+    @staticmethod
+    def _candidate_has_boundary_action(candidate: CandidateResult) -> bool:
+        action = dict(candidate.action or {})
+        return bool(
+            dict(action.get("percentage_changes") or {})
+            or dict(action.get("setpoints") or {})
+        )
+
     def _decision(
         self,
         candidates: List[CandidateResult],
@@ -765,6 +809,11 @@ class GroundingContractBuilder:
                             "decision_policy_objective_source_not_in_user_request:"
                             + str(item.get("metric") or "missing")
                         )
+                elif not decision_policy_source_has_priority_signal(excerpt):
+                    policy_errors.append(
+                        "decision_policy_objective_not_a_priority:"
+                        + str(item.get("metric") or "missing")
+                    )
         eliminated = [
             {"candidate_id": item.candidate_id, "failed_rules": item.failed_rule_ids}
             for item in candidates
@@ -1169,6 +1218,7 @@ _CANONICAL_DISCLOSURE_PREFIXES = (
     "Applied setpoint:",
     "Application status:",
 )
+_CANONICAL_ASSUMPTION_PREFIX = "Assumption source:"
 
 
 def _canonical_sequence_value(values: Any, fallback: Any) -> str:
@@ -1249,22 +1299,103 @@ def _canonical_disclosure_lines_in_answer(answer: str) -> List[str]:
     ]
 
 
+def answer_without_machine_disclosure(answer: str) -> str:
+    """Return natural answer prose without deterministic metadata lines."""
+    return "\n".join(
+        line
+        for line in answer.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+        if not line.strip().startswith(
+            (*_CANONICAL_DISCLOSURE_PREFIXES, _CANONICAL_ASSUMPTION_PREFIX)
+        )
+    ).strip()
+
+
+def _without_embedded_required_disclosures(
+    prose: str,
+    required_lines: Sequence[str],
+) -> str:
+    cleaned: List[str] = []
+    for line in prose.split("\n"):
+        positions = [
+            line.find(required)
+            for required in required_lines
+            if required and required in line
+        ]
+        if positions:
+            line = line[: min(positions)].rstrip()
+        if line.strip():
+            cleaned.append(line)
+    return "\n".join(cleaned).strip()
+
+
+def _canonical_assumption_source_lines(
+    contract: Dict[str, Any],
+) -> List[str]:
+    assignments: Dict[str, str] = {}
+    for line in _canonical_applied_disturbance_lines(contract):
+        if not line.startswith(("Applied disturbance:", "Applied setpoint:")):
+            continue
+        assignment = line.split(":", 1)[1].strip()
+        variable = assignment.split("=", 1)[0]
+        assignments.setdefault(variable, assignment)
+
+    lines: List[str] = []
+    for raw_item in contract.get("provisional_assumptions") or []:
+        item = dict(raw_item or {})
+        variable = str(item.get("variable") or "")
+        assignment = assignments.get(variable)
+        if not assignment:
+            continue
+        line = (
+            f"{_CANONICAL_ASSUMPTION_PREFIX} "
+            f"LLM provisional; {assignment}"
+        )
+        if line not in lines:
+            lines.append(line)
+    return lines
+
+
 def finalize_applied_disturbance_disclosure(
     answer: str,
     contract: Dict[str, Any],
 ) -> str:
     """Serialize the canonical application block without rewriting prose."""
-    required = _canonical_applied_disturbance_lines(contract)
-    remaining = [
-        line
-        for line in answer.replace("\r\n", "\n").replace("\r", "\n").split("\n")
-        if not line.strip().startswith(_CANONICAL_DISCLOSURE_PREFIXES)
+    required = [
+        *_canonical_applied_disturbance_lines(contract),
+        *_canonical_assumption_source_lines(contract),
     ]
-    prose = "\n".join(remaining).strip()
+    prose = answer_without_machine_disclosure(answer)
+    prose = _without_embedded_required_disclosures(prose, required)
     disclosure = "\n".join(required)
     if disclosure and prose:
         return f"{disclosure}\n{prose}"
     return disclosure or prose
+
+
+def comparison_requirements_active(
+    answer: str,
+    contract: Dict[str, Any],
+) -> bool:
+    """Escalate comparison validation only for operational turns or claims."""
+    if int(contract.get("current_candidate_forecast_count") or 0) > 0:
+        return True
+    if int(contract.get("current_decision_policy_call_count") or 0) > 0:
+        return True
+    if _SELECTED_CANDIDATE.search(answer):
+        return True
+    if re.search(
+        r"\bcandidate[_-]?\d+\s*(?:>|<|>=|<=)\s*candidate[_-]?\d+\b",
+        answer,
+        re.IGNORECASE,
+    ):
+        return True
+    return bool(
+        re.search(
+            r"(?:recommend|select|choose|建议|推荐|选择).{0,24}\bcandidate[_-]?\d+\b",
+            answer,
+            re.IGNORECASE,
+        )
+    )
 
 
 def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]:
@@ -1294,7 +1425,14 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
         issues.append("applied_disturbance_disclosure_missing")
     if any(line not in actual_disclosure for line in required_status):
         issues.append("disturbance_no_op_disclosure_missing")
-    if actual_disclosure != required_disclosure and actual_disclosure:
+    disclosure_occurrences = sum(
+        answer.count(line)
+        for line in required_disclosure
+    )
+    if (
+        actual_disclosure != required_disclosure
+        and actual_disclosure
+    ) or disclosure_occurrences != len(required_disclosure):
         issues.append("unexpected_applied_disturbance_disclosure")
     if (
         required_disclosure
@@ -1303,6 +1441,8 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
     ):
         issues.append("canonical_disclosure_block_not_at_start")
     if contract.get("answer_mode") != "dispatch_comparison":
+        return list(dict.fromkeys(issues))
+    if not comparison_requirements_active(answer, contract):
         return list(dict.fromkeys(issues))
     candidates = [
         str(item.get("candidate_id") or "")
@@ -1375,7 +1515,11 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
         ):
             issues.append("candidate_audit_evidence_incomplete")
 
-        if not re.search(r"(?:F|失败|failure)\s*0|无(?:规则)?失败", answer, re.IGNORECASE):
+        if not re.search(
+            r"(?:F|失败|failure)\s*0|failure_count\s*[:=]\s*0|无(?:规则)?失败",
+            answer,
+            re.IGNORECASE,
+        ):
             issues.append("hard_constraint_outcome_missing")
         if len(candidates) > 1 and not re.search(
             r"次优|未选|拒选|淘汰|lower-ranked|not selected|eliminated|rejected",
@@ -1705,8 +1849,12 @@ def _selected_comparison_answer(
         *_comparison_markers(selected_id, contract),
     ]
     answer = "\n".join(lines)
-    over_budget = len(answer) > (650 if chinese else 2_000)
-    if not chinese and len(answer.split()) > 160:
+    over_budget = len(answer) > (
+        chinese_comparison_max_chars(len(ranked))
+        if chinese
+        else ENGLISH_COMPARISON_MAX_CHARS
+    )
+    if not chinese and len(answer.split()) > ENGLISH_MAX_WORDS:
         over_budget = True
     if over_budget:
         contract["answer_render_status"] = "answer_budget_insufficient"
@@ -1805,8 +1953,12 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
         lines,
         "none",
         contract,
-        maximum_chars=650 if chinese else 2_000,
-        maximum_words=None if chinese else 160,
+        maximum_chars=(
+            chinese_comparison_max_chars(len(candidates))
+            if chinese
+            else ENGLISH_COMPARISON_MAX_CHARS
+        ),
+        maximum_words=None if chinese else ENGLISH_MAX_WORDS,
     )
 
 _UNIT_CLAIM = re.compile(
@@ -1995,11 +2147,13 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
             repaired["repair_provenance"] = {"method": "unsupported_unit_removal", "external_llm_calls": 0, "reason": "Unsupported unit labels removed without changing the numeric claims."}
     if "answer_too_long" in issues:
         maximum_chars = (
-            650
+            chinese_comparison_max_chars(
+                len(contract.get("candidate_results") or [])
+            )
             if contract.get("answer_mode") == "dispatch_comparison"
-            else 500
+            else CHINESE_SINGLE_FORECAST_MAX_CHARS
             if repaired.get("scenario_type") == "pipeformer"
-            else 1200
+            else GENERIC_MAX_CHARS
         )
         compacted = _compact_answer(str(repaired.get("final_answer") or ""), maximum_chars)
         if compacted != repaired.get("final_answer"):

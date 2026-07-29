@@ -672,6 +672,8 @@ class TeacherTraceProjector:
         tool_calls: List[Dict[str, Any]],
         tool_outputs: List[Dict[str, Any]],
         answer: str,
+        *,
+        max_pipeformer_variables: Optional[int] = None,
     ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Keep the smallest evidence-bearing tool trajectory for SFT."""
         outputs_by_id = {
@@ -694,6 +696,17 @@ class TeacherTraceProjector:
         ]
         multiple_pipeformer = len(successful_pipeformer) > 1
         if successful_pipeformer:
+            referenced_variables = self._reference_tokens(answer)
+            action_forecasts = [
+                pair
+                for pair in successful_pipeformer
+                if self._forecast_action_variables(pair[1]) & referenced_variables
+            ]
+            # A current comparison needs every cited action forecast, but an
+            # actionless baseline duplicate is already represented by the
+            # candidate forecasts' applied-disturbance evidence.
+            if action_forecasts:
+                successful_pipeformer = action_forecasts
             selected = sorted(
                 [*successful_decision_policies[-1:], *successful_pipeformer],
                 key=lambda pair: pair[0],
@@ -724,6 +737,11 @@ class TeacherTraceProjector:
                     raw_output,
                     answer,
                     include_auxiliary_variables=not multiple_pipeformer,
+                    max_variables=(
+                        SFT_MAX_PIPEFORMER_VARIABLES
+                        if max_pipeformer_variables is None
+                        else max_pipeformer_variables
+                    ),
                 )
             else:
                 raw_output = self._compact_generic_sft_output(
@@ -740,6 +758,18 @@ class TeacherTraceProjector:
                 }
             )
         return compact_calls, compact_outputs
+
+    @staticmethod
+    def _forecast_action_variables(call: Dict[str, Any]) -> set[str]:
+        boundary = dict(dict(call.get("arguments") or {}).get(
+            "boundary_conditions"
+        ) or {})
+        return {
+            str(variable)
+            for key in ("percentage_changes", "setpoints")
+            for variable in dict(boundary.get(key) or {})
+            if str(variable)
+        }
 
     def _select_generic_evidence_pairs(
         self,
@@ -871,6 +901,49 @@ class TeacherTraceProjector:
             ]
         return self.compact_sft_output(compact)
 
+    def compact_sft_decision_summary(self, value: Any) -> Dict[str, Any]:
+        """Keep decision labels and ordering while leaving metric detail to tools."""
+        summary = dict(value or {})
+        raw_policy = summary.get("ranking_policy")
+        if isinstance(raw_policy, dict):
+            compact_policy = {
+                "source": raw_policy.get("source"),
+                "hard_constraints": list(
+                    raw_policy.get("hard_constraints") or []
+                ),
+                "objectives": [
+                    {
+                        key: objective[key]
+                        for key in ("metric", "direction", "tolerance")
+                        if key in objective
+                    }
+                    for objective in raw_policy.get("objectives") or []
+                    if isinstance(objective, dict)
+                ],
+            }
+        elif isinstance(raw_policy, str) and raw_policy.strip():
+            compact_policy = {
+                "source": "legacy_named_policy",
+                "policy_id": raw_policy.strip(),
+            }
+        else:
+            compact_policy = {}
+        compact_summary = {
+            key: summary[key]
+            for key in (
+                "status",
+                "selected_candidate_id",
+                "ranked_candidate_ids",
+                "ranked_candidate_groups",
+                "eliminated_candidates",
+                "missing_metrics",
+            )
+            if key in summary
+        }
+        if compact_policy:
+            compact_summary["ranking_policy"] = compact_policy
+        return compact_summary
+
     def _compact_call_arguments(self, value: Any, *, pipeformer: bool) -> Any:
         if pipeformer and isinstance(value, dict):
             value = {key: item for key, item in value.items() if key != "question"}
@@ -899,6 +972,7 @@ class TeacherTraceProjector:
         answer: str,
         *,
         include_auxiliary_variables: bool,
+        max_variables: int,
     ) -> Dict[str, Any]:
         prediction = dict(output.get("prediction") or {})
         verification = dict(output.get("verification") or {})
@@ -913,7 +987,7 @@ class TeacherTraceProjector:
                 )
             for finding in verification.get("priority_findings") or []:
                 referenced.extend(str(value) for value in finding.get("affected_variables") or [])
-        referenced = list(dict.fromkeys(referenced))[:SFT_MAX_PIPEFORMER_VARIABLES]
+        referenced = list(dict.fromkeys(referenced))[:max_variables]
         summary = dict(prediction.get("output_forecast_summary") or {})
         metric_keys = {
             "mean_prediction",
@@ -1719,6 +1793,33 @@ def _history_turn(record: Dict[str, Any]) -> Dict[str, Any]:
         pipeformer_summary = _pipeformer_history_summary(record)
         if pipeformer_summary:
             verified_evidence_summary["pipeformer"] = pipeformer_summary
+        turn_state = DecisionTraceState().updated_from_tool_results(
+            str(record.get("session_id") or ""),
+            int(record.get("turn_id") or 0),
+            str(record.get("user_input") or ""),
+            outputs,
+        )
+        snapshot = dict(
+            turn_state.verified_evidence.get("single_forecast_snapshot") or {}
+        )
+        if snapshot:
+            verified_evidence_summary["single_forecast_snapshot"] = snapshot
+    policy_outputs = [
+        dict(item.get("output") or {})
+        for item, assessment in zip(outputs, assessments)
+        if (
+            assessment.evidence_found
+            and str(item.get("name") or "").casefold()
+            == "set_decision_policy"
+            and dict(item.get("output") or {}).get("success") is True
+        )
+    ]
+    if policy_outputs and not verified_evidence_summary.get("pipeformer"):
+        policy = dict(policy_outputs[-1].get("decision_policy") or {})
+        if policy.get("source") == "llm_tool":
+            verified_evidence_summary["pipeformer"] = {
+                "decision_policy": policy,
+            }
     compact_calls = [
         {
             "tool_call_id": item.get("tool_call_id"),
@@ -2008,6 +2109,11 @@ def write_split_records(
             projected_evidence = DEFAULT_PROJECTOR.compact_record_evidence(
                 dict(projected.get("evidence") or {})
             )
+            projected["decision_summary"] = (
+                DEFAULT_PROJECTOR.compact_sft_decision_summary(
+                    projected.get("decision_summary")
+                )
+            )
             answer_text = str(projected.get("final_answer") or "")
             supporting_values = list(dict.fromkeys(
                 grounded_numeric_claim_values(
@@ -2028,6 +2134,44 @@ def write_split_records(
                 logger.warning("Skipping SFT record with evidence removed by compaction: sample=%s", item.get("sample_id"))
                 continue
             size = len(json.dumps(projected, ensure_ascii=False))
+            # The normal projection retains up to three referenced forecast
+            # variables.  For a rare near-limit record, retry only that
+            # bounded projection with fewer variables and accept it only when
+            # every numeric and canonical variable claim remains grounded.
+            for max_variables in range(SFT_MAX_PIPEFORMER_VARIABLES - 1, -1, -1):
+                if size <= SFT_MAX_RECORD_CHARS:
+                    break
+                trial = dict(projected)
+                trial["tool_calls"], trial["tool_outputs"] = (
+                    DEFAULT_PROJECTOR.compact_sft_trajectory(
+                        list(item.get("tool_calls") or []),
+                        list(item.get("tool_outputs") or []),
+                        answer_text,
+                        max_pipeformer_variables=max_variables,
+                    )
+                )
+                trial_evidence = numeric_grounding_evidence(trial)
+                if not numeric_claims_are_grounded(
+                    answer_text,
+                    str(trial.get("user_input") or ""),
+                    trial_evidence,
+                ):
+                    continue
+                claimed_variables = {
+                    variable.casefold()
+                    for variable in SFT_VARIABLE_REFERENCE.findall(answer_text)
+                }
+                supported_variables = {
+                    variable.casefold()
+                    for variable in SFT_VARIABLE_REFERENCE.findall(
+                        json.dumps(trial_evidence, ensure_ascii=False)
+                    )
+                }
+                if not claimed_variables <= supported_variables:
+                    continue
+                trial_size = len(json.dumps(trial, ensure_ascii=False))
+                if trial_size < size:
+                    projected, size = trial, trial_size
             if size > SFT_MAX_RECORD_CHARS:
                 logger.warning("Skipping oversized SFT record: sample=%s chars=%d", item.get("sample_id"), size)
                 continue
