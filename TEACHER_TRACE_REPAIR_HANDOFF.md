@@ -1,11 +1,264 @@
-# Teacher-Trace Repair Handoff — 2026-07-27
+# Teacher-Trace Repair Handoff — 2026-07-29
 
-> **Latest-status rule:** Section 0 is the current project state and
-> supersedes conflicting counts or scenario lists in the 2026-07-26
-> historical sections below. The older sections are retained as an audit
-> trail of the first repair pass.
+> **Latest-status rule:** The first Section 0 below is the current project
+> state and supersedes conflicting counts, scenario lists, commands, and
+> pending-work statements in the older 2026-07-26 and 2026-07-27 sections.
+> Those sections are retained only as an audit trail.
 
-## 0. Latest continuation update — 2026-07-27
+## 0. Final continuation update — 2026-07-29
+
+### Final dataset outcome
+
+The regeneration, human review, approved merge, deterministic migration, and
+final evaluation cycle is complete.
+
+Current authoritative invariants:
+
+```text
+Master records:                    1,140
+Unique sample IDs:                 1,140
+Native evaluation pass:            1,140
+Task 1 evaluation pass:            1,140
+Needs review:                           0
+Registry-contract regeneration targets: 0
+Compact SFT records:               1,140
+Train / valid / test:          902 / 124 / 114
+Largest compact SFT record:       34,422 characters
+SFT character cap:                35,000 characters
+```
+
+Every master record contains `state_before` and `recent_turns`. The quality
+and statistics workbooks both verify with zero formula/error cells. No further
+scenario regeneration or merge is required for the current master.
+
+The report still labels a deterministic 285-record manual spot-check as
+`pending_human_signoff`. This is an administrative release check, not a
+dataset-quality failure.
+
+### What was completed
+
+#### Regeneration and merge
+
+- All PipeFormer scenarios selected by the repair workflow were regenerated or
+  deterministically repaired from successful stored evidence.
+- Generated attempts were reviewed before approval.
+- Approved scenario attempts were merged without changing the 1,140-record
+  sample-ID set or original split assignments.
+- The final master, sessions, compact SFT splits, evaluation JSONL, annotations,
+  schema, quality report, and statistics report were synchronized.
+- Dynamic `registry-contract` discovery now reports zero trajectory defects.
+- Existing good scenarios were not regenerated merely because evaluator or
+  memory code changed.
+
+#### Canonical application disclosure
+
+- Successful forecast execution now produces exact machine-generated clauses:
+
+  ```text
+  Applied disturbance: T_001:SNQ=-8%
+  Applied setpoint: R_006:ST=0
+  Application status: R_006:ST=no-op; prior=0; applied=0
+  ```
+
+- The finalizer removes incorrect/duplicate canonical lines and prepends the
+  verified block without rewriting the remaining natural-language answer.
+- Percentage values, binary setpoints, signed zero, decimals, scientific
+  notation, and verified no-op applications are normalized deterministically.
+- Natural Chinese/English synonyms no longer establish critical application
+  disclosure; the validator checks the exact canonical block.
+
+#### Verified bounded memory
+
+- Runtime and teacher generation now use `verified_decision_state_v1`.
+- State contains bounded verified CSV/topology evidence, exact registry IDs,
+  candidate actions and scalar metrics, policy, applied disturbances,
+  unresolved inputs, and source provenance.
+- Failed tool calls remain in the audit trace but do not enter verified state.
+- Equivalent renamed actions are deduplicated by normalized action fingerprint.
+- Case, disturbance, horizon, or action-scope changes invalidate stale
+  candidates and policy.
+- The active prompt/SFT projection contains one `state_before` snapshot plus at
+  most two `recent_turns`; previous raw tool payloads are not replayed.
+- `conversation_context` remains audit-only. Full runtime transcripts remain on
+  disk for audit/resume rather than being injected wholesale.
+- State migration preserves typed decision fields such as `missing_metrics`, so
+  an evidence-insufficient policy cannot silently become a default ranking.
+
+#### Grounding, ranking, and answer compaction
+
+- Forecast execution requires successful relevant registry searches for the
+  disturbance and all candidate action variables.
+- Binary status variables are validated by registry semantics and accept only
+  setpoints `0` or `1`.
+- `set_decision_policy` converts LLM-extracted user priorities into a validated
+  typed objective list; the deterministic ranker evaluates verified metrics.
+- Multi-turn candidate comparisons use verified state rather than relying on
+  long conversational recall.
+- Complete candidate comparison evidence uses a cardinality-aware Chinese
+  answer budget: 750 characters through three candidates, then 100 additional
+  characters per extra candidate, capped at 1,200. Single-forecast Chinese
+  answers remain limited to 500 characters.
+- Canonical variable suffixes such as `:SNQ`, `:ST`, `:FR`, `:SP_`, and
+  `:SP_out` are preserved.
+
+#### Evaluator and deterministic repair
+
+- Prior verified CSV source files in typed history now satisfy later evidence
+  requests.
+- Explicit disclaimers such as `不代表其是瓶颈` are not misclassified as
+  unsupported operational claims.
+- Tool execution evidence is separated from answer-format quality, preventing
+  failed-format cascades.
+- Derived counts, ratios, signed values, and scientific notation are supported
+  deterministically while ranking/list ordinals are ignored.
+- Comparison validation uses every verified current/prior candidate and applies
+  the correct answer budget.
+- Added fail-closed command:
+
+  ```powershell
+  python -m scripts.repair_teacher_trace --repair-current-quality
+  ```
+
+  It repairs evidence-complete quality defects, rebuilds verified memory,
+  preflights all compact SFT records, and commits master/sessions/splits
+  transactionally only when every expected record is exportable.
+- `--list-regeneration-targets` now prints a separate quality/SFT projection, so
+  `target_count=0` cannot be confused with the compact split count.
+
+Before the final deterministic pass:
+
+```text
+Direct quality exclusions:       16
+Dependent context exclusions:    33
+Compact SFT records:           1,091
+```
+
+After the final pass:
+
+```text
+Direct quality exclusions:        0
+Dependent context exclusions:     0
+Compact SFT records:           1,140
+```
+
+#### Reporting code organization
+
+The historical `evaluator/task1.py` mixed evaluation and workbook generation.
+It was split by responsibility:
+
+```text
+pipeclaw/backend/evaluator/teacher_trace_audit.py
+  record checks, schema, sampling, evidence counting, and statistics
+
+pipeclaw/backend/reporting/teacher_trace_quality_report.py
+  schema-file output, audit splits, quality workbook, workbook verification
+
+pipeclaw/backend/reporting/statistics_report.py
+pipeclaw/backend/reporting/pipeformer_audit_report.py
+pipeclaw/backend/reporting/workbook_style.py
+```
+
+`evaluate_teacher_trace.py` now composes
+`TeacherTraceQualityAuditor` with `TeacherTraceQualityReportWriter`. The
+relocated repair utilities remain intentionally under
+`pipeclaw/backend/scripts/`.
+
+### Final verification performed
+
+The final full evaluation reported:
+
+```text
+Native pass:                       1,140 / 1,140
+Task 1 pass:                       1,140 / 1,140
+Average/minimum/maximum score:     100 / 100 / 100
+Quality issue counts:              {}
+Quality workbook errors:           0
+Statistics workbook errors:        0
+Compact split counts:              902 / 124 / 114
+```
+
+Additional verification:
+
+```text
+Reporting split tests:             3 passed
+Reporting/repair module imports:   passed
+Modified Python module compilation: passed
+Stale evaluator.task1 references:  0
+```
+
+### Current commands
+
+From:
+
+```powershell
+cd C:\Users\NIGGABALLS\Documents\Forecast_Grounded_Decision_QA\pipeclaw\backend
+conda activate pipeclaw
+```
+
+Evaluate the current master after any future dataset/evaluator change:
+
+```powershell
+python -X utf8 evaluate_teacher_trace.py
+```
+
+Inspect future trajectory defects:
+
+```powershell
+python -X utf8 -m scripts.repair_teacher_trace `
+  --list-regeneration-targets `
+  --target-profile registry-contract
+```
+
+Run the fail-closed deterministic quality/memory migration when needed:
+
+```powershell
+python -X utf8 -m scripts.repair_teacher_trace --repair-current-quality
+```
+
+Do not run regeneration, merge, or evaluation again merely for reassurance.
+Rerun them only after relevant source data, master records, evaluator logic, or
+generation logic changes.
+
+### Next project steps
+
+1. **Optional release signoff**
+   - Complete or record the disposition of the 285 deterministic manual
+     spot-check rows if the deliverable requires formal human signoff.
+   - No dataset repair is required to perform this administrative review.
+
+2. **Create a clean project checkpoint**
+   - Review the dirty worktree carefully.
+   - Do not use `git add .`; staging and generated directories contain extensive
+     historical artifacts.
+   - Stage source refactors and intended final deliverables explicitly.
+   - Preserve unrelated PipeFormer work.
+
+3. **Freeze the dataset release**
+   - Record the final master checksum and dataset version.
+   - Preserve the 1,140 sample IDs and the 902/124/114 split assignment.
+   - Archive the final quality summary and workbooks with the dataset release.
+   - Keep repair staging and full traces only as audit evidence; they are no
+     longer inputs to the released compact SFT dataset.
+
+4. **Begin student-model distillation**
+   - Train first on the finalized compact SFT splits.
+   - Evaluate tool planning, registry-before-forecast behavior, binary setpoint
+     handling, evidence extraction, constraint judgment, candidate ranking, and
+     canonical disclosure separately.
+   - Compare 7B and 14B behavior using the unchanged validation/test splits.
+   - Track exact-variable preservation and unsupported numerical/causal claims
+     as dedicated error categories.
+
+5. **Future maintenance workflow**
+   - For answer-format or memory-schema changes, use deterministic migration;
+     do not regenerate good tool trajectories.
+   - Regenerate only newly discovered trajectory defects such as unauthorized
+     registry use, failed forecasts, invalid arguments, unverified application,
+     or incomplete verification.
+   - After any approved merge, rerun the evaluator once and require all master,
+     session, split, annotation, and report invariants to remain synchronized.
+
+## Historical continuation update — 2026-07-27
 
 ### Current outcome
 

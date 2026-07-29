@@ -7,7 +7,7 @@ from pathlib import Path
 from statistics import mean, median
 from typing import Any, Dict, List, Mapping, Sequence
 
-from .task1 import Task1QualityVerifier
+from evaluator.teacher_trace_audit import TeacherTraceQualityAuditor
 
 
 class Task1StatisticsWorkbook:
@@ -51,7 +51,7 @@ class Task1StatisticsWorkbook:
         by_id = {str(item.get("sample_id")): item for item in evaluations}
         total = len(records)
         eligible = [record for record in records if Task1StatisticsWorkbook._sft_eligible(record, by_id)]
-        evidence_counts = [Task1QualityVerifier.evidence_item_count(record.get("evidence") or {}) for record in records]
+        evidence_counts = [TeacherTraceQualityAuditor.evidence_item_count(record.get("evidence") or {}) for record in records]
         answer_lengths = [len(str(record.get("final_answer") or "")) for record in records]
         tool_counts = [len(record.get("tool_calls") or []) for record in records]
         constraint_records = [record for record in records if record.get("constraint_check")]
@@ -235,7 +235,7 @@ class Task1StatisticsWorkbook:
             evidence_groups[(
                 str(record.get("dataset_source") or "unknown"),
                 str(record.get("scenario_type") or "unknown"),
-            )].append(Task1QualityVerifier.evidence_item_count(record.get("evidence") or {}))
+            )].append(TeacherTraceQualityAuditor.evidence_item_count(record.get("evidence") or {}))
         for key, values in sorted(evidence_groups.items()):
             evidence_sheet.append([
                 *key, len(values), sum(value == 0 for value in values), min(values),

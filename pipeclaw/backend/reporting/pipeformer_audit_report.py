@@ -8,9 +8,9 @@ from typing import Any, Iterable
 from openpyxl import Workbook, load_workbook
 from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
 
-from evaluator.deterministic_repairs import DETERMINISTIC_REPAIR_SAMPLE_IDS
-from evaluator.workbook_style import polish_workbook
-from repair_teacher_trace import REGENERATION_TARGETS
+from reporting.workbook_style import polish_workbook
+from scripts.deterministic_repairs import DETERMINISTIC_REPAIR_SAMPLE_IDS
+from scripts.repair_teacher_trace import REGENERATION_TARGETS
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]

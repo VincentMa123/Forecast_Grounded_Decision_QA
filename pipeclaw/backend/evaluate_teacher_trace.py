@@ -12,8 +12,10 @@ from evaluator.scorer import (
     NativeEvaluationConfig,
     NativeTraceEvaluator,
 )
-from evaluator.statistics_report import Task1StatisticsWorkbook
-from evaluator.task1 import Task1QualityVerifier, Task1VerificationConfig
+from evaluator.teacher_trace_audit import (
+    TeacherTraceAuditConfig,
+    TeacherTraceQualityAuditor,
+)
 from evaluator.reviewer_annotations import (
     export_reviewer_annotations,
     load_reviewer_annotations,
@@ -22,6 +24,10 @@ from evaluator.reviewer_annotations import (
 from evaluator.teacher_quality import numeric_claims_are_grounded, numeric_grounding_evidence
 from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 from generate_teacher_trace import _history_turn, write_split_records
+from reporting.statistics_report import Task1StatisticsWorkbook
+from reporting.teacher_trace_quality_report import (
+    TeacherTraceQualityReportWriter,
+)
 
 
 BACKEND_ROOT = Path(__file__).resolve().parent
@@ -105,12 +111,13 @@ class TeacherTraceEvaluationRunner:
         self.evaluator = NativeTraceEvaluator(
             NativeEvaluationConfig(minimum_score=args.minimum_score)
         )
-        self.task1 = Task1QualityVerifier(
-            Task1VerificationConfig(
+        self.auditor = TeacherTraceQualityAuditor(
+            TeacherTraceAuditConfig(
                 manual_sample_rate=args.manual_sample_rate,
                 manual_sample_seed=args.manual_sample_seed,
             )
         )
+        self.report_writer = TeacherTraceQualityReportWriter(self.auditor)
 
     def run(self) -> Dict[str, object]:
         args = self.args
@@ -140,7 +147,7 @@ class TeacherTraceEvaluationRunner:
         evaluations = []
         for record in records:
             native = native_results[str(record.get("sample_id") or "")]
-            task1 = self.task1.evaluate(record, native)
+            task1 = self.auditor.evaluate(record, native)
             evaluations.append(
                 {
                     **task1,
@@ -153,7 +160,7 @@ class TeacherTraceEvaluationRunner:
             )
         self._write_jsonl(args.output_jsonl, evaluations)
 
-        self.task1.write_schema(args.schema_json)
+        self.report_writer.write_schema(args.schema_json)
         filtered_run = bool(args.scenario_id or args.sample_id)
         quality_sample_ids = {
             str(item.get("sample_id"))
@@ -173,17 +180,17 @@ class TeacherTraceEvaluationRunner:
                 force=True,
             )
             compact_split_counts = self._split_counts(args.compact_split_dir)
-            audit_split_counts = self.task1.write_audit_splits(
+            audit_split_counts = self.report_writer.write_audit_splits(
                 args.deliverable_dir,
                 records,
                 args.compact_split_dir,
                 quality_sample_ids,
             )
-        statistics = self.task1.statistics(records, evaluations)
+        statistics = self.auditor.statistics(records, evaluations)
         manual_records = (
-            self.task1.manual_review_queue(records, evaluations)
+            self.auditor.manual_review_queue(records, evaluations)
             if args.repair_grounded_records
-            else self.task1.manual_sample(records, evaluations)
+            else self.auditor.manual_sample(records, evaluations)
         )
         rule_files = {
             name: (CONSTRAINT_LIBRARY / name).is_file()
@@ -215,7 +222,7 @@ class TeacherTraceEvaluationRunner:
             statistics,
             Path(display_path(report_source)),
         )
-        self.task1.write_report(
+        self.report_writer.write_report(
             args.report_xlsx,
             records,
             evaluations,
@@ -226,8 +233,10 @@ class TeacherTraceEvaluationRunner:
             reviewer_annotations=reviewer_annotations,
             reset_review_sample_ids=sorted(reset_review_sample_ids),
         )
-        workbook_verification = self.task1.verify_workbook(args.report_xlsx)
-        statistics_workbook_verification = self.task1.verify_workbook(args.statistics_xlsx)
+        workbook_verification = self.report_writer.verify_workbook(args.report_xlsx)
+        statistics_workbook_verification = self.report_writer.verify_workbook(
+            args.statistics_xlsx
+        )
         summary = {
             "schema_version": "pipeclaw_task1_quality_v1",
             "teacher_trace": display_path(report_source),
