@@ -19,3 +19,12 @@ pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
 pipeFormer/data/
 pipeFormer/models/tests
 docs/superpowers
+
+# Task 2 student-distillation generated artifacts
+pipeclaw/task2_student/.cache/
+pipeclaw/task2_student/data/answer_only/*.jsonl
+pipeclaw/task2_student/data/trace_level/*.jsonl
+pipeclaw/task2_student/data/constraint_multitask/*.jsonl
+pipeclaw/task2_student/data/manifests/*.tmp
+pipeclaw/task2_student/outputs/*
+!pipeclaw/task2_student/outputs/.gitkeep
