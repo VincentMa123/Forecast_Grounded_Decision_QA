@@ -6,6 +6,8 @@ __pycache__/
 *.pyo
 *.pyd
 .workbuddy
+.codex
+graphify-out
 pipeFormer/data/**/tokenizer_output.txt
 pipeFormer/build_cache.log
 pipeclaw/backend/generated_teacher_traces/teacher_trace.jsonl
@@ -15,6 +17,8 @@ pipeclaw/backend/generated_teacher_traces/scenario_preflight.json
 pipeclaw/backend/generated_teacher_traces/teacher_trace_sessions.jsonl
 pipeclaw/backend/generated_teacher_traces/backups
 pipeclaw/backend/scripts
+pipeclaw/task2_student/tests/
+pipeclaw/task2_student/graphify-out/
 pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
 pipeFormer/data/
 pipeFormer/models/tests
@@ -31,3 +35,5 @@ pipeclaw/task2_student/data/constraint_multitask/*.tmp
 pipeclaw/task2_student/data/manifests/*.tmp
 pipeclaw/task2_student/outputs/*
 !pipeclaw/task2_student/outputs/.gitkeep
+pipeclaw/task2_student/tests/test_scaffold_contract.py
+pipeclaw/task2_student/tests/test_scaffold_contract.py

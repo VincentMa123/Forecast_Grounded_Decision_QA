@@ -80,6 +80,13 @@ calls and final answers have `loss: true`; verified tool responses have
 `loss: false` and are input evidence only. Failed, unmatched, or unregistered
 tool calls stop conversion.
 
+The trace-level system message starts with the same shared static policy used
+by the production PipeClaw prompt builder. It then adds only the example's
+bounded verified decision state and recent dialogue. Changing runtime state,
+workspace paths, assets, control files, skills, evidence memory, and trace
+metadata are not copied into SFT examples. The shorter answer-only and
+constraint-multitask prompts remain task-focused.
+
 Validate an existing release independently with:
 
 ```powershell
@@ -90,3 +97,73 @@ The validator checks source and output checksums, identities, split isolation,
 tool schemas and call/response pairs, loss flags, structured targets, and
 answer-generation coverage. Generated JSONL files remain ignored by Git; the
 small checksum manifest is trackable.
+
+## Exact Qwen3.5 token profile
+
+Create a dedicated Python 3.12 environment in WSL. For a CPU-only profiling
+environment, install the matching PyTorch pair from the CPU wheel index before
+the remaining requirements:
+
+```bash
+cd /mnt/c/path/to/Forecast_Grounded_Decision_QA
+python3.12 -m venv ~/.venvs/task2-ms-swift
+~/.venvs/task2-ms-swift/bin/python -m pip install \
+  torch==2.13.0+cpu torchvision==0.28.0+cpu \
+  --index-url https://download.pytorch.org/whl/cpu
+~/.venvs/task2-ms-swift/bin/python -m pip install \
+  -r pipeclaw/task2_student/requirements.txt
+```
+
+The CPU wheel selection is only for validation and token profiling. Before
+remote GPU training, install the PyTorch build matching that server's CUDA
+runtime instead.
+
+Run token profiling after dataset validation:
+
+```bash
+~/.venvs/task2-ms-swift/bin/python \
+  pipeclaw/task2_student/scripts/profile_tokens.py
+```
+
+The command downloads the `Qwen/Qwen3.5-0.8B` processor/tokenizer and uses
+MS-SWIFT's training template; it does not load model weights. It verifies the
+six train/valid projection files against the dataset manifest and deliberately
+does not accept the test split. Outputs are:
+
+```text
+data/token_profiles/qwen35_08b_token_profile.json
+data/token_profiles/qwen35_08b_token_records.jsonl
+```
+
+The summary reports exact rendered minimum, median, p95, p99, maximum, and
+coverage at 1,024 through 16,384 tokens. It also groups by projection, split,
+scenario type, and multitask type. Field totals use the same tokenizer on raw
+system, user, tool-schema, tool-call, tool-response, and assistant content;
+they intentionally exclude chat-template overhead and therefore do not sum to
+the exact rendered totals.
+
+No `max_length` or truncation strategy is passed while profiling. Any later
+training limit must fit a complete record or have a reviewed, explicit
+disposition; tool evidence and its grounded final answer must not be separated.
+
+### Measured release result
+
+The 2026-07-30 profile covers all 4,199 train/valid projection records:
+
+| Scope | Count | Median | p95 | p99 | Maximum |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| All projections | 4,199 | 1,445 | 8,828 | 10,758 | 12,397 |
+| Answer only | 1,026 | 107 | 362 | 464 | 609 |
+| Trace level | 1,026 | 5,023 | 9,616 | 10,712 | 12,136 |
+| Constraint multitask | 2,147 | 1,445 | 9,072 | 11,178 | 12,397 |
+
+Complete-record coverage is 43.01% at 1,024, 56.11% at 2,048, 61.92% at
+4,096, 93.00% at 8,192, and 100% at 16,384 tokens. Therefore the lossless
+full-data training configuration should use `max_length=16384`. Shorter local
+smoke tests must select complete records that fit their limit; they must not
+silently truncate the released examples.
+
+Across raw content fields, the system prompt contributes 39.15% of tokens,
+tool schemas 25.78%, and user messages 24.33%. These are the first candidates
+for a future reviewed compact-prompt experiment, but the released Phase 5
+profile preserves them exactly.
