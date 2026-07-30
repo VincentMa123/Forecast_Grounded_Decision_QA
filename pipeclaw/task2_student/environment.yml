@@ -1,0 +1,29 @@
+name: task2-ms-swift
+
+channels:
+  - conda-forge
+
+dependencies:
+  - python=3.12
+  - pip>=25.0
+  - git
+  - ninja
+  - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cu130
+      - torch==2.13.0+cu130               
+      - torchvision==0.28.0+cu130
+      - ms-swift==4.4.2                    
+      - transformers==5.12.1              
+      - peft==0.19.1                       
+      - trl==0.29.1                       
+      - accelerate>=1.14,<2.0
+      - datasets==4.8.4                     
+      - modelscope>=1.39,<2.0               
+      - tokenizers>=0.22,<0.23
+      - safetensors>=0.8,<0.9
+      - qwen-vl-utils>=0.0.14
+      - liger-kernel>=0.8.1               
+      - flash-linear-attention>=0.4.2
+      - bitsandbytes==0.50.0
+      - fsspec[http]>=2023.1.0,<=2026.2.0   
+      - pillow>=8,<12                     

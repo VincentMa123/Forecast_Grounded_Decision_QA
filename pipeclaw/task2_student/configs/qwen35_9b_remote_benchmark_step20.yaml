@@ -1,0 +1,76 @@
+ENV:
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+  NPROC_PER_NODE: 4
+
+model: Qwen/Qwen3.5-9B
+use_hf: false
+output_dir: pipeclaw/task2_student/outputs/qwen35_9b_trace_level_benchmark
+add_version: false
+
+dataset:
+  - pipeclaw/task2_student/data/trace_level/train.jsonl
+val_dataset:
+  - pipeclaw/task2_student/data/trace_level/valid.jsonl
+split_dataset_ratio: 0.0
+load_from_cache_file: true
+dataset_num_proc: 4
+
+tuner_type: lora
+target_modules:
+  - all-linear
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+freeze_vit: true
+freeze_aligner: true
+
+quant_method: bnb
+quant_bits: 4
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+torch_dtype: bfloat16
+attn_impl: flash_attn
+
+# The exact token profile puts the trace-level maximum at 12,136 tokens and 100%
+# of all projections under 16,384, so no released record is truncated. `delete`
+# stays as a fail-closed guard: a record that does not fit is dropped loudly
+# rather than silently cut between tool evidence and the grounded answer.
+max_length: 16384
+truncation_strategy: delete
+loss_scale: default+ignore_empty_think
+add_non_thinking_prefix: true
+packing: false
+
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 8
+gradient_checkpointing: true
+deepspeed: zero2
+optim: adamw_torch
+learning_rate: 0.0001
+lr_scheduler_type: cosine
+warmup_ratio: 0.05
+max_steps: 20
+
+eval_strategy: steps
+eval_steps: 20
+save_strategy: steps
+save_steps: 20
+save_total_limit: 1
+save_only_model: false
+safe_serialization: true
+resume_only_model: false
+ignore_data_skip: false
+
+logging_steps: 1
+logging_first_step: true
+# See qwen35_08b_smoke_step10.yaml: MS-SWIFT's CLI can only pass a boolean for
+# this Transformers 5.12 field, and true maps to "all".
+include_num_input_tokens_seen: true
+report_to: tensorboard
+dataloader_num_workers: 4
+
+seed: 42
+data_seed: 42
+push_to_hub: false

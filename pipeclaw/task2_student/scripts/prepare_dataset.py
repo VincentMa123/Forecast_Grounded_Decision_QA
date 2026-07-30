@@ -109,6 +109,10 @@ def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
         example_id=str(source["sample_id"]),
     )
     record["messages"] = [
+        {
+            "role": "system",
+            "content": static_forecast_policy(),
+        },
         {"role": "user", "content": source["user_input"]},
         {
             "role": "assistant",
@@ -487,7 +491,10 @@ def _system_content(source: dict[str, Any], prompt: str) -> str:
         "state_before": source.get("state_before") or {},
         "recent_turns": source.get("recent_turns") or [],
     }
-    return f"{prompt}\nBounded verified context:\n{stable_json(context)}"
+    return (
+        f"{static_forecast_policy()}\n\n"
+        f"{prompt}\nBounded verified context:\n{stable_json(context)}"
+    )
 
 
 def _trace_system_content(source: dict[str, Any]) -> str:

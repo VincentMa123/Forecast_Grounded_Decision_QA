@@ -1,0 +1,70 @@
+ENV:
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+
+model: Qwen/Qwen3.5-0.8B
+use_hf: false
+output_dir: pipeclaw/task2_student/outputs/qwen35_08b_answer_only_smoke
+add_version: false
+resume_from_checkpoint: pipeclaw/task2_student/outputs/qwen35_08b_answer_only_smoke/checkpoint-10
+
+dataset:
+  - pipeclaw/task2_student/data/answer_only/train.jsonl#32
+val_dataset:
+  - pipeclaw/task2_student/data/answer_only/valid.jsonl#8
+split_dataset_ratio: 0.0
+load_from_cache_file: true
+dataset_num_proc: 1
+
+tuner_type: lora
+target_modules:
+  - all-linear
+lora_rank: 8
+lora_alpha: 32
+lora_dropout: 0.05
+freeze_vit: true
+freeze_aligner: true
+
+quant_method: bnb
+quant_bits: 4
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+torch_dtype: bfloat16
+
+max_length: 2048
+truncation_strategy: delete
+loss_scale: default+ignore_empty_think
+add_non_thinking_prefix: true
+packing: false
+
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 1
+gradient_checkpointing: true
+optim: adamw_torch
+learning_rate: 0.0001
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+max_steps: 20
+
+eval_strategy: steps
+eval_steps: 10
+save_strategy: steps
+save_steps: 10
+save_total_limit: 2
+save_only_model: false
+safe_serialization: true
+resume_only_model: false
+ignore_data_skip: false
+
+logging_steps: 1
+logging_first_step: true
+# See qwen35_08b_smoke_step10.yaml: MS-SWIFT's CLI can only pass a boolean for
+# this Transformers 5.12 field, and true maps to "all".
+include_num_input_tokens_seen: true
+report_to: none
+dataloader_num_workers: 0
+
+seed: 42
+data_seed: 42
+push_to_hub: false

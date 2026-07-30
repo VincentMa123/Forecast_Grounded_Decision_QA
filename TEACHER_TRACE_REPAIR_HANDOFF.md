@@ -1,9 +1,9 @@
-# Teacher-Trace Repair Handoff — 2026-07-29
+# Teacher-Trace Repair Handoff — 2026-07-30
 
-> **Latest-status rule:** The first Section 0 below is the current project
-> state and supersedes conflicting counts, scenario lists, commands, and
-> pending-work statements in the older 2026-07-26 and 2026-07-27 sections.
-> Those sections are retained only as an audit trail.
+> **Latest-status rule:** Section 0 is the final Task 1 state and Section 9 is
+> the current Task 2 state. Together they supersede conflicting counts,
+> scenario lists, commands, and pending-work statements in the older sections,
+> which are retained only as an audit trail.
 
 ## 0. Final continuation update — 2026-07-29
 
@@ -31,9 +31,9 @@ Every master record contains `state_before` and `recent_turns`. The quality
 and statistics workbooks both verify with zero formula/error cells. No further
 scenario regeneration or merge is required for the current master.
 
-The report still labels a deterministic 285-record manual spot-check as
-`pending_human_signoff`. This is an administrative release check, not a
-dataset-quality failure.
+The deterministic 285-record release spot-check has been completed by the
+user. It does not need to be repeated unless the source master, split
+assignments, or derived release changes.
 
 ### What was completed
 
@@ -1320,3 +1320,169 @@ The repair script still uses `capture_output=True`. A future improvement could s
 - Improve workbook readability and styling.
 - Avoid unrelated or unnecessarily broad changes.
 - The user is comfortable running regeneration personally and wants clear commands and visible failure information.
+
+## 9. Task 2 student-model distillation — current continuation state
+
+### Task transition
+
+Task 1 and its 285-record release signoff are complete. Do not reopen or repeat
+that signoff unless the Task 1 release data changes. The active work is Task 2:
+distilling the verified teacher data into a smaller MS-SWIFT student model.
+
+The authoritative released split remains:
+
+```text
+Train / valid / test: 902 / 124 / 114
+```
+
+The original split assignments are preserved across every Task 2 projection;
+test records are not included in training.
+
+### Completed Task 2 preparation
+
+- Phase 2 created the `pipeclaw/task2_student/` scaffold.
+- Phase 3 created three comparison projections:
+  - `answer_only`
+  - `trace_level`
+  - `constraint_multitask`
+- Phase 4 added fail-closed validation for IDs, split counts and leakage, tool
+  call/response pairing, registered tools, loss masking, final answers, JSON,
+  and canonical identifiers. A manifest records counts and checksums.
+- The production static policy is shared by answer-only, trace-level, and
+  constraint-multitask examples. Dynamic workspace state and trace metadata are
+  not embedded into every system prompt.
+- Phase 5 profiled all 4,199 train/valid projected records with the
+  Qwen3.5-0.8B tokenizer.
+- Phase 6 prepared the MS-SWIFT environment.
+- Phase 7 now has a corrected local smoke-test configuration, but the actual
+  10-step run and resume run have not yet been executed.
+
+Current exact token-profile facts:
+
+```text
+All projections:      4,199 records; median 2,840; p95 9,675;
+                      p99 12,029; maximum 13,792
+Answer only:          1,026 records; minimum 1,430; maximum 2,008
+Trace level:          1,026 records; maximum 12,136
+Constraint multitask: 2,147 records; maximum 13,792
+Coverage:             0% at 1,024; 25.91% at 2,048;
+                      58.89% at 4,096; 90.33% at 8,192;
+                      100% at 16,384
+```
+
+The full lossless experiments therefore require `max_length=16384`. The local
+answer-only smoke test uses `max_length=2048`, because every answer-only record
+fits intact and no current record fits the obsolete 1,024-token proposal.
+
+### Local environment observed on 2026-07-30
+
+```text
+GPU:          NVIDIA GeForce RTX 3050 Laptop GPU, 4,096 MiB
+PyTorch:      2.13.0+cu130
+torchvision:  0.28.0+cu130
+CUDA runtime: 13.0
+MS-SWIFT:     4.4.2
+Transformers: 5.12.1
+datasets:     4.8.4
+bitsandbytes: 0.50.0
+```
+
+`torch.cuda.is_available()` returned true. `swift --version` is not a valid
+MS-SWIFT 4.4.2 command; use `python -m pip show ms-swift`.
+
+The forced CUDA wheel installation had left two real dependency conflicts:
+
+```text
+datasets 4.8.4 requires fsspec[http]<=2026.2.0
+gradio 5.50.0 requires pillow<12.0
+```
+
+Both are now pinned away. `pipeclaw/task2_student/environment.yml` is the single
+install file for Task 2: it carries the cu130 PyTorch index and explicit
+`+cu130` pins, the pinned MS-SWIFT stack, and those two transitive upper bounds.
+
+```bash
+conda env create -f pipeclaw/task2_student/environment.yml
+conda activate task2-ms-swift
+python -m pip check
+```
+
+WSL has no Conda installed, so the local environment is still the venv
+`~/.venvs/task2-ms-swift`; the "Without Conda" section of
+`pipeclaw/task2_student/README.md` lists the same pins as plain pip commands.
+Only `causal-conv1d`, `flash-attn`, and `deepspeed` stay outside the file: PyPI
+ships them source-only, so they need `--no-build-isolation` and nvcc, and they
+are required only by the multi-GPU remote configs.
+
+A clean `python -m pip check` is required before starting the smoke test. The
+local environment now reports `No broken requirements found` (fsspec 2026.2.0,
+Pillow 11.3.0).
+
+### Phase 7 files and commands
+
+The two configurations are:
+
+```text
+pipeclaw/task2_student/configs/qwen35_08b_smoke_step10.yaml
+pipeclaw/task2_student/configs/qwen35_08b_smoke_resume_step20.yaml
+```
+
+They use Qwen3.5-0.8B, 4-bit NF4 QLoRA, 32 answer-only training records, 8
+validation records, batch size 1, gradient checkpointing, LoRA rank 8 / alpha
+32, deterministic seeds, and fail-closed deletion of any unexpectedly
+oversized record. The second configuration restores the complete trainer state
+from the predictable `checkpoint-10` path; it is not an adapter-only restart.
+
+Run steps 1 through 10 from the repository root:
+
+```bash
+swift sft \
+  pipeclaw/task2_student/configs/qwen35_08b_smoke_step10.yaml
+```
+
+Inspect `checkpoint-10`, then resume through step 20:
+
+```bash
+swift sft \
+  pipeclaw/task2_student/configs/qwen35_08b_smoke_resume_step20.yaml
+```
+
+Phase 7 is accepted only when the logs show finite nonzero loss and nonzero
+supervised tokens, `checkpoint-10` contains adapter plus trainer state, the
+second run resumes at step 10 rather than restarting, and `checkpoint-20`
+finishes at global step 20. Run one adapter inference afterward and verify that
+its answer is parseable.
+
+### Model and remote-GPU disposition
+
+Keep Qwen3.5 for the current experiment. Current MS-SWIFT documentation lists
+DeepSeek-V4, but the official DeepSeek-V4 checkpoints are not small student
+models: even V4-Flash is a very large mixture-of-experts model. It is not a
+replacement for Qwen3.5-0.8B locally or Qwen3.5-9B remotely.
+
+For the lossless Qwen3.5-9B `max_length=16384` experiment, use a single 80 GB
+GPU such as A800 80 GB as the safe default on AutoDL. A 48 GB card is a
+reasonable benchmark candidate when substantially cheaper. A 32 GB RTX 5090
+may run a rank-64 configuration with batch size 1 and gradient checkpointing,
+but must be tested with the exact 16K configuration before a full rental. Avoid
+planning the rank-64/rank-128 16K experiment around a 24 GB 4090/3090.
+
+Increasing `lora_rank` increases adapter, gradient, and optimizer memory.
+Increasing `lora_alpha` alone changes the LoRA scaling and does not materially
+increase parameter count or VRAM. Rank 64 has eight times the LoRA parameters
+of rank 8; rank 128 has sixteen times as many. Base weights and long-context
+activations still dominate the total.
+
+### Immediate next steps
+
+1. Reconcile the two pip conflicts and obtain a clean `python -m pip check`.
+2. Run the 10-step smoke configuration and inspect `checkpoint-10`.
+3. Run the resume configuration and confirm it continues to step 20.
+4. Preserve both logs and record peak VRAM, elapsed time, processed tokens, and
+   measured tokens per second.
+5. Run one inference from the adapter and validate the structured answer.
+6. Only after Phase 7 passes, add full answer-only, trace-level, and
+   constraint-multitask experiment configurations.
+7. Benchmark the exact 16K Qwen3.5-9B rank planned for the final run for 20
+   steps on the candidate AutoDL GPU. Use measured tokens per second to estimate
+   rental time and cost before launching full SFT.
