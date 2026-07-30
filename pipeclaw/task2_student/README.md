@@ -47,3 +47,46 @@ Small manifests and summary metrics may be committed after review.
 4. Run the local 0.8B smoke test.
 5. Compare answer-only, trace-level, and constraint-aware SFT.
 6. Reuse the same artifacts for the remote 9B experiment.
+
+## Dataset conversion
+
+Run the converter from the repository root in the existing `pipeclaw` Conda
+environment:
+
+```powershell
+conda run -n pipeclaw python pipeclaw/task2_student/scripts/prepare_dataset.py
+```
+
+It reads the three authoritative splits, requires the frozen 902 / 124 / 114
+counts, loads all eight schemas from PipeClaw's actual tool registry, and
+writes:
+
+```text
+data/answer_only/{train,valid,test}.jsonl
+data/trace_level/{train,valid,test}.jsonl
+data/constraint_multitask/{train,valid,test}.jsonl
+data/manifests/task2_dataset_manifest.json
+```
+
+Every record keeps `source_sample_id`, scenario/session/turn identity, and
+`split`. Answer-only and trace-level `example_id` values equal the source
+sample ID. Constraint-aware rows use
+`<source_sample_id>::<task_type>` so the five task targets remain unique and
+auditable.
+
+Trace records use MS-SWIFT's standard `tools` JSON string and `system`,
+`user`, `tool_call`, `tool_response`, and `assistant` roles. Teacher tool
+calls and final answers have `loss: true`; verified tool responses have
+`loss: false` and are input evidence only. Failed, unmatched, or unregistered
+tool calls stop conversion.
+
+Validate an existing release independently with:
+
+```powershell
+conda run -n pipeclaw python pipeclaw/task2_student/scripts/validate_dataset.py
+```
+
+The validator checks source and output checksums, identities, split isolation,
+tool schemas and call/response pairs, loss flags, structured targets, and
+answer-generation coverage. Generated JSONL files remain ignored by Git; the
+small checksum manifest is trackable.

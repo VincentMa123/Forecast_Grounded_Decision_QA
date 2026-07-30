@@ -25,6 +25,9 @@ pipeclaw/task2_student/.cache/
 pipeclaw/task2_student/data/answer_only/*.jsonl
 pipeclaw/task2_student/data/trace_level/*.jsonl
 pipeclaw/task2_student/data/constraint_multitask/*.jsonl
+pipeclaw/task2_student/data/answer_only/*.tmp
+pipeclaw/task2_student/data/trace_level/*.tmp
+pipeclaw/task2_student/data/constraint_multitask/*.tmp
 pipeclaw/task2_student/data/manifests/*.tmp
 pipeclaw/task2_student/outputs/*
 !pipeclaw/task2_student/outputs/.gitkeep

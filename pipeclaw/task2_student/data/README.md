@@ -13,3 +13,19 @@ metadata, and split assignments.
 
 Generated JSONL files are ignored. Manifests remain reviewable and may be
 committed.
+
+Each projection contains `train.jsonl`, `valid.jsonl`, and `test.jsonl`:
+
+- Answer-only rows contain the original user request and supervised final
+  answer.
+- Trace-level rows contain bounded verified state, actual PipeClaw tool
+  schemas, supervised successful tool calls, masked tool responses, and the
+  supervised grounded answer.
+- Constraint-aware rows use the task types `condition_parsing`,
+  `tool_planning`, `constraint_judgment`, `evidence_extraction`, and
+  `answer_generation`. Empty source targets are omitted rather than invented.
+
+`manifests/task2_dataset_manifest.json` records converter version, generation
+time, tool-schema hash, per-file counts, SHA-256 checksums, and auxiliary task
+counts. Run `../scripts/validate_dataset.py` before training or transferring a
+release to a remote GPU.
