@@ -65,7 +65,7 @@ max_length: 16384
 truncation_strategy: delete
 loss_scale: default+ignore_empty_think
 add_non_thinking_prefix: true
-packing: false
+packing: true
 
 # 4 ranks x 1 x 8 = effective batch size 32. 902 train records x 3 epochs is
 # roughly 84 optimizer steps.

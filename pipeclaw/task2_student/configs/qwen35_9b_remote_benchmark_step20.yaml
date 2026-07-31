@@ -37,7 +37,7 @@ max_length: 16384
 truncation_strategy: delete
 loss_scale: default+ignore_empty_think
 add_non_thinking_prefix: true
-packing: false
+packing: true
 
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 1
