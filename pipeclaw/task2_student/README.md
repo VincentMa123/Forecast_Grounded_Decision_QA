@@ -148,85 +148,6 @@ torch lines in `environment.yml`. That index publishes the same verified pair,
 is not equivalent — it stops at torch 2.11.0 / torchvision 0.26.0, so a cu128
 host must re-run the smoke test.
 
-### The three compiled kernels that cannot be in the file
-
-`causal-conv1d`, `flash-attn`, and `deepspeed` are the only training
-dependencies not in `environment.yml`. PyPI ships them source-only and their
-`setup.py` imports torch, so they must be built with build isolation disabled —
-and `--no-build-isolation` is a pip *command* option that a requirements file
-(which is what Conda feeds the pip block) cannot carry. They also need `nvcc`,
-which the local WSL host does not have. On an nvcc host, after activating the
-environment:
-
-```bash
-python -m pip install -U --no-build-isolation \
-  "causal-conv1d>=1.6.2" "flash-attn==2.8.3" "deepspeed>=0.18.9"
-```
-
-DeepSpeed is required by `configs/qwen35_9b_remote_*.yaml` (`deepspeed: zero2`)
-and flash-attn by `attn_impl: flash_attn`. causal-conv1d is the fast kernel for
-the Qwen3.5 gated-DeltaNet layers, and `flash-linear-attention` — which *is* in
-the environment file, wheel-only and needing no compiler — is the Triton
-fallback for it. A single-GPU `sdpa` run therefore needs none of the three.
-
-### Without Conda
-
-The local WSL host has no Conda installed, so training currently runs from the
-Python 3.12 virtual environment `~/.venvs/task2-ms-swift`. To refresh or rebuild
-that path, install the pip block of `environment.yml` by hand — that file stays
-the source of truth for every version:
-
-```bash
-source ~/.venvs/task2-ms-swift/bin/activate
-python -m pip install -U --extra-index-url https://download.pytorch.org/whl/cu130 \
-  torch==2.13.0+cu130 torchvision==0.28.0+cu130
-python -m pip install -U ms-swift==4.4.2 transformers==5.12.1 peft==0.19.1 \
-  trl==0.29.1 "accelerate>=1.14,<2.0" datasets==4.8.4 "modelscope>=1.39,<2.0" \
-  "tokenizers>=0.22,<0.23" "safetensors>=0.8,<0.9" "qwen-vl-utils>=0.0.14" \
-  "liger-kernel>=0.8.1" "flash-linear-attention>=0.4.2" bitsandbytes==0.50.0 \
-  "fsspec[http]>=2023.1.0,<=2026.2.0" "pillow>=8,<12"
-python -m pip check
-```
-
-Order matters here: the CUDA wheels come from the PyTorch index first, then the
-pinned stack from PyPI. For a CPU-only validation or profiling host, replace the
-first command with the CPU wheels:
-
-```bash
-python -m pip install torch==2.13.0+cpu torchvision==0.28.0+cpu \
-  --index-url https://download.pytorch.org/whl/cpu
-```
-
-### Transitive upper bounds
-
-The last two pins in the file constrain `fsspec` to the range `datasets 4.8.4`
-accepts and Pillow to the range Gradio (an ms-swift dependency) accepts. Without
-them pip resolves the newest transitive versions and reports:
-
-```text
-datasets requires fsspec[http]<=2026.2.0
-gradio requires pillow<12.0
-```
-
-Those warnings represent a genuinely inconsistent environment and must be
-resolved before renting a GPU or starting a checkpointed run. With the pins the
-local WSL environment reports `No broken requirements found` (fsspec 2026.2.0,
-Pillow 11.3.0).
-
-### Serving environment
-
-vLLM and SGLang stay out of the training environment on purpose: they pin their
-own torch build and would silently replace the verified `torch 2.13.0+cu130`.
-Phase 7 adapter inference uses `swift infer` with the Transformers backend, so
-no serving stack is required to accept Phase 7. If one is needed later, build a
-throwaway environment beside the training one:
-
-```bash
-conda create -n task2-ms-swift-serve python=3.12 -y
-conda run -n task2-ms-swift-serve python -m pip install \
-  "vllm>=0.17.0" "evalscope>=1.0"
-```
-
 ## Exact Qwen3.5 token profile
 
 Run token profiling after dataset validation:
@@ -366,14 +287,12 @@ across four ranks (effective batch size 32).
 # 1. Build the environment, then add the compiled kernels (needs nvcc)
 conda env create -f pipeclaw/task2_student/environment.yml
 conda activate task2-ms-swift
-python -m pip install -U --no-build-isolation \
-  "causal-conv1d>=1.6.2" "flash-attn==2.8.3" "deepspeed>=0.18.9"
 
 # 2. Measure peak VRAM and tokens/sec on 20 steps of the real configuration
 swift sft pipeclaw/task2_student/configs/qwen35_9b_remote_benchmark_step20.yaml
 
 # 3. Only then start the full run
-swift sft pipeclaw/task2_student/configs/qwen35_9b_remote_trace_level.yaml
+swift sft pipeclaw/task2_student/configs/qwen35_9b.yaml
 ```
 
 The benchmark config is byte-for-byte identical to the full run on every setting

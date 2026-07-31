@@ -8,6 +8,8 @@ dependencies:
   - pip>=25.0
   - git
   - ninja
+  - cuda-nvcc=13.0.88
+  - cuda-cudart-dev=13.0.*
   - pip:
       - --extra-index-url https://download.pytorch.org/whl/cu130
       - torch==2.13.0+cu130               
@@ -25,5 +27,7 @@ dependencies:
       - liger-kernel>=0.8.1               
       - flash-linear-attention>=0.4.2
       - bitsandbytes==0.50.0
-      - fsspec[http]>=2023.1.0,<=2026.2.0   
-      - pillow>=8,<12                     
+      - fsspec[http]>=2023.1.0,<=2026.2.0
+      - pillow>=8,<12
+      - https://github.com/mjun0812/flash-attention-prebuild-wheels/releases/download/v0.9.47/flash_attn-2.8.3%2Bcu130torch2.13-cp312-cp312-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+      - deepspeed>=0.18.9
