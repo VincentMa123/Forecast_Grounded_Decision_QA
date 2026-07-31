@@ -1,6 +1,6 @@
 ENV:
   PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
-  NPROC_PER_NODE: 4
+  NPROC_PER_NODE: 4 #remove when using single GPU
 
 model: Qwen/Qwen3.5-9B
 use_hf: false
@@ -32,10 +32,7 @@ bnb_4bit_use_double_quant: true
 torch_dtype: bfloat16
 attn_impl: flash_attn
 
-# The exact token profile puts the trace-level maximum at 12,136 tokens and 100%
-# of all projections under 16,384, so no released record is truncated. `delete`
-# stays as a fail-closed guard: a record that does not fit is dropped loudly
-# rather than silently cut between tool evidence and the grounded answer.
+# 100% of the released records fit in 16,384 tokens (trace-level maximum 12,136)
 max_length: 16384
 truncation_strategy: delete
 loss_scale: default+ignore_empty_think
@@ -44,9 +41,9 @@ packing: false
 
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 1
-gradient_accumulation_steps: 8
+gradient_accumulation_steps: 8  # set 32 if using single GPU
 gradient_checkpointing: true
-deepspeed: zero2
+deepspeed: zero2 # dont use this when using a single GPU
 optim: adamw_torch
 learning_rate: 0.0001
 lr_scheduler_type: cosine
@@ -65,8 +62,6 @@ ignore_data_skip: false
 
 logging_steps: 1
 logging_first_step: true
-# See qwen35_08b_smoke_step10.yaml: MS-SWIFT's CLI can only pass a boolean for
-# this Transformers 5.12 field, and true maps to "all".
 include_num_input_tokens_seen: true
 report_to: tensorboard
 dataloader_num_workers: 4

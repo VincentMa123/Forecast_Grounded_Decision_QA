@@ -60,7 +60,7 @@ bnb_4bit_use_double_quant: true
 torch_dtype: bfloat16
 attn_impl: flash_attn
 
-# 100% of the released records fit in 16,384 tokens (trace-level maximum 12,136),
+# 100% of the released records fit in 16,384 tokens (trace-level maximum 12,136)
 max_length: 16384
 truncation_strategy: delete
 loss_scale: default+ignore_empty_think
@@ -71,14 +71,14 @@ packing: false
 # roughly 84 optimizer steps.
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 1
-gradient_accumulation_steps: 8
+gradient_accumulation_steps: 8 # set 32 if using single GPU
 gradient_checkpointing: true
-deepspeed: zero2
+deepspeed: zero2 # dont use this when using a single GPU
 optim: adamw_torch
 learning_rate: 0.0001
 lr_scheduler_type: cosine
 warmup_ratio: 0.05
-num_train_epochs: 3
+num_train_epochs: 5
 
 eval_strategy: steps
 eval_steps: 10
