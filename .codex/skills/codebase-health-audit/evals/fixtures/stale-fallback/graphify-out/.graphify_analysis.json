@@ -1,0 +1,71 @@
+{
+  "communities": {
+    "0": [
+      "legacy",
+      "legacy_legacy_timeout",
+      "service",
+      "service_resolved_timeout"
+    ],
+    "1": [
+      "settings",
+      "settings_timeout_seconds"
+    ]
+  },
+  "cohesion": {
+    "0": 0.8333333333333334,
+    "1": 1.0
+  },
+  "gods": [
+    {
+      "id": "legacy_legacy_timeout",
+      "label": "legacy_timeout()",
+      "degree": 3
+    },
+    {
+      "id": "service_resolved_timeout",
+      "label": "resolved_timeout()",
+      "degree": 3
+    },
+    {
+      "id": "settings_timeout_seconds",
+      "label": "timeout_seconds()",
+      "degree": 3
+    }
+  ],
+  "surprises": [
+    {
+      "source": "resolved_timeout()",
+      "target": "timeout_seconds()",
+      "source_files": [
+        "service.py",
+        "settings.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories; bridges separate communities"
+    },
+    {
+      "source": "resolved_timeout()",
+      "target": "legacy_timeout()",
+      "source_files": [
+        "service.py",
+        "legacy.py"
+      ],
+      "confidence": "EXTRACTED",
+      "relation": "calls",
+      "why": "connects across different repos/directories"
+    }
+  ],
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `resolved_timeout()` connect `Community 0` to `Community 1`?",
+      "why": "High betweenness centrality (0.050) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `timeout_seconds()` connect `Community 1` to `Community 0`?",
+      "why": "High betweenness centrality (0.050) - this node is a cross-community bridge."
+    }
+  ]
+}

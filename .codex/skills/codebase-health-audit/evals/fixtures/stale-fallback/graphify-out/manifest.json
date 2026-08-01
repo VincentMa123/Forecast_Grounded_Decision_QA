@@ -1,0 +1,17 @@
+{
+  "legacy.py": {
+    "mtime": 1785571703.2900884,
+    "ast_hash": "86fe7464d3b95f43230c27a2f9b6c129",
+    "semantic_hash": "86fe7464d3b95f43230c27a2f9b6c129"
+  },
+  "service.py": {
+    "mtime": 1785571708.7066793,
+    "ast_hash": "d2bd8a685736c090d7a76a1a96a47ab4",
+    "semantic_hash": "d2bd8a685736c090d7a76a1a96a47ab4"
+  },
+  "settings.py": {
+    "mtime": 1785571697.6567364,
+    "ast_hash": "5fe31ed5c30d2414852002c92eb3bc71",
+    "semantic_hash": "5fe31ed5c30d2414852002c92eb3bc71"
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "legacy.py",
+      "file_type": "code",
+      "source_file": "legacy.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "legacy",
+      "community": 0,
+      "community_name": "Community 0",
+      "norm_label": "legacy.py"
+    },
+    {
+      "label": "legacy_timeout()",
+      "file_type": "code",
+      "source_file": "legacy.py",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "legacy_legacy_timeout",
+      "community": 0,
+      "community_name": "Community 0",
+      "norm_label": "legacy_timeout()"
+    },
+    {
+      "label": "service.py",
+      "file_type": "code",
+      "source_file": "service.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "service",
+      "community": 0,
+      "community_name": "Community 0",
+      "norm_label": "service.py"
+    },
+    {
+      "label": "resolved_timeout()",
+      "file_type": "code",
+      "source_file": "service.py",
+      "source_location": "L5",
+      "_origin": "ast",
+      "id": "service_resolved_timeout",
+      "community": 0,
+      "community_name": "Community 0",
+      "norm_label": "resolved_timeout()"
+    },
+    {
+      "label": "settings.py",
+      "file_type": "code",
+      "source_file": "settings.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "settings",
+      "community": 1,
+      "community_name": "Community 1",
+      "norm_label": "settings.py"
+    },
+    {
+      "label": "timeout_seconds()",
+      "file_type": "code",
+      "source_file": "settings.py",
+      "source_location": "L4",
+      "_origin": "ast",
+      "id": "settings_timeout_seconds",
+      "community": 1,
+      "community_name": "Community 1",
+      "norm_label": "timeout_seconds()"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "legacy.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "legacy",
+      "target": "legacy_legacy_timeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service",
+      "target": "legacy",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service",
+      "target": "legacy_legacy_timeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L7",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service_resolved_timeout",
+      "target": "legacy_legacy_timeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L5",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service",
+      "target": "service_resolved_timeout",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service",
+      "target": "settings",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L2",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service",
+      "target": "settings_timeout_seconds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "service.py",
+      "source_location": "L8",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "service_resolved_timeout",
+      "target": "settings_timeout_seconds",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "settings.py",
+      "source_location": "L4",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "settings",
+      "target": "settings_timeout_seconds",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": [],
+  "built_at_commit": "06069a0d34c9baec43f98f574d9e3cf9e285d248"
+}

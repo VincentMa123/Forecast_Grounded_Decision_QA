@@ -1,0 +1,44 @@
+{
+  "skill_name": "codebase-health-audit",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Perform a read-only health audit of evals/fixtures/stale-fallback. Use its existing Graphify graph first, verify findings in current source, and do not modify the fixture.",
+      "expected_output": "A prioritized audit that identifies the duplicate timeout configuration and broad silent fallback with exact evidence.",
+      "files": [],
+      "expectations": [
+        "Uses the existing Graphify graph before broad source browsing",
+        "Identifies both timeout sources as a duplicate configuration contract",
+        "Identifies the broad exception fallback as hiding invalid input",
+        "Cites exact fixture files and line numbers",
+        "Does not modify the fixture"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Perform a read-only health audit of evals/fixtures/dynamic-registry. Investigate apparently unused helpers and use the existing Graphify graph for navigation.",
+      "expected_output": "An audit that traces decorator registration and keeps or defers the plugin instead of falsely declaring it dead.",
+      "files": [],
+      "expectations": [
+        "Traces the decorator registration and PLUGINS lookup",
+        "Does not classify normalize as verified dead code",
+        "Classifies the plugin as Keep or explains equivalent evidence",
+        "Cites exact fixture files and line numbers",
+        "Does not modify the fixture"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Perform a read-only health audit of evals/fixtures/future-conflict. Check current code against repository standards and documented future plans, using its existing Graphify graph first.",
+      "expected_output": "A prioritized audit of the absolute path and divergent retry values, citing both source and planning evidence.",
+      "files": [],
+      "expectations": [
+        "Identifies the machine-specific OUTPUT_ROOT",
+        "Identifies RETRY_COUNT and retry_count as divergent sources of truth",
+        "Cites ROADMAP.md and AGENTS.md as conflicting requirements",
+        "Separates verified findings from hypotheses",
+        "Does not modify the fixture"
+      ]
+    }
+  ]
+}

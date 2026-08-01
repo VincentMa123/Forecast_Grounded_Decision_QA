@@ -1,0 +1,17 @@
+{
+  "main.py": {
+    "mtime": 1785571734.6580334,
+    "ast_hash": "c51830974dea3d366469765d9fe32868",
+    "semantic_hash": "c51830974dea3d366469765d9fe32868"
+  },
+  "plugin.py": {
+    "mtime": 1785571729.296161,
+    "ast_hash": "df511388a977fa1c7697ae98b3c646b2",
+    "semantic_hash": "df511388a977fa1c7697ae98b3c646b2"
+  },
+  "registry.py": {
+    "mtime": 1785571723.6846213,
+    "ast_hash": "f851d8413dd607879e4b2756756a7db9",
+    "semantic_hash": "f851d8413dd607879e4b2756756a7db9"
+  }
+}
