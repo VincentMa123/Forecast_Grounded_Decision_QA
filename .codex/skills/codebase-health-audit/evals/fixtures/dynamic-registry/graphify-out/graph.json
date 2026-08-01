@@ -10,8 +10,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "main",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 0,
+      "community_name": "Community 0",
       "norm_label": "main.py"
     },
     {
@@ -21,8 +21,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "main_run",
-      "community": 1,
-      "community_name": "Community 1",
+      "community": 0,
+      "community_name": "Community 0",
       "norm_label": "run()"
     },
     {
@@ -32,8 +32,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "plugin",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "plugin.py"
     },
     {
@@ -43,8 +43,8 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "plugin_normalize",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 2,
+      "community_name": "Community 2",
       "norm_label": "normalize()"
     },
     {
@@ -54,8 +54,8 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "registry",
-      "community": 0,
-      "community_name": "Community 0",
+      "community": 1,
+      "community_name": "Community 1",
       "norm_label": "registry.py"
     },
     {
@@ -65,9 +65,31 @@
       "source_location": "L4",
       "_origin": "ast",
       "id": "registry_register",
+      "community": 1,
+      "community_name": "Community 1",
+      "norm_label": "register()"
+    },
+    {
+      "label": "AGENTS.md decorator plugin discovery",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L3-L5",
+      "_origin": "deterministic_fixture_docs",
+      "id": "agents_plugin_discovery",
+      "community": 2,
+      "community_name": "Community 2",
+      "norm_label": "agents.md decorator plugin discovery"
+    },
+    {
+      "label": "AGENTS.md PLUGINS lookup reachability",
+      "file_type": "document",
+      "source_file": "AGENTS.md",
+      "source_location": "L4-L5",
+      "_origin": "deterministic_fixture_docs",
+      "id": "agents_plugins_lookup",
       "community": 0,
       "community_name": "Community 0",
-      "norm_label": "register()"
+      "norm_label": "agents.md plugins lookup reachability"
     }
   ],
   "links": [
@@ -107,6 +129,18 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "documents_dynamic_reachability",
+      "context": "text-derived fixture requirement",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L4-L5",
+      "weight": 1.0,
+      "_origin": "deterministic_fixture_docs",
+      "source": "agents_plugins_lookup",
+      "target": "main_run",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "plugin.py",
@@ -142,6 +176,18 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "documents_dynamic_reachability",
+      "context": "text-derived fixture requirement",
+      "confidence": "EXTRACTED",
+      "source_file": "AGENTS.md",
+      "source_location": "L3-L5",
+      "weight": 1.0,
+      "_origin": "deterministic_fixture_docs",
+      "source": "agents_plugin_discovery",
+      "target": "plugin_normalize",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "references",
       "confidence": "EXTRACTED",
       "source_file": "plugin.py",
@@ -165,6 +211,5 @@
       "confidence_score": 1.0
     }
   ],
-  "hyperedges": [],
-  "built_at_commit": "06069a0d34c9baec43f98f574d9e3cf9e285d248"
+  "hyperedges": []
 }
