@@ -3,7 +3,7 @@
   "evals": [
     {
       "id": 1,
-      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/stale-fallback. Use the existing Graphify graph before broad source browsing, but verify every claim against current repository evidence. Return a concise, prioritized, confidence-aware audit with exact line evidence, explicit action dispositions, remediation, and verification guidance. Do not modify anything.",
+      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/stale-fallback. Use the existing Graphify graph for navigation and verify claims against current source and repository documentation. Do not modify anything.",
       "expected_output": "A source-verified audit that prioritizes the two branch-dependent timeout contracts and the silent broad fallback, distinguishes confirmed evidence from unobserved runtime assumptions, and recommends dispositioned remediation without style noise.",
       "files": [],
       "expectations": [
@@ -20,7 +20,7 @@
     },
     {
       "id": 2,
-      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/dynamic-registry. Use the existing Graphify graph before broad source browsing, but verify every claim against current repository evidence. Return a concise, prioritized, confidence-aware audit with exact line evidence, explicit action dispositions, remediation, and verification guidance. Do not modify anything.",
+      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/dynamic-registry. Use the existing Graphify graph for navigation and verify claims against current source and repository documentation. Do not modify anything.",
       "expected_output": "A conservative, source-verified audit that maps runtime reachability, records no consequential verified defect, explicitly preserves the reachable plugin machinery, and avoids dead-code or style false positives.",
       "files": [],
       "expectations": [
@@ -37,7 +37,7 @@
     },
     {
       "id": 3,
-      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/future-conflict. Use the existing Graphify graph before broad source browsing, but verify every claim against current repository evidence. Return a concise, prioritized, confidence-aware audit with exact line evidence, explicit action dispositions, remediation, and verification guidance. Do not modify anything.",
+      "prompt": "Perform a comprehensive read-only codebase health audit of evals/fixtures/future-conflict. Use the existing Graphify graph for navigation and verify claims against current source and repository documentation. Do not modify anything.",
       "expected_output": "A source- and documentation-verified audit that prioritizes the portability and configuration-consistency risks, separates confirmed conflicts from untested runtime effects, and proposes dispositioned, verifiable remediation.",
       "files": [],
       "expectations": [
