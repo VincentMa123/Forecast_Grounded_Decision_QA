@@ -57,7 +57,9 @@ record count and denominator-aware metric rates.
 
 During a tool turn the loop appends MS-SWIFT's native `tool_call` and
 `tool_response` roles, matching the trace-level training projection; OpenAI-style
-SDK responses are normalized at the parser boundary.
+SDK responses are normalized at the parser boundary. Qwen3.5's
+`<function>/<parameter>` text representation is also parsed; when it appears
+alongside a duplicate native call, the typed text representation is preferred.
 
 The evaluator writes `rollouts.jsonl` and `summary.json`. A rollout can end as
 `completed`, `empty_response`, or `max_turns_exceeded`; malformed tool JSON and

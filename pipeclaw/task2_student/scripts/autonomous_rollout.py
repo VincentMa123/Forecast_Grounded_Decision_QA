@@ -224,6 +224,14 @@ class PromptCaseBuilder:
 
 
 _TAGGED_TOOL_CALL = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL | re.IGNORECASE)
+_QWEN_FUNCTION_CALL = re.compile(
+    r"<function=(?P<name>[^>\s]+)>\s*(?P<body>.*?)\s*</function>",
+    re.DOTALL | re.IGNORECASE,
+)
+_QWEN_PARAMETER = re.compile(
+    r"<parameter=(?P<name>[^>\s]+)>\s*(?P<value>.*?)\s*</parameter>",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 def _parse_call_payload(payload: Any, *, default_id: str, raw: Any) -> tuple[ToolCall | None, str | None]:
@@ -255,12 +263,43 @@ def _parse_call_payload(payload: Any, *, default_id: str, raw: Any) -> tuple[Too
     return ToolCall(call_id, name, dict(arguments), raw), None
 
 
+def _parse_qwen_parameter_value(value: str) -> Any:
+    """Decode one Qwen3.5 parameter while preserving unquoted text strings."""
+
+    stripped = value.strip()
+    if not stripped:
+        return ""
+    if stripped[0] in "[{\"-0123456789" or stripped in {"true", "false", "null"}:
+        try:
+            return json.loads(stripped)
+        except json.JSONDecodeError:
+            pass
+    return stripped
+
+
+def _parse_qwen_function_call(
+    match: re.Match[str], *, default_id: str
+) -> tuple[ToolCall | None, str | None]:
+    """Parse Qwen3.5's ``<function>/<parameter>`` text tool-call format."""
+
+    name = match.group("name").strip()
+    arguments: dict[str, Any] = {}
+    for parameter in _QWEN_PARAMETER.finditer(match.group("body")):
+        parameter_name = parameter.group("name").strip()
+        if parameter_name in arguments:
+            return None, f"malformed_qwen_tool_call: duplicate parameter {parameter_name}"
+        arguments[parameter_name] = _parse_qwen_parameter_value(parameter.group("value"))
+    return ToolCall(default_id, name, arguments, match.group(0)), None
+
+
 def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
     """Normalize tagged, OpenAI-style, and SDK response objects.
 
     Returns ``(visible_text, tool_calls, errors)``.  A response containing a
     malformed tagged call is not treated as a final answer, preventing malformed
-    tool JSON from silently becoming an apparently successful rollout.
+    tool JSON from silently becoming an apparently successful rollout.  Qwen3.5
+    may expose both its typed ``<function>/<parameter>`` text and a duplicate
+    native ``tool_calls`` object; the typed text is authoritative in that case.
     """
 
     errors: list[str] = []
@@ -276,23 +315,51 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
 
     raw_calls = _get(message, "tool_calls")
     content = response if isinstance(response, str) else _get(message, "content", "")
-    calls: list[ToolCall] = []
+    native_calls: list[ToolCall] = []
+    native_errors: list[str] = []
     if raw_calls:
         for index, raw_call in enumerate(raw_calls):
             call, error = _parse_call_payload(raw_call, default_id=f"call-{index + 1}", raw=raw_call)
             if call is not None:
-                calls.append(call)
+                native_calls.append(call)
             if error:
-                errors.append(error)
+                native_errors.append(error)
 
     if content is None:
         content = ""
     if not isinstance(content, str):
         content = str(content)
 
+    qwen_matches = list(_QWEN_FUNCTION_CALL.finditer(content))
+    qwen_calls: list[ToolCall] = []
+    qwen_errors: list[str] = []
+    for index, match in enumerate(qwen_matches):
+        call, error = _parse_qwen_function_call(match, default_id=f"call-{index + 1}")
+        if call is not None:
+            qwen_calls.append(call)
+        if error:
+            qwen_errors.append(error)
+
+    # The Qwen text contains the original typed values.  Prefer it over the
+    # duplicate native representation, whose adapter may stringify arrays,
+    # objects, and numbers.  Preserve a matching native id when available.
+    calls = qwen_calls if qwen_calls else native_calls
+    if qwen_calls:
+        for index, call in enumerate(calls):
+            if index < len(native_calls) and native_calls[index].name == call.name:
+                calls[index] = ToolCall(native_calls[index].call_id, call.name, call.arguments, call.raw)
+        errors.extend(qwen_errors)
+    else:
+        errors.extend(native_errors)
+        errors.extend(qwen_errors)
+
     tagged = list(_TAGGED_TOOL_CALL.finditer(content))
-    if tagged:
+    if tagged or qwen_matches:
         for index, match in enumerate(tagged):
+            # Qwen3.5 wraps its parameter syntax in <tool_call>; it has already
+            # been parsed above and must not be fed to the JSON-only parser.
+            if _QWEN_FUNCTION_CALL.search(match.group(1)):
+                continue
             call, error = _parse_call_payload(
                 match.group(1), default_id=f"call-{len(calls) + index + 1}", raw=match.group(0)
             )
@@ -301,6 +368,7 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
             if error:
                 errors.append(error)
         visible_text = _TAGGED_TOOL_CALL.sub("", content).strip()
+        visible_text = _QWEN_FUNCTION_CALL.sub("", visible_text).strip()
         # If every visible character was a malformed tool block, it is not an answer.
         if errors and not visible_text and not calls:
             visible_text = ""
