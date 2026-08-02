@@ -70,6 +70,22 @@ python -m pipeclaw.task2_student.scripts.evaluate_autonomous `
   --output-dir pipeclaw/task2_student/outputs/evaluation/autonomous
 ```
 
+The same evaluator also supports the 90 OpenClaw (PipeClaw agent) records:
+
+```powershell
+python -m pipeclaw.task2_student.scripts.evaluate_autonomous `
+  --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl `
+  --tool-schema-source pipeclaw/task2_student/data/trace_level/test.jsonl `
+  --scenario-type openclaw `
+  --adapters pipeclaw/task2_student/outputs/qwen35_9b_trace_level/checkpoint-55 `
+  --output-dir pipeclaw/task2_student/outputs/evaluation/openclaw
+```
+
+Omit `--scenario-type` to evaluate both scenario families. The combined
+summary includes separate `by_scenario_type` counts and metric denominators;
+OpenClaw workspaces persist across simulated sessions within each scenario and
+restrict file operations and Python scripts to the evaluation workspace.
+
 Run the same command with `--dry-run` and without `--adapters` to inspect the
 prompt/tool inputs first. Results are written to `rollouts.jsonl` and
 `summary.json`; inapplicable metrics are reported explicitly rather than scored

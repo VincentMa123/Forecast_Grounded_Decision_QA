@@ -419,6 +419,7 @@ class ToolDispatcher:
         schemas: Sequence[Mapping[str, Any]],
         allowed_names: set[str] | None = None,
         authorization_callback: Callable[[ToolCall, Sequence[Mapping[str, Any]]], Mapping[str, Any] | None] | None = None,
+        execution_arguments_callback: Callable[[ToolCall], Mapping[str, Any]] | None = None,
         execution_context: Mapping[str, Any] | None = None,
         workspace_setup: Callable[[Path], None] | None = None,
     ) -> None:
@@ -426,6 +427,7 @@ class ToolDispatcher:
         self.schemas = _schema_index(schemas)
         self.allowed_names = set(allowed_names) if allowed_names is not None else set(self.schemas)
         self.authorization_callback = authorization_callback
+        self.execution_arguments_callback = execution_arguments_callback
         self.execution_context = dict(execution_context or {})
         self.workspace_setup = workspace_setup
         self.completed_tool_calls: list[dict[str, Any]] = []
@@ -472,14 +474,29 @@ class ToolDispatcher:
                 result.setdefault("success", False)
                 self._record(call, result)
                 return result
+        execution_arguments = dict(call.arguments)
+        if self.execution_arguments_callback is not None:
+            try:
+                transformed = self.execution_arguments_callback(call)
+                if not isinstance(transformed, Mapping):
+                    raise TypeError("execution argument callback must return a mapping")
+                execution_arguments = dict(transformed)
+            except Exception as exc:
+                result = {
+                    "success": False,
+                    "error_code": "tool_execution_error",
+                    "error": f"Tool argument transformation failed: {exc}",
+                }
+                self._record(call, result)
+                return result
         try:
             if hasattr(self.registry, "execute"):
-                result = self.registry.execute(call.name, **dict(call.arguments, **self.execution_context))
+                result = self.registry.execute(call.name, **dict(execution_arguments, **self.execution_context))
             else:
                 tool = self.registry.get(call.name)
                 if tool is None:
                     raise KeyError(call.name)
-                result = tool(**dict(call.arguments, **self.execution_context))
+                result = tool(**dict(execution_arguments, **self.execution_context))
             result = self._await_if_needed(result)
             if isinstance(result, Mapping):
                 result = dict(result)

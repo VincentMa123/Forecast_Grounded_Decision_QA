@@ -37,6 +37,7 @@ if __package__ in {None, ""}:  # support both ``-m`` and direct script invocatio
         PromptCaseBuilder,
         ToolCall,
         ToolDispatcher,
+        _jsonable,
         append_tool_exchange,
         parse_tool_calls,
     )
@@ -48,6 +49,7 @@ else:
         PromptCaseBuilder,
         ToolCall,
         ToolDispatcher,
+        _jsonable,
         append_tool_exchange,
         parse_tool_calls,
     )
@@ -62,8 +64,15 @@ def run_case(
     max_turns: int,
     max_new_tokens: int,
     temperature: float,
+    capture_raw_response: bool = False,
 ) -> dict[str, Any]:
-    """Run one bounded model/tool conversation and preserve all partial state."""
+    """Run one bounded model/tool conversation and preserve all partial state.
+
+    ``capture_raw_response`` is intentionally opt-in because SDK response objects
+    can be large.  When enabled, each generator response is serialized before
+    parsing so diagnostics can distinguish model output from normalized rollout
+    messages.
+    """
 
     reset_history = getattr(dispatcher, "reset_history", None)
     if callable(reset_history):
@@ -92,6 +101,8 @@ def run_case(
         "messages": messages,
         "turns": 0,
     }
+    if capture_raw_response:
+        result["raw_responses"] = []
 
     for turn in range(max(0, max_turns)):
         result["turns"] = turn + 1
@@ -106,6 +117,8 @@ def run_case(
             result["generation_error"] = str(exc)
             result["trace_status"] = "generation_error"
             break
+        if capture_raw_response:
+            result["raw_responses"].append(_jsonable(response))
         text, calls, errors = parse_tool_calls(response)
         result["json_errors"].extend(errors)
 
@@ -293,6 +306,154 @@ def _workspace_for(output_dir: Path, sample_id: str) -> Path:
     return base / "workspace-autonomous-evaluation"
 
 
+def _is_openclaw_scenario(scenario_type: Any) -> bool:
+    """Accept the dataset's ``openclaw`` label and the user-facing alias."""
+
+    return str(scenario_type or "").casefold() in {"openclaw", "pipeclaw"}
+
+
+def _evaluation_workspace_key(source: Mapping[str, Any]) -> str:
+    """Return the workspace scope used by an autonomous evaluation case.
+
+    OpenClaw scenarios span several simulated sessions and intentionally carry
+    memory files between them.  Strip only the turn/session suffix so distinct
+    source datasets and scenario IDs still receive isolated workspaces.
+    """
+
+    sample_id = str(source.get("sample_id") or source.get("example_id") or "sample")
+    if not _is_openclaw_scenario(source.get("scenario_type")):
+        return sample_id
+    scenario_scope = sample_id.split("::turn_", 1)[0]
+    scenario_scope = re.sub(r"_session_[^:]+$", "", scenario_scope)
+    if scenario_scope == sample_id:
+        scenario_scope = str(source.get("scenario_id") or scenario_scope)
+    return f"openclaw-{scenario_scope}"
+
+
+_OPENCLAW_PYTHON_COMMANDS = {"python", "python3", "py"}
+_OPENCLAW_WORKSPACE_TOOLS = {"read_file", "write_file", "edit_file", "run_command"}
+# OpenClaw traces use the same deterministic topology/registry tools as the
+# PipeFormer traces. Forecast execution remains excluded: it is expensive and
+# would turn a general agent rollout into a nested model evaluation.
+_OPENCLAW_READONLY_PIPEFORMER_TOOLS = {
+    "analyze_pipeline_topology",
+    "search_pipeformer_registry",
+}
+_OPENCLAW_ALLOWED_TOOLS = _OPENCLAW_WORKSPACE_TOOLS | _OPENCLAW_READONLY_PIPEFORMER_TOOLS
+
+
+def _path_within(root: Path, target: Path) -> bool:
+    try:
+        target.resolve().relative_to(root.resolve())
+    except (ValueError, RuntimeError):
+        return False
+    return True
+
+
+def _safe_openclaw_path(
+    value: Any,
+    workspace_root: Path,
+    *,
+    allow_pipeline_data: bool,
+) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    normalized = value.replace("\\", "/")
+    parts = Path(normalized).parts
+    if ".." in parts:
+        return False
+    if allow_pipeline_data and (
+        normalized == "pipeline_data" or normalized.startswith("pipeline_data/")
+    ):
+        return True
+    raw_path = Path(value)
+    target = raw_path.resolve() if raw_path.is_absolute() else (workspace_root / raw_path).resolve()
+    return _path_within(workspace_root, target)
+
+
+def _sandbox_error(message: str) -> dict[str, Any]:
+    return {
+        "success": False,
+        "record_in_teacher_trace": False,
+        "error_code": "sandbox_violation",
+        "error": message,
+    }
+
+
+def _openclaw_policy_error(call: ToolCall, workspace_root: Path) -> Mapping[str, Any] | None:
+    arguments = dict(call.arguments)
+    if call.name == "analyze_pipeline_topology":
+        node_file = arguments.get("node_file")
+        pipeline_file = arguments.get("pipeline_file")
+        if not isinstance(node_file, str) or not re.fullmatch(r"\d{8}_node\.csv", node_file, re.IGNORECASE):
+            return _sandbox_error("analyze_pipeline_topology node_file must be a daily YYYYMMDD_node.csv filename")
+        if not isinstance(pipeline_file, str) or not re.fullmatch(
+            r"\d{8}_pipeline\.csv", pipeline_file, re.IGNORECASE
+        ):
+            return _sandbox_error(
+                "analyze_pipeline_topology pipeline_file must be a daily YYYYMMDD_pipeline.csv filename"
+            )
+        scope = arguments.get("pipeline_scope")
+        if scope is not None and (
+            not isinstance(scope, list) or any(not isinstance(item, str) for item in scope)
+        ):
+            return _sandbox_error("analyze_pipeline_topology pipeline_scope must be a list of strings")
+        return None
+    if call.name == "search_pipeformer_registry":
+        limit = arguments.get("limit", 12)
+        offset = arguments.get("offset", 0)
+        if not isinstance(limit, int) or not 1 <= limit <= 50:
+            return _sandbox_error("search_pipeformer_registry limit must be an integer from 1 through 50")
+        if not isinstance(offset, int) or offset < 0:
+            return _sandbox_error("search_pipeformer_registry offset must be a non-negative integer")
+        return None
+    if call.name == "read_file":
+        if not _safe_openclaw_path(arguments.get("path"), workspace_root, allow_pipeline_data=True):
+            return _sandbox_error("read_file path is outside the evaluation workspace or allowed pipeline_data root")
+        return None
+    if call.name in {"write_file", "edit_file"}:
+        if not _safe_openclaw_path(arguments.get("path"), workspace_root, allow_pipeline_data=False):
+            return _sandbox_error(f"{call.name} path is outside the evaluation workspace")
+        return None
+    if call.name == "run_command":
+        command = arguments.get("cmd")
+        if not isinstance(command, list) or not command:
+            return _sandbox_error("run_command requires a non-empty command array")
+        executable = str(command[0]).casefold()
+        if executable not in _OPENCLAW_PYTHON_COMMANDS:
+            return _sandbox_error("only Python workspace scripts are allowed during OpenClaw evaluation")
+        if len(command) < 2 or str(command[1]).startswith("-"):
+            return _sandbox_error("run_command must execute a workspace-relative Python script")
+        if not _safe_openclaw_path(command[1], workspace_root, allow_pipeline_data=False):
+            return _sandbox_error("run_command script is outside the evaluation workspace")
+        if any(str(item) in {"-c", "-m"} for item in command[1:]):
+            return _sandbox_error("inline and module Python execution are disabled during evaluation")
+        timeout = arguments.get("timeout_s", 30)
+        if not isinstance(timeout, int) or not 1 <= timeout <= 60:
+            return _sandbox_error("run_command timeout_s must be an integer from 1 through 60")
+        cwd = arguments.get("cwd")
+        if cwd is not None and not _safe_openclaw_path(cwd, workspace_root, allow_pipeline_data=False):
+            return _sandbox_error("run_command cwd is outside the evaluation workspace")
+    return None
+
+
+def _normalize_openclaw_execution_arguments(
+    call: ToolCall,
+    workspace_root: Path,
+) -> Mapping[str, Any]:
+    arguments = dict(call.arguments)
+    if call.name == "run_command":
+        cwd = arguments.get("cwd")
+        if cwd is None:
+            arguments["cwd"] = str(workspace_root)
+        else:
+            raw_path = Path(str(cwd))
+            arguments["cwd"] = str(
+                raw_path.resolve() if raw_path.is_absolute() else (workspace_root / raw_path).resolve()
+            )
+    return arguments
+
+
 def _build_pipeformer_dispatcher(schemas: Sequence[Mapping[str, Any]], repo_root: Path) -> ToolDispatcher:
     backend_root = repo_root / "pipeclaw" / "backend"
     for import_root in (repo_root, backend_root):
@@ -386,6 +547,61 @@ def _build_pipeformer_dispatcher(schemas: Sequence[Mapping[str, Any]], repo_root
     return dispatcher
 
 
+def _build_openclaw_dispatcher(schemas: Sequence[Mapping[str, Any]], repo_root: Path) -> ToolDispatcher:
+    backend_root = repo_root / "pipeclaw" / "backend"
+    for import_root in (repo_root, backend_root):
+        if str(import_root) not in sys.path:
+            sys.path.insert(0, str(import_root))
+    from pipeclaw.backend.agent.tools.registry import tool_registry
+    from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
+    from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools
+
+    register_pipeformer_tools(backend_root)
+    workspace_runner = WorkspaceTools(session_id="autonomous-evaluation").runner
+    workspace_state: dict[str, Path | None] = {"root": None}
+
+    def setup_workspace(workspace_root: Path) -> None:
+        root = Path(workspace_root).resolve()
+        workspace_state["root"] = root
+        workspace_runner.set_workspace_root(root.parent)
+        agent_name = root.name
+        if agent_name.startswith("workspace-"):
+            agent_name = agent_name[len("workspace-") :]
+        workspace_runner.set_active_agent(agent_name or "autonomous-evaluation")
+
+    def authorize(call: ToolCall, completed: Sequence[Mapping[str, Any]]) -> Mapping[str, Any] | None:
+        del completed
+        root = workspace_state.get("root")
+        if root is None:
+            return _sandbox_error("OpenClaw workspace has not been initialized")
+        return _openclaw_policy_error(call, root)
+
+    def transform(call: ToolCall) -> Mapping[str, Any]:
+        root = workspace_state.get("root")
+        if root is None:
+            raise RuntimeError("OpenClaw workspace has not been initialized")
+        return _normalize_openclaw_execution_arguments(call, root)
+
+    schema_names = {
+        str(schema.get("function", {}).get("name"))
+        for schema in schemas
+        if isinstance(schema, Mapping) and isinstance(schema.get("function"), Mapping)
+    }
+    dispatcher = ToolDispatcher(
+        tool_registry,
+        schemas=schemas,
+        allowed_names=_OPENCLAW_ALLOWED_TOOLS & schema_names,
+        authorization_callback=authorize,
+        execution_arguments_callback=transform,
+        execution_context={
+            "session_id": "autonomous-evaluation",
+            "agent_id": "autonomous-evaluation",
+        },
+        workspace_setup=setup_workspace,
+    )
+    return dispatcher
+
+
 def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
     source_records = _read_jsonl(Path(args.source))
     schema_records = _read_jsonl(Path(args.tool_schema_source)) if args.tool_schema_source else source_records
@@ -396,13 +612,20 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
     builder = PromptCaseBuilder()
     cases: list[tuple[dict[str, Any], PromptCase]] = []
     for source in source_records:
-        if args.scenario_type and source.get("scenario_type") != args.scenario_type:
-            continue
+        requested_scenario = str(args.scenario_type or "").casefold()
+        source_scenario = str(source.get("scenario_type") or "").casefold()
+        if requested_scenario:
+            if requested_scenario in {"openclaw", "pipeclaw"}:
+                requested_scenario = "openclaw"
+            if source_scenario in {"openclaw", "pipeclaw"}:
+                source_scenario = "openclaw"
+            if source_scenario != requested_scenario:
+                continue
         keys = _sample_keys(source)
         schemas = next((schemas_by_key[key] for key in keys if key in schemas_by_key), _generic_schemas(source))
         case = builder.build(
             source,
-            workspace_root=_workspace_for(output_dir, str(source.get("sample_id", "sample"))),
+            workspace_root=_workspace_for(output_dir, _evaluation_workspace_key(source)),
             tool_schemas=schemas,
         )
         cases.append((source, case))
@@ -434,15 +657,35 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                 raise ValueError("--adapters is required unless --dry-run is used")
             model = args.model or _discover_base_model(Path(args.adapters))
             generator = SwiftGenerator.from_args(model=model, adapters=args.adapters, device=args.device)
-            all_schemas_by_name: dict[str, Mapping[str, Any]] = {}
+            schemas_by_scenario: dict[str, list[Mapping[str, Any]]] = {}
             for _, case in cases:
+                scenario_key = "openclaw" if _is_openclaw_scenario(case.scenario_type) else "pipeformer"
+                scenario_schemas = schemas_by_scenario.setdefault(scenario_key, [])
+                existing_names = {
+                    str(item.get("function", {}).get("name"))
+                    for item in scenario_schemas
+                    if isinstance(item, Mapping) and isinstance(item.get("function"), Mapping)
+                }
                 for schema in case.tools:
                     function = schema.get("function") if isinstance(schema, Mapping) else None
-                    if isinstance(function, Mapping) and function.get("name"):
-                        all_schemas_by_name[str(function["name"])] = schema
-            dispatcher = _build_pipeformer_dispatcher(list(all_schemas_by_name.values()), Path(args.repo_root))
+                    name = function.get("name") if isinstance(function, Mapping) else None
+                    if name and str(name) not in existing_names:
+                        scenario_schemas.append(schema)
+                        existing_names.add(str(name))
+            dispatchers: dict[str, ToolDispatcher] = {}
+            repo_root = Path(args.repo_root)
+            if "pipeformer" in schemas_by_scenario:
+                dispatchers["pipeformer"] = _build_pipeformer_dispatcher(
+                    schemas_by_scenario["pipeformer"], repo_root
+                )
+            if "openclaw" in schemas_by_scenario:
+                dispatchers["openclaw"] = _build_openclaw_dispatcher(
+                    schemas_by_scenario["openclaw"], repo_root
+                )
             progress = _progress_cases(cases, description="Evaluating")
             for source, case in progress:
+                scenario_key = "openclaw" if _is_openclaw_scenario(case.scenario_type) else "pipeformer"
+                dispatcher = dispatchers[scenario_key]
                 rollout = run_case(
                     case,
                     generator,
@@ -450,6 +693,7 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                     max_turns=args.max_turns,
                     max_new_tokens=args.max_new_tokens,
                     temperature=args.temperature,
+                    capture_raw_response=args.save_raw_responses,
                 )
                 rollout["metrics"] = evaluate_rollout(source, rollout)
                 handle.write(json.dumps(rollout, ensure_ascii=False, default=str) + "\n")
@@ -462,6 +706,24 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                     )
             summary = aggregate_results(results)
             summary["mode"] = "autonomous"
+
+    # Keep the combined score convenient while also exposing separate
+    # denominators for PipeFormer and OpenClaw cases.  This prevents a metric
+    # that is inapplicable to one scenario family from hiding the other family's
+    # performance.
+    summary["by_scenario_type"] = {}
+    for scenario_type in sorted({str(case.scenario_type or "unknown") for _, case in cases}):
+        scenario_results = [
+            result
+            for result, (_, case) in zip(results, cases)
+            if str(case.scenario_type or "unknown") == scenario_type
+        ]
+        if summary.get("mode") == "autonomous":
+            scenario_summary = aggregate_results(scenario_results)
+        else:
+            scenario_summary = {"record_count": len(scenario_results)}
+        scenario_summary["mode"] = summary.get("mode", "dry_run")
+        summary["by_scenario_type"][scenario_type] = scenario_summary
 
     with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
         json.dump(summary, handle, ensure_ascii=False, indent=2, default=str)
@@ -487,12 +749,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model", help="Base model name/path; inferred from adapter_config.json when omitted")
     parser.add_argument("--output-dir", required=True, help="Directory for rollouts.jsonl and summary.json")
     parser.add_argument("--repo-root", default=".", help="Repository root used to import PipeClaw tools")
-    parser.add_argument("--scenario-type", help="Evaluate only one scenario type, e.g. pipeformer")
+    parser.add_argument(
+        "--scenario-type",
+        help="Evaluate one scenario type: pipeformer, openclaw (or the pipeclaw alias); omit for both",
+    )
     parser.add_argument("--limit", type=int, help="Limit the number of cases")
     parser.add_argument("--max-turns", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--device", help="CUDA_VISIBLE_DEVICES value")
+    parser.add_argument(
+        "--save-raw-responses",
+        action="store_true",
+        help="Save serialized generator responses before parsing them",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Build prompts and schemas without loading a model")
     return parser
 

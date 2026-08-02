@@ -13,6 +13,15 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+try:
+    from pipeclaw.backend.evaluator.tool_evidence import (
+        attach_tool_arguments,
+        classify_tool_evidence,
+        requested_artifacts,
+    )
+except ImportError:  # pragma: no cover - supports direct script execution
+    from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+
 
 def _first_mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
@@ -226,6 +235,45 @@ def _student_outputs(rollout: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         if isinstance(output, Mapping):
             result.append(output)
     return result
+
+
+def _artifact_evidence_metric(source: Mapping[str, Any], rollout: Mapping[str, Any]) -> dict[str, Any]:
+    """Check that requested files were actually read or computed from.
+
+    File names are extracted from the current user request, then matched against
+    structured tool evidence.  A write/edit confirmation alone cannot satisfy a
+    read request; this keeps the metric useful for OpenClaw's mixed file and
+    analysis tool traces.
+    """
+
+    user_input = source.get("user_input")
+    requested = requested_artifacts(user_input if isinstance(user_input, str) else "")
+    if not requested:
+        return _metric(False, requested_artifacts=[])
+
+    outputs = rollout.get("tool_outputs")
+    calls = rollout.get("tool_calls")
+    output_items = outputs if isinstance(outputs, Sequence) and not isinstance(outputs, (str, bytes)) else []
+    call_items = calls if isinstance(calls, Sequence) and not isinstance(calls, (str, bytes)) else []
+    enriched = attach_tool_arguments(
+        [dict(item) for item in output_items if isinstance(item, Mapping)],
+        [dict(item) for item in call_items if isinstance(item, Mapping)],
+    )
+    assessments = [classify_tool_evidence(item, requested=requested) for item in enriched]
+    matched = sorted({artifact for assessment in assessments for artifact in assessment.matched_artifacts})
+    missing = sorted(set(requested) - set(matched))
+    evidence_states = [assessment.state.value for assessment in assessments]
+    evidence_reasons = [assessment.reason for assessment in assessments]
+    passed = not missing and any(assessment.evidence_found for assessment in assessments)
+    return _metric(
+        True,
+        passed,
+        requested_artifacts=list(requested),
+        matched_artifacts=matched,
+        missing_artifacts=missing,
+        evidence_states=evidence_states,
+        evidence_reasons=evidence_reasons,
+    )
 
 
 def _first_successful_output(rollout: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -470,6 +518,7 @@ def evaluate_rollout(source: Mapping[str, Any], rollout: Mapping[str, Any]) -> d
         json_applicable and bool(calls) and not json_errors and all(call.get("schema_valid") is not False for call in calls),
         error_count=len(json_errors),
     )
+    artifact_metric = _artifact_evidence_metric(source, rollout)
 
     return {
         "task_parsing": task_metric,
@@ -482,6 +531,7 @@ def evaluate_rollout(source: Mapping[str, Any], rollout: Mapping[str, Any]) -> d
         "hallucination": hallucination_metric,
         "answer_completeness": answer_metric,
         "json_validity": json_metric,
+        "artifact_evidence": artifact_metric,
     }
 
 
