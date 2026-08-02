@@ -22,6 +22,13 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+try:
+    from tqdm.auto import tqdm
+except ImportError:  # pragma: no cover - MS-SWIFT normally installs tqdm
+    def tqdm(iterable=None, *args, **kwargs):
+        del args, kwargs
+        return iterable if iterable is not None else []
+
 if __package__ in {None, ""}:  # support both ``-m`` and direct script invocation
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from pipeclaw.task2_student.scripts.autonomous_rollout import (
@@ -219,6 +226,16 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return records
 
 
+def _progress_cases(
+    cases: Sequence[tuple[dict[str, Any], PromptCase]],
+    *,
+    description: str,
+):
+    """Wrap case iterations with a terminal progress bar."""
+
+    return tqdm(cases, total=len(cases), desc=description, unit="case")
+
+
 def _sample_keys(record: Mapping[str, Any]) -> set[str]:
     keys = set()
     for key in ("sample_id", "example_id", "source_sample_id", "source_id"):
@@ -396,7 +413,8 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
     results: list[dict[str, Any]] = []
     with rollouts_path.open("w", encoding="utf-8") as handle:
         if args.dry_run:
-            for source, case in cases:
+            progress = _progress_cases(cases, description="Preparing evaluation")
+            for source, case in progress:
                 item = {
                     "sample_id": case.sample_id,
                     "scenario_id": case.scenario_id,
@@ -408,6 +426,8 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                 }
                 handle.write(json.dumps(item, ensure_ascii=False, default=str) + "\n")
                 results.append(item)
+                if hasattr(progress, "set_postfix"):
+                    progress.set_postfix(scenario=case.scenario_type, status="dry_run", refresh=False)
             summary = {"mode": "dry_run", "record_count": len(results)}
         else:
             if not args.adapters:
@@ -421,7 +441,8 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                     if isinstance(function, Mapping) and function.get("name"):
                         all_schemas_by_name[str(function["name"])] = schema
             dispatcher = _build_pipeformer_dispatcher(list(all_schemas_by_name.values()), Path(args.repo_root))
-            for source, case in cases:
+            progress = _progress_cases(cases, description="Evaluating")
+            for source, case in progress:
                 rollout = run_case(
                     case,
                     generator,
@@ -433,6 +454,12 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                 rollout["metrics"] = evaluate_rollout(source, rollout)
                 handle.write(json.dumps(rollout, ensure_ascii=False, default=str) + "\n")
                 results.append(rollout)
+                if hasattr(progress, "set_postfix"):
+                    progress.set_postfix(
+                        scenario=case.scenario_type,
+                        status=rollout.get("trace_status", "unknown"),
+                        refresh=False,
+                    )
             summary = aggregate_results(results)
             summary["mode"] = "autonomous"
 
