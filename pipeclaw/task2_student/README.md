@@ -49,6 +49,33 @@ Small manifests and summary metrics may be committed after review.
 5. Compare answer-only, trace-level, and constraint-aware SFT.
 6. Reuse the same artifacts for the remote 9B experiment.
 
+## Held-out autonomous evaluation
+
+After SFT, evaluate the model with an autonomous rollout rather than comparing
+its text to the teacher answer verbatim. The harness builds each request through
+PipeClaw's production `PromptBuilder`, hides all teacher future actions, runs a
+bounded model/tool loop, and compares canonical task fields, tool success,
+constraint labels, risk/intervention labels, evidence, answer presence, and JSON
+validity against the held-out teacher record.
+
+For the gas-pipeline deliverable, use the 24 PipeFormer records in the frozen
+teacher test split and the trace projection only for tool schemas:
+
+```powershell
+python -m pipeclaw.task2_student.scripts.evaluate_autonomous `
+  --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl `
+  --tool-schema-source pipeclaw/task2_student/data/trace_level/test.jsonl `
+  --scenario-type pipeformer `
+  --adapters pipeclaw/task2_student/outputs/qwen35_9b_trace_level/checkpoint-20 `
+  --output-dir pipeclaw/task2_student/outputs/evaluation/autonomous
+```
+
+Run the same command with `--dry-run` and without `--adapters` to inspect the
+prompt/tool inputs first. Results are written to `rollouts.jsonl` and
+`summary.json`; inapplicable metrics are reported explicitly rather than scored
+as failures. See `scripts/README.md` for the safety allowlist and failure-state
+details.
+
 ## Dataset conversion
 
 Run the converter from the repository root in the existing `pipeclaw` Conda

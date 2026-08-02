@@ -1,9 +1,11 @@
-# Teacher-Trace Repair Handoff — 2026-07-30
+# Teacher-Trace Repair Handoff — 2026-08-01
 
-> **Latest-status rule:** Section 0 is the final Task 1 state and Section 9 is
-> the current Task 2 state. Together they supersede conflicting counts,
-> scenario lists, commands, and pending-work statements in the older sections,
-> which are retained only as an audit trail.
+> **Latest-status rule:** Section 0 is the final Task 1 state, Section 9 is the
+> Task 2 local preparation state, and **Section 10 is the current state of the
+> project** (remote GPU benchmark, measured cost model, open decisions).
+> Later sections supersede earlier ones wherever they conflict on counts,
+> commands, or pending work; the earlier sections are retained only as an audit
+> trail. Where Section 10 contradicts Section 9, Section 10 wins.
 
 ## 0. Final continuation update — 2026-07-29
 
@@ -1354,8 +1356,9 @@ test records are not included in training.
 - Phase 5 profiled all 4,199 train/valid projected records with the
   Qwen3.5-0.8B tokenizer.
 - Phase 6 prepared the MS-SWIFT environment.
-- Phase 7 now has a corrected local smoke-test configuration, but the actual
-  10-step run and resume run have not yet been executed.
+- Phase 7 now has a corrected local smoke-test configuration. **Superseded by
+  Section 10:** the 10-step run and the resume run have both since been executed
+  and passed, and a 20-step Qwen3.5-9B benchmark has run on a rented GPU.
 
 Current exact token-profile facts:
 
@@ -1473,7 +1476,16 @@ increase parameter count or VRAM. Rank 64 has eight times the LoRA parameters
 of rank 8; rank 128 has sixteen times as many. Base weights and long-context
 activations still dominate the total.
 
+> **Superseded by Section 10 on GPU sizing.** The 80 GB recommendation was a
+> pre-measurement safety margin. The 16K rank-32 QLoRA configuration has now
+> been measured at **18.47 GiB peak**, so a 32 GB card is sufficient with room
+> for rank 64 (~19.9 GiB projected). 80 GB is only needed if quantization is
+> dropped *and* batch size is raised.
+
 ### Immediate next steps
+
+> **Superseded by Section 10.** Steps 1–5 below are done. Retained for the
+> acceptance criteria they record. See Section 10 for the live next steps.
 
 1. Reconcile the two pip conflicts and obtain a clean `python -m pip check`.
 2. Run the 10-step smoke configuration and inspect `checkpoint-10`.
@@ -1486,3 +1498,284 @@ activations still dominate the total.
 7. Benchmark the exact 16K Qwen3.5-9B rank planned for the final run for 20
    steps on the candidate AutoDL GPU. Use measured tokens per second to estimate
    rental time and cost before launching full SFT.
+
+## 10. Remote-GPU benchmark and cost model — current state (2026-08-01)
+
+### Where the project stands
+
+Task 1 is closed. Task 2 local preparation (Sections 9) is complete: Phase 7's
+10-step and resume-to-20 smoke runs both passed on the RTX 3050, and a real
+20-step Qwen3.5-9B benchmark has now been executed on a rented AutoDL GPU. The
+project is no longer blocked on infrastructure. It is blocked on two decisions:
+whether to keep 4-bit quantization, and which projections to spend GPU hours on.
+
+### Phase 7 local smoke test — passed
+
+`pipeclaw/task2_student/outputs/qwen35_08b_answer_only_smoke/` contains
+`checkpoint-10` and `checkpoint-20` plus `logging.jsonl`. Measured on the
+RTX 3050 4 GB with Qwen3.5-0.8B, answer-only, 4-bit NF4 QLoRA, LoRA rank 8:
+
+```text
+Trainable:      5.4113M of 609.5898M params (0.8877%)
+Peak memory:    2.2 GiB
+train_runtime:  24.18 s for 20 steps
+train_loss:     1.685    best eval_loss: 3.510
+```
+
+Loss is finite and nonzero, supervised tokens are nonzero, and the resume run
+continued from step 10 rather than restarting. The absolute loss values are
+meaningless at this scale — the run exists only to prove the plumbing.
+
+### Remote 20-step benchmark on Qwen3.5-9B — completed
+
+Artifacts are committed under
+`pipeclaw/task2_student/outputs/qwen35_08b_benchmark_step20/`
+(directory name says `08b`; the run is the **9B** model — the name is a
+leftover and is worth renaming). Contents: `args.json`, `logging.jsonl`,
+`adapter_model.safetensors`, `additional_config.json`, and the exact yaml the
+server ran.
+
+**Critical provenance fact.** The server copy of the config was edited before
+launch and diverges from the local
+`configs/qwen35_9b_remote_benchmark_step20.yaml`. As actually run:
+
+```text
+packing:                        false      (local config says true)
+gradient_accumulation_steps:    32         (local config says 8)
+NPROC_PER_NODE / deepspeed:     commented out
+global_world_size:              1
+```
+
+So every measured number below is **unpacked, single-GPU** throughput at an
+effective batch of 1 x 32 x 1 = 32. Do not describe these numbers as reflecting
+the packed 4-GPU config.
+
+Measured configuration and results:
+
+```text
+model:            Qwen/Qwen3.5-9B      template: qwen3_5
+quant:            bnb 4-bit nf4, double quant, compute dtype bfloat16
+torch_dtype:      bfloat16             attn_impl: flash_attn
+max_length:       16384                truncation_strategy: delete
+LoRA:             rank 32, alpha 64, dropout 0.05, all-linear
+loss_scale:       default+ignore_empty_think
+add_non_thinking_prefix: true          lazy_tokenize: true
+gradient_checkpointing: true           use_liger_kernel: false
+dataset:          data/trace_level/train.jsonl (+ valid.jsonl)
+
+Trainable:        86.5567M of 6037.1182M params (1.4337%)
+Peak memory:      18.47 GiB   (trace: 17.37 -> 17.82 -> 18.47)
+train_runtime:    3448.5 s for 20 steps  = 172.4 s/step
+num_input_tokens_seen: 3,755,956 over 20 steps = ~187,798 tokens/step
+Throughput:       ~1,089 tokens/s
+train_loss:       0.9721      token_acc rising 0.774 -> 0.832
+eval_loss:        1.3576      eval_token_acc: 0.8166 (171.4 s for 124 recs)
+total_flos:       1.91e17
+```
+
+Two things worth carrying forward. First, 6,037 M reported params for a 9 B
+model is consistent with 4-bit quantized linears plus bf16 embeddings and
+`lm_head` over the 248,320-token vocabulary. Second, 187,798 tokens/step over an
+effective batch of 32 is ~5,869 tokens per record, which matches trace-level's
+median of 5,023 — confirming records are **not** padded to `max_length` (that
+would be 524,288 tokens/step). This matters for the packing argument below.
+
+### Cost model
+
+AutoDL pricing confirmed on the rented instance: **¥1.58 per GPU-hour**, billed
+only while the instance is running, plus a **20 GB data-disk expansion at ¥0.17
+per calendar day**, billed continuously **including while shut down**. The
+expansion requires shutdown to apply, is data-disk only, and **cannot be
+shrunk**. Releasing the instance stops the disk charge but erases the disk;
+15 consecutive shut-down days triggers automatic release and irrecoverable
+erase. Verify the exact release-day proration on the 费用明细 page — this could
+not be confirmed against official docs (the pricing doc URL 404s).
+
+Projected full-run costs from the measured 172.4 s/step, at 902 train records:
+
+| Projection | Train recs | Steps | Median tokens | Time | Cost |
+|---|---|---|---|---|---|
+| answer_only | 902 | 140 | 1,506 | ~7h09m | ~¥11.30 |
+| trace_level | 902 | 140 | 5,023 | ~7h09m | ~¥11.30 |
+| constraint_multitask | 1,878 | 290 | 2,840 | ~14h50m | ~¥23.43 |
+
+Programme total including setup (3.5 h), the benchmark itself (1.0 h), the full
+ablation grid (87.4 h), DPO (7.0 h), and 14 days of disk: **~¥158.6 for the full
+grid, ~¥88.5 for a staged ablation**, realistically **¥118–150**.
+
+**Known inflation:** the `answer_only` 7h09m figure is derived from step count,
+not from token throughput. Answer-only records have a median of 1,506 tokens
+versus trace-level's 5,023, so its true wall-clock is far lower. Re-deriving it
+on tokens/s would pull the programme total below ¥120. Not yet done.
+
+**Staged ablation** means running the cheap, most-informative arms first
+(answer_only and trace_level at one rank) and only funding the remaining grid
+cells if the first results are ambiguous — as opposed to launching all arms
+up front.
+
+### Technical findings established from installed MS-SWIFT source
+
+Read under `~/miniconda3/envs/task2-ms-swift/lib/python3.12/site-packages/swift/`.
+
+**Packing.** `dataset/packing.py:40-42` uses best-fit-decreasing bin packing via
+`binpacking` 2.0.1 (confirmed installed); `packing_strategy: sequential`
+(`:19-39`) is order-preserving next-fit. `packing_length` defaults to
+`max_length` (`arguments/base_args/base_args.py:198-199`). `packing: true`
+forces `padding_free = True` and requires `attn_impl: flash_attn`.
+`template/base.py:675-696` concatenates records and **resets `position_ids` per
+record**, and `cu_seq_lens` keeps flash-attention block-diagonal, so records do
+not attend across each other. Packing is **incompatible with `lazy_tokenize`**
+(`base_args.py:137-138` raises) — and `lazy_tokenize` is auto-set to true for
+Qwen3.5 because it registers as multimodal (`:130-132`).
+
+**Packing's real benefit is fewer forward/backward passes, not less padding.**
+At `per_device_train_batch_size: 1` there is no padding to eliminate at all, as
+the token count above proves. The gain is pass-count reduction: roughly 10.7x
+for answer_only, 2.8x for trace_level, 4.1x for constraint_multitask, plus more
+deterministic memory. **The danger:** step counts collapse proportionally
+(trace_level 140 -> ~50, answer_only 140 -> ~10), so if packing is enabled
+`gradient_accumulation_steps` must be cut proportionally (~8 for trace_level,
+~4 for answer_only) or the run ends after a handful of optimizer steps.
+
+**Effective batch.** `B = per_device_batch x grad_accum x world_size`. Only
+`world_size` gives real wall-clock speedup (it is also the all-reduce divisor);
+`grad_accum` is sequential on one device; raising per-device batch needs VRAM and
+forfeits the `logits_to_keep` optimization, which gates on `labels.shape[0] == 1`
+(`trainers/mixin.py:1184`).
+
+**LoRA rank and memory.** The rank-32 adapter is 346,302,176 bytes for
+86.5567 M trainable params = exactly 4 bytes each, i.e. **fp32 LoRA weights**.
+Weights + gradients + two Adam moments is therefore ~1.4 GB at rank 32 and
+~2.8 GB at rank 64, putting projected peak at ~19.9 GiB against the measured
+18.47 GiB. **32 GB is comfortably enough for rank 64.** Rank appears only in the
+parameter term; activations scale with batch x seq_len x hidden x layers, not
+with rank. (An earlier estimate of "+0.5 GiB" for rank 64 was wrong by ~3x.)
+
+**Quantization.** 4-bit NF4 is block-wise scaling with 16 levels placed at
+normal-distribution quantiles; double quant compresses the scales (~0.4 GB);
+`bnb_4bit_compute_dtype: bfloat16` dequantizes on the fly for every matmul,
+which costs time. `arguments/base_args/quant_args.py:45-47` returns `None` the
+moment `quant_method` is `None`, so the `bnb_4bit_*` keys become dead config if
+`quant_method` is removed. Freezing the base weights prevents error from
+*compounding*, but does **not** remove the distortion: it is present in every
+forward pass, gradients are computed through the degraded model, and the adapter
+**co-adapts to the quantization** — which is a portability trap when merging the
+adapter back into bf16 weights. 4-bit is also what forces `zero2`: ZeRO-3 cannot
+shard bnb-quantized parameters.
+
+**bf16 feasibility without quantization.** Quantized linears ~3.5 GB + bf16
+embeddings and `lm_head` ~4 GB = ~7.5 GB measured; full bf16 weights are ~18 GB,
+a delta of ~10 GB, giving **~29 GiB of a 32 GB card — marginal but not
+impossible** at 16,384 tokens, batch 1, gradient checkpointing. It must be
+benchmarked before committing to a full rental.
+
+### Open decision: drop quantization?
+
+The MS-SWIFT Qwen3.5 best-practice page
+(`https://swift.readthedocs.io/en/latest/BestPractices/Qwen3_5-Best-Practice.html`)
+uses **no quantization anywhere**. That is a real signal, but its dense SFT
+recipe is not comparable to ours: 4B model, `max_length` 2048, 4 GPUs at
+"4 * 20GiB", batch 4 / accum 1, LoRA r8 alpha32, zero2, 1 epoch,
+`group_by_length: true` (with `--packing true` offered as the alternative),
+`add_non_thinking_prefix: true`, `loss_scale ignore_empty_think`. Its only
+reduced-precision path is FP8 under Megatron. Our run is a 9B model at 16,384
+tokens, which is a different memory regime entirely.
+
+Dropping quantization is viable and would remove the co-adaptation and merge
+risks, and would unlock ZeRO-3 on the 4-GPU path. It is marginal on a single
+32 GB card. To remove it, delete these five lines and keep `torch_dtype:
+bfloat16` and `attn_impl: flash_attn`:
+
+```yaml
+quant_method: bnb
+quant_bits: 4
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+```
+
+They are at `configs/qwen35_9b.yaml:55-59` and
+`configs/qwen35_9b_remote_benchmark_step20.yaml:27-31`. **Not yet applied** —
+awaiting a decision.
+
+### Remote server operational notes
+
+- **Outbound TCP:443 is blocked by default** on the AutoDL instance while ICMP
+  is not, so `ping github.com` succeeds at ~102 ms / 0% loss while `git clone`
+  hangs for 130 s and then reports "Connection timed out". These filters are
+  independent; a successful ping proves nothing about HTTPS. Fix with
+  `source /etc/network_turbo`, which must be re-run in every new shell — it sets
+  only `http_proxy`/`https_proxy`, **does not cover SSH**, and does not carry
+  into a pre-existing screen/tmux session.
+- Private-repo auth is solved (SSH). GitHub port 22 is typically blocked from
+  mainland hosts, so route SSH over `ssh.github.com:443` via `~/.ssh/config`.
+  A deploy key authenticates **only** the `git@github.com:` transport; an
+  `https://` remote ignores it and will always prompt for a username.
+  **Delete the deploy key from GitHub when the instance is released** — the
+  private key lives on a rented machine.
+- Never embed a PAT in a clone URL; it persists in `.git/config`. If HTTPS is
+  needed, prefer `credential.helper 'cache --timeout=3600'` over `store`.
+- **Training data must be `scp`'d to the server.** `.gitignore:30-32` excludes
+  `*.jsonl`, so a fresh clone has no `data/*/train.jsonl`.
+- **The system disk filled up.** Redirect `output_dir` to
+  `/root/autodl-tmp/outputs/...` before any long run; a run that fills the
+  system disk mid-training loses the checkpoint.
+- A stale clone may still occupy `/root/Forecast_Grounded_Decision_QA`.
+- The `flash-attn` wheel referenced in `environment.yml` is a third-party build
+  (mjun0812), not an official release. Noted as a supply-chain consideration.
+
+### Next steps
+
+**A. Settle the precision decision with one ¥1.58 benchmark.** A single 20-step
+run answers three open questions at once: whether bf16 fits in 32 GB, what
+rank 64 actually costs in memory, and what packing does to throughput. This is
+the highest-value hour of GPU time available and should come before any full run.
+
+**B. Fix the config divergence before launching anything.** The local configs and
+the server's edited copy disagree on `packing` and `gradient_accumulation_steps`.
+Decide one way, commit it, and push — otherwise a fresh clone on the server gets
+configs that were never the ones benchmarked. Specifically:
+
+1. Decide `packing`. If enabled, cut `gradient_accumulation_steps` to ~8
+   (trace_level) or ~4 (answer_only), and note that packing cannot coexist with
+   `lazy_tokenize`.
+2. Decide quantization (the five lines above).
+3. If going bf16 on 4 GPUs, change `deepspeed: zero2` to `zero3`.
+4. Redirect `output_dir` to `/root/autodl-tmp/outputs/...`.
+5. Consider `use_liger_kernel: true` — currently false, and it is a
+   free throughput/memory win on Qwen-family models.
+6. Rename `outputs/qwen35_08b_benchmark_step20/` to `..._9b_...`; the model in
+   it is the 9B.
+7. Fix stale comments: `configs/qwen35_9b.yaml:70-71` claims "3 epochs is
+   roughly 84 optimizer steps" while `num_train_epochs: 5` gives ~140, and
+   line 4 still references the old filename
+   `qwen35_9b_remote_trace_level.yaml`.
+
+**C. Re-derive the `answer_only` cost estimate on token throughput** rather than
+step count. Expected to pull the programme total below ¥120.
+
+**D. Then run the actual experiments.** Full answer-only, trace-level, and
+constraint-multitask SFT at the chosen precision and rank, staged rather than as
+a full grid, preserving logs and recording peak VRAM, elapsed time, tokens seen,
+and tokens per second for each arm.
+
+**E. Evaluation and preference optimization** on the held-out 114 test records
+come after SFT. Test records must stay out of training, as they have throughout.
+
+### Standing constraints (unchanged)
+
+- Task 1's frozen 1,140-record release (902 / 124 / 114) must **not** be
+  regenerated.
+- Do not use `git add .`; stage explicit paths. Generated directories contain
+  extensive historical artifacts.
+- Do not reset or discard existing changes. Preserve unrelated PipeFormer work.
+- Do not implement regex-based PipeFormer/OpenClaw tool routing, and do not hide
+  PipeFormer tools based on wording.
+- Preserve Chinese text and canonical variable identifiers.
+- Keep the 35,000-character SFT cap for now.
+- Nothing is staged or committed unless explicitly requested.
+
+
+
+
+
