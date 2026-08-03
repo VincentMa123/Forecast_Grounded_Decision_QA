@@ -69,6 +69,7 @@ def validate_source_records(
     *,
     split: str,
     expected_count: int,
+    tool_schemas: Iterable[dict[str, Any]] | None = None,
 ) -> None:
     """Validate one immutable compact Task 1 split before projection."""
 
@@ -92,7 +93,11 @@ def validate_source_records(
         if not isinstance(record.get("turn_id"), int):
             raise DatasetValidationError(f"{sample_id}: turn_id must be an integer")
         _required_text(record, "final_answer", sample_id)
-        _validate_source_tool_pairs(record, sample_id)
+        _validate_source_tool_pairs(
+            record,
+            sample_id,
+            tool_schemas=tool_schemas,
+        )
 
 
 def validate_projection_records(
@@ -143,6 +148,7 @@ def validate_release(
     manifest_path: Path,
     expected_counts: dict[str, int],
     registered_tool_names: Iterable[str],
+    tool_schemas: Iterable[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Validate a complete generated release against sources and manifest."""
 
@@ -175,6 +181,7 @@ def validate_release(
             records,
             split=split,
             expected_count=expected_counts[split],
+            tool_schemas=tool_schemas,
         )
         source_by_split[split] = {
             str(record["sample_id"]): record for record in records
@@ -273,7 +280,32 @@ def validate_release(
     }
 
 
-def _validate_source_tool_pairs(record: dict[str, Any], sample_id: str) -> None:
+def _required_tool_arguments(
+    tool_schemas: Iterable[dict[str, Any]] | None,
+) -> dict[str, set[str]]:
+    required_by_name: dict[str, set[str]] = {}
+    for schema in tool_schemas or ():
+        function = schema.get("function")
+        if not isinstance(function, dict):
+            continue
+        name = function.get("name")
+        parameters = function.get("parameters")
+        if not isinstance(name, str) or not isinstance(parameters, dict):
+            continue
+        required = parameters.get("required")
+        if isinstance(required, list):
+            required_by_name[name] = {
+                str(field) for field in required if isinstance(field, str)
+            }
+    return required_by_name
+
+
+def _validate_source_tool_pairs(
+    record: dict[str, Any],
+    sample_id: str,
+    *,
+    tool_schemas: Iterable[dict[str, Any]] | None = None,
+) -> None:
     calls = record.get("tool_calls")
     outputs = record.get("tool_outputs")
     if not isinstance(calls, list) or not isinstance(outputs, list):
@@ -281,6 +313,7 @@ def _validate_source_tool_pairs(record: dict[str, Any], sample_id: str) -> None:
             f"{sample_id}: tool_calls and tool_outputs must be lists"
         )
     calls_by_id: dict[str, dict[str, Any]] = {}
+    required_by_name = _required_tool_arguments(tool_schemas)
     for call in calls:
         if not isinstance(call, dict):
             raise DatasetValidationError(f"{sample_id}: tool call must be an object")
@@ -291,6 +324,15 @@ def _validate_source_tool_pairs(record: dict[str, Any], sample_id: str) -> None:
         if not isinstance(call.get("arguments"), dict):
             raise DatasetValidationError(
                 f"{sample_id}: tool call {call_id} arguments must be an object"
+            )
+        tool_name = str(call.get("name") or "")
+        missing_arguments = required_by_name.get(tool_name, set()) - set(
+            call["arguments"]
+        )
+        if missing_arguments:
+            raise DatasetValidationError(
+                f"{sample_id}: tool {tool_name} missing required arguments "
+                f"{sorted(missing_arguments)}"
             )
         calls_by_id[call_id] = call
 
@@ -662,6 +704,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         registered_tool_names={
             str(schema["function"]["name"]) for schema in schemas
         },
+        tool_schemas=schemas,
     )
     print(stable_json(result))
     return 0

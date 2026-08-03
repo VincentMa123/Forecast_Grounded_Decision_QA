@@ -36,6 +36,7 @@ from evaluator.teacher_quality import (
 from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 from evaluator.topology_evidence import topology_summary_from_tool_outputs
 from evaluator.scorer import NativeTraceEvaluator
+from pipeline.forecast_registry_contract import authorize_forecast_registry
 from pipeline.io_utils import write_json, write_jsonl
 from pipeline.scenario_preflight import validate_scenario_sources
 from pipeline.teacher_trace_store import (
@@ -56,6 +57,11 @@ SFT_MAX_TOOL_TEXT_CHARS = 4_000
 SFT_MAX_GENERIC_TOOL_PAIRS = 6
 SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
 SFT_MAX_PIPEFORMER_VARIABLES = 3
+SFT_REGISTRY_ID_FIELDS = (
+    "variable",
+    "role",
+    "controllable",
+)
 COMPACT_COMPARABLE_METRIC_KEYS = (
     "energy_consumption",
     "energy_consumption_delta",
@@ -694,7 +700,6 @@ class TeacherTraceProjector:
         successful_decision_policies = [
             pair for pair in successful if pair[1].get("name") == "set_decision_policy"
         ]
-        multiple_pipeformer = len(successful_pipeformer) > 1
         if successful_pipeformer:
             referenced_variables = self._reference_tokens(answer)
             action_forecasts = [
@@ -707,13 +712,33 @@ class TeacherTraceProjector:
             # candidate forecasts' applied-disturbance evidence.
             if action_forecasts:
                 successful_pipeformer = action_forecasts
+            multiple_pipeformer = len(successful_pipeformer) > 1
+            required_registry_call_ids = self._registry_calls_required_for_forecasts(
+                successful,
+                successful_pipeformer,
+            )
+            selected_registry_searches = [
+                pair
+                for pair in successful
+                if (
+                    pair[1].get("name") == "search_pipeformer_registry"
+                    and str(pair[1].get("tool_call_id") or "")
+                    in required_registry_call_ids
+                )
+            ]
             selected = sorted(
-                [*successful_decision_policies[-1:], *successful_pipeformer],
+                [
+                    *selected_registry_searches,
+                    *successful_decision_policies[-1:],
+                    *successful_pipeformer,
+                ],
                 key=lambda pair: pair[0],
             )
         elif successful:
+            multiple_pipeformer = False
             selected = self._select_generic_evidence_pairs(successful, answer)
         else:
+            multiple_pipeformer = False
             selected = pairs[-1:]
 
         compact_calls = []
@@ -732,7 +757,12 @@ class TeacherTraceProjector:
             if output is None:
                 continue
             raw_output = output.get("output")
-            if call.get("name") == "run_pipeformer_forecast" and isinstance(raw_output, dict):
+            if (
+                call.get("name") == "search_pipeformer_registry"
+                and isinstance(raw_output, dict)
+            ):
+                raw_output = self._compact_registry_sft_output(raw_output)
+            elif call.get("name") == "run_pipeformer_forecast" and isinstance(raw_output, dict):
                 raw_output = self._compact_pipeformer_sft_output(
                     raw_output,
                     answer,
@@ -758,6 +788,77 @@ class TeacherTraceProjector:
                 }
             )
         return compact_calls, compact_outputs
+
+    @staticmethod
+    def _registry_calls_required_for_forecasts(
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Select only searches that actually authorize a retained forecast."""
+        required: set[str] = set()
+        for forecast_index, forecast_call, _ in forecasts:
+            preceding = []
+            for index, call, output_record in successful:
+                if index >= forecast_index:
+                    continue
+                preceding.append(
+                    {
+                        "tool_call_id": call.get("tool_call_id"),
+                        "name": call.get("name"),
+                        "arguments": dict(call.get("arguments") or {}),
+                        "output": (output_record or {}).get("output"),
+                    }
+                )
+            authorization = authorize_forecast_registry(
+                dict(forecast_call.get("arguments") or {}),
+                preceding,
+            )
+            required.update(
+                str(value)
+                for value in authorization.get("disturbance_search_call_ids") or []
+                if str(value)
+            )
+            for call_ids in (authorization.get("candidate_search_call_ids") or {}).values():
+                required.update(str(value) for value in call_ids if str(value))
+        return required
+
+    @staticmethod
+    def _compact_registry_sft_output(
+        value: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """Keep registry authorization evidence while bounding broad result pages.
+
+        Search pages can contain 50 variables with nested effect targets.  The
+        forecast contract only needs the canonical ID (and role/controllability)
+        for every returned entry.  The full semantic registry entry remains in
+        the audit transcript and verified state; this bounded projection keeps
+        registry-before-forecast teaching evidence without oversized SFT records.
+        """
+        compact: Dict[str, Any] = {
+            key: value[key]
+            for key in (
+                "success",
+                "matched_variable_count",
+                "matched_total_count",
+                "offset",
+                "next_offset",
+                "error",
+                "exit_code",
+            )
+            if key in value and value[key] not in (None, "")
+        }
+        variables = []
+        for raw in value.get("variables") or []:
+            if not isinstance(raw, dict) or not raw.get("variable"):
+                continue
+            item = {
+                key: raw[key]
+                for key in SFT_REGISTRY_ID_FIELDS
+                if key in raw
+            }
+            variables.append(item)
+        compact["variables"] = variables
+        return compact
 
     @staticmethod
     def _forecast_action_variables(call: Dict[str, Any]) -> set[str]:
@@ -945,8 +1046,12 @@ class TeacherTraceProjector:
         return compact_summary
 
     def _compact_call_arguments(self, value: Any, *, pipeformer: bool) -> Any:
-        if pipeformer and isinstance(value, dict):
-            value = {key: item for key, item in value.items() if key != "question"}
+        # Keep the complete argument object.  In particular, ``question`` is a
+        # required field of ``run_pipeformer_forecast`` even though it repeats
+        # the record's user_input.  Dropping it here creates schema-invalid SFT
+        # tool calls.  ``pipeformer`` remains part of this helper's interface
+        # for compatibility with existing projection call sites.
+        del pipeformer
         if isinstance(value, dict):
             return {key: self._compact_call_arguments(item, pipeformer=False) for key, item in value.items()}
         if isinstance(value, list):
