@@ -1,0 +1,3214 @@
+{
+  "schema_version": "mock_lifecycle_registry_v1",
+  "synthetic": true,
+  "physical_validation_status": "not_validated",
+  "variables": [
+    {
+      "variable": "B_001:FR",
+      "equipment_id": "B_001",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_015:FR",
+      "equipment_id": "B_015",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_120:FR",
+      "equipment_id": "B_120",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_198:FR",
+      "equipment_id": "B_198",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_233:FR",
+      "equipment_id": "B_233",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_273:FR",
+      "equipment_id": "B_273",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_286:FR",
+      "equipment_id": "B_286",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_302:FR",
+      "equipment_id": "B_302",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_317:FR",
+      "equipment_id": "B_317",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_329:FR",
+      "equipment_id": "B_329",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "B_341:FR",
+      "equipment_id": "B_341",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_flow_ratio",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.2,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.2,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "valve_opening",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "C_001:SP_",
+      "equipment_id": "C_001",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "C_002:SP_out",
+      "equipment_id": "C_002",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_005:SP_",
+      "equipment_id": "C_005",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "C_008:ST",
+      "equipment_id": "C_008",
+      "equipment_type": "compressor",
+      "physical_quantity": "equipment_status",
+      "role": "input",
+      "unit": "binary",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.0,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.0,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.85
+        },
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "C_014:SP_out",
+      "equipment_id": "C_014",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_016:SP_out",
+      "equipment_id": "C_016",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_017:ST",
+      "equipment_id": "C_017",
+      "equipment_type": "compressor",
+      "physical_quantity": "equipment_status",
+      "role": "input",
+      "unit": "binary",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.0,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.0,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.85
+        },
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "C_019:SP_out",
+      "equipment_id": "C_019",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_021:SP_out",
+      "equipment_id": "C_021",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_022:SP_out",
+      "equipment_id": "C_022",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "C_023:SP_out",
+      "equipment_id": "C_023",
+      "equipment_type": "compressor",
+      "physical_quantity": "outlet_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.6
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "E_001:SNQ",
+      "equipment_id": "E_001",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_018:SNQ",
+      "equipment_id": "E_018",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_045:SNQ",
+      "equipment_id": "E_045",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_066:SNQ",
+      "equipment_id": "E_066",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_082:SNQ",
+      "equipment_id": "E_082",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_097:SNQ",
+      "equipment_id": "E_097",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_101:SNQ",
+      "equipment_id": "E_101",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_109:SNQ",
+      "equipment_id": "E_109",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_112:SNQ",
+      "equipment_id": "E_112",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_119:SNQ",
+      "equipment_id": "E_119",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "E_120:SNQ",
+      "equipment_id": "E_120",
+      "equipment_type": "demand_boundary",
+      "physical_quantity": "demand_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "negative",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "negative",
+          "gain": 0.4
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.2
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.35
+        }
+      ]
+    },
+    {
+      "variable": "R_001:SPD",
+      "equipment_id": "R_001",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "downstream_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "R_004:SPD",
+      "equipment_id": "R_004",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "downstream_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "R_005:ST",
+      "equipment_id": "R_005",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "equipment_status",
+      "role": "input",
+      "unit": "binary",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.0,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.0,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.85
+        },
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "R_006:ST",
+      "equipment_id": "R_006",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "equipment_status",
+      "role": "input",
+      "unit": "binary",
+      "controllable": true,
+      "lower_limit": 0.0,
+      "upper_limit": 1.0,
+      "warning_lower_limit": 0.0,
+      "warning_upper_limit": 1.0,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "rotational_speed",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "positive",
+          "gain": 0.65
+        },
+        {
+          "physical_quantity": "compression_ratio",
+          "direction": "positive",
+          "gain": 0.45
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "positive",
+          "gain": 0.85
+        },
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.15
+        }
+      ]
+    },
+    {
+      "variable": "R_007:SPD",
+      "equipment_id": "R_007",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "downstream_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "R_008:SPD",
+      "equipment_id": "R_008",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "downstream_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "R_010:SPD",
+      "equipment_id": "R_010",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "downstream_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "regulator_range",
+          "direction": "positive",
+          "gain": 0.8
+        },
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.1
+        }
+      ]
+    },
+    {
+      "variable": "T_001:SNQ",
+      "equipment_id": "T_001",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_002:SNQ",
+      "equipment_id": "T_002",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_003:SNQ",
+      "equipment_id": "T_003",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_004:SNQ",
+      "equipment_id": "T_004",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_005:SNQ",
+      "equipment_id": "T_005",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_005:SP",
+      "equipment_id": "T_005",
+      "equipment_type": "gas_source",
+      "physical_quantity": "source_pressure_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.55
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.15
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.2
+        }
+      ]
+    },
+    {
+      "variable": "T_006:SNQ",
+      "equipment_id": "T_006",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "multiple_lifecycle_sources",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "T_007:SNQ",
+      "equipment_id": "T_007",
+      "equipment_type": "gas_source",
+      "physical_quantity": "supply_flow_setpoint",
+      "role": "input",
+      "unit": "p.u.",
+      "controllable": true,
+      "lower_limit": 0.4,
+      "upper_limit": 1.6,
+      "warning_lower_limit": 0.4,
+      "warning_upper_limit": 1.6,
+      "source": "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json",
+      "sources": [
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+      ],
+      "effect_targets": [
+        {
+          "physical_quantity": "pressure",
+          "direction": "positive",
+          "gain": 0.3
+        },
+        {
+          "physical_quantity": "flow",
+          "direction": "positive",
+          "gain": 0.5
+        },
+        {
+          "physical_quantity": "linepack",
+          "direction": "positive",
+          "gain": 0.35
+        },
+        {
+          "physical_quantity": "compressor_load",
+          "direction": "negative",
+          "gain": 0.08
+        },
+        {
+          "physical_quantity": "power",
+          "direction": "negative",
+          "gain": 0.05
+        }
+      ]
+    },
+    {
+      "variable": "N_001_v000",
+      "equipment_id": "N_001",
+      "equipment_type": "node",
+      "physical_quantity": "pressure",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "N_002_v000",
+      "equipment_id": "N_002",
+      "equipment_type": "node",
+      "physical_quantity": "pressure",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "N_003_v000",
+      "equipment_id": "N_003",
+      "equipment_type": "node",
+      "physical_quantity": "pressure",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "P_001_v000",
+      "equipment_id": "P_001",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "pressure",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "P_001_v001",
+      "equipment_id": "P_001",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "P_002_v000",
+      "equipment_id": "P_002",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "pressure",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "P_002_v001",
+      "equipment_id": "P_002",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_001_v000",
+      "equipment_id": "B_001",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_001_v001",
+      "equipment_id": "B_001",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_015_v000",
+      "equipment_id": "B_015",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_015_v001",
+      "equipment_id": "B_015",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_120_v000",
+      "equipment_id": "B_120",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_120_v001",
+      "equipment_id": "B_120",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_198_v000",
+      "equipment_id": "B_198",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_198_v001",
+      "equipment_id": "B_198",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_233_v000",
+      "equipment_id": "B_233",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_233_v001",
+      "equipment_id": "B_233",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_273_v000",
+      "equipment_id": "B_273",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_273_v001",
+      "equipment_id": "B_273",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_286_v000",
+      "equipment_id": "B_286",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_286_v001",
+      "equipment_id": "B_286",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_302_v000",
+      "equipment_id": "B_302",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_302_v001",
+      "equipment_id": "B_302",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_317_v000",
+      "equipment_id": "B_317",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_317_v001",
+      "equipment_id": "B_317",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_329_v000",
+      "equipment_id": "B_329",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_329_v001",
+      "equipment_id": "B_329",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_341_v000",
+      "equipment_id": "B_341",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "valve_opening",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "B_341_v001",
+      "equipment_id": "B_341",
+      "equipment_type": "ball_valve",
+      "physical_quantity": "flow",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.2,
+      "warning_upper_limit": 2.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "H_001_v000",
+      "equipment_id": "H_001",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "linepack",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "H_002_v000",
+      "equipment_id": "H_002",
+      "equipment_type": "pipeline_segment",
+      "physical_quantity": "linepack",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_001_v000",
+      "equipment_id": "C_001",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_001_v001",
+      "equipment_id": "C_001",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_001_v002",
+      "equipment_id": "C_001",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_001_v000",
+      "equipment_id": "TE_001",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_002_v000",
+      "equipment_id": "C_002",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_002_v001",
+      "equipment_id": "C_002",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_002_v002",
+      "equipment_id": "C_002",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_002_v000",
+      "equipment_id": "TE_002",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_005_v000",
+      "equipment_id": "C_005",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_005_v001",
+      "equipment_id": "C_005",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_005_v002",
+      "equipment_id": "C_005",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_005_v000",
+      "equipment_id": "TE_005",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_008_v000",
+      "equipment_id": "C_008",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_008_v001",
+      "equipment_id": "C_008",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_008_v002",
+      "equipment_id": "C_008",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_008_v000",
+      "equipment_id": "TE_008",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_014_v000",
+      "equipment_id": "C_014",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_014_v001",
+      "equipment_id": "C_014",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_014_v002",
+      "equipment_id": "C_014",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_014_v000",
+      "equipment_id": "TE_014",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_016_v000",
+      "equipment_id": "C_016",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_016_v001",
+      "equipment_id": "C_016",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_016_v002",
+      "equipment_id": "C_016",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_016_v000",
+      "equipment_id": "TE_016",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_017_v000",
+      "equipment_id": "C_017",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_017_v001",
+      "equipment_id": "C_017",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_017_v002",
+      "equipment_id": "C_017",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_017_v000",
+      "equipment_id": "TE_017",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_019_v000",
+      "equipment_id": "C_019",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_019_v001",
+      "equipment_id": "C_019",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_019_v002",
+      "equipment_id": "C_019",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_019_v000",
+      "equipment_id": "TE_019",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_021_v000",
+      "equipment_id": "C_021",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_021_v001",
+      "equipment_id": "C_021",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_021_v002",
+      "equipment_id": "C_021",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_021_v000",
+      "equipment_id": "TE_021",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_022_v000",
+      "equipment_id": "C_022",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_022_v001",
+      "equipment_id": "C_022",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_022_v002",
+      "equipment_id": "C_022",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_022_v000",
+      "equipment_id": "TE_022",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_023_v000",
+      "equipment_id": "C_023",
+      "equipment_type": "compressor",
+      "physical_quantity": "compressor_load",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_023_v001",
+      "equipment_id": "C_023",
+      "equipment_type": "compressor",
+      "physical_quantity": "compression_ratio",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "C_023_v002",
+      "equipment_id": "C_023",
+      "equipment_type": "compressor",
+      "physical_quantity": "rotational_speed",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -2.0,
+      "upper_limit": 2.0,
+      "warning_lower_limit": -1.2,
+      "warning_upper_limit": 1.2,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "TE_023_v000",
+      "equipment_id": "TE_023",
+      "equipment_type": "compressor_power",
+      "physical_quantity": "power",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_001_v000",
+      "equipment_id": "R_001",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_004_v000",
+      "equipment_id": "R_004",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_005_v000",
+      "equipment_id": "R_005",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_006_v000",
+      "equipment_id": "R_006",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_007_v000",
+      "equipment_id": "R_007",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_008_v000",
+      "equipment_id": "R_008",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    },
+    {
+      "variable": "R_010_v000",
+      "equipment_id": "R_010",
+      "equipment_type": "pressure_regulator",
+      "physical_quantity": "regulator_range",
+      "role": "output",
+      "unit": "p.u.",
+      "controllable": false,
+      "lower_limit": -3.0,
+      "upper_limit": 3.0,
+      "warning_lower_limit": -2.5,
+      "warning_upper_limit": 2.5,
+      "source": "synthetic_derived_state"
+    }
+  ]
+}

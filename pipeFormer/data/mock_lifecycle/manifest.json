@@ -1,0 +1,83 @@
+{
+  "schema_version": "mock_lifecycle_manifest_v1",
+  "synthetic": true,
+  "physical_validation_status": "not_validated",
+  "source_datasets": [
+    "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json",
+    "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json"
+  ],
+  "source_summary": {
+    "Pipeline_Full_Life_Cycle_Test_Dataset-v4.json": {
+      "scenario_count": 70,
+      "scenario_types": {
+        "openclaw": 30,
+        "pipeformer": 40
+      },
+      "session_count": 200,
+      "turn_count": 500,
+      "control_variable_count": 20
+    },
+    "Pipeline_Full_Life_Cycle_Test_Dataset-v7.json": {
+      "scenario_count": 40,
+      "scenario_types": {
+        "pipeformer": 40
+      },
+      "session_count": 40,
+      "turn_count": 40,
+      "control_variable_count": 40
+    }
+  },
+  "source_record_count": 110,
+  "control_variable_count": 48,
+  "forecast_state_variable_count": 82,
+  "control_variables": [
+    "B_001:FR",
+    "B_015:FR",
+    "B_120:FR",
+    "B_198:FR",
+    "B_233:FR",
+    "B_273:FR",
+    "B_286:FR",
+    "B_302:FR",
+    "B_317:FR",
+    "B_329:FR",
+    "B_341:FR",
+    "C_001:SP_",
+    "C_002:SP_out",
+    "C_005:SP_",
+    "C_008:ST",
+    "C_014:SP_out",
+    "C_016:SP_out",
+    "C_017:ST",
+    "C_019:SP_out",
+    "C_021:SP_out",
+    "C_022:SP_out",
+    "C_023:SP_out",
+    "E_001:SNQ",
+    "E_018:SNQ",
+    "E_045:SNQ",
+    "E_066:SNQ",
+    "E_082:SNQ",
+    "E_097:SNQ",
+    "E_101:SNQ",
+    "E_109:SNQ",
+    "E_112:SNQ",
+    "E_119:SNQ",
+    "E_120:SNQ",
+    "R_001:SPD",
+    "R_004:SPD",
+    "R_005:ST",
+    "R_006:ST",
+    "R_007:SPD",
+    "R_008:SPD",
+    "R_010:SPD",
+    "T_001:SNQ",
+    "T_002:SNQ",
+    "T_003:SNQ",
+    "T_004:SNQ",
+    "T_005:SNQ",
+    "T_005:SP",
+    "T_006:SNQ",
+    "T_007:SNQ"
+  ]
+}

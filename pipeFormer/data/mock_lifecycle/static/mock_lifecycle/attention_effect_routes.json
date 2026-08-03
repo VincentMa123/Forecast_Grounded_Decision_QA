@@ -1,0 +1,3858 @@
+[
+  {
+    "control_variable": "B_001:FR",
+    "target_variable": "B_001_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_001:FR",
+    "target_variable": "B_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_001:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_015:FR",
+    "target_variable": "B_015_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_015:FR",
+    "target_variable": "B_015_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_015:FR",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_120:FR",
+    "target_variable": "B_120_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_120:FR",
+    "target_variable": "B_120_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_120:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_198:FR",
+    "target_variable": "B_198_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_198:FR",
+    "target_variable": "B_198_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_198:FR",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_233:FR",
+    "target_variable": "B_233_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_233:FR",
+    "target_variable": "B_233_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_233:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_273:FR",
+    "target_variable": "B_273_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_273:FR",
+    "target_variable": "B_273_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_273:FR",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_286:FR",
+    "target_variable": "B_286_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_286:FR",
+    "target_variable": "B_286_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_286:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_302:FR",
+    "target_variable": "B_302_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_302:FR",
+    "target_variable": "B_302_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_302:FR",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_317:FR",
+    "target_variable": "B_317_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_317:FR",
+    "target_variable": "B_317_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_317:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_329:FR",
+    "target_variable": "B_329_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_329:FR",
+    "target_variable": "B_329_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_329:FR",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "B_341:FR",
+    "target_variable": "B_341_v000",
+    "physical_quantity": "valve_opening",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_341:FR",
+    "target_variable": "B_341_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "B_341:FR",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "C_001_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.4,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_001:SP_",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_002:SP_out",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_002:SP_out",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_002:SP_out",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_002:SP_out",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_002:SP_out",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "C_005_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.4,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_005:SP_",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "C_008_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "R_004_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "R_006_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "R_008_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_008:ST",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_014:SP_out",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_014:SP_out",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_014:SP_out",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_014:SP_out",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_014:SP_out",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_016:SP_out",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_016:SP_out",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_016:SP_out",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_016:SP_out",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_016:SP_out",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "C_017_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "R_001_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "R_005_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "R_007_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "R_010_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_017:ST",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_019:SP_out",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_019:SP_out",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_019:SP_out",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_019:SP_out",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_019:SP_out",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_021:SP_out",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_021:SP_out",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_021:SP_out",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_021:SP_out",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_021:SP_out",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_022:SP_out",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_022:SP_out",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_022:SP_out",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_022:SP_out",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_022:SP_out",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "C_023:SP_out",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_023:SP_out",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "C_023:SP_out",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_023:SP_out",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.6,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "C_023:SP_out",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_001:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_018:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_045:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_066:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_082:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_097:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_101:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_109:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_112:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_119:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "negative",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "negative",
+    "gain": 0.4,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "E_120:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_001:SPD",
+    "target_variable": "R_001_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_001:SPD",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_001:SPD",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_004:SPD",
+    "target_variable": "R_004_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_004:SPD",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_004:SPD",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_001_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_005_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_014_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_017_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_021_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_023_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_001_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_005_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_014_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_017_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_021_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "C_023_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "R_005_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_005:ST",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_002_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_008_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_016_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_019_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_022_v002",
+    "physical_quantity": "rotational_speed",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "positive",
+    "gain": 0.65,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_002_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_008_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_016_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_019_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "C_022_v001",
+    "physical_quantity": "compression_ratio",
+    "direction": "positive",
+    "gain": 0.45,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "positive",
+    "gain": 0.85,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "R_006_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_006:ST",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "R_007:SPD",
+    "target_variable": "R_007_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_007:SPD",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_007:SPD",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_008:SPD",
+    "target_variable": "R_008_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_008:SPD",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_008:SPD",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_010:SPD",
+    "target_variable": "R_010_v000",
+    "physical_quantity": "regulator_range",
+    "direction": "positive",
+    "gain": 0.8,
+    "graph_distance": 0
+  },
+  {
+    "control_variable": "R_010:SPD",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "R_010:SPD",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.1,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_001:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_002:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_003:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_004:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_005:SP",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.55,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_005:SP",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.15,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_005:SP",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.2,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "P_002_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "P_002_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "H_002_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "C_002_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "C_008_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "C_016_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "C_019_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "C_022_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "TE_002_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "TE_008_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "TE_016_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "TE_019_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_006:SNQ",
+    "target_variable": "TE_022_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "P_001_v000",
+    "physical_quantity": "pressure",
+    "direction": "positive",
+    "gain": 0.3,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "P_001_v001",
+    "physical_quantity": "flow",
+    "direction": "positive",
+    "gain": 0.5,
+    "graph_distance": 1
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "H_001_v000",
+    "physical_quantity": "linepack",
+    "direction": "positive",
+    "gain": 0.35,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_001_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_005_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_014_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_017_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_021_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "C_023_v000",
+    "physical_quantity": "compressor_load",
+    "direction": "negative",
+    "gain": 0.08,
+    "graph_distance": 2
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_001_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_005_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_014_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_017_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_021_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  },
+  {
+    "control_variable": "T_007:SNQ",
+    "target_variable": "TE_023_v000",
+    "physical_quantity": "power",
+    "direction": "negative",
+    "gain": 0.05,
+    "graph_distance": 3
+  }
+]

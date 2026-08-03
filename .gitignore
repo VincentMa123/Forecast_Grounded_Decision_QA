@@ -21,7 +21,6 @@ pipeclaw/backend/scripts
 pipeclaw/task2_student/tests/
 pipeclaw/task2_student/graphify-out/
 pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
-pipeFormer/data/
 pipeFormer/models/tests
 docs/superpowers
 

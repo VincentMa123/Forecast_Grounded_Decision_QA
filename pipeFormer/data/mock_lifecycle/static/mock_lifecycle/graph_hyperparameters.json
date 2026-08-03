@@ -1,0 +1,27 @@
+{
+  "graph": {
+    "is_subgraph": true,
+    "center_node": "P_001",
+    "total_nodes": 65,
+    "total_edges": 66,
+    "mock_data": true
+  },
+  "variables": {
+    "total_variables": 130,
+    "boundary_variables": 48,
+    "equipment_variables": 82
+  },
+  "tokenizer": {
+    "quantile_step": 0.1,
+    "constant_freq_threshold": 0.995,
+    "constant_variable_threshold": 0.995,
+    "round_gap": 0.02,
+    "vocab_size": 1085,
+    "boundary_dims": 48,
+    "equipment_dims": 82,
+    "quantile_method": "linear",
+    "range_gap_epsilon": 1e-09,
+    "stats_dir": "tokenizer_save",
+    "stats_file": "token_stats.csv"
+  }
+}
