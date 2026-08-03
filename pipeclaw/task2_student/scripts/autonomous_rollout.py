@@ -477,6 +477,67 @@ def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "argumen
     return None
 
 
+def _coerce_schema_value(value: Any, schema: Mapping[str, Any]) -> Any:
+    """Coerce JSON-like strings only when the declared schema permits it.
+
+    Qwen3.5's tagged ``<parameter>`` format can emit Python-style literals
+    (``True``/``False``) and native adapters may stringify otherwise typed
+    values.  The schema is the only safe source of type information: a field
+    declared as a string must remain a string, while a boolean/integer/array
+    field may be recovered from its serialized representation.
+    """
+
+    expected_type = str(schema.get("type") or "")
+    if isinstance(value, str):
+        stripped = value.strip()
+        if expected_type == "boolean":
+            lowered = stripped.casefold()
+            if lowered == "true":
+                return True
+            if lowered == "false":
+                return False
+        elif expected_type == "integer" and re.fullmatch(r"[+-]?\d+", stripped):
+            try:
+                return int(stripped)
+            except ValueError:
+                pass
+        elif expected_type == "number":
+            try:
+                decoded = json.loads(stripped)
+            except (TypeError, json.JSONDecodeError):
+                decoded = None
+            if isinstance(decoded, (int, float)) and not isinstance(decoded, bool):
+                return decoded
+        elif expected_type in {"array", "object"}:
+            try:
+                decoded = json.loads(stripped)
+            except (TypeError, json.JSONDecodeError):
+                decoded = None
+            if expected_type == "array" and isinstance(decoded, list):
+                value = decoded
+            elif expected_type == "object" and isinstance(decoded, Mapping):
+                value = decoded
+
+    if expected_type == "array" and isinstance(value, list):
+        item_schema = schema.get("items")
+        if isinstance(item_schema, Mapping):
+            return [_coerce_schema_value(item, item_schema) for item in value]
+        return value
+
+    if expected_type == "object" and isinstance(value, Mapping):
+        properties = schema.get("properties", {})
+        if not isinstance(properties, Mapping):
+            return dict(value)
+        return {
+            name: _coerce_schema_value(item, properties[name])
+            if isinstance(properties.get(name), Mapping)
+            else item
+            for name, item in value.items()
+        }
+
+    return value
+
+
 class ToolDispatcher:
     """Validate and execute only explicitly allow-listed evaluation tools."""
 
@@ -511,6 +572,19 @@ class ToolDispatcher:
             return "invalid_arguments"
         return "invalid_arguments" if _schema_error(call.arguments, parameters) else None
 
+    def _schema_normalized_call(self, call: ToolCall) -> ToolCall:
+        schema = self.schemas.get(call.name)
+        if schema is None:
+            return call
+        function = schema.get("function", schema)
+        parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
+        if not isinstance(parameters, Mapping):
+            return call
+        normalized = _coerce_schema_value(call.arguments, parameters)
+        if not isinstance(normalized, Mapping):
+            return call
+        return ToolCall(call.call_id, call.name, dict(normalized), call.raw)
+
     @staticmethod
     def _await_if_needed(value: Any) -> Any:
         if not inspect.isawaitable(value):
@@ -526,26 +600,27 @@ class ToolDispatcher:
             return executor.submit(asyncio.run, value).result()
 
     def dispatch(self, call: ToolCall) -> dict[str, Any]:
-        error_code = self._validate(call)
+        normalized_call = self._schema_normalized_call(call)
+        error_code = self._validate(normalized_call)
         if error_code:
             result = {
                 "success": False,
                 "error_code": error_code,
                 "error": f"Tool call rejected: {call.name}",
             }
-            self._record(call, result)
+            self._record(normalized_call, result)
             return result
         if self.authorization_callback is not None:
-            authorization_error = self.authorization_callback(call, self.completed_tool_calls)
+            authorization_error = self.authorization_callback(normalized_call, self.completed_tool_calls)
             if authorization_error:
                 result = dict(authorization_error)
                 result.setdefault("success", False)
-                self._record(call, result)
+                self._record(normalized_call, result)
                 return result
-        execution_arguments = dict(call.arguments)
+        execution_arguments = dict(normalized_call.arguments)
         if self.execution_arguments_callback is not None:
             try:
-                transformed = self.execution_arguments_callback(call)
+                transformed = self.execution_arguments_callback(normalized_call)
                 if not isinstance(transformed, Mapping):
                     raise TypeError("execution argument callback must return a mapping")
                 execution_arguments = dict(transformed)
@@ -555,13 +630,16 @@ class ToolDispatcher:
                     "error_code": "tool_execution_error",
                     "error": f"Tool argument transformation failed: {exc}",
                 }
-                self._record(call, result)
+                self._record(normalized_call, result)
                 return result
         try:
             if hasattr(self.registry, "execute"):
-                result = self.registry.execute(call.name, **dict(execution_arguments, **self.execution_context))
+                result = self.registry.execute(
+                    normalized_call.name,
+                    **dict(execution_arguments, **self.execution_context),
+                )
             else:
-                tool = self.registry.get(call.name)
+                tool = self.registry.get(normalized_call.name)
                 if tool is None:
                     raise KeyError(call.name)
                 result = tool(**dict(execution_arguments, **self.execution_context))
@@ -571,10 +649,10 @@ class ToolDispatcher:
                 if result.get("error") and "success" not in result:
                     result["success"] = False
                     result.setdefault("error_code", "tool_execution_error")
-                self._record(call, result)
+                self._record(normalized_call, result)
                 return result
             result = {"success": True, "result": result}
-            self._record(call, result)
+            self._record(normalized_call, result)
             return result
         except Exception as exc:  # evaluation records the failure; it must not abort the suite
             result = {
@@ -582,7 +660,7 @@ class ToolDispatcher:
                 "error_code": "tool_execution_error",
                 "error": str(exc),
             }
-            self._record(call, result)
+            self._record(normalized_call, result)
             return result
 
     def _record(self, call: ToolCall, output: Mapping[str, Any]) -> None:
