@@ -72,6 +72,20 @@ workspace: `read_file`, `write_file`, and `edit_file` are workspace-bounded,
 logical `pipeline_data/...` reads remain read-only, and `run_command` is limited
 to a Python script located inside that workspace with a 1--60 second timeout.
 
+The evaluator reuses the base-model loading settings saved in the adapter's
+`args.json`. Therefore a 4-bit QLoRA checkpoint is loaded with bitsandbytes
+4-bit NF4 settings instead of silently loading the 9B base model in BF16. The
+loader prints the resolved mode at startup. Use `--quant-bits 4` or
+`--quant-bits 8` to override the checkpoint metadata, or `--no-quantization`
+to intentionally load the unquantized base model.
+
+Successful PipeFormer forecast responses use the same canonical projection as
+`backend/task1/generate_teacher_trace.py` before they are sent back to the
+student and written to `rollouts.jsonl`. Registry and other tool responses keep
+their registered shape. The dispatcher still uses the full result for
+authorization, and `--save-raw-tool-outputs` can retain a separate raw
+diagnostic copy when needed.
+
 The aggregate is denominator-aware: a metric with no applicable oracle is marked
 `not_applicable`, not counted as a zero. Use the `pipeformer` filter for the gas
 pipeline deliverable and `openclaw` for the PipeClaw agent cases. `summary.json`

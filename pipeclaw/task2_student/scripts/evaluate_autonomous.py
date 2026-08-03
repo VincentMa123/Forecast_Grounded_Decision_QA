@@ -56,6 +56,36 @@ else:
     from .oracle_metrics import aggregate_results, evaluate_rollout
 
 
+def _compact_model_tool_result(tool_name: str, value: Any) -> Any:
+    """Return the bounded tool result that the student sees and we save by default.
+
+    The dispatcher keeps the complete result for authorization while this
+    projection matches the canonical PipeFormer training projection.  The raw
+    payload is intentionally not placed in the model context or rollout JSON;
+    callers can request it separately for debugging.
+    """
+
+    if not isinstance(value, Mapping) or value.get("success") is False:
+        return value
+    if tool_name != "run_pipeformer_forecast":
+        return value
+
+    try:
+        backend_root = Path(__file__).resolve().parents[2] / "backend"
+        if str(backend_root) not in sys.path:
+            sys.path.insert(0, str(backend_root))
+        from task1.generate_teacher_trace import (
+            compact_pipeformer_output,
+            project_pipeformer_output,
+        )
+
+        return compact_pipeformer_output(project_pipeformer_output(dict(value)))
+    except (ImportError, ModuleNotFoundError):
+        # Keep evaluation usable in a minimal installation.  The normal
+        # backend environment provides the canonical projection module.
+        return dict(value)
+
+
 def run_case(
     case: PromptCase,
     generator: Generator,
@@ -65,6 +95,7 @@ def run_case(
     max_new_tokens: int,
     temperature: float,
     capture_raw_response: bool = False,
+    capture_raw_tool_outputs: bool = False,
 ) -> dict[str, Any]:
     """Run one bounded model/tool conversation and preserve all partial state.
 
@@ -103,6 +134,8 @@ def run_case(
     }
     if capture_raw_response:
         result["raw_responses"] = []
+    if capture_raw_tool_outputs:
+        result["raw_tool_outputs"] = []
 
     for turn in range(max(0, max_turns)):
         result["turns"] = turn + 1
@@ -144,17 +177,26 @@ def run_case(
                         "execution_success": execution_success,
                     }
                 )
+                compact_tool_result = _compact_model_tool_result(call.name, tool_result)
                 result["tool_outputs"].append(
                     {
                         "tool_call_id": call.call_id,
                         "name": call.name,
-                        "output": tool_result,
+                        "output": compact_tool_result,
                     }
                 )
+                if capture_raw_tool_outputs:
+                    result["raw_tool_outputs"].append(
+                        {
+                            "tool_call_id": call.call_id,
+                            "name": call.name,
+                            "output": _jsonable(tool_result),
+                        }
+                    )
                 append_tool_exchange(
                     messages,
                     call,
-                    tool_result,
+                    compact_tool_result,
                     assistant_content=text if index == 0 else "",
                 )
             result["messages"] = messages
@@ -182,6 +224,176 @@ def run_case(
     return result
 
 
+def _read_saved_training_args(adapter_dir: Path) -> dict[str, Any]:
+    """Read MS-SWIFT's saved model-loading arguments when available."""
+
+    candidates = (adapter_dir / "args.json", adapter_dir.parent / "args.json")
+    for candidate in candidates:
+        if not candidate.is_file():
+            continue
+        try:
+            payload = json.loads(candidate.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, Mapping):
+            return dict(payload)
+    return {}
+
+
+def _normalize_dtype_name(value: Any) -> str | None:
+    if value is None:
+        return None
+    name = str(value).strip()
+    if name.startswith("torch."):
+        name = name[len("torch.") :]
+    return name or None
+
+
+def _normalize_quant_bits(value: Any) -> int | None:
+    try:
+        bits = int(value)
+    except (TypeError, ValueError):
+        return None
+    return bits if bits in {4, 8} else None
+
+
+def _normalize_bool(value: Any, *, default: bool) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+    return default
+
+
+def _resolve_model_load_kwargs(
+    adapter_dir: Path,
+    *,
+    quant_bits: int | None = None,
+    no_quantization: bool = False,
+) -> dict[str, Any]:
+    """Resolve base-model quantization from CLI overrides or checkpoint metadata.
+
+    MS-SWIFT stores the QLoRA loading arguments in ``args.json`` next to a
+    checkpoint, but the custom Python evaluator does not load that file on its
+    own.  Reusing it keeps evaluation on the same base-weight representation as
+    training.  An explicit ``quant_bits`` override always uses bitsandbytes;
+    ``no_quantization`` deliberately restores the old full-precision behavior.
+    """
+
+    if no_quantization:
+        return {}
+
+    saved_args = _read_saved_training_args(adapter_dir)
+    explicit_override = quant_bits is not None
+    bits = _normalize_quant_bits(quant_bits if explicit_override else saved_args.get("quant_bits"))
+    if bits is None:
+        return {}
+
+    method = "bnb" if explicit_override else str(saved_args.get("quant_method") or "").strip().lower()
+    if not method:
+        method = "bnb"
+    if method != "bnb":
+        raise ValueError(
+            f"Unsupported checkpoint quant_method {method!r}; "
+            "use a bitsandbytes checkpoint or pass --no-quantization"
+        )
+
+    kwargs: dict[str, Any] = {
+        "quant_method": method,
+        "quant_bits": bits,
+        "torch_dtype": _normalize_dtype_name(saved_args.get("torch_dtype")) or "bfloat16",
+    }
+    if bits == 4:
+        kwargs.update(
+            {
+                "bnb_4bit_compute_dtype": (
+                    _normalize_dtype_name(saved_args.get("bnb_4bit_compute_dtype"))
+                    or "bfloat16"
+                ),
+                "bnb_4bit_quant_type": str(
+                    saved_args.get("bnb_4bit_quant_type") or "nf4"
+                ),
+                "bnb_4bit_use_double_quant": _normalize_bool(
+                    saved_args.get("bnb_4bit_use_double_quant"), default=True
+                ),
+            }
+        )
+        quant_storage = _normalize_dtype_name(saved_args.get("bnb_4bit_quant_storage"))
+        if quant_storage:
+            kwargs["bnb_4bit_quant_storage"] = quant_storage
+    return kwargs
+
+
+def _build_model_load_kwargs(model_load_spec: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the Transformers kwargs required for actual BNB quantized loading."""
+
+    if not model_load_spec:
+        return {}
+
+    bits = _normalize_quant_bits(model_load_spec.get("quant_bits"))
+    if bits is None or model_load_spec.get("quant_method") != "bnb":
+        return {}
+
+    try:
+        from transformers import BitsAndBytesConfig
+    except ImportError as exc:  # pragma: no cover - MS-SWIFT installs transformers
+        raise RuntimeError(
+            "bitsandbytes quantization requires Transformers.BitsAndBytesConfig"
+        ) from exc
+
+    config_kwargs: dict[str, Any] = {
+        "load_in_4bit": bits == 4,
+        "load_in_8bit": bits == 8,
+    }
+    if bits == 4:
+        config_kwargs.update(
+            {
+                "bnb_4bit_compute_dtype": model_load_spec.get(
+                    "bnb_4bit_compute_dtype", "bfloat16"
+                ),
+                "bnb_4bit_quant_type": model_load_spec.get(
+                    "bnb_4bit_quant_type", "nf4"
+                ),
+                "bnb_4bit_use_double_quant": model_load_spec.get(
+                    "bnb_4bit_use_double_quant", True
+                ),
+            }
+        )
+        if model_load_spec.get("bnb_4bit_quant_storage") is not None:
+            config_kwargs["bnb_4bit_quant_storage"] = model_load_spec[
+                "bnb_4bit_quant_storage"
+            ]
+
+    return {
+        "torch_dtype": model_load_spec.get("torch_dtype", "bfloat16"),
+        "quantization_config": BitsAndBytesConfig(**config_kwargs),
+    }
+
+
+def _coerce_torch_dtype(model_load_kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    """Convert saved dtype names to torch dtypes for the Python MS-SWIFT API."""
+
+    kwargs = dict(model_load_kwargs)
+    try:
+        import torch
+
+        for key in ("torch_dtype", "bnb_4bit_compute_dtype", "bnb_4bit_quant_storage"):
+            dtype_name = kwargs.get(key)
+            if isinstance(dtype_name, str):
+                kwargs[key] = getattr(torch, dtype_name)
+    except ImportError:  # pragma: no cover - CUDA env supplies torch
+        return kwargs
+    except AttributeError:
+        # Leave an unknown dtype untouched so MS-SWIFT can report its own
+        # version-specific validation error rather than failing here.
+        pass
+    return kwargs
+
+
 class SwiftGenerator:
     """Small adapter around MS-SWIFT's TransformersEngine."""
 
@@ -189,7 +401,15 @@ class SwiftGenerator:
         self.engine = engine
 
     @classmethod
-    def from_args(cls, *, model: str, adapters: str, device: str | None = None) -> "SwiftGenerator":
+    def from_args(
+        cls,
+        *,
+        model: str,
+        adapters: str,
+        device: str | None = None,
+        quant_bits: int | None = None,
+        no_quantization: bool = False,
+    ) -> "SwiftGenerator":
         if device:
             os.environ["CUDA_VISIBLE_DEVICES"] = device
         try:
@@ -199,7 +419,23 @@ class SwiftGenerator:
         except ImportError as exc:  # pragma: no cover - depends on the training environment
             raise RuntimeError("MS-SWIFT and PEFT are required for non-dry-run evaluation") from exc
 
-        model_obj, processor = get_model_processor(model)
+        model_load_spec = _resolve_model_load_kwargs(
+            Path(adapters),
+            quant_bits=quant_bits,
+            no_quantization=no_quantization,
+        )
+        model_load_kwargs = _build_model_load_kwargs(model_load_spec)
+        model_load_kwargs = _coerce_torch_dtype(model_load_kwargs)
+        if model_load_spec:
+            print(
+                "[evaluate_autonomous] base-model loading: "
+                f"quant_method={model_load_spec.get('quant_method')!r}, "
+                f"quant_bits={model_load_spec.get('quant_bits')!r}"
+            )
+        else:
+            print("[evaluate_autonomous] base-model loading: default (unquantized)")
+
+        model_obj, processor = get_model_processor(model, **model_load_kwargs)
         model_obj = PeftModel.from_pretrained(model_obj, adapters)
         template = get_template(processor, enable_thinking=False)
         engine = TransformersEngine(model_obj, template=template)
@@ -656,7 +892,13 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
             if not args.adapters:
                 raise ValueError("--adapters is required unless --dry-run is used")
             model = args.model or _discover_base_model(Path(args.adapters))
-            generator = SwiftGenerator.from_args(model=model, adapters=args.adapters, device=args.device)
+            generator = SwiftGenerator.from_args(
+                model=model,
+                adapters=args.adapters,
+                device=args.device,
+                quant_bits=args.quant_bits,
+                no_quantization=args.no_quantization,
+            )
             schemas_by_scenario: dict[str, list[Mapping[str, Any]]] = {}
             for _, case in cases:
                 scenario_key = "openclaw" if _is_openclaw_scenario(case.scenario_type) else "pipeformer"
@@ -694,6 +936,7 @@ def evaluate_dataset(args: argparse.Namespace) -> dict[str, Any]:
                     max_new_tokens=args.max_new_tokens,
                     temperature=args.temperature,
                     capture_raw_response=args.save_raw_responses,
+                    capture_raw_tool_outputs=args.save_raw_tool_outputs,
                 )
                 rollout["metrics"] = evaluate_rollout(source, rollout)
                 handle.write(json.dumps(rollout, ensure_ascii=False, default=str) + "\n")
@@ -738,7 +981,14 @@ def _discover_base_model(adapter_dir: Path) -> str:
         model = config.get("base_model_name_or_path")
         if model:
             return str(model)
-    raise ValueError("--model is required when adapter_config.json has no base_model_name_or_path")
+    saved_args = _read_saved_training_args(adapter_dir)
+    model = saved_args.get("model")
+    if model:
+        return str(model)
+    raise ValueError(
+        "--model is required when the adapter has no base model in "
+        "adapter_config.json or args.json"
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -758,10 +1008,33 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument("--device", help="CUDA_VISIBLE_DEVICES value")
+    quantization = parser.add_mutually_exclusive_group()
+    quantization.add_argument(
+        "--quant-bits",
+        type=int,
+        choices=(4, 8),
+        help=(
+            "Override the adapter checkpoint's base-model quantization with "
+            "bitsandbytes 4-bit or 8-bit loading"
+        ),
+    )
+    quantization.add_argument(
+        "--no-quantization",
+        action="store_true",
+        help="Ignore saved quantization metadata and load the base model unquantized",
+    )
     parser.add_argument(
         "--save-raw-responses",
         action="store_true",
         help="Save serialized generator responses before parsing them",
+    )
+    parser.add_argument(
+        "--save-raw-tool-outputs",
+        action="store_true",
+        help=(
+            "Save complete tool payloads separately; model-facing and default "
+            "rollout outputs stay compact"
+        ),
     )
     parser.add_argument("--dry-run", action="store_true", help="Build prompts and schemas without loading a model")
     return parser
