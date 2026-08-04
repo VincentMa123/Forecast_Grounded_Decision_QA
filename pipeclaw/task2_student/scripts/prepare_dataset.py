@@ -8,7 +8,7 @@ import json
 import os
 import sys
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,16 @@ except ImportError:  # pragma: no cover - supports direct script execution.
         read_jsonl,
         validate_projection_records,
         validate_source_records,
+    )
+
+try:
+    from ..path_contract import is_host_absolute_path, normalize_relative_path
+except ImportError:  # pragma: no cover - supports direct script execution.
+    if _repo_root_text not in sys.path:
+        sys.path.insert(0, _repo_root_text)
+    from pipeclaw.task2_student.path_contract import (  # type: ignore
+        is_host_absolute_path,
+        normalize_relative_path,
     )
 
 TASK_PROMPTS = {
@@ -96,6 +106,36 @@ def stable_json(value: Any) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
+
+
+def canonicalize_training_tool_arguments(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Remove host-specific cwd values from model-training tool calls.
+
+    ``cmd`` remains intact because its workspace-relative script is part of the
+    learned action. Relative cwd values are retained with POSIX separators;
+    omitted and host-absolute cwd values are represented by omission.
+    """
+
+    del tool_name  # reserved for future per-tool path contracts
+    canonical = dict(arguments)
+    cwd = canonical.get("cwd")
+    if cwd is None or is_host_absolute_path(cwd):
+        canonical.pop("cwd", None)
+    elif isinstance(cwd, str):
+        canonical["cwd"] = normalize_relative_path(cwd)
+    command = canonical.get("cmd")
+    if isinstance(command, list):
+        normalized_command: list[Any] = []
+        for index, item in enumerate(command):
+            if index == 0 or not isinstance(item, str) or item.startswith("-"):
+                normalized_command.append(item)
+            else:
+                normalized_command.append(normalize_relative_path(item))
+        canonical["cmd"] = normalized_command
+    return canonical
 
 
 def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
@@ -580,7 +620,9 @@ def _paired_tool_messages(
                     "content": stable_json(
                         {
                             "name": name,
-                            "arguments": call.get("arguments") or {},
+                            "arguments": canonicalize_training_tool_arguments(
+                                name, call.get("arguments") or {}
+                            ),
                         }
                     ),
                     "loss": True,

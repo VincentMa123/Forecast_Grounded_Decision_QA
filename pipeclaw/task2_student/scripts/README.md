@@ -94,6 +94,20 @@ requested hallucination rate. OpenClaw records additionally expose the generic
 `artifact_evidence` metric, which checks that files named in the current
 request were actually read or used as evidence rather than merely mentioned.
 
+PipeFormer records that carry a non-empty `disturbance_assumption` marker are
+scored assumption-aware: the teacher's sampled disturbance direction and
+magnitude are not exact-match targets. The student must still emit valid
+`up`/`down` and finite numeric values, keep its forecast prediction consistent
+with its tool call, and apply the corresponding boundary change. These records
+also expose an `assumption_consistency` metric; explicit (non-assumed)
+disturbance fields remain strict. Inherited provisional disturbances in a
+multi-turn `state_before.scope` are marked the same way when the preceding
+teacher turn discloses an LLM assumption. Numeric evidence accepts values from
+successful student tool outputs as well as the teacher oracle, while candidate
+indexes and ordered-list markers are ignored. `tool_call` remains strict (any
+failed call is visible), and `tool_recovery` separately reports whether a
+required tool eventually succeeded after a failed retry.
+
 ### Raw-response diagnostics
 
 The normal rollout stores normalized calls and messages. To preserve the

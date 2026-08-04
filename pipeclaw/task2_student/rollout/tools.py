@@ -1,229 +1,25 @@
-"""Core helpers for autonomous evaluation of a Task 2 student model.
+"""Tool-call parsing, schema validation, and allow-listed dispatch.
 
-The training traces in this repository contain the teacher's future tool calls and
-answer.  This module deliberately builds a prompt from the pre-action state only,
-then provides a small, allow-listed tool loop for evaluation.
+This module owns the model-facing tool protocol only.  It imports no evaluation
+code: nothing here knows about teacher oracles, metrics, or scores.
 """
 
 from __future__ import annotations
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import inspect
 import json
 import re
-from dataclasses import dataclass
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Any, Callable, Mapping, Protocol, Sequence
+from typing import Any, Callable, Mapping, Sequence
+
+from .models import ToolCall, as_mapping, get_field, jsonable
 
 
-@dataclass
-class PromptCase:
-    """A prompt-only evaluation case plus its source record."""
-
-    sample_id: str
-    scenario_id: str
-    scenario_type: str
-    messages: list[dict[str, Any]]
-    tools: list[dict[str, Any]]
-    source_record: dict[str, Any]
-    workspace_root: Path | None = None
-
-
-@dataclass(frozen=True)
-class ToolCall:
-    """A normalized function call emitted by a model."""
-
-    call_id: str
-    name: str
-    arguments: dict[str, Any]
-    raw: Any
-
-
-class Generator(Protocol):
-    def generate(
-        self,
-        messages: Sequence[Mapping[str, Any]],
-        tools: Sequence[Mapping[str, Any]],
-        *,
-        max_tokens: int,
-        temperature: float,
-    ) -> Any:
-        """Generate one response for the current conversation."""
-
-
-def _as_mapping(value: Any) -> Mapping[str, Any] | None:
-    if isinstance(value, Mapping):
-        return value
-    if value is None:
-        return None
-    if hasattr(value, "model_dump"):
-        try:
-            dumped = value.model_dump()
-            if isinstance(dumped, Mapping):
-                return dumped
-        except Exception:
-            pass
-    if hasattr(value, "dict"):
-        try:
-            dumped = value.dict()
-            if isinstance(dumped, Mapping):
-                return dumped
-        except Exception:
-            pass
-    # Lightweight SDK response objects are sometimes plain classes rather than
-    # pydantic models.  Expose the small set of fields needed by the parser.
-    fields = (
-        "id",
-        "type",
-        "function",
-        "name",
-        "arguments",
-        "content",
-        "tool_calls",
-        "choices",
-        "message",
-    )
-    attrs = {field: getattr(value, field) for field in fields if hasattr(value, field)}
-    if attrs:
-        return attrs
-    return None
-
-
-def _get(value: Any, key: str, default: Any = None) -> Any:
-    mapped = _as_mapping(value)
-    if mapped is not None:
-        return mapped.get(key, default)
-    return getattr(value, key, default)
-
-
-def _jsonable(value: Any) -> Any:
-    """Convert SDK response objects into JSON-compatible values."""
-
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Mapping):
-        return {str(key): _jsonable(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_jsonable(item) for item in value]
-    mapped = _as_mapping(value)
-    if mapped is not None:
-        return {str(key): _jsonable(item) for key, item in mapped.items()}
-    return str(value)
-
-
-def strip_teacher_future_messages(messages: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Keep context through the last user turn and hide teacher future actions.
-
-    This is intentionally conservative: earlier system/user context is retained,
-    but all messages after the current user request (tool calls, tool responses,
-    and the teacher answer) are removed.
-    """
-
-    copied = [dict(message) for message in messages]
-    last_user = max(
-        (index for index, message in enumerate(copied) if message.get("role") == "user"),
-        default=len(copied) - 1,
-    )
-    return copied[: last_user + 1]
-
-
-def _parse_tools(value: Any) -> list[dict[str, Any]]:
-    if value is None:
-        return []
-    if isinstance(value, str):
-        try:
-            value = json.loads(value)
-        except json.JSONDecodeError:
-            return []
-    if isinstance(value, Mapping):
-        value = [value]
-    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
-        return []
-    return [dict(_jsonable(item)) for item in value if isinstance(_jsonable(item), Mapping)]
-
-
-class PromptCaseBuilder:
-    """Build production-shaped prompts without exposing teacher future messages."""
-
-    def build(
-        self,
-        record: Mapping[str, Any],
-        *,
-        workspace_root: Path,
-        prompt_builder: Any | None = None,
-        tool_schemas: Sequence[Mapping[str, Any]] | None = None,
-    ) -> PromptCase:
-        if not isinstance(record, Mapping):
-            raise TypeError("evaluation record must be a mapping")
-        user_input = record.get("user_input")
-        if not isinstance(user_input, str) or not user_input.strip():
-            raw_messages = record.get("messages")
-            if isinstance(raw_messages, Sequence) and not isinstance(raw_messages, (str, bytes)):
-                user_messages = [
-                    message.get("content")
-                    for message in raw_messages
-                    if isinstance(message, Mapping) and message.get("role") == "user"
-                ]
-                if user_messages and isinstance(user_messages[-1], str):
-                    user_input = user_messages[-1]
-        if not isinstance(user_input, str) or not user_input.strip():
-            raise ValueError("evaluation record requires a non-empty user_input")
-
-        if prompt_builder is None:
-            from pipeclaw.backend.agent.prompt_builder import PromptBuilder
-
-            prompt_builder = PromptBuilder(workspace_root)
-
-        memory_payload = {
-            "control_files": [],
-            "assets": [],
-            "trace_meta": {},
-            "verified_evidence_summaries": [],
-        }
-        system_prompt = prompt_builder.build(
-            memory_payload=memory_payload,
-            skills_section="",
-            verified_state=record.get("state_before") or {},
-            recent_turns=record.get("recent_turns") or [],
-        )
-
-        raw_messages = record.get("messages")
-        if isinstance(raw_messages, Sequence) and not isinstance(raw_messages, (str, bytes)):
-            # The source trace may include a system prompt and several turns.  We
-            # still strip every teacher-generated future message before use.
-            messages = strip_teacher_future_messages(raw_messages)
-            if not any(message.get("role") == "user" for message in messages):
-                messages.append({"role": "user", "content": user_input})
-            # PromptBuilder is the authoritative system prompt for autonomous eval.
-            system_index = next(
-                (index for index, message in enumerate(messages) if message.get("role") == "system"),
-                None,
-            )
-            if system_index is None:
-                messages.insert(0, {"role": "system", "content": system_prompt})
-            else:
-                messages[system_index] = {"role": "system", "content": system_prompt}
-        else:
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_input},
-            ]
-
-        schemas = list(tool_schemas or _parse_tools(record.get("tools")))
-        source_record = dict(record)
-        return PromptCase(
-            sample_id=str(record.get("sample_id") or record.get("example_id") or "unknown"),
-            scenario_id=str(record.get("scenario_id") or ""),
-            scenario_type=str(record.get("scenario_type") or ""),
-            messages=messages,
-            tools=schemas,
-            source_record=source_record,
-            workspace_root=Path(workspace_root),
-        )
-
-
-_TAGGED_TOOL_CALL = re.compile(r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL | re.IGNORECASE)
+_TAGGED_TOOL_CALL = re.compile(
+    r"<tool_call>\s*(.*?)\s*</tool_call>", re.DOTALL | re.IGNORECASE
+)
 _QWEN_FUNCTION_CALL = re.compile(
     r"<function=(?P<name>[^>\s]+)>\s*(?P<body>.*?)\s*</function>",
     re.DOTALL | re.IGNORECASE,
@@ -234,18 +30,20 @@ _QWEN_PARAMETER = re.compile(
 )
 
 
-def _parse_call_payload(payload: Any, *, default_id: str, raw: Any) -> tuple[ToolCall | None, str | None]:
+def _parse_call_payload(
+    payload: Any, *, default_id: str, raw: Any
+) -> tuple[ToolCall | None, str | None]:
     if isinstance(payload, str):
         try:
             payload = json.loads(payload)
         except json.JSONDecodeError as exc:
             return None, f"malformed_tool_call_json: {exc.msg}"
-    mapped = _as_mapping(payload)
+    mapped = as_mapping(payload)
     if mapped is None:
         return None, "malformed_tool_call_payload: expected object"
 
     function = mapped.get("function")
-    function_map = _as_mapping(function) or {}
+    function_map = as_mapping(function) or {}
     name = mapped.get("name") or function_map.get("name")
     arguments = mapped.get("arguments", function_map.get("arguments", {}))
     if not isinstance(name, str) or not name:
@@ -287,8 +85,13 @@ def _parse_qwen_function_call(
     for parameter in _QWEN_PARAMETER.finditer(match.group("body")):
         parameter_name = parameter.group("name").strip()
         if parameter_name in arguments:
-            return None, f"malformed_qwen_tool_call: duplicate parameter {parameter_name}"
-        arguments[parameter_name] = _parse_qwen_parameter_value(parameter.group("value"))
+            return (
+                None,
+                f"malformed_qwen_tool_call: duplicate parameter {parameter_name}",
+            )
+        arguments[parameter_name] = _parse_qwen_parameter_value(
+            parameter.group("value")
+        )
     return ToolCall(default_id, name, arguments, match.group(0)), None
 
 
@@ -304,22 +107,24 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
 
     errors: list[str] = []
     message = response
-    choices = _get(response, "choices")
+    choices = get_field(response, "choices")
     if choices:
         try:
             first_choice = choices[0]
         except (IndexError, TypeError):
             first_choice = None
-        message = _get(first_choice, "message", first_choice)
-    message = _get(response, "message", message)
+        message = get_field(first_choice, "message", first_choice)
+    message = get_field(response, "message", message)
 
-    raw_calls = _get(message, "tool_calls")
-    content = response if isinstance(response, str) else _get(message, "content", "")
+    raw_calls = get_field(message, "tool_calls")
+    content = response if isinstance(response, str) else get_field(message, "content", "")
     native_calls: list[ToolCall] = []
     native_errors: list[str] = []
     if raw_calls:
         for index, raw_call in enumerate(raw_calls):
-            call, error = _parse_call_payload(raw_call, default_id=f"call-{index + 1}", raw=raw_call)
+            call, error = _parse_call_payload(
+                raw_call, default_id=f"call-{index + 1}", raw=raw_call
+            )
             if call is not None:
                 native_calls.append(call)
             if error:
@@ -347,7 +152,9 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
     if qwen_calls:
         for index, call in enumerate(calls):
             if index < len(native_calls) and native_calls[index].name == call.name:
-                calls[index] = ToolCall(native_calls[index].call_id, call.name, call.arguments, call.raw)
+                calls[index] = ToolCall(
+                    native_calls[index].call_id, call.name, call.arguments, call.raw
+                )
         errors.extend(qwen_errors)
     else:
         errors.extend(native_errors)
@@ -361,7 +168,9 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
             if _QWEN_FUNCTION_CALL.search(match.group(1)):
                 continue
             call, error = _parse_call_payload(
-                match.group(1), default_id=f"call-{len(calls) + index + 1}", raw=match.group(0)
+                match.group(1),
+                default_id=f"call-{len(calls) + index + 1}",
+                raw=match.group(0),
             )
             if call is not None:
                 calls.append(call)
@@ -381,8 +190,12 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
                 decoded = json.loads(stripped)
             except json.JSONDecodeError:
                 decoded = None
-            if isinstance(decoded, Mapping) and ("name" in decoded or "function" in decoded):
-                call, error = _parse_call_payload(decoded, default_id="call-1", raw=decoded)
+            if isinstance(decoded, Mapping) and (
+                "name" in decoded or "function" in decoded
+            ):
+                call, error = _parse_call_payload(
+                    decoded, default_id="call-1", raw=decoded
+                )
                 if call is not None:
                     calls.append(call)
                 if error:
@@ -391,7 +204,9 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
     return content.strip(), calls, errors
 
 
-def _schema_index(schemas: Sequence[Mapping[str, Any]]) -> dict[str, Mapping[str, Any]]:
+def _schema_index(
+    schemas: Sequence[Mapping[str, Any]],
+) -> dict[str, Mapping[str, Any]]:
     index: dict[str, Mapping[str, Any]] = {}
     for schema in schemas:
         function = schema.get("function", schema) if isinstance(schema, Mapping) else {}
@@ -416,7 +231,11 @@ def _type_matches(value: Any, expected: str) -> bool:
     return True
 
 
-def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "arguments") -> str | None:
+def schema_error(
+    value: Any, schema: Mapping[str, Any], *, path: str = "arguments"
+) -> str | None:
+    """Return the first JSON-schema violation, or ``None`` when the value fits."""
+
     expected_type = schema.get("type")
     if expected_type and not _type_matches(value, str(expected_type)):
         return f"{path}: expected {expected_type}"
@@ -443,7 +262,7 @@ def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "argumen
         item_schema = schema.get("items")
         if isinstance(item_schema, Mapping):
             for index, item in enumerate(value):
-                error = _schema_error(item, item_schema, path=f"{path}[{index}]")
+                error = schema_error(item, item_schema, path=f"{path}[{index}]")
                 if error:
                     return error
     if isinstance(value, Mapping):
@@ -451,7 +270,9 @@ def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "argumen
         required = schema.get("required", [])
         missing = [name for name in required if name not in value]
         if missing:
-            return f"{path}: missing required field(s) {', '.join(map(str, missing))}"
+            return (
+                f"{path}: missing required field(s) {', '.join(map(str, missing))}"
+            )
         if schema.get("additionalProperties") is False:
             extras = [name for name in value if name not in properties]
             if extras:
@@ -460,7 +281,7 @@ def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "argumen
             for name, item in value.items():
                 child_schema = properties.get(name)
                 if isinstance(child_schema, Mapping):
-                    error = _schema_error(item, child_schema, path=f"{path}.{name}")
+                    error = schema_error(item, child_schema, path=f"{path}.{name}")
                     if error:
                         return error
         for condition in schema.get("allOf", []) or []:
@@ -468,16 +289,18 @@ def _schema_error(value: Any, schema: Mapping[str, Any], *, path: str = "argumen
                 continue
             if_schema = condition.get("if")
             then_schema = condition.get("then")
-            if not isinstance(if_schema, Mapping) or not isinstance(then_schema, Mapping):
+            if not isinstance(if_schema, Mapping) or not isinstance(
+                then_schema, Mapping
+            ):
                 continue
-            if _schema_error(value, if_schema, path=path) is None:
-                error = _schema_error(value, then_schema, path=path)
+            if schema_error(value, if_schema, path=path) is None:
+                error = schema_error(value, then_schema, path=path)
                 if error:
                     return error
     return None
 
 
-def _coerce_schema_value(value: Any, schema: Mapping[str, Any]) -> Any:
+def coerce_schema_value(value: Any, schema: Mapping[str, Any]) -> Any:
     """Coerce JSON-like strings only when the declared schema permits it.
 
     Qwen3.5's tagged ``<parameter>`` format can emit Python-style literals
@@ -521,7 +344,7 @@ def _coerce_schema_value(value: Any, schema: Mapping[str, Any]) -> Any:
     if expected_type == "array" and isinstance(value, list):
         item_schema = schema.get("items")
         if isinstance(item_schema, Mapping):
-            return [_coerce_schema_value(item, item_schema) for item in value]
+            return [coerce_schema_value(item, item_schema) for item in value]
         return value
 
     if expected_type == "object" and isinstance(value, Mapping):
@@ -529,7 +352,7 @@ def _coerce_schema_value(value: Any, schema: Mapping[str, Any]) -> Any:
         if not isinstance(properties, Mapping):
             return dict(value)
         return {
-            name: _coerce_schema_value(item, properties[name])
+            name: coerce_schema_value(item, properties[name])
             if isinstance(properties.get(name), Mapping)
             else item
             for name, item in value.items()
@@ -547,14 +370,20 @@ class ToolDispatcher:
         *,
         schemas: Sequence[Mapping[str, Any]],
         allowed_names: set[str] | None = None,
-        authorization_callback: Callable[[ToolCall, Sequence[Mapping[str, Any]]], Mapping[str, Any] | None] | None = None,
-        execution_arguments_callback: Callable[[ToolCall], Mapping[str, Any]] | None = None,
+        authorization_callback: Callable[
+            [ToolCall, Sequence[Mapping[str, Any]]], Mapping[str, Any] | None
+        ]
+        | None = None,
+        execution_arguments_callback: Callable[[ToolCall], Mapping[str, Any]]
+        | None = None,
         execution_context: Mapping[str, Any] | None = None,
         workspace_setup: Callable[[Path], None] | None = None,
     ) -> None:
         self.registry = registry
         self.schemas = _schema_index(schemas)
-        self.allowed_names = set(allowed_names) if allowed_names is not None else set(self.schemas)
+        self.allowed_names = (
+            set(allowed_names) if allowed_names is not None else set(self.schemas)
+        )
         self.authorization_callback = authorization_callback
         self.execution_arguments_callback = execution_arguments_callback
         self.execution_context = dict(execution_context or {})
@@ -570,7 +399,7 @@ class ToolDispatcher:
         parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
         if not isinstance(parameters, Mapping) or not isinstance(call.arguments, Mapping):
             return "invalid_arguments"
-        return "invalid_arguments" if _schema_error(call.arguments, parameters) else None
+        return "invalid_arguments" if schema_error(call.arguments, parameters) else None
 
     def _schema_normalized_call(self, call: ToolCall) -> ToolCall:
         schema = self.schemas.get(call.name)
@@ -580,7 +409,7 @@ class ToolDispatcher:
         parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
         if not isinstance(parameters, Mapping):
             return call
-        normalized = _coerce_schema_value(call.arguments, parameters)
+        normalized = coerce_schema_value(call.arguments, parameters)
         if not isinstance(normalized, Mapping):
             return call
         return ToolCall(call.call_id, call.name, dict(normalized), call.raw)
@@ -611,7 +440,9 @@ class ToolDispatcher:
             self._record(normalized_call, result)
             return result
         if self.authorization_callback is not None:
-            authorization_error = self.authorization_callback(normalized_call, self.completed_tool_calls)
+            authorization_error = self.authorization_callback(
+                normalized_call, self.completed_tool_calls
+            )
             if authorization_error:
                 result = dict(authorization_error)
                 result.setdefault("success", False)
@@ -715,6 +546,6 @@ def append_tool_exchange(
     messages.append(
         {
             "role": "tool_response",
-            "content": json.dumps(_jsonable(result), ensure_ascii=False, sort_keys=True),
+            "content": json.dumps(jsonable(result), ensure_ascii=False, sort_keys=True),
         }
     )

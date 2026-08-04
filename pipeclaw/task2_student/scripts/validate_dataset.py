@@ -8,6 +8,16 @@ import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+try:
+    from ..path_contract import is_host_absolute_path
+except ImportError:  # pragma: no cover - direct script execution
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+    from pipeclaw.task2_student.path_contract import (  # type: ignore
+        is_host_absolute_path,
+    )
+
 
 SOURCE_REQUIRED_FIELDS = frozenset(
     {
@@ -393,6 +403,22 @@ def _validate_messages(
             raise DatasetValidationError(
                 f"{example_id}: message {message_index} content must be a string"
             )
+        content = message["content"]
+        if message.get("role") in {"system", "tool_call"} and "windows-first" in content.casefold():
+            raise DatasetValidationError(
+                f"{example_id}: generated contract contains host-specific path policy"
+            )
+        if message.get("role") == "tool_call":
+            try:
+                parsed_call = json.loads(content)
+            except json.JSONDecodeError:
+                parsed_call = None
+            if isinstance(parsed_call, dict):
+                arguments = parsed_call.get("arguments")
+                if isinstance(arguments, dict) and is_host_absolute_path(arguments.get("cwd")):
+                    raise DatasetValidationError(
+                        f"{example_id}: tool_call cwd must be workspace-relative or omitted"
+                    )
 
     task_type = record.get("task_type")
     if projection == "constraint_multitask":
@@ -467,6 +493,10 @@ def _validate_tools(record: dict[str, Any], example_id: str) -> set[str]:
     raw_tools = record.get("tools")
     if not isinstance(raw_tools, str):
         raise DatasetValidationError(f"{example_id}: tools must be a JSON string")
+    if "windows-first" in raw_tools.casefold():
+        raise DatasetValidationError(
+            f"{example_id}: tool schema contains host-specific path policy"
+        )
     tools = _parse_json(raw_tools, f"{example_id}: tools")
     if not isinstance(tools, list) or not tools:
         raise DatasetValidationError(f"{example_id}: tools must contain schemas")
