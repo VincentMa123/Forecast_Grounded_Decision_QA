@@ -5,24 +5,24 @@ import json
 from pathlib import Path
 from typing import Dict
 
-from evaluator.csv_evidence import build_csv_evidence
-from evaluator.grounding_contract import repair_grounded_record
+from grounding.evidence.csv import build_csv_evidence
+from grounding.contract import repair_grounded_record
 from evaluator.scorer import (
     DEFAULT_MINIMUM_SCORE,
     NativeEvaluationConfig,
     NativeTraceEvaluator,
 )
-from evaluator.teacher_trace_audit import (
+from reporting.teacher_trace_audit import (
     TeacherTraceAuditConfig,
     TeacherTraceQualityAuditor,
 )
-from evaluator.reviewer_annotations import (
+from reporting.reviewer_annotations import (
     export_reviewer_annotations,
     load_reviewer_annotations,
     load_sample_id_set,
 )
 from evaluator.teacher_quality import numeric_claims_are_grounded, numeric_grounding_evidence
-from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from grounding.evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 from generate_teacher_trace import _history_turn, write_split_records
 from reporting.statistics_report import Task1StatisticsWorkbook
 from reporting.teacher_trace_quality_report import (

@@ -1,0 +1,277 @@
+"""Shared helpers for canonical evaluator checks."""
+
+from __future__ import annotations
+
+import json
+import math
+from collections.abc import Mapping, Sequence
+from typing import Any
+
+from ..models import EvaluationContext, MetricResult
+from ..profiles import get_profile_policy
+from .assumptions import inferred_task_fields, prediction_view
+
+
+PIPEFORMER_TOOL = "run_pipeformer_forecast"
+REGISTRY_TOOL = "search_pipeformer_registry"
+CANONICAL_METRIC_NAMES = (
+    "task_parsing",
+    "assumption_consistency",
+    "tool_call",
+    "checkpoint_inference",
+    "disturbance_application",
+    "forecast_horizon",
+    "constraint_execution",
+    "constraint_judgment",
+    "verification_completeness",
+    "registry_ordering",
+    "risk",
+    "manual_intervention",
+    "dispatch",
+    "evidence_consistency",
+    "answer_completeness",
+    "json_validity",
+    "artifact_evidence",
+    "record_contract",
+)
+
+
+def sequence(value: Any) -> Sequence[Any]:
+    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+        return value
+    return ()
+
+
+def mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
+
+
+def metric(
+    context: EvaluationContext,
+    name: str,
+    *,
+    applicable: bool,
+    passed: bool = False,
+    details: Mapping[str, Any] | None = None,
+    teacher_variant: str = "pipeformer",
+) -> MetricResult:
+    policy = get_profile_policy(
+        context.profile,
+        teacher_variant=teacher_variant,
+    ).metric(name)
+    return MetricResult(
+        name=name,
+        applicable=bool(applicable),
+        passed=bool(passed) if applicable else False,
+        weight=policy.weight,
+        critical=policy.critical,
+        included_in_score=policy.included_in_score,
+        details=dict(details or {}),
+    )
+
+
+def inapplicable_metrics(
+    context: EvaluationContext,
+    names: Sequence[str],
+    *,
+    teacher_variant: str = "pipeformer",
+) -> list[MetricResult]:
+    return [
+        metric(
+            context,
+            name,
+            applicable=False,
+            teacher_variant=teacher_variant,
+        )
+        for name in names
+    ]
+
+
+def verification_view(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    value = output.get("verification") or output.get("constraint_check")
+    return value if isinstance(value, Mapping) else {}
+
+
+def normalize(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {
+            str(key): normalize(item)
+            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+        }
+    if isinstance(value, (list, tuple, set, frozenset)):
+        values = [normalize(item) for item in value]
+        try:
+            return sorted(
+                values,
+                key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
+            )
+        except TypeError:
+            return values
+    if isinstance(value, float) and math.isfinite(value):
+        return round(value, 6)
+    return value
+
+
+def numbers_match(actual: Any, expected: Any) -> bool:
+    try:
+        actual_value = float(actual)
+        expected_value = float(expected)
+    except (TypeError, ValueError):
+        return False
+    return math.isclose(
+        actual_value,
+        expected_value,
+        rel_tol=1e-6,
+        abs_tol=1e-6,
+    )
+
+
+def task_match(
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    fields = (
+        "case_id",
+        "current_operating_condition_number",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "forecast_horizon_minutes",
+        "task_type",
+        "constraint_verification_types",
+        "required_constraints",
+    )
+    required_fields = {"case_id", "disturbance_variable"}
+    assumed_fields = inferred_task_fields(expected)
+    mismatches: list[str] = []
+    for field in fields:
+        if field not in expected or field in assumed_fields:
+            continue
+        if field not in actual:
+            if field in required_fields:
+                mismatches.append(field)
+            continue
+        left = normalize(expected[field])
+        right = normalize(actual[field])
+        if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+            equal = math.isclose(
+                float(left),
+                float(right),
+                rel_tol=1e-5,
+                abs_tol=1e-5,
+            )
+        else:
+            equal = left == right
+        if not equal:
+            mismatches.append(field)
+    return not mismatches, mismatches
+
+
+def disturbance_was_applied(
+    output: Mapping[str, Any],
+    task: Mapping[str, Any],
+) -> bool:
+    prediction = prediction_view(output)
+    variable = str(
+        task.get("disturbance_variable")
+        or prediction.get("disturbance_variable")
+        or ""
+    )
+    if not variable or variable != str(prediction.get("disturbance_variable") or ""):
+        return False
+    boundary = mapping(task.get("boundary_conditions"))
+    setpoints = mapping(boundary.get("setpoints"))
+    percentages = mapping(boundary.get("percentage_changes"))
+    assumed = inferred_task_fields(task)
+    magnitude = task.get("disturbance_magnitude_percent")
+    if "disturbance_magnitude_percent" in assumed or magnitude is None:
+        magnitude = prediction.get("disturbance_magnitude_percent")
+    direction = str(
+        (
+            prediction.get("disturbance_direction")
+            if "disturbance_direction" in assumed
+            else task.get("disturbance_direction")
+        )
+        or prediction.get("disturbance_direction")
+        or ""
+    ).casefold()
+    expected_mode = ""
+    expected_value: Any = None
+    if variable in setpoints:
+        if variable in percentages:
+            return False
+        expected_mode = "setpoint"
+        expected_value = setpoints[variable]
+    elif variable in percentages:
+        expected_mode = "percent_change"
+        expected_value = percentages[variable]
+        if magnitude is not None:
+            signed = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
+            if direction not in {"up", "down"} or not numbers_match(
+                expected_value,
+                signed,
+            ):
+                return False
+    elif magnitude is not None and direction in {"up", "down"}:
+        expected_mode = "percent_change"
+        expected_value = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
+    else:
+        return False
+    applied = sequence(
+        mapping(output.get("task_resolution")).get("applied_boundary_conditions")
+    )
+    return any(
+        isinstance(item, Mapping)
+        and str(item.get("variable") or "") == variable
+        and str(item.get("mode") or "") == expected_mode
+        and numbers_match(item.get("value", item.get("requested_value")), expected_value)
+        for item in applied
+    )
+
+
+def horizon_is_consistent(output: Mapping[str, Any]) -> bool:
+    prediction = prediction_view(output)
+    requested = prediction.get("forecast_horizon_minutes")
+    actual = prediction.get("actual_forecast_horizon_minutes")
+    window = mapping(prediction.get("forecast_window"))
+    try:
+        step = float(window.get("time_step_minutes") or 0.0)
+        actual_value = float(actual)
+    except (TypeError, ValueError):
+        return False
+    if requested is None:
+        try:
+            steps = int(window.get("predict_row_count") or 0)
+        except (TypeError, ValueError):
+            return False
+        return actual_value > 0 and (
+            not steps
+            or abs(actual_value - steps * step) <= max(step, 1e-6)
+        )
+    try:
+        requested_value = float(requested)
+    except (TypeError, ValueError):
+        return False
+    return abs(requested_value - actual_value) <= max(step, 1e-6)
+
+
+def requested_constraints_executed(output: Mapping[str, Any]) -> bool:
+    verification = verification_view(output)
+    requested = {str(item) for item in sequence(verification.get("requested_categories"))}
+    categories = {
+        str(key) for key in mapping(verification.get("category_status"))
+    }
+    return bool(
+        requested
+        and requested <= categories
+        and mapping(verification.get("rule_status"))
+    )
+
+
+def verification_is_complete(output: Mapping[str, Any]) -> bool:
+    verification = verification_view(output)
+    return bool(
+        verification
+        and verification.get("verification_complete") is True
+        and not sequence(verification.get("not_evaluated_rules"))
+    )

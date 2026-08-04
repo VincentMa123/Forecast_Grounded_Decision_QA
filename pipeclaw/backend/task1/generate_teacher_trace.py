@@ -4,19 +4,20 @@ import argparse
 import hashlib
 import json
 import logging
+import ntpath
 import os
 import re
 from datetime import datetime
 from pathlib import Path
+from pathlib import PureWindowsPath
 from typing import Any, Dict, List, Optional
 
-from evaluator.csv_evidence import build_csv_evidence
-from evaluator.decision_trace_state import (
+from grounding.decision_trace_state import (
     DecisionTraceState,
     bounded_recent_turns,
     serialize_verified_decision_state,
 )
-from evaluator.grounding_contract import (
+from grounding.contract import (
     GroundingContractBuilder,
     comparison_answer_issues,
     finalize_applied_disturbance_disclosure,
@@ -33,8 +34,10 @@ from evaluator.teacher_quality import (
     safety_and_energy_checks_pass as _safety_and_energy_checks_pass,
     tool_output_failed,
 )
-from evaluator.tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
-from evaluator.topology_evidence import topology_summary_from_tool_outputs
+from grounding.evidence.csv import build_csv_evidence
+from grounding.evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from grounding.evidence.topology import topology_summary_from_tool_outputs
+from grounding.pipeformer_projection import compact_pipeformer_output, project_pipeformer_output
 from evaluator.scorer import NativeTraceEvaluator
 from pipeline.forecast_registry_contract import authorize_forecast_registry
 from pipeline.io_utils import write_json, write_jsonl
@@ -84,6 +87,20 @@ SFT_OMITTED_TOOL_KEYS = {
     "timestamp",
     "workspace",
 }
+SFT_OMITTED_CALL_ARGUMENT_KEYS = frozenset({"cwd"})
+
+
+def _host_absolute_path(value: Any) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    raw = value.strip()
+    normalized = raw.replace("\\", "/")
+    return bool(
+        Path(normalized).is_absolute()
+        or PureWindowsPath(raw).is_absolute()
+        or ntpath.splitdrive(raw)[0]
+        or normalized.startswith("//")
+    )
 def backend_root() -> Path:
     return Path(__file__).resolve().parent
 
@@ -553,53 +570,6 @@ def compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
     return _without_none_values(compact)
 
 
-def project_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
-    parsed_task = compact_parsed_task(output)
-    metadata = dict(output.get("forecast_metadata") or {})
-    task_resolution = {
-        "resolved_attention_variable_count": parsed_task.get("resolved_attention_variable_count", 0),
-        "resolved_output_variable_count": parsed_task.get("resolved_output_variable_count", 0),
-        "unresolved_attention_targets": parsed_task.get("unresolved_attention_targets", []),
-        "unresolved_output_state_variables": parsed_task.get("unresolved_output_state_variables", []),
-        "applied_boundary_conditions": metadata.get("applied_boundary_conditions", []),
-        "variable_normalizations": parsed_task.get("variable_normalizations", []),
-        "vocabulary_normalizations": parsed_task.get("vocabulary_normalizations", []),
-        "invalid_normalized_variables": parsed_task.get("invalid_normalized_variables", []),
-    }
-    provenance = {
-        "checkpoint_id": metadata.get("checkpoint_id"),
-        "data_case_id": metadata.get("data_case_id"),
-        "device": metadata.get("device"),
-        "model_input_projection_type": metadata.get("model_input_projection_type"),
-        "data_provenance": metadata.get("data_provenance"),
-    }
-    return {
-        "parsed_task": parsed_task,
-        "prediction_summary": compact_prediction_summary(output),
-        "constraint_check": compact_constraint_check(output),
-        "evidence": dict(output.get("evidence") or {}),
-        "risk_level": output.get("risk_level"),
-        "manual_intervention_label": output.get("manual_intervention_label"),
-        "dispatch_recommendation": output.get("dispatch_recommendation"),
-        "task_resolution": _without_none_values(task_resolution),
-        "provenance": _without_none_values(provenance),
-    }
-
-
-def compact_pipeformer_output(projection: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "success": True,
-        "task_resolution": projection["task_resolution"],
-        "prediction": projection["prediction_summary"],
-        "verification": projection["constraint_check"],
-        "evidence": projection["evidence"],
-        "risk_level": projection.get("risk_level"),
-        "manual_intervention_label": projection.get("manual_intervention_label"),
-        "dispatch_recommendation": projection.get("dispatch_recommendation"),
-        "provenance": projection["provenance"],
-    }
-
-
 def export_trace_tools(
     trace: Dict[str, Any],
 ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
@@ -1053,7 +1023,15 @@ class TeacherTraceProjector:
         # for compatibility with existing projection call sites.
         del pipeformer
         if isinstance(value, dict):
-            return {key: self._compact_call_arguments(item, pipeformer=False) for key, item in value.items()}
+            compacted: dict[str, Any] = {}
+            for key, item in value.items():
+                if key in SFT_OMITTED_CALL_ARGUMENT_KEYS:
+                    if item is None or _host_absolute_path(item):
+                        continue
+                    if isinstance(item, str):
+                        item = item.replace("\\", "/")
+                compacted[key] = self._compact_call_arguments(item, pipeformer=False)
+            return compacted
         if isinstance(value, list):
             return [self._compact_call_arguments(item, pipeformer=False) for item in value]
         if isinstance(value, str) and len(value) > 2_000:

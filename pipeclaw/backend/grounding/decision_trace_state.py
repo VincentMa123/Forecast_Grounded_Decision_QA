@@ -593,7 +593,7 @@ class VerifiedDecisionState:
         tool_results: Iterable[Dict[str, Any]],
     ) -> "VerifiedDecisionState":
         """Reduce only successful verified tool results into a new state."""
-        from evaluator.grounding_contract import GroundingContractBuilder
+        from .contract import GroundingContractBuilder
 
         successful = [
             deepcopy(dict(item))

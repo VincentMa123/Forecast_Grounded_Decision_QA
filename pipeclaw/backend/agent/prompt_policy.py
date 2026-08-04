@@ -13,7 +13,7 @@ _STATIC_POLICY_SECTIONS = (
         "- Use native function calling; never simulate a tool call in text.",
         "- Send one fresh, complete JSON object that matches the selected tool schema. Never concatenate objects, reuse argument text, or invent keys.",
         "- Prefer one tool call at a time. Read its result before choosing the next call; use multiple calls only when they are independent.",
-        "- For `run_command`, `cmd` is an array of strings. This environment is Windows-first: prefer cmd or PowerShell unless another shell is confirmed.",
+        "- For `run_command`, `cmd` is a JSON array. Use the paths from the active Workspace Contract or workspace-relative paths; omit `cwd` when the active workspace is sufficient. The runner selects the host interpreter and shell for Windows or Linux. Never copy a path from another session or training example.",
         "- On a structured tool error, follow its retry instruction exactly. A successful exit code without requested evidence is not evidence.",
     ),
     _section(

@@ -6,11 +6,18 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from pipeline.scenario_preflight import (
-    DATA_FILE_RE,
-    DATA_FILE_SUBDIRECTORIES,
-    DEFAULT_PIPELINE_DATA_ROOT,
-)
+try:
+    from pipeclaw.backend.pipeline.scenario_preflight import (
+        DATA_FILE_RE,
+        DATA_FILE_SUBDIRECTORIES,
+        DEFAULT_PIPELINE_DATA_ROOT,
+    )
+except ImportError:  # pragma: no cover - direct backend execution
+    from pipeline.scenario_preflight import (
+        DATA_FILE_RE,
+        DATA_FILE_SUBDIRECTORIES,
+        DEFAULT_PIPELINE_DATA_ROOT,
+    )
 from .pipeline_scope import filter_rows_by_named_pipeline
 
 

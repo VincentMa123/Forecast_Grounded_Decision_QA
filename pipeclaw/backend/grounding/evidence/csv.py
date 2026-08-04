@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
-from .tool_evidence import attach_tool_arguments, tool_output_failed
+from .tool import attach_tool_arguments, tool_output_failed
 from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
 
 

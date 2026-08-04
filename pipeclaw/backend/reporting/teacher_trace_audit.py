@@ -7,14 +7,14 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from .teacher_quality import (
+from evaluator.teacher_quality import (
     numeric_claim_values,
     numeric_claims_are_grounded,
     numeric_grounding_evidence,
     tool_output_failed,
 )
 
-from .tool_evidence import attach_tool_arguments
+from grounding.evidence.tool import attach_tool_arguments
 
 TEACHER_TRACE_REQUIRED_FIELDS = (
     "sample_id",

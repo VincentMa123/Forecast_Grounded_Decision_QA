@@ -6,9 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from evaluator.teacher_trace_audit import TeacherTraceQualityAuditor
+from reporting.teacher_trace_audit import TeacherTraceQualityAuditor
 from evaluator.teacher_quality import tool_output_failed
-from evaluator.tool_evidence import attach_tool_arguments
+from grounding.evidence.tool import attach_tool_arguments
 
 
 class TeacherTraceQualityReportWriter:

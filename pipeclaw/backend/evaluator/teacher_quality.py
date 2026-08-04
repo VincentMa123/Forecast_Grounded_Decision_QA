@@ -4,32 +4,60 @@ import json
 import re
 from typing import Any, Dict, List, Optional
 
-from .answer_limits import (
-    CHINESE_SINGLE_FORECAST_MAX_CHARS,
-    ENGLISH_MAX_WORDS,
-    GENERIC_MAX_CHARS,
-    chinese_comparison_max_chars,
-)
-from .csv_evidence import build_csv_evidence
-from .decision_trace_state import VerifiedDecisionState
-from .grounding_contract import (
-    GroundingContractBuilder,
-    answer_without_machine_disclosure,
-    comparison_answer_issues,
-)
-from .tool_evidence import (
-    DATA_FILE_REFERENCE,
-    ToolEvidenceState,
-    attach_tool_arguments,
-    classify_tool_evidence,
-    requested_artifacts,
-    tool_output_failed,
-)
-from .topology_evidence import (
-    topology_quality_issues,
-    topology_summary_from_tool_outputs,
-    topology_tool_required,
-)
+try:
+    from pipeclaw.backend.grounding.answer_limits import (
+        CHINESE_SINGLE_FORECAST_MAX_CHARS,
+        ENGLISH_MAX_WORDS,
+        GENERIC_MAX_CHARS,
+        chinese_comparison_max_chars,
+    )
+    from pipeclaw.backend.grounding.contract import (
+        GroundingContractBuilder,
+        answer_without_machine_disclosure,
+        comparison_answer_issues,
+    )
+    from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
+    from pipeclaw.backend.grounding.evidence.csv import build_csv_evidence
+    from pipeclaw.backend.grounding.evidence.tool import (
+        DATA_FILE_REFERENCE,
+        ToolEvidenceState,
+        attach_tool_arguments,
+        classify_tool_evidence,
+        requested_artifacts,
+        tool_output_failed,
+    )
+    from pipeclaw.backend.grounding.evidence.topology import (
+        topology_quality_issues,
+        topology_summary_from_tool_outputs,
+        topology_tool_required,
+    )
+except ImportError:  # pragma: no cover - direct backend execution
+    from grounding.answer_limits import (
+        CHINESE_SINGLE_FORECAST_MAX_CHARS,
+        ENGLISH_MAX_WORDS,
+        GENERIC_MAX_CHARS,
+        chinese_comparison_max_chars,
+    )
+    from grounding.contract import (
+        GroundingContractBuilder,
+        answer_without_machine_disclosure,
+        comparison_answer_issues,
+    )
+    from grounding.decision_trace_state import VerifiedDecisionState
+    from grounding.evidence.csv import build_csv_evidence
+    from grounding.evidence.tool import (
+        DATA_FILE_REFERENCE,
+        ToolEvidenceState,
+        attach_tool_arguments,
+        classify_tool_evidence,
+        requested_artifacts,
+        tool_output_failed,
+    )
+    from grounding.evidence.topology import (
+        topology_quality_issues,
+        topology_summary_from_tool_outputs,
+        topology_tool_required,
+    )
 
 UNSUPPORTED_HISTORY_CLAIM = re.compile(
     r"\b(?:reproduced (?:in|across|during)|reproducible across|previous runs?|prior runs?|stable across runs?|times stable)\b"

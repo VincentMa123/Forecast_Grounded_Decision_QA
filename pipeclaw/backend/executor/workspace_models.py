@@ -31,7 +31,7 @@ class FileMeta(BaseModel):
 class WorkspaceSnapshot(BaseModel):
     """A snapshot of files currently in the workspace."""
 
-    root: str = Field(..., description="Absolute WORKSPACE_DIR on server")
+    root: str = Field(..., description="Configured WORKSPACE_DIR for this runtime")
     files: List[FileMeta] = Field(
         default_factory=list,
         description="Relative file paths under workspace (recursive)",
@@ -51,6 +51,9 @@ class ToolResultBase(BaseModel):
     error: Optional[str] = Field(
         None, description="Error message if success=False"
     )
+    error_code: Optional[str] = Field(
+        None, description="Stable machine-readable error code, when applicable"
+    )
     warnings: List[str] = Field(
         default_factory=list, description="Non-fatal warnings"
     )
@@ -69,7 +72,7 @@ class WriteFileResult(ToolResultBase):
         ..., description="Path relative to WORKSPACE_DIR that was written"
     )
     abs_path: Optional[str] = Field(
-        None, description="Absolute path on server"
+        None, description="Absolute path on the configured runtime, when applicable"
     )
     bytes_written: Optional[int] = Field(
         None, ge=0, description="Bytes written (UTF-8)"
@@ -85,7 +88,7 @@ class EditFileResult(ToolResultBase):
         ..., description="Path relative to WORKSPACE_DIR that was edited"
     )
     abs_path: Optional[str] = Field(
-        None, description="Absolute path on server"
+        None, description="Absolute path on the configured runtime, when applicable"
     )
     old_string: Optional[str] = Field(
         None, description="The old string that was matched"
@@ -107,7 +110,7 @@ class ReadFileResult(ToolResultBase):
         ..., description="Path relative to WORKSPACE_DIR that was read"
     )
     abs_path: Optional[str] = Field(
-        None, description="Absolute path on server"
+        None, description="Absolute path on the configured runtime, when applicable"
     )
     size_bytes: Optional[int] = Field(
         None, ge=0, description="File size"
@@ -135,7 +138,7 @@ class RunCommandResult(ToolResultBase):
         ..., description="Executed command list (e.g. ['python','task.py'])"
     )
     cwd: Optional[str] = Field(
-        None, description="Working directory (WORKSPACE_DIR)"
+        None, description="Configured absolute or workspace-relative working directory"
     )
     exit_code: Optional[int] = Field(
         None, description="Process exit code"
@@ -147,10 +150,10 @@ class RunCommandResult(ToolResultBase):
     stderr: str = Field("", description="Captured stderr (truncated)")
     run_dir: Optional[str] = Field(
         None,
-        description="Directory storing run logs (stdout.txt, stderr.txt, meta.json)",
+        description="Directory storing run logs on the configured runtime",
     )
     output_dir: Optional[str] = Field(
-        None, description="OUTPUT_DIR used for artifacts"
+        None, description="Configured runtime output directory"
     )
     output_files: List[FileMeta] = Field(
         default_factory=list,

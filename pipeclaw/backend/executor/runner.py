@@ -5,13 +5,16 @@ from __future__ import annotations
 
 import json
 import logging
+import ntpath
 import os
 import subprocess
 import time
 from datetime import datetime
 import shlex
 import locale
+from dataclasses import dataclass
 from pathlib import Path
+from pathlib import PureWindowsPath
 from typing import List, Optional, Tuple
 
 from .workspace_models import (
@@ -42,6 +45,85 @@ ALLOWED_COMMANDS = {
 }
 SHELL_WRAPPED_COMMANDS = {"dir", "ls", "cp", "mv", "rm", "del", "mkdir", "rmdir", "copy", "xcopy", "robocopy", "echo"}
 NON_ERROR_EXIT_CODES = {"robocopy": set(range(0, 8))}
+
+
+@dataclass(frozen=True)
+class WorkspaceCwdResolution:
+    """Cross-platform resolution of a model-supplied working directory."""
+
+    valid: bool
+    path: Optional[Path]
+    logical_path: Optional[str]
+    error_code: Optional[str] = None
+    error: Optional[str] = None
+    rebased: bool = False
+
+
+def _is_absolute_path_any_platform(value: str) -> bool:
+    """Recognize POSIX, Windows drive-letter, and UNC paths on every host."""
+
+    text = str(value).strip()
+    normalized = text.replace("\\", "/")
+    return bool(
+        Path(normalized).is_absolute()
+        or PureWindowsPath(text).is_absolute()
+        or ntpath.splitdrive(text)[0]
+        or normalized.startswith("//")
+    )
+
+
+def resolve_workspace_cwd(
+    workspace_dir: Path | str,
+    cwd: Optional[str],
+) -> WorkspaceCwdResolution:
+    """Resolve a relative model cwd without ever nesting a foreign absolute path."""
+
+    root = Path(workspace_dir).resolve()
+    if cwd is None or not str(cwd).strip() or str(cwd).strip() == ".":
+        return WorkspaceCwdResolution(True, root, ".")
+    raw = str(cwd).strip()
+    normalized = raw.replace("\\", "/")
+    if _is_absolute_path_any_platform(raw):
+        # A path absolute to this host can be accepted only when it is already
+        # inside the active workspace. Foreign drive/UNC paths are rejected.
+        candidate = Path(normalized)
+        if candidate.is_absolute():
+            target = candidate.resolve()
+            try:
+                relative = target.relative_to(root)
+            except (ValueError, RuntimeError):
+                relative = None
+            if relative is not None:
+                logical = relative.as_posix() or "."
+                return WorkspaceCwdResolution(True, target, logical, rebased=True)
+        return WorkspaceCwdResolution(
+            False,
+            None,
+            None,
+            error_code="invalid_cwd",
+            error="cwd must be omitted or a workspace-relative subdirectory",
+        )
+    parts = tuple(part for part in Path(normalized).parts if part not in ("", "."))
+    if ".." in parts:
+        return WorkspaceCwdResolution(
+            False,
+            None,
+            None,
+            error_code="invalid_cwd",
+            error="cwd cannot traverse outside the active workspace",
+        )
+    target = (root / normalized).resolve()
+    try:
+        relative = target.relative_to(root)
+    except (ValueError, RuntimeError):
+        return WorkspaceCwdResolution(
+            False,
+            None,
+            None,
+            error_code="invalid_cwd",
+            error="cwd must remain inside the active workspace",
+        )
+    return WorkspaceCwdResolution(True, target, relative.as_posix() or ".")
 
 
 def _decode_output(data: Optional[bytes]) -> str:
@@ -129,8 +211,10 @@ class WorkspaceRunner:
     def _resolve_tool_path(self, workspace_dir: Path, path: str) -> Optional[Path]:
         if self._is_pipeline_data_logical_path(path):
             return None
-        raw_path = Path(path)
-        if raw_path.is_absolute():
+        raw_path = Path(str(path).replace("\\", "/"))
+        if _is_absolute_path_any_platform(str(path)):
+            if not raw_path.is_absolute():
+                return None
             target = raw_path.resolve()
             if self._is_within_root(target, workspace_dir) or self._is_allowed_absolute_tool_path(target):
                 return target
@@ -143,8 +227,10 @@ class WorkspaceRunner:
             if not self._valid_pipeline_data_relative(relative):
                 return None
             return self._safe_resolve(self.pipeline_data_root, relative)
-        raw_path = Path(path)
-        if raw_path.is_absolute():
+        raw_path = Path(str(path).replace("\\", "/"))
+        if _is_absolute_path_any_platform(str(path)):
+            if not raw_path.is_absolute():
+                return None
             target = raw_path.resolve()
             if (
                 self._is_within_root(target, workspace_dir)
@@ -301,6 +387,17 @@ class WorkspaceRunner:
         command = str(cmd[0]).lower()
         if command not in ALLOWED_COMMANDS:
             return RunCommandResult(success=False, session_id=session_id, cmd=cmd, error=f"Command not allowed: {cmd[0]}. Allowed: {sorted(ALLOWED_COMMANDS)}", workspace=None)
+        cwd_resolution = resolve_workspace_cwd(workspace_dir, cwd)
+        if not cwd_resolution.valid or cwd_resolution.path is None:
+            return RunCommandResult(
+                success=False,
+                session_id=session_id,
+                cmd=cmd,
+                cwd=None,
+                error_code=cwd_resolution.error_code or "invalid_cwd",
+                error=cwd_resolution.error or "Invalid working directory",
+                workspace=None,
+            )
         effective_cmd = self._prepare_command(cmd)
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir = runs_dir / f"run_{run_id}"
@@ -319,7 +416,7 @@ class WorkspaceRunner:
         stderr_data: bytes = b""
         exit_code = None
         error = None
-        effective_cwd = cwd if cwd else str(workspace_dir)
+        effective_cwd = str(cwd_resolution.path)
         try:
             result = subprocess.run(effective_cmd, cwd=effective_cwd, env=env, capture_output=True, text=False, timeout=timeout_s)
             exit_code = result.returncode
@@ -344,7 +441,21 @@ class WorkspaceRunner:
         (run_dir / "meta.json").write_text(json.dumps({"cmd": cmd, "effective_cmd": effective_cmd, "exit_code": exit_code, "duration_s": round(duration, 3), "timestamp": datetime.now().isoformat(timespec="seconds"), "timeout_s": timeout_s, "error": error}, ensure_ascii=False, indent=2), encoding="utf-8")
         output_files = self._list_files(output_dir, workspace_dir)
         success = error is None and exit_code in success_exit_codes
-        return RunCommandResult(success=success, session_id=session_id, cmd=cmd, cwd=effective_cwd, exit_code=exit_code, duration_s=round(duration, 3), stdout=truncated_stdout, stderr=truncated_stderr, run_dir=str(run_dir), output_dir=str(output_dir), output_files=output_files, error=error, workspace=None)
+        return RunCommandResult(
+            success=success,
+            session_id=session_id,
+            cmd=cmd,
+            cwd=cwd_resolution.logical_path,
+            exit_code=exit_code,
+            duration_s=round(duration, 3),
+            stdout=truncated_stdout,
+            stderr=truncated_stderr,
+            run_dir=run_dir.relative_to(workspace_dir).as_posix(),
+            output_dir=output_dir.relative_to(workspace_dir).as_posix(),
+            output_files=output_files,
+            error=error,
+            workspace=None,
+        )
 
 
 _runner: Optional[WorkspaceRunner] = None

@@ -18,7 +18,7 @@ from .decision_policy import (
     normalize_decision_policy,
     rank_candidate_groups,
 )
-from .tool_evidence import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from .evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 
 
 RISK_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}

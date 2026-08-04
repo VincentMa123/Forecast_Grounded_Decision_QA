@@ -7,7 +7,7 @@ from pathlib import Path
 from statistics import mean, median
 from typing import Any, Dict, List, Mapping, Sequence
 
-from evaluator.teacher_trace_audit import TeacherTraceQualityAuditor
+from reporting.teacher_trace_audit import TeacherTraceQualityAuditor
 
 
 class Task1StatisticsWorkbook:

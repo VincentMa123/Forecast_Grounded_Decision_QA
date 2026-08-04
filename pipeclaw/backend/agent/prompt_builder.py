@@ -113,7 +113,7 @@ class PromptBuilder:
             "\n".join(
                 [
                     "## Workspace Contract",
-                    f"- WORKSPACE_ROOT: {self.workspace_root.as_posix()}",
+                    f"- WORKSPACE_ROOT: {self.workspace_root.as_posix()} (runtime-configured for this deployment)",
                     f"- MEMORY_ROOT: {(self.workspace_root / 'memory').as_posix()}",
                     f"- ASSETS_ROOT: {(self.workspace_root / 'assets').as_posix()}",
                     f"- TRACE_ROOT: {(self.workspace_root / 'context_trace').as_posix()}",
