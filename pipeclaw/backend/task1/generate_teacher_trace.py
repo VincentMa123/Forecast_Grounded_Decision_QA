@@ -65,7 +65,7 @@ from pipeline.teacher_trace_store import (
 
 logger = logging.getLogger("teacher_trace")
 
-SFT_MAX_RECORD_CHARS = 35_000
+SFT_MAX_RECORD_CHARS = 36_000
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
 SFT_MAX_GENERIC_TOOL_PAIRS = 6
 SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
@@ -75,6 +75,32 @@ SFT_REGISTRY_ID_FIELDS = (
     "role",
     "controllable",
 )
+# Prior-turn tool calls reach the student through ``state_before.provenance``.
+# The tool name alone is nearly contentless -- eight names cover every call in
+# the corpus -- so each retained call also carries the arguments that identify
+# *what* it acted on.  Bulk payloads (file contents, edit diffs, Chinese
+# assumption prose) and pagination knobs are dropped: they cost characters
+# without telling the student anything it can act on.  ``None`` keeps every
+# argument; an empty set keeps the name only.  Unlisted tools fall through to
+# name-only so a newly added tool never leaks an unvetted payload.
+SFT_PRIOR_TOOL_CALL_ARGUMENT_KEYS: Dict[str, Optional[frozenset]] = {
+    "read_file": frozenset({"path"}),
+    "write_file": frozenset({"path"}),
+    "edit_file": frozenset({"path"}),
+    # ``cwd`` is an absolute path on the trace-generation machine, not signal.
+    "run_command": frozenset({"cmd"}),
+    "search_pipeformer_registry": frozenset({"query", "role", "controllable"}),
+    "run_pipeformer_forecast": frozenset({
+        "case_id",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "output_state_variables",
+    }),
+    "analyze_pipeline_topology": None,
+    # The resulting policy is already projected into ``state_before``.
+    "set_decision_policy": frozenset(),
+}
 COMPACT_COMPARABLE_METRIC_KEYS = (
     "energy_consumption",
     "energy_consumption_delta",
@@ -2242,6 +2268,53 @@ def run_backend_session(
     return records, session_record
 
 
+def prior_tool_call_provenance(
+    conversation_context: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """Summarize the tool calls earlier turns already made.
+
+    ``VerifiedDecisionState.from_history`` records only opaque
+    ``tool_call_ids``, which tell the student that *something* ran but not
+    what.  This projects each prior call down to its name plus the arguments
+    that identify its target, deduplicated while preserving first-call order.
+    """
+    summarized: List[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for turn in conversation_context or []:
+        for source_call in dict(turn).get("tool_calls") or []:
+            call = dict(source_call)
+            name = str(call.get("name") or "")
+            if not name:
+                continue
+            arguments = call.get("arguments")
+            if isinstance(arguments, str):
+                try:
+                    arguments = json.loads(arguments)
+                except (TypeError, ValueError):
+                    arguments = {}
+            if not isinstance(arguments, dict):
+                arguments = {}
+            retained_keys = SFT_PRIOR_TOOL_CALL_ARGUMENT_KEYS.get(name, frozenset())
+            projected_arguments = (
+                dict(arguments)
+                if retained_keys is None
+                else {
+                    key: arguments[key]
+                    for key in sorted(arguments)
+                    if key in retained_keys
+                }
+            )
+            entry: Dict[str, Any] = {"name": name}
+            if projected_arguments:
+                entry["arguments"] = projected_arguments
+            fingerprint = json.dumps(entry, ensure_ascii=False, sort_keys=True)
+            if fingerprint in seen:
+                continue
+            seen.add(fingerprint)
+            summarized.append(entry)
+    return summarized
+
+
 def write_split_records(
     output_dir: Path,
     records: List[Dict[str, Any]],
@@ -2299,6 +2372,21 @@ def write_split_records(
                         os.getenv("RECENT_TURNS_MAX_CHARS", "4000")
                     ),
                 )
+            # ``state_before`` reaches the student verbatim at inference time,
+            # so naming the tools earlier turns already ran is what stops the
+            # model from re-reading a file it has read.  Copy on the way in:
+            # ``projected["state_before"]`` may still alias the source record.
+            prior_tool_calls = prior_tool_call_provenance(
+                item.get("conversation_context") or []
+            )
+            state_before = projected.get("state_before")
+            if prior_tool_calls and isinstance(state_before, dict):
+                provenance = dict(state_before.get("provenance") or {})
+                provenance["prior_tool_calls"] = prior_tool_calls
+                projected["state_before"] = {
+                    **state_before,
+                    "provenance": provenance,
+                }
             full_grounding_evidence = numeric_grounding_evidence(item)
             projected["tool_calls"], projected["tool_outputs"] = DEFAULT_PROJECTOR.compact_sft_trajectory(
                 list(projected.get("tool_calls") or []),
