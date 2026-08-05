@@ -13,11 +13,36 @@ must not mutate Task 1 inputs.
   measures exact untruncated Qwen3.5/MS-SWIFT template lengths without loading
   model weights. It writes a reviewable summary JSON and an ignored per-record
   JSONL audit.
-- `evaluate_autonomous.py` evaluates a student with a bounded prompt/tool loop;
-  it never places teacher tool calls or the teacher answer in the prompt. The
-  loop uses the production `PromptBuilder`, validates a scenario-specific
-  allow-listed tool set, records partial traces, and scores semantic
-  task/tool/constraint/evidence metrics against the held-out teacher oracle.
+- `evaluate_autonomous.py` is a thin CLI. It parses arguments and hands off to
+  `pipeclaw.task2_student.rollout.suite`, which runs the bounded prompt/tool
+  loop and then scores the finished rollouts with the canonical evaluator. It
+  never places teacher tool calls or the teacher answer in the prompt.
+
+## Execution and evaluation are separate
+
+The rollout and its score are produced by two different packages, in that
+order:
+
+- **Execution** — `pipeclaw/task2_student/rollout/`: `prompting.py` builds the
+  request through the production `PromptBuilder`, `tools.py` parses and
+  dispatches tool calls, `runner.py` drives the bounded turn loop, and
+  `scenarios.py` owns allow lists, workspaces, and result compaction.
+  `swift_generator.py` loads MS-SWIFT. None of these modules import the
+  evaluator, so a rollout can be generated with no scoring code loaded.
+- **Evaluation** — `pipeclaw/backend/evaluator/`, the only evaluation package
+  in the repository. It sees a finished rollout record and the held-out teacher
+  record, and nothing else.
+
+`rollout/suite.py` is the single module that touches both sides: it calls
+`evaluate(rollout, profile=EvaluationProfile.AUTONOMOUS_ROLLOUT, reference=source)`
+per record and `summarize(reports)` at the end. Keep it that way — adding an
+evaluator import to any other rollout module puts scoring back inside
+execution.
+
+`rollout/__init__.py` re-exports only the hardware-free core (`models`,
+`prompting`, `runner`, `tools`). Import `scenarios`, `swift_generator`, and
+`suite` from their modules directly, so that importing the package does not
+pull in torch or MS-SWIFT.
 
 ## Autonomous rollout evaluation
 
@@ -32,6 +57,9 @@ python -m pipeclaw.task2_student.scripts.evaluate_autonomous `
   --adapters pipeclaw/task2_student/outputs/qwen35_9b_trace_level/checkpoint-20 `
   --output-dir pipeclaw/task2_student/outputs/evaluation/autonomous
 ```
+
+The command, its flags, and the dry-run workflow are unchanged by the
+evaluation refactor; only the internals moved.
 
 `--model` may be omitted when the adapter's `adapter_config.json` contains
 `base_model_name_or_path`. Add `--dry-run` (and omit `--adapters`) to write the
@@ -61,7 +89,8 @@ SDK responses are normalized at the parser boundary. Qwen3.5's
 `<function>/<parameter>` text representation is also parsed; when it appears
 alongside a duplicate native call, the typed text representation is preferred.
 
-The evaluator writes `rollouts.jsonl` and `summary.json`. A rollout can end as
+The evaluator writes `rollouts.jsonl` and `summary.json`, both stamped
+`"schema_version": "pipeclaw_evaluation_v2"`. A rollout can end as
 `completed`, `empty_response`, or `max_turns_exceeded`; malformed tool JSON and
 tool failures remain in the record instead of aborting the suite. Tool calls are
 schema-checked and only read-only/topology/registry/forecast operations are
@@ -71,6 +100,31 @@ precondition used by PipeClaw. OpenClaw cases use an isolated scenario
 workspace: `read_file`, `write_file`, and `edit_file` are workspace-bounded,
 logical `pipeline_data/...` reads remain read-only, and `run_command` is limited
 to a Python script located inside that workspace with a 1--60 second timeout.
+
+### Schema-v2 score and critical gate
+
+Each record in `rollouts.jsonl` carries an `overall_score`, a `passed` flag, and
+a `metrics` mapping in which every entry reports `applicable`, `passed`,
+`weight`, `critical`, `included_in_score`, and a nested `details`.
+
+Under the autonomous profile every applicable deliverable metric carries weight
+`1.0`, and `overall_score` is the percentage of that weight which passed. Only
+metrics that are both `applicable` and `included_in_score` enter the
+denominator, so `overall_score` is `null` when a record raised no scorable
+metric at all.
+
+`passed` requires the critical gate, not a score threshold: **any** failing
+critical metric, or any hard grounding issue, fails the record however high the
+weighted score is. Critical metrics cover applicable task parsing, tool
+execution, assumption consistency, PipeFormer authenticity, disturbance and
+horizon correctness, constraint execution and judgment, verification, registry
+ordering, decision labels, grounding, answer completeness, JSON validity, and
+requested artifact evidence. Unlike the teacher profile there is no
+minimum-score bar; a student is judged on getting the critical work right.
+
+`tool_recovery`, `portability`, `raw_capture_metadata`, `model_loading_metadata`,
+and `hallucination` are diagnostics: `included_in_score: false` and never
+critical. They describe the run without grading it.
 
 The evaluator reuses the base-model loading settings saved in the adapter's
 `args.json`. Therefore a 4-bit QLoRA checkpoint is loaded with bitsandbytes
@@ -88,21 +142,41 @@ diagnostic copy when needed.
 
 The aggregate is denominator-aware: a metric with no applicable oracle is marked
 `not_applicable`, not counted as a zero. Use the `pipeformer` filter for the gas
-pipeline deliverable and `openclaw` for the PipeClaw agent cases. `summary.json`
-includes both `pass_rate` and `failure_rate`; use `failure_rate` for the
-requested hallucination rate. OpenClaw records additionally expose the generic
+pipeline deliverable and `openclaw` for the PipeClaw agent cases. Each metric in
+`summary.json` reports `numerator`, `denominator`, `pass_rate`, and
+`failure_rate`. OpenClaw records additionally expose the generic
 `artifact_evidence` metric, which checks that files named in the current
 request were actually read or used as evidence rather than merely mentioned.
 
+### Hallucination rate is derived, not measured separately
+
+`summary["hallucination_rate"]` is exactly `evidence_consistency.failure_rate`,
+and each autonomous record's `hallucination` entry is a copy of its
+`evidence_consistency` result tagged `derived_from: "evidence_consistency"` and
+`included_in_score: false`. The grounding checker runs once per record; there is
+no second pass, so the two figures cannot drift apart. Report
+`hallucination_rate` (or equivalently the `evidence_consistency` failure rate)
+as the requested hallucination rate.
+
 PipeFormer records that carry a non-empty `disturbance_assumption` marker are
-scored assumption-aware: the teacher's sampled disturbance direction and
-magnitude are not exact-match targets. The student must still emit valid
-`up`/`down` and finite numeric values, keep its forecast prediction consistent
-with its tool call, and apply the corresponding boundary change. These records
-also expose an `assumption_consistency` metric; explicit (non-assumed)
-disturbance fields remain strict. Inherited provisional disturbances in a
-multi-turn `state_before.scope` are marked the same way when the preceding
-teacher turn discloses an LLM assumption. Numeric evidence accepts values from
+scored assumption-aware. When the request does not state the disturbance
+direction or magnitude, the student may assume one, and **its assumption does
+not have to equal the teacher's sampled value.** Concretely, for every field the
+teacher marked assumed:
+
+- `task_parsing` excludes that field from comparison entirely — a different
+  value is not a parsing failure.
+- `disturbance_application` and `assumption_consistency` resolve the expected
+  boundary change from the student's own executed prediction rather than the
+  teacher's value.
+
+The student must still emit a valid `up`/`down` direction and finite numeric
+values, keep its forecast prediction consistent with its own tool call, and
+apply the corresponding boundary change — it is held to internal consistency,
+not to the teacher's arbitrary choice. Explicit (non-assumed) disturbance fields
+remain strict. Inherited provisional disturbances in a multi-turn
+`state_before.scope` are marked the same way when the preceding teacher turn
+discloses an LLM assumption. Numeric evidence accepts values from
 successful student tool outputs as well as the teacher oracle, while candidate
 indexes and ordered-list markers are ignored. `tool_call` remains strict (any
 failed call is visible), and `tool_recovery` separately reports whether a

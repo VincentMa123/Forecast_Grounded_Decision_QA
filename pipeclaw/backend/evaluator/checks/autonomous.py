@@ -33,7 +33,7 @@ from .common import (
     metric,
     requested_constraints_executed,
     sequence,
-    task_match,
+    task_field_comparison,
     verification_is_complete,
     verification_view,
 )
@@ -93,21 +93,25 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
     actual_tasks = _student_tasks(context.record)
     unmatched = list(expected_tasks)
     mismatches: list[str] = []
+    matched_fields: list[str] = []
     matched_count = 0
     for actual in actual_tasks:
         matched_index = next(
             (
                 index
                 for index, expected in enumerate(unmatched)
-                if task_match(expected, actual)[0]
+                if task_field_comparison(expected, actual)[0]
             ),
             None,
         )
         if matched_index is not None:
             matched_count += 1
+            matched_fields.extend(
+                task_field_comparison(unmatched[matched_index], actual)[2]
+            )
             unmatched.pop(matched_index)
         elif unmatched:
-            mismatches.extend(task_match(unmatched[0], actual)[1])
+            mismatches.extend(task_field_comparison(unmatched[0], actual)[1])
     assumed_fields = sorted(
         {
             field
@@ -124,6 +128,7 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
         details={
             "expected_task_count": len(expected_tasks),
             "matched_task_count": matched_count,
+            "matched_fields": sorted(set(matched_fields)),
             "mismatched_fields": sorted(set(mismatches)),
             "assumed_fields": assumed_fields,
         },

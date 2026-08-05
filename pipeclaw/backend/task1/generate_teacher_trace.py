@@ -7,10 +7,20 @@ import logging
 import ntpath
 import os
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from pathlib import PureWindowsPath
 from typing import Any, Dict, List, Optional
+
+# Importable as a plain script (``python generate_teacher_trace.py``) from any
+# working directory.  Python only ever puts *this* file's directory on the path,
+# and this module lives in the ``task1`` subdirectory, so the ``grounding``/
+# ``evaluator``/``pipeline`` packages one level up in ``backend`` are otherwise
+# unreachable.  Mirrors the bootstrap in ``backend/scripts/curate_teacher_trace.py``.
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 from grounding.decision_trace_state import (
     DecisionTraceState,
@@ -38,7 +48,7 @@ from grounding.evidence.csv import build_csv_evidence
 from grounding.evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 from grounding.evidence.topology import topology_summary_from_tool_outputs
 from grounding.pipeformer_projection import compact_pipeformer_output, project_pipeformer_output
-from evaluator.scorer import NativeTraceEvaluator
+from evaluator.scorer import NativeTraceEvaluator, apply_quality_aliases
 from pipeline.forecast_registry_contract import authorize_forecast_registry
 from pipeline.io_utils import write_json, write_jsonl
 from pipeline.scenario_preflight import validate_scenario_sources
@@ -102,7 +112,15 @@ def _host_absolute_path(value: Any) -> bool:
         or normalized.startswith("//")
     )
 def backend_root() -> Path:
-    return Path(__file__).resolve().parent
+    """Locate ``pipeclaw/backend``, which is this module's *parent* package.
+
+    This file lives in ``pipeclaw/backend/task1/``, so ``__file__.parent`` is
+    ``task1`` rather than the backend root.  Every data default below
+    (``pipeclaw_data``, ``generated_teacher_traces``, ``.env``, ``.openclaw``)
+    resolves against the backend directory, so returning ``task1`` silently
+    pointed all of them at directories that do not exist.
+    """
+    return BACKEND_ROOT
 
 
 def default_scenario_files() -> List[Path]:
@@ -683,7 +701,7 @@ class TeacherTraceProjector:
             if action_forecasts:
                 successful_pipeformer = action_forecasts
             multiple_pipeformer = len(successful_pipeformer) > 1
-            required_registry_call_ids = self._registry_calls_required_for_forecasts(
+            required_registry_call_ids = self._registry_calls_to_retain(
                 successful,
                 successful_pipeformer,
             )
@@ -759,6 +777,28 @@ class TeacherTraceProjector:
             )
         return compact_calls, compact_outputs
 
+    @classmethod
+    def _registry_calls_to_retain(
+        cls,
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Select every registry search a retained forecast still depends on.
+
+        Two independent rules contribute, and both are needed: one keeps the
+        searches the runtime precondition *requires* to authorize the call, the
+        other keeps the searches that *explain where the forecast's observation
+        targets came from*.  They are kept as separate methods because they
+        answer different questions and fail differently — see each docstring.
+        """
+        return cls._registry_calls_required_for_forecasts(
+            successful,
+            forecasts,
+        ) | cls._registry_calls_grounding_forecast_targets(
+            successful,
+            forecasts,
+        )
+
     @staticmethod
     def _registry_calls_required_for_forecasts(
         successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
@@ -790,6 +830,74 @@ class TeacherTraceProjector:
             )
             for call_ids in (authorization.get("candidate_search_call_ids") or {}).values():
                 required.update(str(value) for value in call_ids if str(value))
+        return required
+
+    @staticmethod
+    def _registry_calls_grounding_forecast_targets(
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Keep the searches that discover a forecast's observation targets.
+
+        The registry precondition only authorizes the disturbance and the
+        boundary-condition action variables, so
+        :meth:`_registry_calls_required_for_forecasts` drops every
+        ``role="output"`` discovery page.  That deletes the teacher's
+        demonstration of how ``attention_targets`` and
+        ``output_state_variables`` are derived and leaves the retained
+        trajectory naming canonical observation IDs with no visible lookup.
+
+        A search grounds a target when it returned that canonical ID, or when
+        the query asked for it by name.  The query check is what preserves the
+        semantic group targets (``pressure``, ``linepack``, ``compressor_load``)
+        that are legal attention targets but are never returned as variable IDs.
+        Searches that match no retained target stay dropped.
+        """
+        targets: set[str] = set()
+        for _, forecast_call, _ in forecasts:
+            arguments = dict(forecast_call.get("arguments") or {})
+            for field in ("attention_targets", "output_state_variables"):
+                targets.update(
+                    str(value).strip()
+                    for value in arguments.get(field) or []
+                    if isinstance(value, str) and str(value).strip()
+                )
+        if not targets:
+            return set()
+        folded_targets = {value.casefold() for value in targets}
+
+        last_forecast_index = max(index for index, _, _ in forecasts)
+        required: set[str] = set()
+        for index, call, output_record in successful:
+            if index >= last_forecast_index:
+                continue
+            if call.get("name") != "search_pipeformer_registry":
+                continue
+            output = (output_record or {}).get("output")
+            if not isinstance(output, dict) or output.get("success") is False:
+                continue
+            returned = {
+                str(entry.get("variable")).strip()
+                for entry in output.get("variables") or []
+                if isinstance(entry, dict) and entry.get("variable")
+            }
+            if returned & targets:
+                required.add(str(call.get("tool_call_id") or ""))
+                continue
+            arguments = dict(call.get("arguments") or {})
+            requested = {
+                term.casefold()
+                for term in str(arguments.get("query") or "").split()
+                if term.strip()
+            }
+            requested.update(
+                str(value).strip().casefold()
+                for value in arguments.get("attention_targets") or []
+                if isinstance(value, str) and str(value).strip()
+            )
+            if requested & folded_targets:
+                required.add(str(call.get("tool_call_id") or ""))
+        required.discard("")
         return required
 
     @staticmethod
@@ -1557,10 +1665,18 @@ def _build_teacher_record(
         hard_issues=quality_issues,
         trace_status=trace.get("status"),
     )
-    record["quality_flag"] = native_quality["quality_flag"]
-    record["quality_score"] = native_quality["quality_score"]
-    record["quality_profile"] = native_quality["profile"]
-    record["quality_failed_checks"] = native_quality["failed_checks"]
+    # The quality_* fields are aliases of the canonical schema-v2 report; the
+    # generator never computes a second score of its own.
+    apply_quality_aliases(
+        record,
+        native_quality,
+        aliases=(
+            "quality_flag",
+            "quality_score",
+            "quality_profile",
+            "quality_failed_checks",
+        ),
+    )
     return record
 
 

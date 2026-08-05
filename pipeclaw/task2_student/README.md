@@ -32,6 +32,9 @@ existing PipeClaw backend environment. See "Environment setup" below.
 - `configs/`: reviewed local and remote experiment commands.
 - `data/`: deterministic answer-only, trace-level, and constraint-aware
   projections plus checksum manifests.
+- `rollout/`: autonomous model/tool **execution** — prompt construction, tool
+  parsing and dispatch, the bounded turn loop, scenario allow lists and
+  workspaces, MS-SWIFT generation, and the dataset suite.
 - `scripts/`: dataset preparation, validation, token profiling, evaluation,
   and comparison programs.
 - `tests/`: Task 2 unit and contract tests.
@@ -39,6 +42,12 @@ existing PipeClaw backend environment. See "Environment setup" below.
 
 Generated JSONL, model weights, checkpoints, and caches are not committed.
 Small manifests and summary metrics may be committed after review.
+
+There is **no** evaluator package under `task2_student/`. All scoring lives in
+`pipeclaw/backend/evaluator/`, the single evaluation package for both tasks;
+`pipeclaw/tests/evaluation/test_layout.py` fails if a second one reappears.
+`rollout/suite.py` is the only rollout module that imports it, so execution and
+evaluation stay separable.
 
 ## Workflow
 
@@ -57,6 +66,11 @@ PipeClaw's production `PromptBuilder`, hides all teacher future actions, runs a
 bounded model/tool loop, and compares canonical task fields, tool success,
 constraint labels, risk/intervention labels, evidence, answer presence, and JSON
 validity against the held-out teacher record.
+
+Execution and scoring are two steps in two packages: `rollout/` produces the
+record, then `pipeclaw/backend/evaluator/` scores it under
+`EvaluationProfile.AUTONOMOUS_ROLLOUT`. The command below is unchanged by that
+split.
 
 For the gas-pipeline deliverable, use the 24 PipeFormer records in the frozen
 teacher test split and the trace projection only for tool schemas:
@@ -88,9 +102,18 @@ restrict file operations and Python scripts to the evaluation workspace.
 
 Run the same command with `--dry-run` and without `--adapters` to inspect the
 prompt/tool inputs first. Results are written to `rollouts.jsonl` and
-`summary.json`; inapplicable metrics are reported explicitly rather than scored
-as failures. See `scripts/README.md` for the safety allowlist and failure-state
-details.
+`summary.json`, both stamped `"schema_version": "pipeclaw_evaluation_v2"`.
+
+Under schema v2, every applicable deliverable metric carries weight `1.0` and
+`overall_score` is the percentage of that weight which passed; inapplicable
+metrics are reported explicitly rather than scored as failures, and diagnostics
+(`tool_recovery`, `portability`, capture and model-loading metadata,
+`hallucination`) stay out of the denominator. A record's `passed` flag is a
+critical gate, not a threshold: one failing critical metric or hard grounding
+issue fails it regardless of score. `summary["hallucination_rate"]` is derived
+from `evidence_consistency.failure_rate` rather than measured separately. See
+`scripts/README.md` for the safety allowlist, failure-state details, and the
+full metric list.
 
 ## Dataset conversion
 

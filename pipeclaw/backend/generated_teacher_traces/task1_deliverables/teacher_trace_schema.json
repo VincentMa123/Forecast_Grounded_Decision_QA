@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "teacher_trace_schema.json",
+  "title": "PipeClaw Task 1 Teacher Trace Record",
+  "type": "object",
+  "required": [
+    "sample_id",
+    "scenario_id",
+    "scenario_type",
+    "state_before",
+    "recent_turns",
+    "user_input",
+    "parsed_task",
+    "tool_calls",
+    "tool_outputs",
+    "prediction_summary",
+    "constraint_check",
+    "evidence",
+    "risk_level",
+    "manual_intervention_label",
+    "dispatch_recommendation",
+    "final_answer",
+    "quality_flag"
+  ],
+  "properties": {
+    "sample_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scenario_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "state_before": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "scope",
+        "provenance"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": "verified_decision_state_v1"
+        },
+        "scope": {
+          "type": "object"
+        },
+        "verified_evidence": {
+          "type": "object"
+        },
+        "registry_variables": {
+          "type": "object",
+          "required": [
+            "context_only",
+            "search_call_ids",
+            "returned_ids"
+          ]
+        },
+        "candidates": {
+          "type": "array"
+        },
+        "decision_policy": {
+          "type": "object"
+        },
+        "applied_disturbances": {
+          "type": "array"
+        },
+        "unresolved_inputs": {
+          "type": "array"
+        },
+        "provenance": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "recent_turns": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "object"
+      }
+    },
+    "user_input": {
+      "type": "string"
+    },
+    "parsed_task": {
+      "type": "object"
+    },
+    "tool_calls": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "tool_outputs": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "prediction_summary": {
+      "type": "object"
+    },
+    "constraint_check": {
+      "type": "object"
+    },
+    "evidence": {
+      "type": "object"
+    },
+    "risk_level": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "unknown",
+        null
+      ]
+    },
+    "manual_intervention_label": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "no_intervention",
+        "monitoring_only",
+        "operator_attention_required",
+        "immediate_intervention_required",
+        "unknown",
+        null
+      ]
+    },
+    "dispatch_recommendation": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "final_answer": {
+      "type": "string"
+    },
+    "quality_flag": {
+      "type": "string",
+      "enum": [
+        "pass",
+        "needs_review"
+      ]
+    }
+  },
+  "additionalProperties": true
+}

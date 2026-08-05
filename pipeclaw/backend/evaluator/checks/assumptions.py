@@ -58,10 +58,59 @@ def prediction_view(forecast_output: Mapping[str, Any]) -> Mapping[str, Any]:
     return prediction if isinstance(prediction, Mapping) else forecast_output
 
 
+def expected_applied_disturbance(
+    actual_task: Mapping[str, Any],
+    prediction: Mapping[str, Any],
+    variable: str,
+    *,
+    assumed_fields: frozenset[str] | None = None,
+) -> dict[str, Any] | None:
+    """Return the signed percent change the runtime should have applied.
+
+    Explicit task values win.  Provisionally assumed values fall back to the
+    student's executed prediction, because an underspecified request lets the
+    student choose its own direction and magnitude — that choice does not have
+    to equal the teacher's sampled one.  ``assumed_fields`` comes from the
+    teacher record when the caller already resolved it; otherwise it is read
+    off ``actual_task``.  Returns ``None`` when the inputs cannot determine a
+    valid signed magnitude.
+    """
+
+    assumed = (
+        inferred_task_fields(actual_task)
+        if assumed_fields is None
+        else frozenset(assumed_fields)
+    )
+    direction = str(
+        (
+            prediction.get("disturbance_direction")
+            if "disturbance_direction" in assumed
+            else actual_task.get("disturbance_direction")
+        )
+        or prediction.get("disturbance_direction")
+        or ""
+    ).casefold()
+    magnitude = (
+        None
+        if "disturbance_magnitude_percent" in assumed
+        else actual_task.get("disturbance_magnitude_percent")
+    )
+    if magnitude is None:
+        magnitude = prediction.get("disturbance_magnitude_percent")
+    try:
+        expected = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(expected) or not variable or direction not in {"up", "down"}:
+        return None
+    return {"mode": "percent_change", "value": expected}
+
+
 def _applied_disturbance_matches(
     actual_task: Mapping[str, Any],
     prediction: Mapping[str, Any],
     forecast_output: Mapping[str, Any],
+    assumed_fields: frozenset[str] | None = None,
 ) -> bool:
     resolution = forecast_output.get("task_resolution")
     if not isinstance(resolution, Mapping):
@@ -75,20 +124,15 @@ def _applied_disturbance_matches(
         or prediction.get("disturbance_variable")
         or ""
     )
-    direction = str(
-        actual_task.get("disturbance_direction")
-        or prediction.get("disturbance_direction")
-        or ""
-    ).casefold()
-    magnitude = actual_task.get("disturbance_magnitude_percent")
-    if magnitude is None:
-        magnitude = prediction.get("disturbance_magnitude_percent")
-    try:
-        expected = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
-    except (TypeError, ValueError):
+    expected_disturbance = expected_applied_disturbance(
+        actual_task,
+        prediction,
+        variable,
+        assumed_fields=assumed_fields,
+    )
+    if expected_disturbance is None:
         return False
-    if not math.isfinite(expected) or not variable or direction not in {"up", "down"}:
-        return False
+    expected = float(expected_disturbance["value"])
 
     for item in applied:
         if not isinstance(item, Mapping):
@@ -171,6 +215,7 @@ def assumption_consistency(
         actual_task,
         prediction,
         forecast_output,
+        assumed_fields,
     ):
         mismatches.append("applied_boundary_conditions")
     return not mismatches, mismatches

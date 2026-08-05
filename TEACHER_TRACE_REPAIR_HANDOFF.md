@@ -1,11 +1,14 @@
-# Teacher-Trace Repair Handoff — 2026-08-01
+# Teacher-Trace Repair Handoff — 2026-08-04
 
 > **Latest-status rule:** Section 0 is the final Task 1 state, Section 9 is the
-> Task 2 local preparation state, and **Section 10 is the current state of the
-> project** (remote GPU benchmark, measured cost model, open decisions).
-> Later sections supersede earlier ones wherever they conflict on counts,
-> commands, or pending work; the earlier sections are retained only as an audit
-> trail. Where Section 10 contradicts Section 9, Section 10 wins.
+> Task 2 local preparation state, Section 10 is the remote GPU benchmark and
+> cost model, and **Section 11 is the current state of the codebase**
+> (unified evaluation and rollout refactor). Later sections supersede earlier
+> ones wherever they conflict on counts, commands, module paths, or pending
+> work; the earlier sections are retained only as an audit trail. Where
+> Section 11 contradicts an earlier section on where code lives or how a score
+> is computed, Section 11 wins. Section 10 remains authoritative for GPU cost,
+> memory, and training-configuration decisions.
 
 ## 0. Final continuation update — 2026-07-29
 
@@ -1774,6 +1777,195 @@ come after SFT. Test records must stay out of training, as they have throughout.
 - Preserve Chinese text and canonical variable identifiers.
 - Keep the 35,000-character SFT cap for now.
 - Nothing is staged or committed unless explicitly requested.
+
+---
+
+## 11. Unified evaluation and rollout refactor — current state (2026-08-04)
+
+Plan: `docs/superpowers/plans/2026-08-04-unified-evaluation-rollout-refactor.md`.
+This is a **structural refactor only**. No training data, adapter, checkpoint,
+model configuration, or teacher-trace content changed, and no difficulty-scoring
+mechanism was added — that idea was evaluated and deliberately dropped as
+unnecessary for this project.
+
+### What the codebase looked like before
+
+Two evaluators existed side by side: `pipeclaw/backend/evaluator/` for teacher
+traces and `pipeclaw/task2_student/evaluator/` for student rollouts. They had
+their own score formulas, their own metric implementations, and their own
+notion of what "passed" meant. The backend evaluator additionally owned runtime
+grounding code used *during* generation, and the Task 2 evaluator interleaved
+model/tool execution with scoring, so a rollout could not be produced without
+loading scoring code and vice versa.
+
+### Completed migration
+
+**One evaluation package.** `pipeclaw/backend/evaluator/` is now the sole
+evaluation package. `pipeclaw/task2_student/evaluator/` is deleted.
+`pipeclaw/tests/evaluation/test_layout.py` fails if it reappears.
+
+**Runtime grounding moved out of the evaluator** into
+`pipeclaw/backend/grounding/` (contract, decision policy, decision-trace state,
+answer limits, and CSV/pipeline-scope/tool/topology evidence).
+`teacher_trace_audit.py` and `reviewer_annotations.py` moved to
+`pipeclaw/backend/reporting/`. The canonical PipeFormer projection
+(`project_pipeformer_output` / `compact_pipeformer_output`) moved out of
+`backend/task1/generate_teacher_trace.py` into
+`grounding/pipeformer_projection.py`; teacher generation and rollout scenarios
+now import the same functions instead of keeping fallback copies, and the
+dynamic import of `task1.generate_teacher_trace` is gone.
+
+**Execution separated from evaluation.** Task 2 model/tool execution lives in
+`pipeclaw/task2_student/rollout/`: `models.py`, `prompting.py`, `tools.py`,
+`runner.py`, `scenarios.py`, `swift_generator.py`, `suite.py`. The first four
+contain no evaluator import, so a rollout can be generated with no scoring code
+loaded. `suite.py` is the single seam where the evaluator enters the rollout
+package — keep it that way. `rollout/__init__.py` re-exports only the
+hardware-free core; `scenarios`, `swift_generator`, and `suite` must be imported
+directly, and torch/MS-SWIFT imports inside `suite.py` are deferred into
+`_build_runner` so importing the package does not pull in CUDA.
+
+**API changes** (all call sites updated):
+
+```text
+run_case(...)                    -> RolloutRunner(gen, dispatcher, policy=...).run(case, RolloutConfig(...)).to_dict()
+evaluate_rollout(source, roll)   -> evaluate(roll, profile=EvaluationProfile.AUTONOMOUS_ROLLOUT, reference=source)
+aggregate_results(results)       -> summarize(reports)
+```
+
+`scripts/evaluate_autonomous.py` is now a thin CLI over `rollout.suite`.
+
+### Schema-v2 output contract
+
+`EVALUATION_SCHEMA_VERSION = "pipeclaw_evaluation_v2"`, stamped on every report
+and on `summary.json`. One score formula exists in the repository, in
+`evaluator/engine.py`:
+
+```python
+included    = [m for m in metrics if m.applicable and m.included_in_score]
+denominator = sum(m.weight for m in included)
+overall_score = (
+    round(100.0 * sum(m.weight for m in included if m.passed) / denominator, 6)
+    if denominator else None
+)
+hard_gate_passed = not hard_issues and all(m.passed for m in included if m.critical)
+```
+
+- **Teacher profile** — hand-tuned per-check weights, `passed` requires
+  `hard_gate_passed` *and* `overall_score >= 85.0`.
+- **Autonomous profile** — every applicable deliverable metric weighs `1.0`,
+  no minimum-score threshold, `passed` = `hard_gate_passed` and a non-null
+  score.
+- Inapplicable metrics and diagnostics (`tool_recovery`, `portability`,
+  `raw_capture_metadata`, `model_loading_metadata`, `hallucination`) never
+  enter the denominator.
+- **Hallucination is derived, not measured twice.** The per-record
+  `hallucination` entry is a copy of `evidence_consistency` tagged
+  `derived_from: "evidence_consistency"`, `included_in_score: false`, emitted
+  only for the autonomous profile; `summary["hallucination_rate"]` equals
+  `evidence_consistency.failure_rate`. The grounding checker runs once.
+
+**Deprecated but still callable** (teacher side, in `evaluator/scorer.py`):
+`apply_quality_aliases()` writes the released `quality_flag`, `quality_score`,
+`quality_profile`, `quality_failed_checks`, and `quality_issues` fields, and
+`NativeTraceEvaluator` forwards `evaluate`/`summarize`/`load`. Both **copy from**
+an `EvaluationReport` rather than recomputing anything. New code should use
+`evaluate()` and read the report fields directly.
+
+### Preserved commands
+
+Unchanged by this refactor, flags and all:
+
+```powershell
+python -m pipeclaw.task2_student.scripts.evaluate_autonomous `
+  --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl `
+  --tool-schema-source pipeclaw/task2_student/data/trace_level/test.jsonl `
+  --scenario-type pipeformer `
+  --adapters pipeclaw/task2_student/outputs/qwen35_9b_trace_level/checkpoint-20 `
+  --output-dir pipeclaw/task2_student/outputs/evaluation/autonomous
+```
+
+The `--dry-run` workflow (omit `--adapters`) still writes prompt messages and
+tool schemas without loading model weights, and still shows only `system,user`
+messages. `python pipeclaw/backend/evaluate_teacher_trace.py` and the
+resumable OpenClaw regeneration driver are also unchanged.
+
+### Verification evidence (2026-08-04)
+
+```powershell
+python -m unittest discover -s pipeclaw/tests -p "test_*.py"     # exit 0 — 121/121 OK
+python -m compileall -q pipeclaw/backend pipeclaw/task2_student  # exit 0
+python -m pipeclaw.task2_student.scripts.evaluate_autonomous --help  # exit 0
+```
+
+Stale-import and duplicate-score searches over `pipeclaw/**/*.py`:
+
+- `task2_student.evaluator`, `evaluator.grounding_contract`,
+  `evaluator.decision_policy` — **no matches.**
+- `def evaluate_rollout` / `def aggregate_results` — only in
+  `pipeclaw/tests/evaluation/legacy_shape.py` (test support, see below).
+- `overall_score =` — only in `evaluator/engine.py`. One score formula.
+
+### Limitations and open items
+
+**1. `pipeclaw/tests/evaluation/legacy_shape.py` is a judgment call.** The
+deleted `task2_student/evaluator/oracle_metrics.py` was already a thin facade
+translating canonical results into the released legacy metric shape
+(`record_pass`/`rate`, details flattened), but roughly twenty tests were written
+against that shape and cover behaviour the schema-v2 contract tests do not:
+assumption consistency, tool recovery, artifact evidence, and numeric-evidence
+rules. Rather than delete the coverage or keep a production module the refactor
+exists to remove, the adapter was moved **verbatim** into
+`pipeclaw/tests/evaluation/legacy_shape.py` as test support. Nothing in
+`pipeclaw/backend` or `pipeclaw/task2_student` imports it. The cleaner endpoint
+is to rewrite those tests against `evaluate()`/`summarize()` directly and delete
+the shim.
+
+**2. Assumption-aware disturbance scoring was completed, not just moved.** When
+a request does not state the disturbance variable's direction or magnitude, the
+student is allowed to assume one, and **that assumption does not have to match
+the teacher's sampled value.** Three of the four code paths already implemented
+this: `task_field_comparison` (`checks/common.py`) excludes assumed fields from
+task comparison entirely, `disturbance_was_applied` (`checks/common.py:204`)
+prefers the student's predicted value for assumed fields, and
+`assumption_consistency` checks the student against *itself* — that its stated
+direction/magnitude is valid and matches what its own forecast call executed.
+
+The fourth, `expected_applied_disturbance` (`checks/assumptions.py`), did not:
+it was a verbatim extraction of older inline logic that read the teacher's
+values unconditionally, so a legitimately-divergent assumption failed
+`applied_boundary_conditions` and, through it, the critical
+`assumption_consistency` gate. It now takes an optional `assumed_fields`
+argument and applies the same precedence rule as `disturbance_was_applied`:
+explicit task values win, assumed fields fall back to the student's executed
+prediction. `assumption_consistency` passes the teacher-derived assumed-field
+set through rather than re-deriving it. The docstring that described this
+behaviour was correct; the code now matches it.
+
+Verified by `test_native_scorer_uses_student_values_for_inferred_disturbance`,
+which was the one failing test here and now passes:
+`pipeclaw/task2_student/tests/test_oracle_metrics.py` is 19/19.
+
+**3. `pipeclaw/task2_student/tests/` is gitignored** (`.gitignore:21`), so those
+tests are *not* part of the committed suite and are not covered by the
+`discover -s pipeclaw/tests` verification above. Run separately:
+`python -m unittest discover -s pipeclaw/task2_student/tests` → 98/101. The
+three failures are all `test_scaffold_contract`: missing
+`pipeclaw/task2_student/requirements.txt`, missing CUDA requirements file, and
+`include_num_input_tokens_seen` asserting `'non_padding'` against the `True`
+that the Transformers 5.12 CLI limitation in Section 9 forces. All three are
+pre-existing environment/scaffold drift, unrelated to this refactor.
+
+**4. Nothing is staged or committed.** The working tree carries this refactor
+alongside unrelated dirty dataset and prompt changes. Stage explicit paths only;
+`pipeclaw/backend/evaluator/scorer.py` is missing from the plan's own Step 7
+stage list and must be added explicitly, or `apply_quality_aliases` will be left
+out of the commit.
+
+**5. `pipeclaw/task2_student/evaluator/` was untracked**, so git could not have
+restored it. A copy was taken to
+`%TEMP%\pipeclaw_task2_evaluator_backup` before deletion. Delete that backup
+once the refactor is committed and reviewed.
 
 
 

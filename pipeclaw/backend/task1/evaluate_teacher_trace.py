@@ -2,8 +2,22 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Dict
+
+# Importable as a plain script (``python evaluate_teacher_trace.py``) from any
+# working directory.  Python only ever puts *this* file's directory on the path,
+# which covers the sibling ``generate_teacher_trace`` import below but not the
+# ``grounding``/``evaluator``/``reporting`` packages one level up in ``backend``.
+# Mirrors the bootstrap in ``backend/scripts/curate_teacher_trace.py``.
+_MODULE_ROOTS = (
+    Path(__file__).resolve().parents[1],  # backend/  -> grounding, evaluator, reporting
+    Path(__file__).resolve().parent,  # backend/task1/ -> generate_teacher_trace
+)
+for _root in _MODULE_ROOTS:
+    if str(_root) not in sys.path:
+        sys.path.insert(0, str(_root))
 
 from grounding.evidence.csv import build_csv_evidence
 from grounding.contract import repair_grounded_record
@@ -11,6 +25,7 @@ from evaluator.scorer import (
     DEFAULT_MINIMUM_SCORE,
     NativeEvaluationConfig,
     NativeTraceEvaluator,
+    apply_quality_aliases,
 )
 from reporting.teacher_trace_audit import (
     TeacherTraceAuditConfig,
@@ -30,7 +45,7 @@ from reporting.teacher_trace_quality_report import (
 )
 
 
-BACKEND_ROOT = Path(__file__).resolve().parent
+BACKEND_ROOT = _MODULE_ROOTS[0]
 REPOSITORY_ROOT = BACKEND_ROOT.parents[1]
 DEFAULT_TRACE = BACKEND_ROOT / "generated_teacher_traces" / "teacher_trace.json"
 GENERATED_ROOT = BACKEND_ROOT / "generated_teacher_traces"
@@ -315,11 +330,9 @@ class TeacherTraceEvaluationRunner:
             record_id = str(record.get("sample_id") or "")
             native_results[record_id] = native
             if self.args.repair_grounded_records:
-                record["quality_flag"] = native["quality_flag"]
-                record["quality_score"] = native["quality_score"]
-                record["quality_profile"] = native["profile"]
-                record["quality_failed_checks"] = native["failed_checks"]
-                record["quality_issues"] = native["quality_issues"]
+                # Repaired records adopt the aliases of the re-run canonical
+                # report rather than a second offline score calculation.
+                apply_quality_aliases(record, native)
             outputs = attach_tool_arguments(
                 record.get("tool_outputs") or [],
                 record.get("tool_calls") or [],

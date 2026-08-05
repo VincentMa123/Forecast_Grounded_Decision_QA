@@ -1,0 +1,138 @@
+{
+  "schema_version": "pipeclaw_task1_quality_v1",
+  "teacher_trace": "pipeclaw/backend/generated_teacher_traces/teacher_trace.json",
+  "minimum_pass_score": 85.0,
+  "native_evaluation": {
+    "schema_version": "pipeclaw_evaluation_v2",
+    "mode": "teacher",
+    "record_count": 1140,
+    "overall": {
+      "mean_score": null,
+      "minimum_score": null,
+      "maximum_score": null,
+      "pass_count": 0,
+      "pass_rate": 0.0
+    },
+    "metrics": {},
+    "diagnostics": {},
+    "hallucination_rate": null,
+    "portability": {
+      "cwd_rebased_calls": 0,
+      "records_with_cwd_rebased": 0,
+      "rebased_execution_successes": 0,
+      "rebased_execution_failures": 0,
+      "portable_path_normalization_calls": 0
+    },
+    "by_scenario_type": {},
+    "pass_count": 0,
+    "needs_review_count": 1140,
+    "average_quality_score": null,
+    "minimum_quality_score": null,
+    "maximum_quality_score": null,
+    "profile_counts": {
+      "teacher_trace": 1140
+    },
+    "quality_issue_counts": {}
+  },
+  "task1_statistics": {
+    "total_sample_count": 1140,
+    "task_type_distribution": {
+      "prediction": 20,
+      "prediction_and_verification": 56,
+      "unknown": 1,
+      "unspecified": 163
+    },
+    "scenario_type_distribution": {
+      "openclaw": 900,
+      "pipeformer": 240
+    },
+    "dataset_source_distribution": {
+      "Pipeline_Full_Life_Cycle_Test_Dataset-v4": 500,
+      "Pipeline_Full_Life_Cycle_Test_Dataset-v7": 40,
+      "pipeclaw_dataset_v2": 600
+    },
+    "constraint_type_distribution": {
+      "abnormality_warning": 75,
+      "compressor": 77,
+      "dispatch_priority": 77,
+      "equipment_regulation": 15,
+      "flow": 77,
+      "human_intervention": 77,
+      "linepack": 77,
+      "pressure": 77
+    },
+    "risk_level_distribution": {
+      "low": 60,
+      "medium": 57,
+      "not_applicable": 1023
+    },
+    "human_intervention_distribution": {
+      "monitoring_only": 57,
+      "no_intervention": 60,
+      "not_applicable": 1023
+    },
+    "native_quality_distribution": {
+      "pass": 1140
+    },
+    "task1_quality_distribution": {
+      "pass": 1140
+    },
+    "average_evidence_item_count": 10.735965,
+    "native_quality_pass_rate": 1.0,
+    "task1_quality_pass_rate": 1.0
+  },
+  "manual_spot_check": {
+    "queue_mode": "deterministic_stratified_sample",
+    "sample_rate_target": 0.25,
+    "sample_count": 285,
+    "actual_sample_rate": 0.25,
+    "status": "pending_human_signoff"
+  },
+  "rule_library_complete": true,
+  "workbook_verification": {
+    "sheet_count": 12,
+    "formula_count": 0,
+    "error_count": 0,
+    "error_cells": []
+  },
+  "statistics_workbook_verification": {
+    "sheet_count": 14,
+    "formula_count": 0,
+    "error_count": 0,
+    "error_cells": []
+  },
+  "artifacts": {
+    "teacher_trace_schema": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/teacher_trace_schema.json",
+    "teacher_trace_quality_report": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/teacher_trace_quality_report.xlsx",
+    "teacher_trace_statistics": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/teacher_trace_statistics.xlsx",
+    "quality_evaluation_jsonl": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/quality_evaluation.jsonl",
+    "quality_evaluation_summary": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/quality_evaluation_summary.json",
+    "audit_split_counts": {
+      "train": 902,
+      "valid": 124,
+      "test": 114
+    },
+    "compact_sft_split_dir": "pipeclaw/backend/generated_teacher_traces/splits",
+    "compact_sft_split_counts": {
+      "train": 902,
+      "valid": 124,
+      "test": 114
+    },
+    "pipeline_constraint_rule_library": {
+      "pipeline_constraints.json": true,
+      "pressure_rules.json": true,
+      "flow_rules.json": true,
+      "linepack_rules.json": true,
+      "compressor_rules.json": true,
+      "intervention_rules.json": true,
+      "dispatch_priority_rules.json": true
+    },
+    "filtered_run_did_not_rewrite_splits": false,
+    "reviewer_annotations": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/manual_quality_decisions.jsonl",
+    "reset_review_record_count": 0
+  },
+  "output_jsonl": "pipeclaw/backend/generated_teacher_traces/task1_deliverables/quality_evaluation.jsonl",
+  "repair_output": null,
+  "repaired_sft_record_count": null,
+  "reviewer_annotation_export": null
+}

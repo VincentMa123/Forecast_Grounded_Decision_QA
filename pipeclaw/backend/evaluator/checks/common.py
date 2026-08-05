@@ -126,10 +126,18 @@ def numbers_match(actual: Any, expected: Any) -> bool:
     )
 
 
-def task_match(
+def task_field_comparison(
     expected: Mapping[str, Any],
     actual: Mapping[str, Any],
-) -> tuple[bool, list[str]]:
+) -> tuple[bool, list[str], list[str]]:
+    """Compare oracle and student task fields.
+
+    Returns ``(matched, mismatched_fields, matched_fields)`` where
+    ``matched_fields`` lists compared fields whose values are equal.  Assumed
+    fields are excluded from comparison entirely, so they appear in neither
+    list.
+    """
+
     fields = (
         "case_id",
         "current_operating_condition_number",
@@ -144,6 +152,7 @@ def task_match(
     required_fields = {"case_id", "disturbance_variable"}
     assumed_fields = inferred_task_fields(expected)
     mismatches: list[str] = []
+    matched_fields: list[str] = []
     for field in fields:
         if field not in expected or field in assumed_fields:
             continue
@@ -164,7 +173,17 @@ def task_match(
             equal = left == right
         if not equal:
             mismatches.append(field)
-    return not mismatches, mismatches
+        else:
+            matched_fields.append(field)
+    return not mismatches, mismatches, matched_fields
+
+
+def task_match(
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    matched, mismatches, _matched_fields = task_field_comparison(expected, actual)
+    return matched, mismatches
 
 
 def disturbance_was_applied(

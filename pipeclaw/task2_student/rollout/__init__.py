@@ -1,13 +1,15 @@
 """Model/tool execution for Task 2 autonomous rollouts.
 
 A rollout only produces a trajectory.  Scoring is the responsibility of
-``pipeclaw.backend.evaluator``, so nothing in this package imports evaluation,
-metric, or teacher-oracle code.
+``pipeclaw.backend.evaluator``, so nothing in the execution core imports
+evaluation, metric, or teacher-oracle code.  ``.suite`` is the one module that
+joins the two, and it is imported explicitly rather than re-exported here.
 
 The re-exports here are limited to the hardware-free execution core.  Import
-``.scenarios`` for PipeFormer/OpenClaw dispatchers and ``.swift_generator`` for
-model loading directly, so that neither the PipeFormer backend nor torch is
-pulled in by simply importing this package.
+``.scenarios`` for PipeFormer/OpenClaw dispatchers, ``.swift_generator`` for
+model loading, and ``.suite`` for dataset orchestration directly, so that
+neither the PipeFormer backend nor torch is pulled in by simply importing this
+package.
 """
 
 from __future__ import annotations

@@ -128,6 +128,35 @@ def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[st
     return payload
 
 
+TEACHER_QUALITY_ALIASES = {
+    "quality_flag": "quality_flag",
+    "quality_score": "quality_score",
+    "quality_profile": "profile",
+    "quality_failed_checks": "failed_checks",
+    "quality_issues": "quality_issues",
+}
+
+
+def apply_quality_aliases(
+    record: Dict[str, Any],
+    native: Dict[str, Any],
+    *,
+    aliases: Iterable[str] = TEACHER_QUALITY_ALIASES,
+) -> Dict[str, Any]:
+    """Write the released ``quality_*`` teacher fields from one v2 report.
+
+    Teacher generation and offline evaluation both persist these aliases.  They
+    are copied from the canonical report rather than recomputed, so there is
+    exactly one score formula in the repository.
+    """
+
+    for alias in aliases:
+        source = TEACHER_QUALITY_ALIASES[alias]
+        if source in native:
+            record[alias] = native[source]
+    return record
+
+
 class NativeTraceEvaluator:
     """Compatibility API that delegates all evaluation to schema v2."""
 
