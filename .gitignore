@@ -8,6 +8,8 @@ __pycache__/
 .workbuddy
 .codex
 .claude
+.agents
+agent_docs
 graphify-out
 pipeFormer/data/**/tokenizer_output.txt
 pipeFormer/build_cache.log

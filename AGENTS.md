@@ -31,6 +31,12 @@ Recent commits are short, imperative summaries such as `Test run the pipeFormer 
 
 `pipeclaw/backend/main.py` loads `backend/.env` for `OPENAI_API_KEY`, `OPENAI_API_BASE`, and `OPENAI_MODEL`. Do not expose private credentials or internal operational data; replace `backend/pipeline_data/` with private data only in local or controlled environments.
 
+## Agent Workflow
+
+Default to light work and inspect only relevant files. Use local `agent_docs/workflow/` guidance only when the user explicitly requests a medium or heavy route.
+
+Every subagent task must invoke `[@ponytail](plugin://ponytail@ponytail) ultra` and minimize scope without weakening required validation, safety, or correctness.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

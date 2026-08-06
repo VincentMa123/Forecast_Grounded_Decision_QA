@@ -30,6 +30,7 @@ _CHINESE_ORDINAL_SUFFIX = re.compile(r"\s*[段条章节次项名位类级]")
 # ``至19日`` abbreviates the end of a date range whose head ``_DATE_SPAN``
 # already consumed, so the trailing day number arrives here unattached.
 _DATE_COMPONENT_SUFFIX = re.compile(r"\s*[日号月]")
+_ROW_CLAUSE_SEPARATOR = re.compile(r"(?:\r?\n|[；;。，])")
 
 
 def _is_compact_date(raw: str) -> bool:
@@ -120,6 +121,71 @@ def _source_outputs(source: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return result
 
 
+def _answer_rows(evidence: Any) -> list[Mapping[str, Any]]:
+    """Return typed CSV row values already produced by the evidence reducer."""
+
+    csv_evidence = mapping(mapping(evidence).get("csv_evidence"))
+    return [
+        mapping(item.get("values"))
+        for item in sequence(csv_evidence.get("answer_rows"))
+        if isinstance(item, Mapping) and mapping(item.get("values"))
+    ]
+
+
+def _unsupported_row_claims(
+    answer: str,
+    rows: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Find numbers attached to the wrong entity within a CSV-row claim."""
+
+    row_strings = [
+        {
+            str(value).strip().casefold()
+            for value in row.values()
+            if isinstance(value, str) and value.strip()
+        }
+        for row in rows
+    ]
+    string_counts = {
+        value: sum(value in values for values in row_strings)
+        for values in row_strings
+        for value in values
+    }
+    discriminative = {
+        value
+        for value, count in string_counts.items()
+        if count < len(row_strings)
+    }
+    issues: list[dict[str, Any]] = []
+    for clause in _ROW_CLAUSE_SEPARATOR.split(answer):
+        normalized = clause.casefold()
+        mentioned = sorted(value for value in discriminative if value in normalized)
+        numbers = _numeric_claims(clause)
+        if not mentioned or not numbers:
+            continue
+        unsupported = [
+            number
+            for number in numbers
+            if not any(
+                set(mentioned).issubset(strings)
+                and any(
+                    math.isclose(number, row_number, rel_tol=1e-5, abs_tol=1e-5)
+                    for row_number in _observed_numbers(row)
+                )
+                for row, strings in zip(rows, row_strings)
+            )
+        ]
+        if unsupported:
+            issues.append(
+                {
+                    "claim": clause.strip(),
+                    "identifiers": mentioned,
+                    "numeric_values": unsupported,
+                }
+            )
+    return issues
+
+
 def _prior_turn_evidence(source: Mapping[str, Any]) -> list[float]:
     """Numbers a previous turn in this session already established.
 
@@ -174,15 +240,21 @@ def _autonomous_evidence(
             for evidence in unique_numbers
         )
     ]
+    row_evidence = [
+        *_answer_rows(oracle.get("verified_evidence", {})),
+        *_answer_rows(state_before.get("verified_evidence")),
+    ]
+    unsupported_rows = _unsupported_row_claims(final_answer, row_evidence)
     applicable = bool(unique_numbers) and bool(final_answer.strip())
     return metric(
         context,
         "evidence_consistency",
         applicable=applicable,
-        passed=applicable and not unsupported,
+        passed=applicable and not unsupported and not unsupported_rows,
         details={
             "claimed_numeric_values": claims,
             "unsupported_numeric_values": unsupported,
+            "unsupported_row_claims": unsupported_rows,
         },
     )
 

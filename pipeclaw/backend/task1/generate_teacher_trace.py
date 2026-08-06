@@ -740,9 +740,30 @@ class TeacherTraceProjector:
                     in required_registry_call_ids
                 )
             ]
+            unique_registry_searches = []
+            seen_registry_searches = set()
+            for pair in selected_registry_searches:
+                raw_output = (pair[2] or {}).get("output")
+                fingerprint = json.dumps(
+                    {
+                        "arguments": pair[1].get("arguments") or {},
+                        "output": (
+                            self._compact_registry_sft_output(raw_output)
+                            if isinstance(raw_output, dict)
+                            else raw_output
+                        ),
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                )
+                if fingerprint in seen_registry_searches:
+                    continue
+                seen_registry_searches.add(fingerprint)
+                unique_registry_searches.append(pair)
             selected = sorted(
                 [
-                    *selected_registry_searches,
+                    *unique_registry_searches,
                     *successful_decision_policies[-1:],
                     *successful_pipeformer,
                 ],
