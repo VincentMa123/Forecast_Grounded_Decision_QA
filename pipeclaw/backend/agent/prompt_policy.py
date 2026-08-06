@@ -26,10 +26,10 @@ _STATIC_POLICY_SECTIONS = (
     ),
     _section(
         "## Pipeline Data Access",
-        "- For a known CSV, call `read_file` directly with its logical path. Do not search WORKSPACE_ROOT, ASSETS_ROOT, TRACE_ROOT, logs, or repository directories.",
+        "- For a known CSV, call `read_file` directly with its logical path. Do not search WORKSPACE_DIR, ASSETS_ROOT, TRACE_ROOT, logs, or repository directories.",
         "- Paths: `pipeline_data/node_flow/YYYYMMDD_node.csv`, `pipeline_data/pipeline_flow/YYYYMMDD_pipeline.csv`, and `pipeline_data/consumer_flow/YYYYMMDD_consumer.csv`.",
         "- Extract the filename from the request; never hardcode a date. Read with `limit=400`, then paginate only when needed.",
-        "- For computation, join the extracted filename to NODE_FLOW_DIR, PIPELINE_FLOW_DIR, or CONSUMER_FLOW_DIR from `os.environ`; write helpers in WORKSPACE_ROOT and results in OUTPUT_DIR. Serialize Decimal safely with `json.dumps(payload, default=str)` or explicit string conversion.",
+        "- For computation, join the extracted filename to NODE_FLOW_DIR, PIPELINE_FLOW_DIR, or CONSUMER_FLOW_DIR from `os.environ`; write helpers in WORKSPACE_DIR and results in OUTPUT_DIR. Serialize Decimal safely with `json.dumps(payload, default=str)` or explicit string conversion.",
         "- For reachability, source counts, shortest paths, or gateways, call `analyze_pipeline_topology`. `multi_source_reachable` and `shared_gateway_dependency` are independent; copy only returned metrics.",
         "- A connected path proves reachability, not capacity, pressure, guaranteed supply, or cause. Do not invent an unrecorded branch, injection, transfer, action, or cause; report the mismatch as unresolved and name the evidence needed.",
     ),

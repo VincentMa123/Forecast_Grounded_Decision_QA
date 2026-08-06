@@ -2,13 +2,14 @@
 
 > **Latest-status rule:** Section 0 is the final Task 1 state, Section 9 is the
 > Task 2 local preparation state, Section 10 is the remote GPU benchmark and
-> cost model, and **Section 11 is the current state of the codebase**
-> (unified evaluation and rollout refactor). Later sections supersede earlier
-> ones wherever they conflict on counts, commands, module paths, or pending
-> work; the earlier sections are retained only as an audit trail. Where
-> Section 11 contradicts an earlier section on where code lives or how a score
-> is computed, Section 11 wins. Section 10 remains authoritative for GPU cost,
-> memory, and training-configuration decisions.
+> cost model, Section 11 is the unified evaluation and rollout refactor, and
+> **Section 12 is the current state of the evaluator**. Later sections supersede
+> earlier ones wherever they conflict on counts, commands, module paths, or
+> pending work; the earlier sections are retained only as an audit trail. Where
+> Section 12 contradicts an earlier section on how a metric is computed or what
+> the evaluator scores, Section 12 wins; Section 11 remains authoritative for
+> where code lives and for the score formula itself. Section 10 remains
+> authoritative for GPU cost, memory, and training-configuration decisions.
 
 ## 0. Final continuation update — 2026-07-29
 
@@ -1966,6 +1967,265 @@ out of the commit.
 restored it. A copy was taken to
 `%TEMP%\pipeclaw_task2_evaluator_backup` before deletion. Delete that backup
 once the refactor is committed and reviewed.
+
+---
+
+## 12. Evaluator hardening for OpenClaw — current state (2026-08-06)
+
+Goal: make the evaluator trustworthy for OpenClaw records, and fix checks that
+were wrong or misleading. Section 11 remains authoritative for *where* code
+lives and for the score formula; this section is authoritative for *what each
+check actually measures*. **Nothing here is staged or committed.**
+
+### How the evaluator is now measured
+
+Two instruments, both required. Neither existed before this work.
+
+**Self-consistency replay.** `measure_eval.py` (repo root, untracked) feeds
+frozen split records back through `EvaluationProfile.AUTONOMOUS_ROLLOUT` as if
+they were student rollouts — `context.record` is the rollout, `context.reference`
+is the split record. Teacher data grading itself is a **floor, not an
+achievement**: anything below 100% is either an evaluator defect or a data
+defect, and the job is to tell which. Reads `EVAL_SPLIT` (defaults to the
+released splits).
+
+**Vacuous probe (negative control).** The same script grades
+`{tool_calls: [], tool_outputs: [], final_answer: "x"}` against all 90 OpenClaw
+references. It **must stay 0/90**. Any relaxation that lets it pass has broken
+the evaluator, and every change below was re-verified against it. This is the
+guard that makes "replay went up" mean something — without it, the cheapest way
+to raise a pass rate is to weaken a check until an empty rollout satisfies it.
+
+Current readings — OpenClaw **90/90**, PipeFormer **24/24**, probe **0/90**,
+suite **113 OK** — but the 90/90 is on an **in-memory re-projection**; see
+"Latent defect" below for what the on-disk splits still read.
+
+### Five defects fixed, all one family
+
+Every one was *"the check demanded a serialization shape instead of the
+substance."* Worth stating as a family, because the next evaluator bug is likely
+to be the sixth instance:
+
+1. **`constraint_execution`** required `rule_status` — SFT compaction drops that
+   key.
+2. **`disturbance_application`** read only `boundary_conditions.setpoints`, so
+   all 19 binary `*:ST` `disturbance_setpoint` calls in the release failed.
+3. **`artifact_evidence`** credited only `read_file`'s `path`, so any question
+   naming a data file was unsatisfiable for domain tools such as
+   `analyze_pipeline_topology`.
+4. **`answer_completeness`** accepted any non-empty string. For tool-less
+   OpenClaw records it is the *only* always-scored deliverable, so `"x"` scored
+   a pass — this is precisely what the vacuous probe was built to catch. Now
+   requires 8 characters (`_MIN_SUBSTANTIVE_ANSWER_CHARS`); the shortest genuine
+   answer in the release is 10, so the floor rejects stubs without failing a
+   real record. It is a non-degeneracy floor, not a semantic judgement.
+5. **`answer_claim_support`** — see below.
+
+#### `answer_claim_support` false positives (fixed 2026-08-06)
+
+Its `_IDENTIFIER_CLAIM` second branch was effectively "any snake_case token", so
+schema field names the answer mentions *in prose while explaining its own
+output* — `forecast_id`, `recovery_ratio`, `selected_candidate_id`,
+`ranked_candidate_ids`, `set_decision_policy`, `abs_disturbance_percent` —
+counted as fabricated identifiers once compaction stripped those keys from
+`tool_outputs`. **9 of 24 PipeFormer records, every one a false positive.**
+
+It now reuses `VARIABLE_REFERENCE` from `evaluator/teacher_quality.py` (a
+stdlib-only module, so no import cycle) plus the original file-name branch.
+PipeFormer went **15/9 → 24/0**. The data-file branch must stay *first* in the
+alternation: `ghost_station.csv` would otherwise match as the stem
+`ghost_station`, letting a fabricated file name be satisfied by an unrelated
+variable of the same name.
+
+**Do not promote it out of `AUTONOMOUS_DIAGNOSTIC_METRICS`.** 84 of 90 OpenClaw
+records are `n/a` on it, because those answers cite numerals and Chinese station
+names and name no identifier at all — `evidence_consistency` covers the
+numerals. That 84 is a **property of the data, not of the narrowing**: the old
+loose regex matched zero tokens in those same 84 answers too.
+
+**Known trade.** `baseline_65ba9efdd34f` (in
+`scenario_pipeformer_prediction_012_session_001`) is no longer matched at all,
+so a genuinely fabricated `baseline_<hex>` would now pass unexamined. It was
+never fabrication — it was established in `tool_outputs` at turn 1 and
+`state_before` at turn 2 but cited at turn 3, past the 2-entry `recent_turns`
+window. That is the latent split-projection defect, not a hallucination.
+
+#### `applicable` is a third outcome, not a pass
+
+`applicable = bool(claims) and bool(corpus.strip())`. Zero claims → **n/a**, not
+pass. Counting vacuous truth as a pass would pad the rate with records the check
+never touched. This distinction is what makes the 84 above readable as data
+shape rather than as evaluator success.
+
+### Multi-turn grounding is load-bearing — measured, not assumed
+
+`_claim_support_metric` pools `tool_outputs`, `tool_calls`, `state_before`, and
+`recent_turns` from **both** `context.record` and `context.reference`, plus
+`context.oracle`. Measured over the test split (n=89 identifier claims):
+
+```text
+ground in the turn's own calls:   55
+ground ONLY via history:          34   (38%)
+orphans:                           0
+```
+
+Dropping either history key would false-flag 38% of all claims. Identical on
+stale and re-projected splits. Any future check that reads only the current
+turn's evidence is wrong for this dataset.
+
+### Latent defect: lossy split projection
+
+Defect 1 (empty `state_before.verified_evidence`) was **fixed in code**:
+`generate_teacher_trace.py` used to write `state_before` only
+`if "state_before" not in projected`, so a snapshot captured before its own
+history was reduced stayed empty forever. It now merges reducer output per key
+(a wholesale rebuild would drop `candidates` on 87 records and `decision_policy`
+on 1). Distribution goes 150/789/201 → **150/73/917**; the remaining 73 are
+correct (66 PipeFormer deliberately omitting `single_forecast_snapshot`, 7
+OpenClaw with `verified_state_eligible=False`).
+
+**The on-disk splits are still stale.** Re-projecting the test split *in memory*
+changes 68/114 records and takes replay to 90/90 · 24/24 · probe 0/90. On disk,
+0 of 114 records carry `conversation_context` and only 23 carry a non-empty
+`state_before.verified_evidence`.
+
+Defect 2 — `sft_fields` omits `conversation_context` entirely and `recent_turns`
+is a 2-entry window — **remains latent**. Facts established 2+ turns back fall
+out of the corpus. No evaluator change can recover them on the path anyone
+actually runs: `rollout/suite.py:364` grades with `reference=<a line from
+--source>`, and every documented `--source` is `splits/teacher_trace_test.jsonl`.
+
+#### Re-projection procedure (not yet run)
+
+This is **re-projection, not regeneration** — it reads the frozen
+`teacher_trace.json` and rewrites only derived artifacts, so it does not violate
+the Section 10 constraint against regenerating the release.
+
+```powershell
+# 1. back up both directories first
+#    generated_teacher_traces/splits/ and .../task1_deliverables/
+# 2. conda run -n pipeclaw python pipeclaw/backend/task1/evaluate_teacher_trace.py
+# 3. verify: 1140 records (902/124/114); measure_eval.py reads 90/90, 24/24, probe 0/90
+# 4. rollback = restore the .bak directories
+```
+
+Caveats, in order of how much they can cost:
+
+- **If step 3 reads below 1,140, stop and roll back.** The CLI re-derives
+  eligibility from `task1_quality_flag == "pass"` computed by the *current*
+  working tree, which can only shrink the count.
+- Reviewer annotations round-trip through
+  `export_reviewer_annotations` → `load_reviewer_annotations`
+  (`evaluate_teacher_trace.py:142-147`), but verify they survived.
+- It rewrites **6 deliverables**: `quality_evaluation.jsonl`,
+  `quality_evaluation_summary.json`, `teacher_trace_schema.json`,
+  `teacher_trace_quality_report.xlsx`, `teacher_trace_statistics.xlsx`,
+  `manual_quality_decisions.jsonl`.
+- **This CLI has never been run end to end in this working tree.**
+
+**Retraining is required afterward.** 716 of 1,140 records gain non-empty
+`state_before.verified_evidence`. The current student was trained on records
+whose grounding was absent, so train and eval would otherwise come from
+different distributions.
+
+### A fix that was written, measured, and then deleted
+
+`_carried_verified_evidence` in `checks/evidence.py` rebuilt evidence with
+`VerifiedDecisionState.from_history` whenever `conversation_context` was present,
+instead of trusting the `state_before` snapshot. Measured on all 1,140 **source**
+records: `evidence_consistency` failures **171 → 109**, overall record pass
+**966 → 1027**, **74 false positives removed** — every one an OpenClaw multi-turn
+recall turn.
+
+It was deleted anyway. `conversation_context` reaches the evaluator on **no real
+path**: the split has none, the student rollout record has none, and the teacher
+profile takes precomputed `issues` rather than calling `_autonomous_evidence` at
+all. The helper only fired when grading raw dataset lines as rollouts — i.e.
+only inside `measure_eval.py`. It cost a cross-layer `evaluator → grounding`
+import (the one `test_grounding_imports.py` exists to police) for zero live
+effect.
+
+Those 74 records are the size of the **upstream** defect, not a pending
+evaluator fix. Recorded here so the measurement is not lost and the helper is
+not rediscovered as a good idea. If anything ever rebuilds state from history
+again, `grounding/decision_trace_state.py:1104` needs an **integer** `turn_id`
+(`"turn_001"` raises `ValueError`).
+
+### Diagnostic metrics
+
+`AUTONOMOUS_DIAGNOSTIC_METRICS` (`profiles.py:96-109`) — observed, never scored,
+never in the denominator: `tool_recovery`, `portability`, `raw_capture_metadata`,
+`model_loading_metadata`, `hallucination`, and `answer_claim_support`.
+
+They stay unscored until a real student rollout supplies the distribution needed
+to set a defensible threshold. Promoting one on teacher-replay evidence alone
+would be setting a threshold from the only population guaranteed to pass it.
+
+### Complexity review applied
+
+Removed the redundant `tool_call_settled` and multilingual label diagnostics,
+moved `first_failing_metric` into `measure_eval.py`, collapsed `_json_text`,
+removed duplicate numeric-tree traversal, and made the measurement script
+evaluate each record once. `answer_claim_support`, the minimum-answer guard,
+and the binary-setpoint validation remain.
+
+**Finding 6 is withdrawn and should not be revisited without new evidence.** The
+reasoning was that `pipeformer_tool_runtime.py:660-688` already raises on both a
+bool `disturbance_setpoint` and a setpoints conflict, making the evaluator's
+guards redundant. That is wrong: `checks/autonomous.py:249` builds `tasks` from
+`call.get("arguments")` — the **student's** tool-call arguments — and a replayed
+or hand-authored record never passes through the runtime at all. The evaluator
+is the trust boundary here, not a second line of defence behind one. (The frozen
+1,140 records do contain zero bool `disturbance_setpoint` values, which is why
+the guard looks dead from the data alone.)
+
+### Verification commands
+
+```powershell
+# replay + vacuous probe (set EVAL_SPLIT to test a re-projection)
+conda run -n pipeclaw python measure_eval.py
+
+# evaluation suite — run from repo root, note the -t .
+conda run -n pipeclaw python -m unittest discover -s pipeclaw/tests/evaluation -t .
+```
+
+Environment gotchas that cost real time:
+
+- The suite prints a large JSON report; grep `^(Ran |OK|FAILED)`.
+- **`conda run` re-encodes captured stdout as cp1252 on Windows** and dies with
+  `UnicodeEncodeError` on Chinese text or `\ufffd`. Write probe output to a file
+  with `io.open(path, "w", encoding="utf-8")` and read it back instead of
+  printing.
+- `conda run python -c` rejects multi-line scripts.
+- A `/tmp/x.py` path passed as a *string argument* to conda Python resolves to
+  `C:\tmp/x.py`.
+- PowerShell 5.1 has no `&&`.
+
+### Files touched (uncommitted)
+
+```text
+pipeclaw/backend/evaluator/checks/autonomous.py
+pipeclaw/backend/evaluator/checks/common.py
+pipeclaw/backend/evaluator/checks/evidence.py
+pipeclaw/backend/evaluator/profiles.py
+pipeclaw/backend/grounding/evidence/tool.py
+pipeclaw/backend/task1/generate_teacher_trace.py
+measure_eval.py                                    (untracked)
+pipeclaw/backend/generated_teacher_traces/splits_probe/   (untracked scratch)
+```
+
+`splits_probe/` is a throwaway re-projection used as `EVAL_SPLIT` for
+measurement. Delete it once the real re-projection is run.
+
+### Next steps
+
+1. **Decide whether to run the re-projection.** It is the only thing standing
+   between the on-disk splits and the measured 90/90. Procedure and rollback are
+   above; retraining follows it.
+2. Apply or drop findings 1–5 and 7. Finding 6 is settled — leave the guard.
+3. Delete `splits_probe/` and the `.bak` directories once re-projection is
+   accepted.
+4. Leave the diagnostic metrics unscored until a real student rollout exists.
 
 
 

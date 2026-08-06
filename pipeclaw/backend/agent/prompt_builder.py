@@ -113,14 +113,14 @@ class PromptBuilder:
             "\n".join(
                 [
                     "## Workspace Contract",
-                    f"- WORKSPACE_ROOT: {self.workspace_root.as_posix()} (runtime-configured for this deployment)",
+                    f"- WORKSPACE_DIR: {self.workspace_root.as_posix()} (runtime-configured for this deployment)",
                     f"- MEMORY_ROOT: {(self.workspace_root / 'memory').as_posix()}",
                     f"- ASSETS_ROOT: {(self.workspace_root / 'assets').as_posix()}",
                     f"- TRACE_ROOT: {(self.workspace_root / 'context_trace').as_posix()}",
                     f"- TEMPORARY_DIR: {(self.workspace_root / 'temporary_dir').as_posix()}",
                     f"- REPORTS_DIR: {(self.workspace_root / 'reports').as_posix()}",
                     f"- PLAN_PATH: {(self.workspace_root / 'plan.md').as_posix()}",
-                    "- Write intermediate artifacts under TEMPORARY_DIR and deliverables under REPORTS_DIR. Do not rely on per-session roots or scatter generated files under WORKSPACE_ROOT.",
+                    "- Write intermediate artifacts under TEMPORARY_DIR and deliverables under REPORTS_DIR. Do not rely on per-session roots or scatter generated files under WORKSPACE_DIR.",
                 ]
             )
         )

@@ -214,13 +214,34 @@ def disturbance_was_applied(
         or prediction.get("disturbance_direction")
         or ""
     ).casefold()
+    # Binary status variables (``*:ST``) carry their target as a scalar
+    # ``disturbance_setpoint`` argument; the runtime folds it into
+    # ``boundary_conditions.setpoints`` itself and forces magnitude/direction to
+    # ``None``, so the request never shows a nested setpoint.  Reading only the
+    # nested form left this check structurally unable to pass a binary
+    # disturbance, so it graded the argument spelling rather than the action.
+    setpoint_argument = task.get("disturbance_setpoint")
+    if isinstance(setpoint_argument, bool):
+        # The runtime rejects booleans outright; accepting them here would let
+        # ``true`` masquerade as the setpoint ``1``.
+        return False
     expected_mode = ""
     expected_value: Any = None
-    if variable in setpoints:
+    if variable in setpoints or setpoint_argument is not None:
         if variable in percentages:
             return False
         expected_mode = "setpoint"
-        expected_value = setpoints[variable]
+        if setpoint_argument is None:
+            expected_value = setpoints[variable]
+        else:
+            expected_value = setpoint_argument
+            if variable in setpoints and not numbers_match(
+                setpoints[variable],
+                setpoint_argument,
+            ):
+                # The runtime raises on this conflict, so a trace exhibiting it
+                # did not apply the disturbance the caller asked for.
+                return False
     elif variable in percentages:
         expected_mode = "percent_change"
         expected_value = percentages[variable]
@@ -277,14 +298,18 @@ def horizon_is_consistent(output: Mapping[str, Any]) -> bool:
 def requested_constraints_executed(output: Mapping[str, Any]) -> bool:
     verification = verification_view(output)
     requested = {str(item) for item in sequence(verification.get("requested_categories"))}
-    categories = {
-        str(key) for key in mapping(verification.get("category_status"))
+    category_status = {
+        str(key): str(value)
+        for key, value in mapping(verification.get("category_status")).items()
     }
-    return bool(
-        requested
-        and requested <= categories
-        and mapping(verification.get("rule_status"))
-    )
+    if not requested or not requested <= set(category_status):
+        return False
+    # ``rule_status`` used to be required here, but compaction drops rule-level
+    # detail while keeping ``category_status``, so requiring it measured how
+    # verbose the record schema is rather than whether the constraints ran.  A
+    # category carrying a real evaluated status is the execution evidence; a
+    # requested category left ``not_evaluated`` is a genuine miss.
+    return all(category_status[name] != "not_evaluated" for name in requested)
 
 
 def verification_is_complete(output: Mapping[str, Any]) -> bool:

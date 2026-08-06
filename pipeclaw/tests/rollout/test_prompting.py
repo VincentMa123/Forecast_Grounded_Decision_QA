@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
+from pipeclaw.backend.agent.prompt_builder import PromptBuilder
 from pipeclaw.task2_student.rollout.prompting import (
     PromptCaseBuilder,
     parse_tool_schemas,
@@ -93,6 +94,12 @@ class PromptCaseBuilderTests(unittest.TestCase):
             prompt_builder=self.prompt_builder,
             **kwargs,
         )
+
+    def test_prompt_uses_runner_workspace_environment_name(self) -> None:
+        prompt = PromptBuilder(self.workspace).build(memory_payload={})
+
+        self.assertIn("WORKSPACE_DIR", prompt)
+        self.assertNotIn("WORKSPACE_ROOT", prompt)
 
     def test_teacher_future_messages_are_hidden(self) -> None:
         case = self.build(

@@ -2355,15 +2355,25 @@ def write_split_records(
             if item.get("split") != split:
                 continue
             projected = {key: item[key] for key in sft_fields if key in item}
-            if "state_before" not in projected:
-                projected["state_before"] = serialize_verified_decision_state(
-                    DecisionTraceState.from_history(
-                        item.get("conversation_context") or []
-                    ),
-                    max_chars=int(
-                        os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")
-                    ),
-                )
+            # A record that already carried ``state_before`` used to be trusted
+            # outright, so a snapshot captured before its own history was
+            # reduced stayed empty forever -- 716 of 1140 records reached the
+            # student with no ``verified_evidence`` despite their
+            # ``conversation_context`` holding verified ``csv_evidence``.  Fill
+            # per key rather than replacing: ``candidates`` is written by the
+            # PipeFormer comparison path on 87 records and the reducer does not
+            # produce it, so a wholesale rebuild would drop it.
+            rebuilt = serialize_verified_decision_state(
+                DecisionTraceState.from_history(
+                    item.get("conversation_context") or []
+                ),
+                max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+            )
+            state_before = dict(projected.get("state_before") or {})
+            for key, value in rebuilt.items():
+                if value and not state_before.get(key):
+                    state_before[key] = value
+            projected["state_before"] = state_before
             if "recent_turns" not in projected:
                 projected["recent_turns"] = bounded_recent_turns(
                     item.get("conversation_context") or [],

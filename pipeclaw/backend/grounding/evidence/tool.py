@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -59,13 +60,20 @@ def _source_artifact_names(wrapper: dict[str, Any], output: dict[str, Any], tool
     candidates = []
     candidates.extend(output.get("source_artifacts") or [])
     if tool_name == "read_file":
-        candidates.extend([output.get("path"), output.get("abs_path"), arguments.get("path")])
+        candidates.extend([output.get("path"), output.get("abs_path")])
     elif tool_name == "run_command":
         command = output.get("cmd") or arguments.get("cmd") or []
         if isinstance(command, list):
             candidates.extend(command)
         else:
             candidates.append(command)
+    if arguments:
+        # Domain tools name the artifacts they consume in their own arguments
+        # (``analyze_pipeline_topology(node_file=..., pipeline_file=...)``).
+        # Inspecting only ``read_file``'s ``path`` credited the calling
+        # convention rather than the data actually read, so a question naming a
+        # data file was unsatisfiable for every other tool.
+        candidates.append(json.dumps(arguments, ensure_ascii=False, default=str))
     names = []
     for candidate in candidates:
         names.extend(DATA_FILE_REFERENCE.findall(str(candidate or "")))
@@ -151,7 +159,9 @@ def classify_tool_evidence(
         if not text.strip():
             return ToolEvidenceAssessment(ToolEvidenceState.CONTENT_EVIDENCE, "command_action_confirmed", matched)
         return ToolEvidenceAssessment(ToolEvidenceState.CONTENT_EVIDENCE, "command_content_or_computation", matched)
-    if requested_set:
+    if requested_set and not matched:
+        # A tool that never touched the requested artifact grounds nothing; one
+        # that consumed it and returned a payload does, whatever its name.
         return ToolEvidenceAssessment(ToolEvidenceState.NO_EVIDENCE, "requested_artifact_not_read")
     if tool_name in {"write_file", "edit_file"}:
         return ToolEvidenceAssessment(ToolEvidenceState.CONTENT_EVIDENCE, "file_action_confirmed")

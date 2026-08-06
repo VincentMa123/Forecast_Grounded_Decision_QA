@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -23,6 +25,7 @@ except ImportError:  # pragma: no cover - direct backend execution
     from pipeline.forecast_registry_contract import authorize_forecast_registry
 
 from ..models import EvaluationContext, MetricResult
+from ..teacher_quality import VARIABLE_REFERENCE
 from .assumptions import assumption_consistency, inferred_task_fields, prediction_view
 from .common import (
     CANONICAL_METRIC_NAMES,
@@ -135,7 +138,9 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
     )
 
 
-def _tool_metrics(context: EvaluationContext) -> tuple[MetricResult, MetricResult]:
+def _tool_metrics(
+    context: EvaluationContext,
+) -> tuple[MetricResult, MetricResult]:
     calls = _calls(context.record)
     teacher_names = {str(item) for item in sequence(context.oracle.get("teacher_tool_names"))}
     required = set()
@@ -154,6 +159,11 @@ def _tool_metrics(context: EvaluationContext) -> tuple[MetricResult, MetricResul
     failed_calls = [call for call in calls if call not in valid_calls]
     emitted_valid = {str(call.get("name")) for call in valid_calls if call.get("name")}
     applicable = bool(teacher_names)
+    last_required: dict[str, Mapping[str, Any]] = {}
+    for call in calls:
+        name = str(call.get("name") or "")
+        if name in required:
+            last_required[name] = call
     tool_result = metric(
         context,
         "tool_call",
@@ -171,11 +181,6 @@ def _tool_metrics(context: EvaluationContext) -> tuple[MetricResult, MetricResul
             "failed_call_count": len(failed_calls),
         },
     )
-    last_required: dict[str, Mapping[str, Any]] = {}
-    for call in calls:
-        name = str(call.get("name") or "")
-        if name in required:
-            last_required[name] = call
     recovered = bool(failed_calls) and required <= set(last_required) and all(
         call.get("schema_valid") is not False
         and call.get("execution_success") is not False
@@ -337,6 +342,59 @@ def _registry_metric(context: EvaluationContext) -> MetricResult:
     )
 
 
+# The data-file branch must precede the identifier branch: ``ghost_station.csv``
+# would otherwise match as the stem ``ghost_station``, so a fabricated file name
+# could be satisfied by an unrelated variable of the same name in the corpus.
+#
+# The identifier branch is the project's canonical variable pattern rather than
+# "any snake_case token".  The looser form matched schema field names the answer
+# names in prose while explaining its own output -- ``forecast_id``,
+# ``recovery_ratio``, ``selected_candidate_id`` -- and SFT compaction strips
+# those keys from ``tool_outputs``, so the check scored compaction rather than
+# fabrication (9 of 24 PipeFormer teacher records, every one a false positive).
+_IDENTIFIER_CLAIM = re.compile(
+    r"[\w\-]+\.(?:csv|xlsx?|json|txt)|" + VARIABLE_REFERENCE.pattern
+)
+
+
+def _json_text(value: Any) -> str:
+    return json.dumps(value, ensure_ascii=False, default=str)
+
+
+def _claim_support_metric(context: EvaluationContext) -> MetricResult:
+    """Are the identifiers named in the answer present in observed evidence?
+
+    ``evidence_consistency`` only inspects numbers, so an answer that cites no
+    figures is never checked.  Identifiers (canonical variable IDs, CSV file
+    names) are the other thing a student can fabricate, and they appear in the
+    records numbers do not reach.
+    """
+
+    answer = str(context.record.get("final_answer") or "")
+    claims = {match.group(0) for match in _IDENTIFIER_CLAIM.finditer(answer)}
+    haystack: list[str] = []
+    for source in (context.record, context.reference or {}):
+        for key in ("tool_outputs", "tool_calls", "state_before", "recent_turns"):
+            value = source.get(key)
+            if value:
+                haystack.append(_json_text(value))
+    haystack.append(_json_text(context.oracle))
+    corpus = "\n".join(haystack)
+    unsupported = sorted(claim for claim in claims if claim not in corpus)
+    applicable = bool(claims) and bool(corpus.strip())
+    return metric(
+        context,
+        "answer_claim_support",
+        applicable=applicable,
+        passed=applicable and not unsupported,
+        details={
+            "claim_count": len(claims),
+            "unsupported_count": len(unsupported),
+            "unsupported_identifiers": unsupported[:20],
+        },
+    )
+
+
 def _label_metric(
     context: EvaluationContext,
     name: str,
@@ -363,15 +421,27 @@ def _label_metric(
     )
 
 
+# The shortest genuine ``final_answer`` in the frozen 1,140-record release is 10
+# characters, so a floor below that rejects degenerate stubs without failing any
+# real record.  This is a non-degeneracy floor, not a semantic judgement: for the
+# tool-less OpenClaw records ``answer_completeness`` is the only always-scored
+# deliverable, and accepting ``"x"`` let an empty rollout score as a pass.
+_MIN_SUBSTANTIVE_ANSWER_CHARS = 8
+
+
 def _answer_metric(context: EvaluationContext) -> MetricResult:
     answer = str(context.record.get("final_answer") or "")
-    applicable = bool(str((context.reference or {}).get("final_answer") or "").strip()) or bool(answer.strip())
+    stripped = answer.strip()
+    applicable = bool(str((context.reference or {}).get("final_answer") or "").strip()) or bool(stripped)
     return metric(
         context,
         "answer_completeness",
         applicable=applicable,
-        passed=applicable and bool(answer.strip()),
-        details={"answer_length": len(answer)},
+        passed=applicable and len(stripped) >= _MIN_SUBSTANTIVE_ANSWER_CHARS,
+        details={
+            "answer_length": len(answer),
+            "minimum_length": _MIN_SUBSTANTIVE_ANSWER_CHARS,
+        },
     )
 
 
@@ -466,6 +536,7 @@ def evaluate_autonomous_checks(
     """Return every canonical autonomous metric plus unscored diagnostics."""
 
     tool_call, tool_recovery = _tool_metrics(context)
+    claim_support = _claim_support_metric(context)
     metrics = [
         _task_parsing(context),
         _assumption_metric(context),
@@ -495,4 +566,5 @@ def evaluate_autonomous_checks(
     by_name = {item.name: item for item in metrics}
     ordered = [by_name[name] for name in CANONICAL_METRIC_NAMES]
     ordered.append(tool_recovery)
+    ordered.append(claim_support)
     return ordered, {"portability": _portability_diagnostics(context.record)}
