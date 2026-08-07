@@ -418,6 +418,7 @@ def _build_runner(args: Any, cases: Sequence[tuple[Mapping[str, Any], PromptCase
         device=getattr(args, "device", None),
         quant_bits=getattr(args, "quant_bits", None),
         no_quantization=bool(getattr(args, "no_quantization", False)),
+        enable_thinking=bool(getattr(args, "enable_thinking", False)),
     )
     repo_root = Path(getattr(args, "repo_root", "."))
     policy = ScenarioPolicy()

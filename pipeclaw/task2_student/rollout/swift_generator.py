@@ -233,6 +233,7 @@ class SwiftGenerator:
         device: str | None = None,
         quant_bits: int | None = None,
         no_quantization: bool = False,
+        enable_thinking: bool = False,
     ) -> "SwiftGenerator":
         if device:
             os.environ["CUDA_VISIBLE_DEVICES"] = device
@@ -265,7 +266,7 @@ class SwiftGenerator:
         model_obj, processor = get_model_processor(model, **model_load_kwargs)
         if adapters:
             model_obj = PeftModel.from_pretrained(model_obj, adapters)
-        template = get_template(processor, enable_thinking=False)
+        template = get_template(processor, enable_thinking=enable_thinking)
         engine = TransformersEngine(model_obj, template=template)
         return cls(engine)
 

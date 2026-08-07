@@ -67,6 +67,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-turns", type=int, default=8)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
+    parser.add_argument(
+        "--enable-thinking",
+        action="store_true",
+        help="Enable the model's reasoning mode; disabled by default for benchmark parity",
+    )
     parser.add_argument("--device", help="CUDA_VISIBLE_DEVICES value")
     quantization = parser.add_mutually_exclusive_group()
     quantization.add_argument(
