@@ -40,10 +40,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--tool-schema-source",
         help="Projection JSONL containing OpenAI tool schemas",
     )
-    parser.add_argument("--adapters", help="LoRA adapter directory")
+    parser.add_argument("--adapters", help="Optional LoRA adapter directory")
     parser.add_argument(
         "--model",
-        help="Base model name/path; inferred from adapter_config.json when omitted",
+        help=(
+            "Base model name/path; inferred from adapter metadata when --adapters "
+            "is used, otherwise required"
+        ),
     )
     parser.add_argument(
         "--output-dir",

@@ -404,14 +404,17 @@ def _build_runner(args: Any, cases: Sequence[tuple[Mapping[str, Any], PromptCase
     the dry-run path and the test suite never touch model weights or CUDA.
     """
 
-    if not getattr(args, "adapters", None):
-        raise ValueError("--adapters is required unless --dry-run is used")
+    adapters = getattr(args, "adapters", None)
+    model = getattr(args, "model", None)
+    if not adapters and not model:
+        raise ValueError("--model or --adapters is required unless --dry-run is used")
     from .swift_generator import SwiftGenerator, discover_base_model
 
-    model = getattr(args, "model", None) or discover_base_model(Path(args.adapters))
+    if not model:
+        model = discover_base_model(Path(adapters))
     generator = SwiftGenerator.from_args(
         model=model,
-        adapters=args.adapters,
+        adapters=adapters,
         device=getattr(args, "device", None),
         quant_bits=getattr(args, "quant_bits", None),
         no_quantization=bool(getattr(args, "no_quantization", False)),

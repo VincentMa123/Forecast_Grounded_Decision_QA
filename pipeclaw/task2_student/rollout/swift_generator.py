@@ -70,7 +70,7 @@ def normalize_bool(value: Any, *, default: bool) -> bool:
 
 
 def resolve_model_load_kwargs(
-    adapter_dir: Path,
+    adapter_dir: Path | None,
     *,
     quant_bits: int | None = None,
     no_quantization: bool = False,
@@ -87,7 +87,7 @@ def resolve_model_load_kwargs(
     if no_quantization:
         return {}
 
-    saved_args = read_saved_training_args(adapter_dir)
+    saved_args = read_saved_training_args(adapter_dir) if adapter_dir else {}
     explicit_override = quant_bits is not None
     bits = normalize_quant_bits(
         quant_bits if explicit_override else saved_args.get("quant_bits")
@@ -229,7 +229,7 @@ class SwiftGenerator:
         cls,
         *,
         model: str,
-        adapters: str,
+        adapters: str | None,
         device: str | None = None,
         quant_bits: int | None = None,
         no_quantization: bool = False,
@@ -237,16 +237,18 @@ class SwiftGenerator:
         if device:
             os.environ["CUDA_VISIBLE_DEVICES"] = device
         try:
-            from peft import PeftModel
             from swift import get_model_processor, get_template
             from swift.infer_engine import TransformersEngine
+            if adapters:
+                from peft import PeftModel
         except ImportError as exc:  # pragma: no cover - depends on the training env
             raise RuntimeError(
-                "MS-SWIFT and PEFT are required for non-dry-run evaluation"
+                "MS-SWIFT is required for non-dry-run evaluation; PEFT is required "
+                "when --adapters is used"
             ) from exc
 
         model_load_spec = resolve_model_load_kwargs(
-            Path(adapters),
+            Path(adapters) if adapters else None,
             quant_bits=quant_bits,
             no_quantization=no_quantization,
         )
@@ -261,7 +263,8 @@ class SwiftGenerator:
             print("[evaluate_autonomous] base-model loading: default (unquantized)")
 
         model_obj, processor = get_model_processor(model, **model_load_kwargs)
-        model_obj = PeftModel.from_pretrained(model_obj, adapters)
+        if adapters:
+            model_obj = PeftModel.from_pretrained(model_obj, adapters)
         template = get_template(processor, enable_thinking=False)
         engine = TransformersEngine(model_obj, template=template)
         return cls(engine)
