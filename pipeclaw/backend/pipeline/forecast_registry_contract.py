@@ -105,7 +105,7 @@ def _candidate_search_authorizes(
     arguments = dict(call.get("arguments") or {})
     if (
         _normalized(arguments.get("role")) != "input"
-        or arguments.get("controllable") is not True
+        or _normalized(arguments.get("controllable")) != "true"
     ):
         return False
     return any(

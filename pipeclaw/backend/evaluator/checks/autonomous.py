@@ -73,6 +73,51 @@ def _successful_forecast_pairs(
     return pairs
 
 
+def _same_forecast_action(
+    expected_call: Mapping[str, Any],
+    actual_call: Mapping[str, Any],
+) -> bool:
+    """Match legacy partial teacher calls without equating different actions."""
+    expected = mapping(expected_call.get("arguments"))
+    actual = mapping(actual_call.get("arguments"))
+    scalar_keys = (
+        "case_id",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "disturbance_setpoint",
+        "forecast_horizon_minutes",
+    )
+    if not expected or any(
+        key in expected and actual.get(key) != expected[key]
+        for key in scalar_keys
+    ):
+        return False
+    if "boundary_conditions" not in expected:
+        return True
+    expected_boundary = mapping(expected.get("boundary_conditions"))
+    actual_boundary = mapping(actual.get("boundary_conditions"))
+    return all(
+        dict(mapping(expected_boundary.get(key)))
+        == dict(mapping(actual_boundary.get(key)))
+        for key in ("percentage_changes", "setpoints")
+    )
+
+
+def _matching_reference_output(
+    context: EvaluationContext,
+    actual_call: Mapping[str, Any],
+) -> Mapping[str, Any] | None:
+    return next(
+        (
+            output
+            for call, output in _successful_forecast_pairs(context.reference or {})
+            if _same_forecast_action(call, actual_call)
+        ),
+        None,
+    )
+
+
 def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     tasks = [
         mapping(call.get("arguments"))
@@ -269,30 +314,30 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         passed=applicable and bool(outputs) and all(verification_is_complete(output) for output in outputs),
     )
 
-    expected_statuses: Mapping[str, Any] = {}
-    for item in sequence((context.reference or {}).get("tool_outputs")):
-        if not isinstance(item, Mapping):
-            continue
-        value = _output(item)
-        if item.get("name") == PIPEFORMER_TOOL or verification_view(value):
-            expected_statuses = mapping(verification_view(value).get("category_status"))
-            if expected_statuses:
-                break
     expected_constraints = {
         str(item) for item in sequence(context.oracle.get("required_constraints"))
     }
-    actual_statuses = mapping(
-        verification_view(outputs[0]).get("category_status") if outputs else {}
-    )
-    judgment_applicable = applicable and bool(expected_constraints or expected_statuses)
+    actual_statuses = [
+        mapping(verification_view(output).get("category_status"))
+        for output in outputs
+    ]
+    matched_statuses = [
+        (
+            actual,
+            mapping(verification_view(reference).get("category_status")),
+        )
+        for (call, _), actual in zip(pairs, actual_statuses)
+        for reference in [_matching_reference_output(context, call)]
+        if reference is not None
+    ]
+    judgment_applicable = applicable and bool(expected_constraints or matched_statuses)
     judgment_pass = bool(actual_statuses) and all(
-        str(actual_statuses.get(key)) == str(value)
-        for key, value in expected_statuses.items()
+        expected_constraints <= {str(key) for key in statuses}
+        for statuses in actual_statuses
+    ) and all(
+        all(str(actual.get(key)) == str(value) for key, value in expected.items())
+        for actual, expected in matched_statuses
     )
-    if expected_constraints:
-        judgment_pass = judgment_pass and expected_constraints <= {
-            str(key) for key in actual_statuses
-        }
     judgment = metric(
         context,
         "constraint_judgment",
@@ -300,7 +345,10 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         passed=judgment_pass,
         details={
             "expected_constraints": sorted(expected_constraints),
-            "actual_constraints": sorted(str(key) for key in actual_statuses),
+            "actual_constraints": sorted({
+                str(key) for statuses in actual_statuses for key in statuses
+            }),
+            "matched_reference_forecast_count": len(matched_statuses),
         },
     )
     return [checkpoint, disturbance, horizon, constraint_execution, judgment, complete]
@@ -398,26 +446,41 @@ def _claim_support_metric(context: EvaluationContext) -> MetricResult:
 def _label_metric(
     context: EvaluationContext,
     name: str,
-    oracle_key: str,
     output_key: str,
 ) -> MetricResult:
-    expected = context.oracle.get(oracle_key)
     pairs = _successful_forecast_pairs(context.record)
-    output = pairs[0][1] if pairs else {}
-    verification = verification_view(output)
-    actual = verification.get(output_key, output.get(output_key))
-    if output_key == "human_intervention_label":
-        actual = verification.get(
-            output_key,
-            output.get(output_key, output.get("manual_intervention_label")),
-        )
-    applicable = expected is not None
+    matched = [
+        (reference, output)
+        for call, output in pairs
+        for reference in [_matching_reference_output(context, call)]
+        if reference is not None
+    ]
+
+    def value(output: Mapping[str, Any]) -> Any:
+        verification = verification_view(output)
+        fallback = output.get(output_key)
+        if output_key == "human_intervention_label":
+            fallback = output.get(output_key, output.get("manual_intervention_label"))
+        return verification.get(output_key, fallback)
+
+    comparisons = [
+        (expected, value(output))
+        for reference, output in matched
+        if (expected := value(reference)) is not None
+    ]
+    expected = [item[0] for item in comparisons]
+    actual = [item[1] for item in comparisons]
+    applicable = bool(comparisons)
     return metric(
         context,
         name,
         applicable=applicable,
         passed=applicable and actual == expected,
-        details={"expected": expected, "actual": actual},
+        details={
+            "expected": expected[0] if len(expected) == 1 else expected,
+            "actual": actual[0] if len(actual) == 1 else actual,
+            "matched_reference_forecast_count": len(matched),
+        },
     )
 
 
@@ -543,17 +606,15 @@ def evaluate_autonomous_checks(
         tool_call,
         *_pipeformer_metrics(context),
         _registry_metric(context),
-        _label_metric(context, "risk", "risk_level", "risk_level"),
+        _label_metric(context, "risk", "risk_level"),
         _label_metric(
             context,
             "manual_intervention",
-            "manual_intervention_label",
             "human_intervention_label",
         ),
         _label_metric(
             context,
             "dispatch",
-            "dispatch_recommendation",
             "dispatch_recommendation",
         ),
         evidence_consistency(context),
