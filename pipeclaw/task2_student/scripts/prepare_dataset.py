@@ -40,13 +40,18 @@ except ImportError:  # pragma: no cover - supports direct script execution.
     )
 
 try:
-    from ..path_contract import is_host_absolute_path, normalize_relative_path
+    from ..path_contract import (
+        is_host_absolute_path,
+        normalize_relative_path,
+        redact_host_paths,
+    )
 except ImportError:  # pragma: no cover - supports direct script execution.
     if _repo_root_text not in sys.path:
         sys.path.insert(0, _repo_root_text)
     from pipeclaw.task2_student.path_contract import (  # type: ignore
         is_host_absolute_path,
         normalize_relative_path,
+        redact_host_paths,
     )
 
 TASK_PROMPTS = {
@@ -122,7 +127,7 @@ def canonicalize_training_tool_arguments(
     del tool_name  # reserved for future per-tool path contracts
     canonical = dict(arguments)
     cwd = canonical.get("cwd")
-    if cwd is None or is_host_absolute_path(cwd):
+    if cwd is None or cwd == "<host-path>" or is_host_absolute_path(cwd):
         canonical.pop("cwd", None)
     elif isinstance(cwd, str):
         canonical["cwd"] = normalize_relative_path(cwd)
@@ -142,6 +147,7 @@ def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
     """Project one compact Task 1 record into the answer-only baseline."""
 
     validate_source_records([source], split=split, expected_count=1)
+    source = redact_host_paths(source)
     record = _identity_fields(
         source,
         split=split,
@@ -177,6 +183,7 @@ def project_trace_level(
     """Project one compact Task 1 record into MS-SWIFT agent format."""
 
     validate_source_records([source], split=split, expected_count=1)
+    source = redact_host_paths(source)
     normalized_schemas, registered_names = _normalize_tool_schemas(tool_schemas)
     record = _identity_fields(
         source,
@@ -215,6 +222,7 @@ def project_constraint_multitask(
     """Create nonempty structured auxiliary examples for the five Task 2 skills."""
 
     validate_source_records([source], split=split, expected_count=1)
+    source = redact_host_paths(source)
     normalized_schemas, registered_names = _normalize_tool_schemas(tool_schemas)
     examples: list[dict[str, Any]] = []
 

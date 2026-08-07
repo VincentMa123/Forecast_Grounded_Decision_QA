@@ -48,7 +48,7 @@ _STATIC_POLICY_SECTIONS = (
         "- A qualitative missing magnitude/direction may be simulated only with `disturbance_assumption`; mark it as an LLM provisional assumption and disclose it.",
         "- Copy every registered variable ID exactly as returned, including suffixes such as `:SNQ`, `:ST`, `:FR`, and `:SP_`. Never abbreviate `T_002:SNQ` to `T_002`, even to save characters.",
         "- Never add physical meanings to an identifier unless exact metadata was returned. Never claim uniqueness, prior runs, causality, propagation, or effects absent from structured evidence.",
-        "- Follow the user's requested slots and prohibitions. Treat `not_evaluated` as not passed.",
+        "- Follow the user's requested slots and prohibitions. Report `not_evaluated` as not evaluated, never as `fail`; if that category is required, the overall verification remains incomplete and cannot be released.",
         "- HARD OUTPUT LIMIT: at most 160 English words, 500 total characters for ordinary Chinese/mixed forecast answers, or 650 total characters for multi-candidate Chinese/mixed comparisons. Remove decoration and repetition, but preserve actions, objective evidence, audit outcomes, ranking, selection, rejection reasons, and assumptions.",
     ),
 )

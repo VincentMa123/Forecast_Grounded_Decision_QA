@@ -1219,6 +1219,20 @@ _CANONICAL_DISCLOSURE_PREFIXES = (
     "Application status:",
 )
 _CANONICAL_ASSUMPTION_PREFIX = "Assumption source:"
+_NOT_EVALUATED_DISCLOSURE = "not_evaluated（未执行该项校核，不能判定 pass/fail）"
+_AMBIGUOUS_NOT_EVALUATED = re.compile(
+    r"(?<![A-Za-z0-9_])not_evaluated(?![A-Za-z0-9_])(?:"
+    r"\s*[（(][^）)\r\n]{0,60}未通过[^）)\r\n]{0,60}[）)]"
+    r"|[，,]\s*(?:即|属|视为|按)\s*[“\"]?未通过"
+    r"(?:校核项|校核|评估|处理|对待|项)?[”\"]?"
+    r"(?:\s*(?:处理|看待|对待))?[）)]?"
+    r")"
+)
+
+
+def normalize_not_evaluated_wording(answer: str) -> str:
+    """Keep not-evaluated evidence distinct from an actual failed check."""
+    return _AMBIGUOUS_NOT_EVALUATED.sub(_NOT_EVALUATED_DISCLOSURE, answer)
 
 
 def _canonical_sequence_value(values: Any, fallback: Any) -> str:
@@ -1364,7 +1378,9 @@ def finalize_applied_disturbance_disclosure(
         *_canonical_applied_disturbance_lines(contract),
         *_canonical_assumption_source_lines(contract),
     ]
-    prose = answer_without_machine_disclosure(answer)
+    prose = normalize_not_evaluated_wording(
+        answer_without_machine_disclosure(answer)
+    )
     prose = _without_embedded_required_disclosures(prose, required)
     disclosure = "\n".join(required)
     if disclosure and prose:
@@ -2145,6 +2161,9 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
         if stripped != repaired.get("final_answer"):
             repaired["final_answer"] = stripped
             repaired["repair_provenance"] = {"method": "unsupported_unit_removal", "external_llm_calls": 0, "reason": "Unsupported unit labels removed without changing the numeric claims."}
+    repaired["final_answer"] = normalize_not_evaluated_wording(
+        str(repaired.get("final_answer") or "")
+    )
     if "answer_too_long" in issues:
         maximum_chars = (
             chinese_comparison_max_chars(

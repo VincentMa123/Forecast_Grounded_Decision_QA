@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import Any, Iterable, Sequence
 
 try:
-    from ..path_contract import is_host_absolute_path
+    from ..path_contract import is_host_absolute_path, redact_host_paths
 except ImportError:  # pragma: no cover - direct script execution
     import sys
 
     sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
     from pipeclaw.task2_student.path_contract import (  # type: ignore
         is_host_absolute_path,
+        redact_host_paths,
     )
 
 
@@ -605,6 +606,7 @@ def _validate_derived_identities(
             raise DatasetValidationError(
                 f"{projection}/{split}: unknown source_sample_id {source_sample_id}"
             )
+        source = redact_host_paths(source)
         for field in ("scenario_id", "session_id", "turn_id", "scenario_type"):
             if record.get(field) != source.get(field):
                 raise DatasetValidationError(

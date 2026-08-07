@@ -454,7 +454,7 @@ def grounded_numeric_claim_values(
     claimed = _numbers_in_text(answer)
     supported = _numbers_in_text(question)
     supported.extend(_numbers_in_value(evidence))
-    supported.extend(_derived_numbers_in_value(evidence))
+    supported.extend(derived_numeric_values(evidence))
     claimed_times = _time_values_in_minutes(answer)
     supported_times = [
         minutes
@@ -969,62 +969,88 @@ def _numbers_in_value(value: Any) -> List[float]:
     return []
 
 
-def _derived_numbers_in_value(value: Any) -> List[float]:
-    """Compute bounded counts and grouped scalar sums from structured evidence."""
-    derived: List[float] = []
-    if isinstance(value, dict):
-        for item in value.values():
-            derived.extend(_derived_numbers_in_value(item))
-        return derived
-    if not isinstance(value, list):
-        return derived
-    derived.append(float(len(value)))
-    rows = [dict(item) for item in value if isinstance(item, dict)]
-    if rows and len(rows) <= 2_000:
-        keys = sorted({key for row in rows for key in row})[:40]
-        numeric_keys = [
-            key
-            for key in keys
-            if any(
-                isinstance(row.get(key), (int, float))
-                and not isinstance(row.get(key), bool)
-                for row in rows
-            )
-        ]
-        category_keys = [
-            key
-            for key in keys
-            if any(isinstance(row.get(key), str) for row in rows)
-        ][:8]
-        for numeric_key in numeric_keys:
-            values = [
-                float(row[numeric_key])
-                for row in rows
-                if isinstance(row.get(numeric_key), (int, float))
-                and not isinstance(row.get(numeric_key), bool)
+def derived_numeric_values(value: Any) -> List[float]:
+    """Derive bounded counts, sums, and shares from typed or JSON evidence."""
+
+    def number(item: Any) -> Optional[float]:
+        if isinstance(item, bool):
+            return None
+        if isinstance(item, (int, float)):
+            return float(item)
+        if isinstance(item, str) and re.fullmatch(r"[+\-]?\d+(?:\.\d+)?", item.strip()):
+            return float(item)
+        return None
+
+    def rounded(item: float) -> List[float]:
+        return [item, *(round(item, digits) for digits in range(7))]
+
+    def collect(item: Any, totals: List[float]) -> List[float]:
+        if isinstance(item, str):
+            stripped = item.lstrip()
+            if not stripped.startswith(("{", "[")):
+                return []
+            try:
+                item, _ = json.JSONDecoder().raw_decode(stripped)
+            except (TypeError, ValueError):
+                return []
+        if isinstance(item, dict):
+            local_totals = [
+                value
+                for key, field in item.items()
+                if "total" in str(key).casefold()
+                and (value := number(field)) is not None
+                and value != 0
             ]
-            if values:
-                derived.append(sum(values))
-                derived.append(float(sum(number > 0 for number in values)))
-            for category_key in category_keys:
-                grouped: Dict[str, float] = {}
-                for row in rows:
-                    category = row.get(category_key)
-                    number = row.get(numeric_key)
-                    if (
-                        not isinstance(category, str)
-                        or not isinstance(number, (int, float))
-                        or isinstance(number, bool)
-                    ):
-                        continue
-                    grouped[category] = (
-                        grouped.get(category, 0.0) + float(number)
-                    )
-                if len(grouped) <= 200:
-                    derived.extend(grouped.values())
-    for item in value:
-        derived.extend(_derived_numbers_in_value(item))
-    return derived
+            return [
+                value
+                for field in item.values()
+                for value in collect(field, local_totals or totals)
+            ]
+        if not isinstance(item, list):
+            return []
+
+        derived = [float(len(item))]
+        rows = [
+            dict(row["values"]) if isinstance(row.get("values"), dict) else dict(row)
+            for row in item
+            if isinstance(row, dict)
+        ]
+        if rows and len(rows) <= 2_000:
+            keys = sorted({key for row in rows for key in row})[:40]
+            numeric_keys = [
+                key for key in keys if any(number(row.get(key)) is not None for row in rows)
+            ]
+            category_keys = [
+                key for key in keys if any(isinstance(row.get(key), str) for row in rows)
+            ][:8]
+            for numeric_key in numeric_keys:
+                values = [value for row in rows if (value := number(row.get(numeric_key))) is not None]
+                if not values:
+                    continue
+                derived.extend(rounded(sum(values)))
+                derived.append(float(sum(value > 0 for value in values)))
+                running = 0.0
+                for value in values:
+                    running += value
+                    derived.extend(rounded(running))
+                    for total in totals:
+                        derived.extend(rounded(value / total * 100.0))
+                        derived.extend(rounded(running / total * 100.0))
+                for category_key in category_keys:
+                    grouped: Dict[str, float] = {}
+                    counts: Dict[str, int] = {}
+                    for row in rows:
+                        category = row.get(category_key)
+                        value = number(row.get(numeric_key))
+                        if isinstance(category, str) and value is not None:
+                            grouped[category] = grouped.get(category, 0.0) + value
+                            counts[category] = counts.get(category, 0) + 1
+                    if len(grouped) <= 200:
+                        derived.extend(value for total in grouped.values() for value in rounded(total))
+                        derived.extend(float(count) for count in counts.values())
+        return derived + [value for field in item for value in collect(field, totals)]
+
+    return collect(value, [])
 
 
 def _variable_references_are_grounded(answer: str, grounding_evidence: Any) -> bool:

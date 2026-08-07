@@ -13,7 +13,7 @@ except ImportError:  # pragma: no cover - direct backend execution
     from grounding.contract import comparison_answer_issues
 
 from ..models import EvaluationContext, EvaluationProfile, MetricResult
-from ..teacher_quality import record_grounding_contract
+from ..teacher_quality import derived_numeric_values, record_grounding_contract
 from .common import mapping, metric, sequence
 
 
@@ -32,7 +32,7 @@ _DATE_SPAN = re.compile(
 )
 # ``第 3 段`` indexes a pipeline segment and ``第5名`` a rank; the digit is an
 # ordinal, not a data claim, so it must not be checked against the evidence pool.
-_CHINESE_ORDINAL_SUFFIX = re.compile(r"\s*[段条章节次项名位类级]")
+_CHINESE_ORDINAL_SUFFIX = re.compile(r"\s*(?:[段条章节次项名位类级]|[、，,]\s*第)")
 # ``至19日`` abbreviates the end of a date range whose head ``_DATE_SPAN``
 # already consumed, so the trailing day number arrives here unattached.
 _DATE_COMPONENT_SUFFIX = re.compile(r"\s*[日号月]")
@@ -50,7 +50,11 @@ def _is_compact_date(raw: str) -> bool:
 
 
 def _numeric_claims(text: str) -> list[float]:
-    claims: list[float] = []
+    return [value for value, _, _ in _numeric_claim_items(text)]
+
+
+def _numeric_claim_items(text: str) -> list[tuple[float, int, int]]:
+    items: list[tuple[float, int, int]] = []
     date_spans = [match.span() for match in _DATE_SPAN.finditer(text)]
     for match in _NUMERIC_CLAIM.finditer(text):
         if any(start <= match.start() < end for start, end in date_spans):
@@ -88,10 +92,11 @@ def _numeric_claims(text: str) -> list[float]:
         if is_integer and prefix.rstrip().endswith("至") and _DATE_COMPONENT_SUFFIX.match(suffix):
             continue
         try:
-            claims.append(float(raw_value.replace("−", "-").replace(",", "")))
+            value = float(raw_value.replace("−", "-").replace(",", ""))
         except ValueError:
             continue
-    return claims
+        items.append((value, match.start(), match.end()))
+    return items
 
 
 def _observed_numbers(value: Any) -> list[float]:
@@ -166,31 +171,115 @@ def _unsupported_row_claims(
     issues: list[dict[str, Any]] = []
     for clause in _ROW_CLAUSE_SEPARATOR.split(answer):
         normalized = clause.casefold()
-        mentioned = sorted(value for value in discriminative if value in normalized)
-        numbers = _numeric_claims(clause)
-        if not mentioned or not numbers:
-            continue
-        unsupported = [
-            number
-            for number in numbers
-            if not any(
-                set(mentioned).issubset(strings)
-                and any(
-                    math.isclose(number, row_number, rel_tol=1e-5, abs_tol=1e-5)
-                    for row_number in _observed_numbers(row)
-                )
-                for row, strings in zip(rows, row_strings)
-            )
+        occurrences = [
+            (match.start(), match.end(), value)
+            for value in discriminative
+            for match in re.finditer(re.escape(value), normalized)
         ]
+        numeric_items = _numeric_claim_items(clause)
+        if not occurrences or not numeric_items:
+            continue
+        unsupported: list[float] = []
+        issue_identifiers: set[str] = set()
+        previous_end = 0
+        for number, start, end in numeric_items:
+            identifiers = {
+                value
+                for item_start, item_end, value in occurrences
+                if previous_end <= item_start and item_end <= start
+            }
+            if not identifiers:
+                preceding = [item for item in occurrences if item[1] <= start]
+                if preceding:
+                    identifiers = {max(preceding, key=lambda item: item[1])[2]}
+            previous_end = end
+            if not identifiers:
+                continue
+            matching_rows = [
+                row
+                for row, strings in zip(rows, row_strings)
+                if identifiers.issubset(strings)
+            ]
+            supported_numbers = [
+                value for row in matching_rows for value in _observed_numbers(row)
+            ]
+            if len(identifiers) == 1 and len(matching_rows) > 1:
+                numeric_keys = {
+                    key
+                    for row in matching_rows
+                    for key, value in row.items()
+                    if isinstance(value, (int, float)) and not isinstance(value, bool)
+                }
+                supported_numbers.extend(
+                    sum(float(row[key]) for row in matching_rows if key in row)
+                    for key in numeric_keys
+                )
+            if not any(
+                math.isclose(number, supported, rel_tol=1e-5, abs_tol=1e-5)
+                for supported in supported_numbers
+            ):
+                unsupported.append(number)
+                issue_identifiers.update(identifiers)
         if unsupported:
             issues.append(
                 {
                     "claim": clause.strip(),
-                    "identifiers": mentioned,
+                    "identifiers": sorted(issue_identifiers),
                     "numeric_values": unsupported,
                 }
             )
     return issues
+
+
+def _ranking_row_issues(
+    answer: str,
+    rows: Sequence[Mapping[str, Any]],
+    question: str,
+) -> list[dict[str, Any]]:
+    if not re.search(r"(?:前\s*\d+\s*名|top\s*\d+|升序|降序)", question, re.IGNORECASE):
+        return []
+    ranked: list[tuple[str, float]] = []
+    for line in answer.splitlines():
+        if not re.match(r"\s*\d+\s*[.)、]\s*", line):
+            continue
+        normalized = line.casefold()
+        for row in rows:
+            identifiers = [
+                str(value).strip()
+                for value in row.values()
+                if isinstance(value, str) and str(value).strip().casefold() in normalized
+            ]
+            if not identifiers:
+                continue
+            row_numbers = _observed_numbers(row)
+            number = next(
+                (
+                    claim
+                    for claim in _numeric_claims(line)
+                    if any(
+                        math.isclose(claim, observed, rel_tol=1e-5, abs_tol=1e-5)
+                        for observed in row_numbers
+                    )
+                ),
+                None,
+            )
+            if number is not None:
+                ranked.append((identifiers[-1], number))
+                break
+    if len(ranked) < 2:
+        return []
+    ascending = bool(re.search(r"(?:升序|最小|lowest|ascending)", question, re.IGNORECASE))
+    ordered = all(
+        left <= right if ascending else left >= right
+        for (_, left), (_, right) in zip(ranked, ranked[1:])
+    )
+    if ordered:
+        return []
+    return [{
+        "claim": "ranked rows are not in the requested order",
+        "identifiers": [identifier for identifier, _ in ranked],
+        "numeric_values": [number for _, number in ranked],
+    }]
 
 
 def _prior_turn_evidence(source: Mapping[str, Any]) -> list[float]:
@@ -217,18 +306,27 @@ def _autonomous_evidence(
     oracle = context.oracle
     rollout = context.record
     evidence_numbers = _observed_numbers(oracle.get("verified_evidence", {}))
+    evidence_numbers.extend(derived_numeric_values(oracle.get("verified_evidence", {})))
     for output in _source_outputs(source):
         evidence_numbers.extend(_observed_numbers(output))
+        evidence_numbers.extend(derived_numeric_values(output))
     state_before = mapping(source.get("state_before"))
     evidence_numbers.extend(_observed_numbers(state_before.get("verified_evidence")))
+    evidence_numbers.extend(derived_numeric_values(state_before.get("verified_evidence")))
     for task in sequence(oracle.get("tasks")):
         evidence_numbers.extend(_observed_numbers(task))
     # Successful student tool output is independently verified evidence.  It
     # need not reproduce a different valid teacher forecast sample.
     for output in _source_outputs(rollout):
         evidence_numbers.extend(_observed_numbers(output))
+        evidence_numbers.extend(derived_numeric_values(output))
     evidence_numbers.extend(_prior_turn_evidence(rollout))
     evidence_numbers.extend(_prior_turn_evidence(source))
+    evidence_numbers.extend(_numeric_claims(str(source.get("user_input") or "")))
+    row_evidence = [
+        *_answer_rows(oracle.get("verified_evidence", {})),
+        *_answer_rows(state_before.get("verified_evidence")),
+    ]
 
     unique_numbers: list[float] = []
     for number in evidence_numbers:
@@ -247,11 +345,14 @@ def _autonomous_evidence(
             for evidence in unique_numbers
         )
     ]
-    row_evidence = [
-        *_answer_rows(oracle.get("verified_evidence", {})),
-        *_answer_rows(state_before.get("verified_evidence")),
+    unsupported_rows = [
+        *_unsupported_row_claims(final_answer, row_evidence),
+        *_ranking_row_issues(
+            final_answer,
+            row_evidence,
+            str(source.get("user_input") or ""),
+        ),
     ]
-    unsupported_rows = _unsupported_row_claims(final_answer, row_evidence)
     contract = record_grounding_contract({**source, **rollout})
     candidate_issues = (
         comparison_answer_issues(_LEADING_THINK.sub("", final_answer), contract)

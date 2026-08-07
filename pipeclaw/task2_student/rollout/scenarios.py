@@ -20,7 +20,7 @@ from pipeclaw.backend.grounding.pipeformer_projection import (
     project_pipeformer_output,
 )
 
-from ..path_contract import is_host_absolute_path
+from ..path_contract import is_host_absolute_path, redact_host_paths
 from .models import PromptCase, ToolCall
 from .tools import ToolDispatcher
 
@@ -86,20 +86,6 @@ def evaluation_workspace_key(source: Mapping[str, Any]) -> str:
     if scenario_scope == sample_id:
         scenario_scope = str(source.get("scenario_id") or scenario_scope)
     return f"openclaw-{scenario_scope}"
-
-
-def redact_host_paths(value: Any) -> Any:
-    """Remove host filesystem roots from text shown to the model."""
-
-    if not isinstance(value, str):
-        return value
-    # Keep logical pipeline/workspace paths while removing common host roots
-    # from errors and command output shown to the model.
-    redacted = re.sub(r"(?i)(?:[A-Z]:[\\/]|\\\\)[^\s\"'<>]+", "<host-path>", value)
-    redacted = re.sub(
-        r"(?<![\w.])/(?:root|home|Users|var|tmp)/[^\s\"'<>]+", "<host-path>", redacted
-    )
-    return redacted
 
 
 _OPENCLAW_PASSTHROUGH_KEYS = (

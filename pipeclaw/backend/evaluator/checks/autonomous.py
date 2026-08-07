@@ -188,13 +188,29 @@ def _tool_metrics(
 ) -> tuple[MetricResult, MetricResult]:
     calls = _calls(context.record)
     teacher_names = {str(item) for item in sequence(context.oracle.get("teacher_tool_names"))}
-    required = set()
-    if PIPEFORMER_TOOL in teacher_names:
-        required.add(PIPEFORMER_TOOL)
-    if "set_decision_policy" in teacher_names:
-        required.add("set_decision_policy")
-    if not required:
-        required = set(teacher_names)
+    is_openclaw = str((context.reference or {}).get("scenario_type") or "").casefold() in {
+        "openclaw",
+        "pipeclaw",
+    }
+
+    def capabilities(names: set[str]) -> set[str]:
+        result = names - {"write_file", "edit_file"}
+        if names & {"write_file", "edit_file"}:
+            result.add("workspace_mutation")
+        return result
+
+    if is_openclaw:
+        required = capabilities(teacher_names)
+        state_evidence = mapping(mapping((context.reference or {}).get("state_before")).get("verified_evidence"))
+        question = str((context.reference or {}).get("user_input") or "")
+        if required == {"read_file"} and state_evidence and not requested_artifacts(question):
+            required.clear()
+    else:
+        required = {
+            name
+            for name in (PIPEFORMER_TOOL, "set_decision_policy")
+            if name in teacher_names
+        } or set(teacher_names)
     valid_calls = [
         call
         for call in calls
@@ -202,22 +218,26 @@ def _tool_metrics(
         and call.get("execution_success") is not False
     ]
     failed_calls = [call for call in calls if call not in valid_calls]
-    emitted_valid = {str(call.get("name")) for call in valid_calls if call.get("name")}
-    applicable = bool(teacher_names)
+    emitted_names = {str(call.get("name")) for call in valid_calls if call.get("name")}
+    emitted_valid = capabilities(emitted_names) if is_openclaw else emitted_names
+    applicable = bool(required or calls)
+    failed_names = {str(call.get("name")) for call in failed_calls if call.get("name")}
+    failed_capabilities = capabilities(failed_names) if is_openclaw else failed_names
+    recovery_targets = required | failed_capabilities
     last_required: dict[str, Mapping[str, Any]] = {}
     for call in calls:
         name = str(call.get("name") or "")
-        if name in required:
-            last_required[name] = call
+        call_capabilities = capabilities({name}) if is_openclaw else {name}
+        for capability in call_capabilities & recovery_targets:
+            last_required[capability] = call
     tool_result = metric(
         context,
         "tool_call",
         applicable=applicable,
         passed=(
             applicable
-            and bool(valid_calls)
             and required <= emitted_valid
-            and len(valid_calls) == len(calls)
+            and not failed_calls
         ),
         details={
             "expected_tool_names": sorted(teacher_names),
@@ -226,7 +246,7 @@ def _tool_metrics(
             "failed_call_count": len(failed_calls),
         },
     )
-    recovered = bool(failed_calls) and required <= set(last_required) and all(
+    recovered = bool(failed_calls) and recovery_targets <= set(last_required) and all(
         call.get("schema_valid") is not False
         and call.get("execution_success") is not False
         for call in last_required.values()
@@ -511,12 +531,12 @@ def _answer_metric(context: EvaluationContext) -> MetricResult:
 def _json_metric(context: EvaluationContext) -> MetricResult:
     calls = _calls(context.record)
     errors = sequence(context.record.get("json_errors"))
-    applicable = bool(sequence(context.oracle.get("teacher_tool_names")))
+    applicable = bool(calls or errors)
     return metric(
         context,
         "json_validity",
         applicable=applicable,
-        passed=applicable and bool(calls) and not errors and all(
+        passed=applicable and not errors and all(
             call.get("schema_valid") is not False for call in calls
         ),
         details={"error_count": len(errors)},
