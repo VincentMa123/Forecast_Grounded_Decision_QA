@@ -9,6 +9,7 @@ execution core remains testable without teacher oracles or score weights.
 
 from __future__ import annotations
 
+import gc
 import json
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -249,6 +250,16 @@ def _set_postfix(progress: Any, **fields: Any) -> None:
         progress.set_postfix(refresh=False, **fields)
 
 
+def _release_cuda_cache() -> None:
+    """Release unreachable per-case tensors and unused CUDA allocator blocks."""
+
+    import torch
+
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+
+
 def _summary(
     reports: Sequence[EvaluationReport],
     *,
@@ -373,6 +384,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                     scenario=case.scenario_type,
                     status=rollout.get("trace_status", "unknown"),
                 )
+                _release_cuda_cache()
 
     summary = _summary(
         [report for report in reports if report is not None],

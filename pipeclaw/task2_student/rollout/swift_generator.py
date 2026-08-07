@@ -1,8 +1,8 @@
 """Model loading and generation for autonomous rollouts.
 
-``SwiftGenerator`` is the only place in the rollout package that imports torch,
-PEFT, or MS-SWIFT.  Every other module runs without model weights or CUDA, which
-keeps the runner and scenario tests fast and hardware-free.
+``SwiftGenerator`` is the only place in the rollout package that imports PEFT
+or MS-SWIFT and owns model weights.  The suite only imports torch lazily for
+between-case allocator cleanup, keeping dry runs hardware-free.
 
 Base-model quantization is resolved from the adapter checkpoint's own
 ``args.json`` so evaluation loads the same weight representation that training
