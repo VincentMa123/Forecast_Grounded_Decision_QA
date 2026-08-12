@@ -34,8 +34,16 @@ from pipeclaw.backend.grounding.contract import (
 )
 from pipeclaw.backend.agent.prompt_policy import candidate_contract_message
 from pipeclaw.backend.pipeline.forecast_registry_contract import forecast_registry_failure_result
+from pipeclaw.task2_student.rollout.tools import (
+    ToolCall,
+    coerce_schema_value,
+    parse_tool_calls,
+    schema_error,
+)
 
 logger = logging.getLogger(__name__)
+
+_THINKING_BLOCK = re.compile(r"<think>.*?</think>", re.DOTALL | re.IGNORECASE)
 
 AnswerValidator = Callable[[str, List[Dict[str, Any]]], List[str]]
 
@@ -98,6 +106,10 @@ def _forecast_call_signature(arguments: Dict[str, Any]) -> str:
         sort_keys=True,
         separators=(",", ":"),
     )
+
+
+def _tool_call_signature(name: str, arguments: Dict[str, Any]) -> str:
+    return f"{name}:{json.dumps(arguments, ensure_ascii=False, sort_keys=True, default=str, separators=(',', ':'))}"
 
 
 def equivalent_forecast_call(
@@ -299,12 +311,35 @@ class AgentOrchestrator:
         parts.append(request.message)
         return "\n".join(parts).strip()
 
-    def _safe_parse_args(self, raw_args: str) -> Optional[Dict[str, Any]]:
-        try:
-            parsed = json.loads(raw_args) if raw_args else {}
-            return parsed if isinstance(parsed, dict) else None
-        except json.JSONDecodeError:
-            return None
+    def _normalize_tool_response(
+        self,
+        response: Any,
+    ) -> tuple[str, List[ToolCall], List[str]]:
+        """Use the shared Qwen/OpenAI parser before displaying or executing a call."""
+        visible_text, tool_calls, errors = parse_tool_calls(response)
+        normalized_calls: List[ToolCall] = []
+        for call in tool_calls:
+            info = tool_registry.get_tool_info(call.name) or {}
+            parameters = info.get("parameters")
+            arguments = (
+                coerce_schema_value(call.arguments, parameters)
+                if isinstance(parameters, dict)
+                else call.arguments
+            )
+            normalized_calls.append(
+                ToolCall(call.call_id, call.name, dict(arguments), call.raw)
+            )
+        return _THINKING_BLOCK.sub("", visible_text).strip(), normalized_calls, errors
+
+    @staticmethod
+    def _tool_argument_error(call: ToolCall) -> Optional[str]:
+        info = tool_registry.get_tool_info(call.name)
+        parameters = info.get("parameters") if info else None
+        return (
+            schema_error(call.arguments, parameters)
+            if isinstance(parameters, dict)
+            else None
+        )
 
     def _chat_request_payload(
         self,
@@ -360,6 +395,8 @@ class AgentOrchestrator:
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_context}]
         tools_schema = tool_registry.openai_tools_schema()
         completed_tool_calls: List[Dict[str, Any]] = []
+        failed_tool_signatures: Dict[str, int] = {}
+        successful_tool_revision = 0
         last_request_snapshot: Optional[Dict[str, Any]] = None
         logger.info("Agent tool loop ready: session_id=%s model=%s tools=%d", self.session_id, self.model, len(tools_schema))
 
@@ -402,8 +439,16 @@ class AgentOrchestrator:
                 choice = response.choices[0]
                 message = choice.message
                 finish_reason = choice.finish_reason
-                tool_calls = message.tool_calls or []
-                content = (message.content or "").strip()
+                content, tool_calls, tool_parse_errors = self._normalize_tool_response(
+                    response,
+                )
+                if tool_parse_errors:
+                    logger.warning(
+                        "Model tool-call parse errors: session_id=%s step=%d errors=%s",
+                        self.session_id,
+                        step_index + 1,
+                        tool_parse_errors,
+                    )
                 logger.info(
                     "LLM response received: session_id=%s step=%d finish_reason=%s tool_calls=%d content_chars=%d",
                     self.session_id,
@@ -444,8 +489,16 @@ class AgentOrchestrator:
                     response = fallback_response
                     message = fallback_choice.message
                     finish_reason = fallback_choice.finish_reason
-                    tool_calls = message.tool_calls or []
-                    content = (message.content or "").strip()
+                    content, tool_calls, tool_parse_errors = self._normalize_tool_response(
+                        response,
+                    )
+                    if tool_parse_errors:
+                        logger.warning(
+                            "Fallback tool-call parse errors: session_id=%s step=%d errors=%s",
+                            self.session_id,
+                            step_index + 1,
+                            tool_parse_errors,
+                        )
                     try:
                         response_trace = response.model_dump(mode="json")
                     except Exception as exc:
@@ -514,7 +567,9 @@ class AgentOrchestrator:
                         try:
                             repair_response = client.chat.completions.create(**repair_payload)
                             repair_choice = repair_response.choices[0]
-                            repaired_text = (repair_choice.message.content or "").strip()
+                            repaired_text = _THINKING_BLOCK.sub(
+                                "", repair_choice.message.content or ""
+                            ).strip()
                             if repaired_text:
                                 repaired_text = finalize_runtime_answer(
                                     repaired_text,
@@ -576,11 +631,11 @@ class AgentOrchestrator:
 
                 assistant_tool_calls = [
                     {
-                        "id": call.id,
+                        "id": call.call_id,
                         "type": "function",
                         "function": {
-                            "name": call.function.name,
-                            "arguments": call.function.arguments,
+                            "name": call.name,
+                            "arguments": json.dumps(call.arguments, ensure_ascii=False),
                         },
                     }
                     for call in tool_calls
@@ -590,11 +645,10 @@ class AgentOrchestrator:
                 )
 
                 for call in tool_calls:
-                    args = self._safe_parse_args(call.function.arguments)
-                    tool_input: Dict[str, Any] = args if args is not None else {"_raw_arguments": call.function.arguments}
+                    args = dict(call.arguments)
+                    tool_input: Dict[str, Any] = args
                     if (
-                        args is not None
-                        and call.function.name == "run_pipeformer_forecast"
+                        call.name == "run_pipeformer_forecast"
                     ):
                         active_state = transition_forecast_scope(
                             active_state,
@@ -603,31 +657,46 @@ class AgentOrchestrator:
                     logger.info(
                         "Tool call started: session_id=%s tool=%s call_id=%s args=%s",
                         self.session_id,
-                        call.function.name,
-                        call.id,
+                        call.name,
+                        call.call_id,
                         json.dumps(tool_input, ensure_ascii=False, default=str)[:1200],
                     )
                     tool_timestamp = event_time or datetime.now().isoformat()
                     yield {
                         "event": "tool_start",
                         "data": {
-                            "tool_call_id": call.id,
-                            "tool": call.function.name,
+                            "tool_call_id": call.call_id,
+                            "tool": call.name,
                             "input": tool_input,
                             "timestamp": tool_timestamp,
                         },
                     }
 
-                    if args is None:
+                    signature = _tool_call_signature(call.name, args)
+                    argument_error = self._tool_argument_error(call)
+                    if failed_tool_signatures.get(signature) == successful_tool_revision:
                         result = {
                             "success": False,
-                            "error": "Invalid JSON arguments",
-                            "tool": call.function.name,
-                            "raw_arguments": call.function.arguments,
+                            "record_in_teacher_trace": False,
+                            "error_code": "duplicate_failed_tool_call",
+                            "error": (
+                                "This tool call already failed with the same normalized "
+                                "arguments. Change the arguments or answer from the "
+                                "available evidence instead of retrying it unchanged."
+                            ),
+                            "tool": call.name,
+                        }
+                    elif argument_error:
+                        result = {
+                            "success": False,
+                            "record_in_teacher_trace": False,
+                            "error_code": "tool_arguments_schema_invalid",
+                            "error": f"Tool arguments failed schema validation: {argument_error}",
+                            "tool": call.name,
                         }
                     else:
                         preexecution_failure = forecast_preexecution_failure(
-                            call.function.name,
+                            call.name,
                             args,
                             completed_tool_calls,
                             current_user_request=current_user_request,
@@ -637,7 +706,7 @@ class AgentOrchestrator:
                         else:
                             try:
                                 result = tool_registry.execute(
-                                    call.function.name,
+                                    call.name,
                                     session_id=self.session_id,
                                     agent_id=self.agent_id,
                                     **args,
@@ -646,7 +715,7 @@ class AgentOrchestrator:
                                 result = {
                                     "success": False,
                                     "error": str(exc),
-                                    "tool": call.function.name,
+                                    "tool": call.name,
                                     "params": args,
                                 }
 
@@ -655,28 +724,32 @@ class AgentOrchestrator:
                         and not bool(result.get("error"))
                         and result.get("exit_code") in (None, 0)
                     )
+                    if result_success:
+                        successful_tool_revision += 1
+                    else:
+                        failed_tool_signatures[signature] = successful_tool_revision
                     record_result = should_record_tool_result(
-                        call.function.name,
+                        call.name,
                         result,
                     )
                     if record_result:
                         completed_tool_calls.append(
                             {
-                                "tool_call_id": call.id,
-                                "name": call.function.name,
-                                "arguments": args or {},
+                                "tool_call_id": call.call_id,
+                                "name": call.name,
+                                "arguments": args,
                                 "output": result,
                             }
                         )
                     logger.info(
                         "Tool call finished: session_id=%s tool=%s call_id=%s success=%s",
                         self.session_id,
-                        call.function.name,
-                        call.id,
+                        call.name,
+                        call.call_id,
                         result_success,
                     )
                     result_summary = json.dumps(result, ensure_ascii=False)[:4000]
-                    trace_extra = {"tool_call_id": call.id, "result": result}
+                    trace_extra = {"tool_call_id": call.call_id, "result": result}
                     if isinstance(result, dict) and result.get("error"):
                         trace_extra["failure_context"] = {
                             "finish_reason": finish_reason,
@@ -689,8 +762,8 @@ class AgentOrchestrator:
                     if record_result:
                         self.trace_writer.append_tool_call(
                             self.session_id,
-                            call.function.name,
-                            args or {},
+                            call.name,
+                            args,
                             result_summary,
                             extra=trace_extra,
                             timestamp=event_time,
@@ -698,8 +771,8 @@ class AgentOrchestrator:
                     else:
                         self.trace_writer.append_audit_tool_call(
                             self.session_id,
-                            call.function.name,
-                            args or {},
+                            call.name,
+                            args,
                             result,
                             timestamp=event_time,
                         )
@@ -707,8 +780,8 @@ class AgentOrchestrator:
                             "Tool call retained as internal planning correction: "
                             "session_id=%s tool=%s call_id=%s error_code=%s",
                             self.session_id,
-                            call.function.name,
-                            call.id,
+                            call.name,
+                            call.call_id,
                             result.get("error_code")
                             if isinstance(result, dict)
                             else None,
@@ -717,14 +790,14 @@ class AgentOrchestrator:
                     yield {
                         "event": "tool_end",
                         "data": {
-                            "tool_call_id": call.id,
-                            "tool": call.function.name,
+                            "tool_call_id": call.call_id,
+                            "tool": call.name,
                             "output": result_summary,
                             "timestamp": tool_end_timestamp,
                             "success": result_success,
                         },
                     }
-                    messages.append({"role": "tool", "tool_call_id": call.id, "content": json.dumps(result, ensure_ascii=False)})
+                    messages.append({"role": "tool", "tool_call_id": call.call_id, "content": json.dumps(result, ensure_ascii=False)})
         except Exception as exc:
             last_request_path = last_request_snapshot.get("payload_path") if last_request_snapshot else None
             error_message = f"LLM call failed: {exc}" + (f" | last_request={last_request_path}" if last_request_path else "")
