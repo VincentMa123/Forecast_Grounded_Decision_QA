@@ -3,31 +3,28 @@
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-try:
-    from pipeclaw.backend.grounding.evidence.tool import (
-        attach_tool_arguments,
-        classify_tool_evidence,
-        requested_artifacts,
-    )
-    from pipeclaw.backend.pipeline.forecast_registry_contract import (
-        authorize_forecast_registry,
-    )
-except ImportError:  # pragma: no cover - direct backend execution
-    from grounding.evidence.tool import (
-        attach_tool_arguments,
-        classify_tool_evidence,
-        requested_artifacts,
-    )
-    from pipeline.forecast_registry_contract import authorize_forecast_registry
+from pipeclaw.backend.grounding.evidence.tool import (
+    attach_tool_arguments,
+    classify_tool_evidence,
+    requested_artifacts,
+)
+from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
+
+from pipeclaw.backend.evaluator.numeric_grounding import (
+    numeric_claims_are_grounded,
+    numeric_grounding_evidence,
+)
+from pipeclaw.backend.evaluator.quality_references import numeric_claim_values
 
 from ..models import EvaluationContext, MetricResult
-from .assumptions import prediction_view
 from .common import (
     CANONICAL_METRIC_NAMES,
     PIPEFORMER_TOOL,
+    checkpoint_inference_used,
     disturbance_was_applied,
     horizon_is_consistent,
     mapping,
@@ -55,6 +52,34 @@ REQUIRED_RECORD_FIELDS = (
     "dispatch_recommendation",
     "final_answer",
     "quality_flag",
+)
+
+TEACHER_TRACE_REQUIRED_FIELDS = (
+    "sample_id", "scenario_id", "scenario_type", "state_before", "recent_turns",
+    "user_input", "parsed_task", "tool_calls", "tool_outputs", "prediction_summary",
+    "constraint_check", "evidence", "risk_level", "manual_intervention_label",
+    "dispatch_recommendation", "final_answer", "quality_flag",
+)
+TEACHER_TRACE_EXPECTED_TYPES = {
+    "sample_id": str, "scenario_id": str, "scenario_type": str, "state_before": dict,
+    "recent_turns": list, "user_input": str, "parsed_task": dict, "tool_calls": list,
+    "tool_outputs": list, "prediction_summary": dict, "constraint_check": dict,
+    "evidence": dict, "final_answer": str, "quality_flag": str,
+}
+ENTIRELY_SAFE_CLAIM = re.compile(
+    r"完全安全|无任何风险|没有任何风险|所有(?:校核|规则|约束)均?通过|各项(?:校核|规则|约束)均?通过"
+    r"|\b(?:entirely|completely|fully)\s+safe\b"
+    r"|\ball\s+(?:requested\s+)?(?:checks|constraints|rules)\s+pass(?:ed)?\b"
+    r"|\bno\s+(?:operational\s+)?risk\b", re.IGNORECASE,
+)
+REDUCE_UPSTREAM_INJECTION = re.compile(
+    r"(?:减少|降低|下调|削减).{0,24}(?:上游|气源).{0,16}(?:注气|供气|供给|流量)"
+    r"|(?:上游|气源).{0,16}(?:注气|供气|供给|流量).{0,24}(?:减少|降低|下调|削减)"
+    r"|\b(?:reduce|decrease|lower|cut)\b.{0,40}\b(?:upstream\s+)?(?:injection|supply|inflow)\b", re.IGNORECASE,
+)
+RAISE_COMPRESSOR_LOAD = re.compile(
+    r"(?:提高|增加|上调).{0,24}压缩机.{0,12}负荷|压缩机.{0,12}负荷.{0,24}(?:提高|增加|上调)"
+    r"|\b(?:raise|increase|boost)\b.{0,40}\bcompressor\s+load\b", re.IGNORECASE,
 )
 
 
@@ -170,7 +195,7 @@ def _record_contract(
         context,
         "record_contract",
         applicable=True,
-        passed=not missing,
+        passed=not missing and size <= maximum_chars,
         details={
             "record_chars": size,
             "maximum_chars": maximum_chars,
@@ -180,6 +205,69 @@ def _record_contract(
     )
 
 
+def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return Task 1 compatibility diagnostics from the canonical evaluator."""
+    missing = [name for name in TEACHER_TRACE_REQUIRED_FIELDS if name not in record]
+    invalid_types = [
+        name for name, expected in TEACHER_TRACE_EXPECTED_TYPES.items()
+        if name in record and not isinstance(record[name], expected)
+    ]
+    invalid_types.extend(
+        name for name in ("risk_level", "manual_intervention_label", "dispatch_recommendation")
+        if name in record and record[name] is not None and not isinstance(record[name], str)
+    )
+    schema_issues = [f"missing:{name}" for name in missing]
+    schema_issues.extend(f"invalid_type:{name}" for name in invalid_types)
+
+    answer = str(record.get("final_answer") or "")
+    constraint = dict(record.get("constraint_check") or {})
+    category_status = dict(constraint.get("category_status") or {})
+    rule_status = dict(constraint.get("rule_status") or {})
+    rule_issues: list[str] = []
+    if constraint:
+        if constraint.get("risk_level") is not None and record.get("risk_level") != constraint.get("risk_level"):
+            rule_issues.append("risk_level_disagrees_with_constraint_check")
+        if constraint.get("human_intervention_label") is not None and record.get("manual_intervention_label") != constraint.get("human_intervention_label"):
+            rule_issues.append("intervention_label_disagrees_with_constraint_check")
+        nonpass = any(value in {"warning", "fail"} for value in category_status.values()) or any(value in {"warning", "fail"} for value in rule_status.values())
+        if nonpass and ENTIRELY_SAFE_CLAIM.search(answer):
+            rule_issues.append("final_answer_claims_entirely_safe_despite_nonpass_rule")
+        pressure_fail = category_status.get("pressure") == "fail" or any(str(flag).startswith("pressure_violation") for flag in constraint.get("triggered_flags") or [])
+        if pressure_fail and record.get("risk_level") == "low":
+            rule_issues.append("pressure_violation_cannot_have_low_risk")
+        if pressure_fail and record.get("manual_intervention_label") == "no_intervention":
+            rule_issues.append("pressure_violation_cannot_require_no_intervention")
+
+    dispatch_issues: list[str] = []
+    if constraint:
+        flags = {str(value) for value in constraint.get("triggered_flags") or []}
+        pressure_fail = category_status.get("pressure") == "fail" or any(value.startswith("pressure_violation") for value in flags) or rule_status.get("node_pressure_operating_window") == "fail"
+        compressor_overload = "compressor_overload" in flags or rule_status.get("compressor_load_limit") == "fail"
+        dispatch = "\n".join(str(value).strip() for value in (record.get("dispatch_recommendation") or "", answer) if str(value).strip())
+        if pressure_fail and REDUCE_UPSTREAM_INJECTION.search(dispatch):
+            dispatch_issues.append("pressure_violation_recommends_reducing_upstream_injection")
+        if compressor_overload and RAISE_COMPRESSOR_LOAD.search(dispatch):
+            dispatch_issues.append("compressor_overload_recommends_raising_compressor_load")
+        if constraint.get("dispatch_recommendation") and record.get("dispatch_recommendation") and str(constraint["dispatch_recommendation"]).strip() != str(record["dispatch_recommendation"]).strip():
+            dispatch_issues.append("dispatch_recommendation_disagrees_with_constraint_check")
+    grounded = numeric_claims_are_grounded(answer, str(record.get("user_input") or ""), numeric_grounding_evidence(dict(record)))
+    rule_check = {"status": "not_applicable", "issues": []} if not constraint else {
+        "status": "pass" if not rule_issues else "fail",
+        "issues": rule_issues,
+        "overall_constraint_status": constraint.get("overall_status"),
+    }
+    dispatch_check = {"status": "not_applicable", "issues": []} if not constraint else {
+        "status": "pass" if not dispatch_issues else "fail",
+        "issues": dispatch_issues,
+        "pressure_failure_present": pressure_fail,
+        "compressor_overload_present": compressor_overload,
+    }
+    return {
+        "schema": {"status": "pass" if not schema_issues else "fail", "issues": schema_issues},
+        "numerical_consistency": {"status": "pass" if grounded else "fail", "claimed_numeric_value_count": len(numeric_claim_values(answer)), "issues": [] if grounded else ["unsupported_numerical_claim"]},
+        "rule_consistency": rule_check,
+        "dispatch_consistency": dispatch_check,
+    }
 def _pipeformer_checks(
     context: EvaluationContext,
     issues: Sequence[str],
@@ -222,11 +310,7 @@ def _pipeformer_checks(
             context,
             "checkpoint_inference",
             applicable=True,
-            passed=successful and all(
-                prediction_view(output).get("forecast_mode") == "checkpoint_inference"
-                and bool(mapping(output.get("provenance")).get("checkpoint_id"))
-                for output in outputs
-            ),
+            passed=successful and all(checkpoint_inference_used(output) for output in outputs),
         ),
         metric(
             context,
@@ -362,10 +446,11 @@ def evaluate_teacher_checks(
 ) -> tuple[list[MetricResult], tuple[str, ...], dict[str, Any]]:
     """Return canonical teacher metrics and the single grounding issue set."""
 
+    teacher_diagnostics = teacher_trace_diagnostics(context.record)
     if derive_hard_issues:
-        from ..teacher_quality import record_quality_issues
+        from ..answer_quality import record_answer_quality_issues
 
-        issues = tuple(record_quality_issues(dict(context.record)))
+        issues = tuple(record_answer_quality_issues(dict(context.record)))
     else:
         issues = tuple(context.hard_issues)
     has_pipeformer = any(
@@ -385,4 +470,7 @@ def evaluate_teacher_checks(
             maximum_chars=maximum_chars,
         )
         variant = "generic"
-    return metrics, issues, {"teacher_variant": variant}
+    return metrics, issues, {
+        "teacher_variant": variant,
+        "teacher_trace_checks": teacher_diagnostics,
+    }

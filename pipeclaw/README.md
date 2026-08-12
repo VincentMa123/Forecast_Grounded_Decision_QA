@@ -25,7 +25,7 @@ Natural gas pipeline decisions often depend on data that lives in different syst
 
 The project is meant to run as a full stack system rather than a paper-only artifact.
 
-- The backend entrypoint is `python backend/main.py`, which starts a FastAPI service on `http://localhost:8003`.
+- From the repository root, run `python -m pipeclaw.backend.main` to start the FastAPI service on `http://localhost:8003`.
 - The frontend entrypoint is `npm run dev` inside `frontend/`, which starts the Vite development server.
 - `frontend/src/api/client.ts` uses `/api` as the base path, and `frontend/vite.config.ts` proxies `/api` and `/assets` to `http://localhost:8003` during development.
 - The backend exposes flow and date APIs such as `/api/flow/nodes`, `/api/flow/pipelines`, `/api/flow/consumers`, and `/api/dates`, together with agent endpoints under `/api/agent/*`.
@@ -112,9 +112,9 @@ This case study shows a concrete analysis trace, including generated code, inter
 
 ## Quick Start
 
-1. Install backend dependencies: `pip install -r backend/requirements.txt`
-2. Install frontend dependencies: `cd frontend && npm install`
-3. Start backend: `python backend/main.py`
-4. Start frontend: `cd frontend && npm run dev`
+1. Install backend dependencies: `pip install -r pipeclaw/backend/requirements.txt`
+2. Install frontend dependencies: `cd pipeclaw/frontend && npm install`
+3. From the repository root, start backend: `python -m pipeclaw.backend.main`
+4. Start frontend: `cd pipeclaw/frontend && npm run dev`
 
 For a step-by-step setup guide, see [how_to_run.md](how_to_run.md). The aligned Chinese version is available in [README_zh.md](README_zh.md). The repository is runnable out of the box with the bundled mock `backend/pipeline_data/`, while the original private operational flow base remains excluded.

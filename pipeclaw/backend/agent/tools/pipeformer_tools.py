@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import csv
-from collections import deque
 import json
 from pathlib import Path
 import os
@@ -9,10 +7,15 @@ import re
 from typing import Any, Dict, List, Optional
 
 from .registry import register_tool
-from pipeline.pipeformer_tool_runtime import PipeFormerForecastService
-from pipeline.variable_registry import VariableRegistry
-from grounding.decision_policy import METRIC_CATALOG, normalize_decision_policy
-from grounding.evidence.topology import build_topology_evidence_result
+from pipeclaw.backend.pipeline.pipeformer_registry_service import (
+    PipeFormerRegistrySearchService,
+)
+from pipeclaw.backend.pipeline.pipeformer_tool_runtime import PipeFormerForecastService
+from pipeclaw.backend.grounding.decision_policy import (
+    METRIC_CATALOG,
+    normalize_policy_tool_request,
+)
+from pipeclaw.backend.grounding.evidence.topology import build_topology_evidence_result
 
 _REGISTERED = False
 NODE_FILE_RE = re.compile(r"^\d{8}_node\.csv$", re.IGNORECASE)
@@ -23,99 +26,20 @@ def _default_backend_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-class PipeFormerRegistrySearchService:
-    """Expose a bounded semantic projection of the PipeFormer variable registry."""
-
-    def __init__(self, repo_or_backend_root: Path) -> None:
-        root = Path(repo_or_backend_root).resolve()
-        self.repo_root = root if (root / "pipeFormer").is_dir() else root.parents[1]
-
-    def _registry_path(self) -> Path:
-        override = os.getenv("PIPEFORMER_VARIABLE_REGISTRY")
-        if override:
-            return Path(override).expanduser().resolve()
-        return (
-            self.repo_root
-            / "pipeFormer"
-            / "data"
-            / "mock_lifecycle"
-            / "static"
-            / "mock_lifecycle"
-            / "variable_registry.json"
-        )
-
-    def _topology_path(self) -> Path:
-        return self._registry_path().parent / "save_connect_all_nodes.csv"
-
-    def _topology_distances(self, targets: List[str]) -> Dict[str, int]:
-        path = self._topology_path()
-        if not targets or not path.is_file():
-            return {}
-        graph: Dict[str, set[str]] = {}
-        with path.open("r", encoding="utf-8-sig", newline="") as handle:
-            for row in csv.DictReader(handle):
-                left = str(row.get("node") or "").strip()
-                right = str(row.get("connected_node") or "").strip()
-                if not left or not right:
-                    continue
-                graph.setdefault(left, set()).add(right)
-                graph.setdefault(right, set()).add(left)
-        distances: Dict[str, int] = {}
-        queue = deque()
-        for target in targets:
-            normalized = str(target).strip()
-            if normalized in graph and normalized not in distances:
-                distances[normalized] = 0
-                queue.append(normalized)
-        while queue:
-            node = queue.popleft()
-            for neighbor in graph.get(node, ()):
-                if neighbor not in distances:
-                    distances[neighbor] = distances[node] + 1
-                    queue.append(neighbor)
-        return distances
-
-    def search(self, **filters: Any) -> Dict[str, Any]:
-        registry = VariableRegistry.read(self._registry_path())
-        attention_targets = [str(value) for value in filters.pop("attention_targets", [])]
-        offset = max(0, int(filters.pop("offset", 0)))
-        limit = max(1, min(int(filters.pop("limit", 12)), 50))
-        variables = registry.search(
-            **filters,
-            limit=max(1, len(registry.by_name)),
-        )
-        distances = self._topology_distances(attention_targets)
-        if attention_targets:
-            for item in variables:
-                item["topology_distance"] = distances.get(str(item.get("equipment_id")))
-            variables.sort(
-                key=lambda item: (
-                    item["topology_distance"] is None,
-                    item["topology_distance"] if item["topology_distance"] is not None else 10**9,
-                    str(item.get("variable")),
-                )
-            )
-        page = variables[offset : offset + limit]
-        result = {
-            "success": True,
-            "matched_variable_count": len(page),
-            "matched_total_count": len(variables),
-            "offset": offset,
-            "variables": page,
-        }
-        if offset + len(page) < len(variables):
-            result["next_offset"] = offset + len(page)
-        return result
-
-
-def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
+def register_pipeformer_tools(
+    backend_root: Optional[Path] = None,
+    *,
+    registry_search_service: Optional[PipeFormerRegistrySearchService] = None,
+) -> None:
     global _REGISTERED
     if _REGISTERED:
         return
     _REGISTERED = True
     resolved_backend_root = Path(backend_root).resolve() if backend_root else _default_backend_root()
     forecast_service = PipeFormerForecastService(resolved_backend_root)
-    registry_search_service = PipeFormerRegistrySearchService(resolved_backend_root)
+    registry_search_service = registry_search_service or PipeFormerRegistrySearchService(
+        resolved_backend_root
+    )
 
     @register_tool(
         name="analyze_pipeline_topology",
@@ -202,8 +126,8 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         name="search_pipeformer_registry",
         description=(
             "Search the PipeFormer variable registry before every forecast and before selecting dispatch controls. "
-            "Use role=input and controllable=true for action variables; results contain canonical IDs, "
-            "equipment semantics, limits, and declared effect targets. A forecast may use only variables "
+            "Use role=input and controllable=true for action variables. Each bounded result page contains "
+            "canonical variable IDs plus role and controllable flags; a forecast may use only variables "
             "that appear in preceding successful relevant search results."
         ),
         parameters={
@@ -230,7 +154,10 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
             },
             "additionalProperties": False,
         },
-        returns="A compact ranked list of canonical PipeFormer registry variables.",
+        returns=(
+            "A bounded ranked page with success, matched counts, offset, an optional next_offset, "
+            "and variables containing only variable, role, and controllable."
+        ),
     )
     def search_pipeformer_registry(
         query: str = "",
@@ -341,49 +268,11 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
         agent_id: str = "default",
     ) -> Dict[str, Any]:
         del session_id, agent_id
-        legacy_excerpt = str(source_excerpt).strip()
-        normalized_objectives = [dict(item or {}) for item in objectives]
-        source_errors = []
-        for index, objective in enumerate(normalized_objectives):
-            if str(objective.get("source_excerpt") or "").strip():
-                continue
-            if legacy_excerpt and len(normalized_objectives) == 1:
-                objective["source_excerpt"] = legacy_excerpt
-                continue
-            source_errors.append(
-                "decision_policy_objective_source_excerpt_missing:"
-                f"{index}:{objective.get('metric') or 'missing'}"
-            )
-        policy, errors = normalize_decision_policy({
-            "hard_constraints": hard_constraints,
-            "objectives": normalized_objectives,
-        })
-        errors.extend(source_errors)
-        if errors:
-            return {
-                "success": False,
-                "error_code": "invalid_decision_policy",
-                "error": (
-                    "Decision policy rejected. Retry set_decision_policy using only catalog "
-                    "metrics, their catalog direction, an ordered list of at most five "
-                    "objectives, and one exact contiguous source_excerpt per objective "
-                    "from the current user request."
-                ),
-                "validation_errors": list(dict.fromkeys(errors)),
-            }
-        policy["source"] = "llm_tool"
-        if legacy_excerpt:
-            policy["source_excerpt"] = legacy_excerpt
-        return {
-            "success": True,
-            "decision_policy": policy,
-            "next_step": (
-                "Reuse prior verified candidate forecasts when the case, "
-                "disturbance, horizon, and actions are unchanged. Rank them "
-                "with this policy; rerun only candidates whose forecast inputs "
-                "changed."
-            ),
-        }
+        return normalize_policy_tool_request(
+            hard_constraints=hard_constraints,
+            objectives=objectives,
+            source_excerpt=source_excerpt,
+        )
 
     @register_tool(
         name="run_pipeformer_forecast",
@@ -485,7 +374,11 @@ def register_pipeformer_tools(backend_root: Optional[Path] = None) -> None:
                         "being evaluated. Dispatch candidate calls normally use external_condition."
                     ),
                 },
-                "forecast_horizon_minutes": {"type": "integer", "description": "Requested forecast horizon in minutes."},
+                "forecast_horizon_minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Requested forecast horizon in minutes (at least 1).",
+                },
                 "attention_targets": {
                     "type": "array",
                     "items": {"type": "string"},

@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 from typing import Any, Dict
 
-from grounding.decision_trace_state import VerifiedDecisionState
+from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
 
 
 _SAFE_SESSION = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -41,6 +41,21 @@ class VerifiedStateManager:
         payload = state.to_dict()
         event_path = self.event_path(session_id)
         event_path.parent.mkdir(parents=True, exist_ok=True)
+        snapshot_path = self.snapshot_path(session_id)
+        temporary = snapshot_path.with_suffix(".json.tmp")
+        try:
+            temporary.write_text(
+                json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            os.replace(temporary, snapshot_path)
+        except Exception:
+            try:
+                temporary.unlink()
+            except OSError:
+                pass
+            raise
+
         with event_path.open("a", encoding="utf-8", newline="\n") as handle:
             handle.write(
                 json.dumps(
@@ -50,14 +65,6 @@ class VerifiedStateManager:
                 )
                 + "\n"
             )
-
-        snapshot_path = self.snapshot_path(session_id)
-        temporary = snapshot_path.with_suffix(".json.tmp")
-        temporary.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temporary, snapshot_path)
         return {
             "state_snapshot_path": snapshot_path.as_posix(),
             "state_event_path": event_path.as_posix(),
@@ -76,14 +83,12 @@ class VerifiedStateManager:
         event_path = self.event_path(session_id)
         latest: Dict[str, Any] | None = None
         if event_path.is_file():
-            for line in event_path.read_text(
-                encoding="utf-8-sig"
-            ).splitlines():
+            for line in event_path.read_bytes().splitlines():
                 if not line.strip():
                     continue
                 try:
-                    event = json.loads(line)
-                except json.JSONDecodeError:
+                    event = json.loads(line.decode("utf-8-sig"))
+                except (UnicodeDecodeError, json.JSONDecodeError):
                     continue
                 if (
                     event.get("event") == "state_snapshot"

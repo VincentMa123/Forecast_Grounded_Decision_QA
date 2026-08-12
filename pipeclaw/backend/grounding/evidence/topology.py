@@ -6,18 +6,11 @@ from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-try:
-    from pipeclaw.backend.pipeline.scenario_preflight import (
-        DATA_FILE_RE,
-        DATA_FILE_SUBDIRECTORIES,
-        DEFAULT_PIPELINE_DATA_ROOT,
-    )
-except ImportError:  # pragma: no cover - direct backend execution
-    from pipeline.scenario_preflight import (
-        DATA_FILE_RE,
-        DATA_FILE_SUBDIRECTORIES,
-        DEFAULT_PIPELINE_DATA_ROOT,
-    )
+from pipeclaw.backend.pipeline.scenario_preflight import (
+    DATA_FILE_RE,
+    DATA_FILE_SUBDIRECTORIES,
+    DEFAULT_PIPELINE_DATA_ROOT,
+)
 from .pipeline_scope import filter_rows_by_named_pipeline
 
 
@@ -53,19 +46,6 @@ CANONICAL_STATION_ALIASES = {
     "湘潭分输站": "湘潭站",
     "乌鲁木齐压气站": "乌鲁木齐站",
 }
-
-
-def build_topology_evidence(
-    text: str,
-    *,
-    pipeline_data_root: Path | None = None,
-) -> Dict[str, Any]:
-    """Derive compact graph facts from explicitly referenced daily CSV files."""
-    summary, _ = build_topology_evidence_result(
-        text,
-        pipeline_data_root=pipeline_data_root,
-    )
-    return summary
 
 
 def build_topology_evidence_result(

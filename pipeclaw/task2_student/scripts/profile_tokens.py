@@ -3,21 +3,25 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import importlib
 import json
 import math
-from collections.abc import Callable, Iterable, Sequence
+import tempfile
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol
 
-try:
-    from .validate_dataset import read_jsonl
-except ImportError:  # pragma: no cover - supports direct script execution.
-    from validate_dataset import read_jsonl  # type: ignore
+from pipeclaw.task2_student.release_artifacts import (
+    JsonlArtifactError,
+    atomic_write_text,
+    read_jsonl as _read_jsonl_artifact,
+    sha256_bytes,
+    sha256_file as _sha256_file,
+    stable_json as _stable_json,
+    utc_now as _utc_now,
+)
 
 
 DEFAULT_THRESHOLDS = (1024, 2048, 4096, 8192, 16384)
@@ -59,6 +63,13 @@ DEFAULT_MODEL_ID = "Qwen/Qwen3.5-0.8B"
 
 class TokenProfileError(ValueError):
     """Raised when a token profile cannot be produced safely."""
+
+
+def _read_jsonl(path: Path) -> list[dict[str, Any]]:
+    try:
+        return _read_jsonl_artifact(path)
+    except JsonlArtifactError as exc:
+        raise TokenProfileError(str(exc)) from exc
 
 
 @dataclass(frozen=True)
@@ -477,10 +488,150 @@ def write_profile_reports(
 ) -> None:
     """Atomically write the summary JSON and per-record JSONL report."""
 
+    if summary_path.resolve() == records_path.resolve():
+        raise TokenProfileError("summary and records destinations must differ")
     summary_text = _stable_json(report) + "\n"
-    records_text = "".join(_stable_json(row) + "\n" for row in rows)
-    _atomic_write_text(summary_path, summary_text)
-    _atomic_write_text(records_path, records_text)
+    records_text = _records_text(rows)
+    atomic_write_text(summary_path, summary_text)
+    atomic_write_text(records_path, records_text)
+
+
+def _commit_profile_reports(
+    *,
+    summary_path: Path,
+    records_path: Path,
+    staged_summary_path: Path,
+    staged_records_path: Path,
+) -> None:
+    """Replace records first and summary last; summary is the commit marker."""
+
+    summary_path = summary_path.resolve()
+    records_path = records_path.resolve()
+    atomic_write_text(
+        records_path,
+        staged_records_path.read_text(encoding="utf-8"),
+    )
+    atomic_write_text(
+        summary_path,
+        staged_summary_path.read_text(encoding="utf-8"),
+    )
+
+
+def validate_profile_provenance(
+    profile: Mapping[str, Any] | Path | str,
+    *,
+    data_root: Path,
+    manifest_path: Path,
+    projections: Sequence[str] | None = None,
+    splits: Sequence[str] | None = None,
+    records_path: Path,
+) -> None:
+    """Fail closed unless a profile binds to the current selected release."""
+
+    profile_data = (
+        _read_profile_json(Path(profile))
+        if isinstance(profile, (Path, str))
+        else profile
+    )
+    if not isinstance(profile_data, Mapping):
+        raise TokenProfileError("profile must be a JSON object")
+    if profile_data.get("schema_version") != "task2_token_profile_v1":
+        raise TokenProfileError("unsupported token profile schema")
+
+    profile_projections = _selection(
+        profile_data.get("projections"), "profile projections"
+    )
+    profile_splits = _selection(profile_data.get("splits"), "profile splits")
+    selected_projections = (
+        _selection(projections, "projection selection")
+        if projections is not None
+        else profile_projections
+    )
+    selected_splits = (
+        _selection(splits, "split selection")
+        if splits is not None
+        else profile_splits
+    )
+    if set(selected_projections) != set(profile_projections):
+        raise TokenProfileError("profile projection selection does not match the requested selection")
+    if set(selected_splits) != set(profile_splits):
+        raise TokenProfileError("profile split selection does not match the requested selection")
+
+    manifest_path = manifest_path.resolve()
+    data_root = data_root.resolve()
+    recorded_manifest = profile_data.get("dataset_manifest")
+    if not isinstance(recorded_manifest, Mapping):
+        raise TokenProfileError("profile dataset manifest provenance is missing")
+    expected_manifest_file = _relative_report_path(manifest_path, data_root)
+    if recorded_manifest.get("file") != expected_manifest_file:
+        raise TokenProfileError(
+            "profile manifest path does not match the selected dataset manifest"
+        )
+    try:
+        current_manifest_sha256 = _sha256_file(manifest_path)
+    except OSError as exc:
+        raise TokenProfileError(
+            f"selected dataset manifest is unreadable: {manifest_path}"
+        ) from exc
+    if recorded_manifest.get("sha256") != current_manifest_sha256:
+        raise TokenProfileError(
+            "profile manifest checksum mismatch: "
+            f"recorded {recorded_manifest.get('sha256')!r}, "
+            f"current {current_manifest_sha256!r}"
+        )
+
+    inputs = load_profile_inputs(
+        data_root=data_root,
+        manifest_path=manifest_path,
+        projections=selected_projections,
+        splits=selected_splits,
+    )
+    recorded_inputs = profile_data.get("input_files")
+    if not isinstance(recorded_inputs, list) or not all(
+        isinstance(item, Mapping) for item in recorded_inputs
+    ):
+        raise TokenProfileError("profile input provenance is missing")
+    expected_inputs = [
+        {
+            "projection": item.projection,
+            "split": item.split,
+            "file": _relative_report_path(item.path, data_root),
+            "record_count": len(item.records),
+            "sha256": item.sha256,
+        }
+        for item in inputs
+    ]
+    actual_inputs = sorted(
+        recorded_inputs,
+        key=lambda item: (
+            str(item.get("projection")),
+            str(item.get("split")),
+        ),
+    )
+    if actual_inputs != sorted(
+        expected_inputs,
+        key=lambda item: (item["projection"], item["split"]),
+    ):
+        raise TokenProfileError("profile input provenance mismatch")
+    recorded_records_sha256 = profile_data.get("records_sha256")
+    if not isinstance(recorded_records_sha256, str):
+        raise TokenProfileError("profile records checksum is missing")
+    if records_path is None:
+        raise TokenProfileError("profile records path is required")
+    records_path = records_path.resolve()
+    _read_profile_rows(records_path)
+    try:
+        current_records_sha256 = _sha256_file(records_path)
+    except OSError as exc:
+        raise TokenProfileError(
+            f"profile records are unreadable: {records_path}"
+        ) from exc
+    if recorded_records_sha256 != current_records_sha256:
+        raise TokenProfileError(
+            "profile records checksum mismatch: "
+            f"recorded {recorded_records_sha256!r}, "
+            f"current {current_records_sha256!r}"
+        )
 
 
 def measure_field_content(
@@ -577,7 +728,7 @@ def load_profile_inputs(
                     f"{projection}/{split}: unexpected dataset path"
                 )
             path = data_root / projection / f"{split}.jsonl"
-            records = read_jsonl(path)
+            records = _read_jsonl(path)
             if details.get("record_count") != len(records):
                 raise TokenProfileError(
                     f"{projection}/{split}: record count does not match manifest"
@@ -608,12 +759,65 @@ def _count_text(encoder: TextTokenCounter, text: str, location: str) -> int:
     return count
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
+def _read_profile_json(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise TokenProfileError(f"profile JSON is unreadable: {path}") from exc
+    if not isinstance(value, dict):
+        raise TokenProfileError(f"profile JSON must contain an object: {path}")
+    return value
+
+
+def _read_profile_rows(path: Path) -> list[dict[str, Any]]:
+    try:
+        rows = _read_jsonl(path)
+    except (OSError, ValueError) as exc:
+        raise TokenProfileError(f"profile records are unreadable: {path}") from exc
+    if not rows:
+        raise TokenProfileError(f"profile records are empty: {path}")
+    return rows
+
+
+def _validate_staged_profile(
+    report: Mapping[str, Any],
+    rows: Sequence[Mapping[str, Any]],
+    inputs: Sequence[ProfileInput],
+) -> None:
+    if report.get("schema_version") != "task2_token_profile_v1":
+        raise TokenProfileError("staged profile has an unsupported schema")
+    summary = report.get("summary")
+    overall = summary.get("overall") if isinstance(summary, Mapping) else None
+    count = overall.get("count") if isinstance(overall, Mapping) else None
+    expected_count = sum(len(item.records) for item in inputs)
+    if not isinstance(count, int) or count != len(rows) or count != expected_count:
+        raise TokenProfileError(
+            "staged profile record count mismatch: "
+            f"summary={count!r}, records={len(rows)}, inputs={expected_count}"
+        )
+    expected_pairs = {(item.projection, item.split) for item in inputs}
+    row_counts: dict[tuple[str, str], int] = {}
+    for row in rows:
+        key = (str(row.get("projection")), str(row.get("split")))
+        row_counts[key] = row_counts.get(key, 0) + 1
+    if set(row_counts) != expected_pairs:
+        raise TokenProfileError("staged profile projection/split selection mismatch")
+    for item in inputs:
+        if row_counts.get((item.projection, item.split)) != len(item.records):
+            raise TokenProfileError(
+                f"staged profile record count mismatch for {item.projection}/{item.split}"
+            )
+
+
+def _selection(value: Any, label: str) -> tuple[str, ...]:
+    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
+        raise TokenProfileError(f"{label} must be a nonempty list")
+    values = tuple(str(item) for item in value)
+    if not values or any(not item for item in values):
+        raise TokenProfileError(f"{label} must be a nonempty list")
+    if len(set(values)) != len(values):
+        raise TokenProfileError(f"{label} contains duplicates")
+    return values
 
 
 def _relative_report_path(path: Path, data_root: Path) -> str:
@@ -641,29 +845,8 @@ def _flat_vector(value: Any, location: str) -> list[Any]:
     return value
 
 
-def _stable_json(value: Any) -> str:
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
-
-def _atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = Path(f"{path}.tmp")
-    temporary_path.write_text(content, encoding="utf-8", newline="\n")
-    temporary_path.replace(path)
-
-
-def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+def _records_text(rows: Sequence[dict[str, Any]]) -> str:
+    return "".join(_stable_json(row) + "\n" for row in rows)
 
 
 def _required_text(record: dict[str, Any], field: str, location: str) -> str:
@@ -720,7 +903,29 @@ def main(
         default=None,
         help="Optional fixed UTC timestamp for reproducible report tests.",
     )
+    parser.add_argument(
+        "--validate-profile",
+        action="store_true",
+        help=(
+            "Validate the existing summary provenance and exit before loading "
+            "MS-SWIFT or a tokenizer."
+        ),
+    )
     args = parser.parse_args(argv)
+    if args.summary_output.resolve() == args.records_output.resolve():
+        raise TokenProfileError("summary and records destinations must differ")
+
+    if args.validate_profile:
+        validate_profile_provenance(
+            args.summary_output,
+            data_root=args.data_root,
+            manifest_path=args.manifest_path,
+            projections=args.projections,
+            splits=args.splits,
+            records_path=args.records_output,
+        )
+        print(_stable_json({"validated_profile": args.summary_output.resolve().as_posix()}))
+        return 0
 
     inputs = load_profile_inputs(
         data_root=args.data_root,
@@ -742,12 +947,36 @@ def main(
         manifest_sha256=_sha256_file(args.manifest_path),
         created_at=args.created_at,
     )
-    write_profile_reports(
-        summary_path=args.summary_output,
-        records_path=args.records_output,
-        report=report,
-        rows=rows,
-    )
+    report = {
+        **report,
+        "records_sha256": sha256_bytes(_records_text(rows).encode("utf-8")),
+    }
+    with tempfile.TemporaryDirectory(prefix="task2-token-profile-") as scratch:
+        staged_summary_path = Path(scratch) / "candidate_profile.json"
+        staged_records_path = Path(scratch) / "candidate_records.jsonl"
+        write_profile_reports(
+            summary_path=staged_summary_path,
+            records_path=staged_records_path,
+            report=report,
+            rows=rows,
+        )
+        staged_report = _read_profile_json(staged_summary_path)
+        staged_rows = _read_profile_rows(staged_records_path)
+        validate_profile_provenance(
+            staged_report,
+            data_root=args.data_root,
+            manifest_path=args.manifest_path,
+            projections=args.projections,
+            splits=args.splits,
+            records_path=staged_records_path,
+        )
+        _validate_staged_profile(staged_report, staged_rows, inputs)
+        _commit_profile_reports(
+            summary_path=args.summary_output,
+            records_path=args.records_output,
+            staged_summary_path=staged_summary_path,
+            staged_records_path=staged_records_path,
+        )
     print(
         _stable_json(
             {
@@ -761,4 +990,7 @@ def main(
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except TokenProfileError as exc:
+        raise SystemExit(f"Token profile validation failed: {exc}") from exc

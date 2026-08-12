@@ -30,6 +30,42 @@ def normalize_relative_path(value: str) -> str:
     return str(value).replace("\\", "/")
 
 
+def canonicalize_recorded_tool_arguments(
+    tool_name: str,
+    arguments: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Make recorded workspace-tool arguments portable without changing execution.
+
+    Saved training and rollout calls retain logical relative paths, while
+    host-specific values are omitted or redacted. Execution-time workspace
+    rebasing remains a separate concern in the rollout scenario adapter.
+    """
+
+    canonical = dict(arguments)
+    if tool_name != "run_command":
+        return canonical
+
+    cwd = canonical.get("cwd")
+    if cwd is None or cwd == "<host-path>" or is_host_absolute_path(cwd):
+        canonical.pop("cwd", None)
+    elif isinstance(cwd, str):
+        canonical["cwd"] = normalize_relative_path(cwd)
+
+    command = canonical.get("cmd")
+    if isinstance(command, list):
+        canonical["cmd"] = [
+            (
+                "<host-path>"
+                if isinstance(item, str) and is_host_absolute_path(item)
+                else normalize_relative_path(item)
+                if isinstance(item, str) and not item.startswith("-")
+                else item
+            )
+            for item in command
+        ]
+    return canonical
+
+
 def redact_host_paths(value: Any) -> Any:
     """Return a copy with host-specific absolute paths removed recursively."""
 

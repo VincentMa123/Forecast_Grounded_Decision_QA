@@ -117,36 +117,90 @@ def resolve_disturbance_timing_mode(
 
 
 def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
+    path = Path(path)
+    if not path.is_file():
+        raise FileNotFoundError(f"PipeFormer variable mapping not found: {path}")
     with path.open("r", encoding="utf-8", newline="") as fh:
         reader = csv.DictReader(fh)
-        mapping = {}
-        for row in reader:
-            name = row.get("variable_name")
-            if not name:
-                continue
+        expected_header = ["index", "variable_name", "global_index"]
+        if reader.fieldnames != expected_header:
+            raise ValueError(
+                f"Unexpected PipeFormer mapping header: {reader.fieldnames}; "
+                f"expected {expected_header}."
+            )
+        mapping: Dict[str, Dict[str, Any]] = {}
+        mapping_indices: Dict[int, str] = {}
+        global_indices: Dict[int, str] = {}
+        for line_number, row in enumerate(reader, start=2):
+            if row.get(None):
+                raise ValueError(f"Invalid PipeFormer mapping row {line_number}: {row}")
+            raw_name = row.get("variable_name")
+            name = str(raw_name or "").strip()
+            if not name or raw_name != name:
+                raise ValueError(f"Invalid PipeFormer mapping variable name at row {line_number}.")
+            if name in mapping:
+                raise ValueError(f"Duplicate PipeFormer mapping variable name: {name}")
+            try:
+                index = int(str(row.get("index")))
+                global_index = int(str(row.get("global_index")))
+            except (TypeError, ValueError) as exc:
+                raise ValueError(
+                    f"PipeFormer mapping indices must be integers at row {line_number}."
+                ) from exc
+            if index < 0 or global_index < 0:
+                raise ValueError(
+                    f"PipeFormer mapping indices must be non-negative at row {line_number}."
+                )
+            if index in mapping_indices:
+                raise ValueError(f"Duplicate PipeFormer mapping index: {index}")
+            if global_index in global_indices:
+                raise ValueError(f"Duplicate PipeFormer mapping global_index: {global_index}")
             mapping[name] = {
-                "index": int(row["index"]),
-                "global_index": int(row["global_index"]),
+                "index": index,
+                "global_index": global_index,
             }
+            mapping_indices[index] = name
+            global_indices[global_index] = name
+    expected_indices = list(range(len(mapping)))
+    actual_indices = list(mapping_indices)
+    if not mapping or actual_indices != expected_indices:
+        raise ValueError(
+            "PipeFormer mapping indices must be contiguous and in model input order "
+            f"{expected_indices}; got {actual_indices}."
+        )
     return mapping
 
 
 def find_default_checkpoint_dir(repo_root: Path) -> Path:
     outputs_root = repo_root / "pipeFormer" / "outputs"
     active_manifest = outputs_root / "mock_decoder_active.json"
-    if active_manifest.is_file():
+    if active_manifest.exists() or active_manifest.is_symlink():
         try:
             active = json.loads(active_manifest.read_text(encoding="utf-8-sig"))
-        except (OSError, json.JSONDecodeError):
-            active = {}
-        if active.get("accepted") is True and active.get("checkpoint_dir"):
-            candidate = (outputs_root / str(active["checkpoint_dir"])).resolve()
-            try:
-                candidate.relative_to(outputs_root.resolve())
-            except ValueError:
-                candidate = Path()
-            if candidate.is_dir():
-                return candidate
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError(f"Invalid PipeFormer active manifest: {active_manifest}") from exc
+        if not isinstance(active, dict):
+            raise ValueError(f"PipeFormer active manifest must contain a JSON object: {active_manifest}")
+        if active.get("accepted") is not True:
+            raise ValueError(f"PipeFormer active manifest is not accepted: {active_manifest}")
+        checkpoint_value = active.get("checkpoint_dir")
+        if not isinstance(checkpoint_value, str) or not checkpoint_value.strip():
+            raise ValueError(f"PipeFormer active manifest is missing checkpoint_dir: {active_manifest}")
+        relative_checkpoint = Path(checkpoint_value)
+        if relative_checkpoint.is_absolute():
+            raise ValueError(f"PipeFormer active manifest checkpoint_dir must be relative: {checkpoint_value}")
+        candidate = (outputs_root / relative_checkpoint).resolve()
+        try:
+            candidate.relative_to(outputs_root.resolve())
+        except ValueError as exc:
+            raise ValueError(
+                f"PipeFormer active manifest checkpoint_dir escapes outputs: {checkpoint_value}"
+            ) from exc
+        if not candidate.is_dir():
+            raise FileNotFoundError(
+                f"PipeFormer active manifest checkpoint directory not found: {candidate}"
+            )
+        return candidate
     output_dirs = [
         outputs_root / "mock_decoder",
     ]
@@ -244,7 +298,7 @@ def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: s
         state_dict = torch.load(weights_path, weights_only=True, **load_kwargs)
     except TypeError:
         state_dict = torch.load(weights_path, **load_kwargs)
-    model.load_state_dict(state_dict, strict=False)
+    model.load_state_dict(state_dict, strict=True)
     model.to(device)
     model.eval()
     logger.info("PipeFormer checkpoint loaded successfully")
@@ -511,17 +565,40 @@ def load_prediction_mask(static_dir: Path, variable_names: List[str]):
 
     mask_path = static_dir / "prediction_mask.csv"
     if not mask_path.exists():
-        cache_mask = static_dir / "cache" / "prediction_mask.npy"
-        if cache_mask.exists():
-            return np.load(cache_mask).astype(np.int32)
         raise FileNotFoundError(f"prediction_mask.csv not found: {mask_path}")
 
-    mask_by_name = {}
+    expected_names = set(variable_names)
+    if len(expected_names) != len(variable_names):
+        raise ValueError("Expected PipeFormer variable names contain duplicates.")
+    mask_by_name: Dict[str, int] = {}
     with mask_path.open("r", encoding="utf-8", newline="") as fh:
-        reader = csv.DictReader(fh)
-        for row in reader:
-            mask_by_name[str(row["variable_name"])] = int(row["predict"])
-    return np.asarray([mask_by_name.get(name, 0) for name in variable_names], dtype=np.int32)
+        reader = csv.reader(fh)
+        header = next(reader, None)
+        if header != ["variable_name", "predict"]:
+            raise ValueError(f"Unexpected prediction_mask.csv header: {header}")
+        for line_number, row in enumerate(reader, start=2):
+            if len(row) != 2 or not row[0]:
+                raise ValueError(f"Invalid prediction_mask.csv row {line_number}: {row}")
+            variable_name, raw_mask = row
+            if variable_name in mask_by_name:
+                raise ValueError(f"Duplicate prediction mask variable: {variable_name}")
+            try:
+                mask_value = int(raw_mask)
+            except ValueError as exc:
+                raise ValueError(
+                    f"Prediction mask for {variable_name} must be an integer: {raw_mask}"
+                ) from exc
+            if mask_value not in {0, 1}:
+                raise ValueError(
+                    f"Prediction mask for {variable_name} must be 0 or 1: {mask_value}"
+                )
+            mask_by_name[variable_name] = mask_value
+    actual_names = set(mask_by_name)
+    if actual_names != expected_names:
+        missing = sorted(expected_names - actual_names)
+        extra = sorted(actual_names - expected_names)
+        raise ValueError(f"Prediction mask variables do not match mapping; missing={missing}, extra={extra}")
+    return np.asarray([mask_by_name[name] for name in variable_names], dtype=np.int32)
 
 
 def parse_time_label(value: str) -> Optional[datetime]:
@@ -598,23 +675,144 @@ def rows_from_arrays(
 
 @dataclass(frozen=True)
 class PipeFormerInferenceConfig:
-    checkpoint_dir: Path
-    pipeformer_root: Path
-    data_dir: Optional[Path] = None
-    static_dir: Optional[Path] = None
-    mapping_path: Optional[Path] = None
-    device: str = "cpu"
+    checkpoint_dir: Optional[Path | str] = None
+    pipeformer_root: Optional[Path | str] = None
+    data_dir: Optional[Path | str] = None
+    static_dir: Optional[Path | str] = None
+    mapping_path: Optional[Path | str] = None
+    device: Optional[str] = None
     disturbance_timing_mode: Optional[str] = None
+    backend_root: Optional[Path | str] = None
+
+
+@dataclass(frozen=True)
+class ResolvedPipeFormerEnvironment:
+    """One validated PipeFormer artifact view shared by runtime and inference."""
+
+    pipeformer_root: Path
+    checkpoint_dir: Path
+    training_config: Dict[str, Any]
+    data_dir: Path
+    static_dir: Path
+    mapping_path: Path
+    variable_mapping: Dict[str, Dict[str, Any]]
+    variable_names: tuple[str, ...]
+    registry: VariableRegistry
+    device: str
+    disturbance_timing_mode: Optional[str] = None
+
+    @property
+    def registry_document(self) -> Dict[str, Any]:
+        return self.registry.document
+
+
+def _configured_path(value: Optional[Path | str]) -> Optional[Path]:
+    return Path(value).expanduser().resolve() if value else None
+
+
+def _repo_root_for_config(config: PipeFormerInferenceConfig) -> Optional[Path]:
+    backend_root = _configured_path(config.backend_root)
+    if backend_root is None:
+        return None
+    try:
+        return backend_root.parents[1]
+    except IndexError as exc:
+        raise ValueError(f"Could not derive repository root from backend root: {backend_root}") from exc
+
+
+def resolve_pipeformer_environment(
+    config: PipeFormerInferenceConfig,
+) -> ResolvedPipeFormerEnvironment:
+    """Resolve and validate PipeFormer files once before authorization or rollout."""
+    repo_root = _repo_root_for_config(config)
+    pipeformer_root = _configured_path(config.pipeformer_root) or _configured_path(
+        os.getenv("PIPEFORMER_ROOT")
+    )
+    if pipeformer_root is None:
+        if repo_root is None:
+            raise ValueError("PipeFormer root is required when backend_root is not supplied.")
+        pipeformer_root = (repo_root / "pipeFormer").resolve()
+    if not pipeformer_root.is_dir():
+        raise FileNotFoundError(f"PipeFormer root directory not found: {pipeformer_root}")
+
+    checkpoint_dir = _configured_path(config.checkpoint_dir) or _configured_path(
+        os.getenv("PIPEFORMER_CHECKPOINT_DIR")
+    )
+    if checkpoint_dir is None:
+        if repo_root is None:
+            raise ValueError("PipeFormer checkpoint is required when backend_root is not supplied.")
+        checkpoint_dir = find_default_checkpoint_dir(repo_root).resolve()
+    if not checkpoint_dir.is_dir():
+        raise FileNotFoundError(f"PipeFormer checkpoint directory not found: {checkpoint_dir}")
+
+    training_config = load_training_config(checkpoint_dir, pipeformer_root)
+    if not isinstance(training_config, dict):
+        raise ValueError("PipeFormer training_config.json must contain an object.")
+    data_dir = (
+        _configured_path(config.data_dir)
+        or _configured_path(os.getenv("PIPEFORMER_DATA_DIR"))
+        or resolve_relative(training_config.get("data_dir"), pipeformer_root)
+    )
+    static_dir = (
+        _configured_path(config.static_dir)
+        or _configured_path(os.getenv("PIPEFORMER_STATIC_DIR"))
+        or resolve_relative(training_config.get("static_dir"), pipeformer_root)
+    )
+    if data_dir is None or static_dir is None:
+        raise ValueError("Could not resolve PipeFormer data_dir/static_dir for checkpoint inference.")
+    if not data_dir.is_dir() or not static_dir.is_dir():
+        raise FileNotFoundError(
+            f"PipeFormer data/static directories not found: data_dir={data_dir}, static_dir={static_dir}"
+        )
+    mapping_path = (
+        _configured_path(config.mapping_path)
+        or _configured_path(os.getenv("PIPEFORMER_MAPPING_CSV"))
+        or (static_dir / "index_variable_mapping.csv").resolve()
+    )
+    variable_mapping = load_variable_mapping(mapping_path)
+    variable_names = tuple(
+        name for name, _ in sorted(variable_mapping.items(), key=lambda item: item[1]["index"])
+    )
+    registry = VariableRegistry.read(static_dir / "variable_registry.json")
+    registry.require(variable_names)
+    device = str(config.device or os.getenv("PIPEFORMER_DEVICE", "cpu")).strip()
+    if not device:
+        raise ValueError("PipeFormer device must not be empty.")
+    return ResolvedPipeFormerEnvironment(
+        pipeformer_root=pipeformer_root,
+        checkpoint_dir=checkpoint_dir,
+        training_config=training_config,
+        data_dir=data_dir,
+        static_dir=static_dir,
+        mapping_path=mapping_path,
+        variable_mapping=variable_mapping,
+        variable_names=variable_names,
+        registry=registry,
+        device=device,
+        disturbance_timing_mode=config.disturbance_timing_mode,
+    )
 
 
 class PipeFormerInferenceEngine:
     """Run checkpoint inference using one resolved PipeFormer environment."""
 
-    def __init__(self, config: PipeFormerInferenceConfig) -> None:
-        self.config = config
+    def __init__(
+        self,
+        environment_or_config: ResolvedPipeFormerEnvironment | PipeFormerInferenceConfig,
+    ) -> None:
+        self.config = (
+            environment_or_config
+            if isinstance(environment_or_config, PipeFormerInferenceConfig)
+            else None
+        )
+        self.environment = (
+            resolve_pipeformer_environment(environment_or_config)
+            if isinstance(environment_or_config, PipeFormerInferenceConfig)
+            else environment_or_config
+        )
 
     def forecast(self, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
-        return _run_checkpoint_inference(parsed_task=parsed_task, config=self.config)
+        return _run_checkpoint_inference(parsed_task=parsed_task, environment=self.environment)
 
 
 def run_checkpoint_inference(
@@ -644,50 +842,31 @@ def run_checkpoint_inference(
 def _run_checkpoint_inference(
     *,
     parsed_task: Dict[str, Any],
-    config: PipeFormerInferenceConfig,
+    environment: ResolvedPipeFormerEnvironment,
 ) -> Dict[str, Any]:
-    checkpoint_dir = config.checkpoint_dir
-    pipeformer_root = config.pipeformer_root
-    data_dir = config.data_dir
-    static_dir = config.static_dir
-    mapping_path = config.mapping_path
-    device = config.device
+    checkpoint_dir = environment.checkpoint_dir
+    pipeformer_root = environment.pipeformer_root
+    data_dir = environment.data_dir
+    static_dir = environment.static_dir
+    mapping_path = environment.mapping_path
+    device = environment.device
     disturbance_timing_mode = resolve_disturbance_timing_mode(
         parsed_task,
-        config.disturbance_timing_mode,
+        environment.disturbance_timing_mode,
     )
     started_at = time.perf_counter()
     logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
     import numpy as np
     import torch
 
-    checkpoint_dir = checkpoint_dir.resolve()
-    pipeformer_root = pipeformer_root.resolve()
-    training_config = load_training_config(checkpoint_dir, pipeformer_root)
-    data_dir = (data_dir or resolve_relative(training_config.get("data_dir"), pipeformer_root))
-    static_dir = (static_dir or resolve_relative(training_config.get("static_dir"), pipeformer_root))
-    if data_dir is None or static_dir is None:
-        raise ValueError("Could not resolve PipeFormer data_dir/static_dir for checkpoint inference.")
-    mapping_path = (mapping_path or static_dir / "index_variable_mapping.csv").resolve()
+    training_config = environment.training_config
     logger.info("PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s", data_dir, static_dir, mapping_path)
 
     add_pipeformer_import_paths(pipeformer_root)
-    variable_mapping = load_variable_mapping(mapping_path)
-    variable_names = [
-        name
-        for name, _ in sorted(
-            variable_mapping.items(),
-            key=lambda item: item[1]["index"],
-        )
-    ]
-    variable_registry = load_variable_registry(
-        static_dir / "variable_registry.json",
-        variable_names,
-    )
-    registry = VariableRegistry(
-        path=static_dir / "variable_registry.json",
-        document=variable_registry,
-    )
+    variable_mapping = environment.variable_mapping
+    variable_names = list(environment.variable_names)
+    variable_registry = environment.registry_document
+    registry = environment.registry
     normalized_task = normalize_task_variables(
         parsed_task,
         registry,

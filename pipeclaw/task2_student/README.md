@@ -121,7 +121,7 @@ Run the converter from the repository root in the existing `pipeclaw` Conda
 environment:
 
 ```powershell
-conda run -n pipeclaw python pipeclaw/task2_student/scripts/prepare_dataset.py
+conda run -n pipeclaw python -m pipeclaw.task2_student.scripts.prepare_dataset
 ```
 
 It reads the three authoritative splits, requires the frozen 902 / 124 / 114
@@ -159,7 +159,7 @@ trace metadata are not copied into SFT examples.
 Validate an existing release independently with:
 
 ```powershell
-conda run -n pipeclaw python pipeclaw/task2_student/scripts/validate_dataset.py
+conda run -n pipeclaw python -m pipeclaw.task2_student.scripts.validate_dataset
 ```
 
 The validator checks source and output checksums, identities, split isolation,
@@ -214,13 +214,13 @@ torch lines in `environment.yml`. That index publishes the same verified pair,
 is not equivalent — it stops at torch 2.11.0 / torchvision 0.26.0, so a cu128
 host must re-run the smoke test.
 
-## Exact Qwen3.5 token profile
+## Qwen3.5 token profile status
 
 Run token profiling after dataset validation:
 
 ```bash
 ~/.venvs/task2-ms-swift/bin/python \
-  pipeclaw/task2_student/scripts/profile_tokens.py
+  -m pipeclaw.task2_student.scripts.profile_tokens
 ```
 
 The command downloads the `Qwen/Qwen3.5-0.8B` processor/tokenizer and uses
@@ -233,55 +233,26 @@ data/token_profiles/qwen35_08b_token_profile.json
 data/token_profiles/qwen35_08b_token_records.jsonl
 ```
 
-The summary reports exact rendered minimum, median, p95, p99, maximum, and
-coverage at 1,024 through 16,384 tokens. It also groups by projection, split,
-scenario type, and multitask type. Field totals use the same tokenizer on raw
-system, user, tool-schema, tool-call, tool-response, and assistant content;
-they intentionally exclude chat-template overhead and therefore do not sum to
-the exact rendered totals.
+The checked-in profile is stale. Task 11 could not regenerate it because the
+designated environments do not contain MS-SWIFT or a cached Qwen3.5 tokenizer;
+the current dataset manifest and profile provenance do not match. Do not use
+the checked-in profile's token lengths, coverage, or hardware guidance as
+current figures. Regenerate into a scratch directory and review the provenance
+before replacing either released profile artifact.
 
 No `max_length` or truncation strategy is passed while profiling. Any later
 training limit must fit a complete record or have a reviewed, explicit
 disposition; tool evidence and its grounded final answer must not be separated.
 
-### Measured release result
-
-The 2026-07-30 profile covers all 4,199 train/valid projection records:
-
-| Scope | Count | Median | p95 | p99 | Maximum |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| All projections | 4,199 | 2,840 | 9,675 | 12,029 | 13,792 |
-| Answer only | 1,026 | 1,506 | 1,761 | 1,863 | 2,008 |
-| Trace level | 1,026 | 5,023 | 9,616 | 10,712 | 12,136 |
-| Constraint multitask | 2,147 | 2,840 | 10,467 | 12,573 | 13,792 |
-
-Complete-record coverage is 0% at 1,024, 25.91% at 2,048, 58.89% at 4,096,
-90.33% at 8,192, and 100% at 16,384 tokens. Therefore the lossless
-full-data training configuration should use `max_length=16384`. Shorter local
-smoke tests must select complete records that fit their limit; they must not
-silently truncate the released examples.
-
-Across raw content fields, the system prompt contributes 56.26% of tokens,
-tool schemas 18.54%, and user messages 17.49%. These are the first candidates
-for a future reviewed compact-prompt experiment, but the released Phase 5
-profile preserves them exactly.
+The profile writer reports exact rendered lengths, coverage, and field totals
+when a current tokenizer is available. Keep any resulting figures with the
+profile provenance; do not copy them into this README without a successful
+refresh.
 
 ## Phase 7: local CUDA smoke test
 
-The local CUDA installation has been observed with:
-
-```text
-GPU:          NVIDIA GeForce RTX 3050 Laptop GPU, 4,096 MiB
-PyTorch:      2.13.0+cu130
-torchvision:  0.28.0+cu130
-CUDA runtime: 13.0
-MS-SWIFT:     4.4.2
-Transformers: 5.12.1
-bitsandbytes: 0.50.0
-```
-
-`torch.cuda.is_available()` returned true and `python -m pip check` now reports
-`No broken requirements found`. Check the environment again before training:
+The local hardware and package snapshot is not a refreshed profile result.
+Check the environment again before training:
 
 ```bash
 conda activate task2-ms-swift   # or: source ~/.venvs/task2-ms-swift/bin/activate
@@ -312,13 +283,10 @@ packing disabled there is no intra-batch padding, so `"all"` and
 limitation, not a YAML-versus-flags problem: the same value fails when passed
 directly on the command line.
 
-The original smoke-test proposal used a 1,024-token maximum, but the exact
-profile shows that the shortest current record is 1,430 tokens. Phase 7
-therefore uses 32 answer-only training records and 8 answer-only validation
-records with `max_length=2048`. The answer-only maximum is 2,008, so all
-selected records fit without truncation. The configuration uses the
-fail-closed `delete` strategy as a guard against an unexpectedly oversized
-record.
+The smoke configurations retain their reviewed `max_length=2048` and
+fail-closed `delete` strategy. Because the checked-in profile is stale, validate
+the selected records against a fresh profile before treating that limit as
+current.
 
 Run steps 1 through 10 from the repository root:
 
@@ -345,9 +313,10 @@ user to run on the CUDA environment.
 ## Remote server run (Qwen3.5-9B)
 
 Two configurations cover the rented Linux server. Both use the full trace-level
-projection at the lossless `max_length=16384`, 4-bit NF4 QLoRA with LoRA
-rank 32 / alpha 64, `flash_attn`, gradient checkpointing, and DeepSpeed ZeRO-2
-across four ranks (effective batch size 32).
+projection with `max_length=16384`, 4-bit NF4 QLoRA with LoRA rank 32 / alpha
+64, `flash_attn`, gradient checkpointing, and DeepSpeed ZeRO-2 across four
+ranks (effective batch size 32). The checked-in token profile is stale; verify
+current tokenizer coverage before describing this limit as lossless.
 
 ```bash
 # 1. Build the environment, then add the compiled kernels (needs nvcc)

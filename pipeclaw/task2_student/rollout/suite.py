@@ -20,9 +20,15 @@ from pipeclaw.backend.evaluator import (
     evaluate,
     summarize,
 )
+from pipeclaw.task2_student.release_artifacts import (
+    JsonlArtifactError,
+    atomic_jsonl_writer,
+    atomic_write_text,
+    read_jsonl as _read_jsonl_artifact,
+)
 
 from .models import PromptCase, RolloutConfig
-from .prompting import PromptCaseBuilder
+from .prompting import PromptCaseBuilder, parse_tool_schemas
 from .runner import RolloutRunner
 from .scenarios import (
     ScenarioPolicy,
@@ -59,19 +65,12 @@ _REPORT_ROOT_FIELDS = (
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read one JSON object per line, reporting the offending line on failure."""
 
-    records: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line_number, line in enumerate(handle, start=1):
-            if not line.strip():
-                continue
-            try:
-                record = json.loads(line)
-            except json.JSONDecodeError as exc:
-                raise ValueError(f"invalid JSONL at {path}:{line_number}: {exc}") from exc
-            if not isinstance(record, Mapping):
-                raise ValueError(f"expected object at {path}:{line_number}")
-            records.append(dict(record))
-    return records
+    try:
+        return _read_jsonl_artifact(path, skip_blank_lines=True)
+    except JsonlArtifactError as exc:
+        if exc.message == "JSONL row must be an object":
+            raise ValueError(f"expected object at {exc.path}:{exc.line_number}") from exc
+        raise ValueError(f"invalid JSONL at {exc.path}:{exc.line_number}: {exc.message}") from exc
 
 
 def _progress_cases(
@@ -102,17 +101,7 @@ def tool_schema_index(
 
     index: dict[str, list[dict[str, Any]]] = {}
     for record in records:
-        schemas = record.get("tools")
-        if isinstance(schemas, str):
-            try:
-                schemas = json.loads(schemas)
-            except json.JSONDecodeError:
-                schemas = []
-        if isinstance(schemas, Mapping):
-            schemas = [schemas]
-        if not isinstance(schemas, Sequence) or isinstance(schemas, (str, bytes)):
-            schemas = []
-        normalised = [dict(schema) for schema in schemas if isinstance(schema, Mapping)]
+        normalised = parse_tool_schemas(record.get("tools"))
         for key in sample_keys(record):
             index[key] = normalised
     return index
@@ -165,6 +154,47 @@ def _scenario_matches(source: Mapping[str, Any], requested: str) -> bool:
     return source_key == requested_key
 
 
+def _authoritative_schema_set(
+    schemas: Sequence[Mapping[str, Any]] | None,
+) -> bool:
+    """Return whether schemas carry an explicit OpenAI function contract."""
+
+    if not schemas:
+        return False
+    for schema in schemas:
+        if not isinstance(schema, Mapping) or schema.get("type") != "function":
+            return False
+        function = schema.get("function")
+        if not isinstance(function, Mapping):
+            return False
+        name = function.get("name")
+        if not isinstance(name, str) or not name.strip():
+            return False
+    return True
+
+
+def _schemas_for_source(
+    source: Mapping[str, Any],
+    schemas_by_key: Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    allow_generic_schemas: bool,
+) -> list[dict[str, Any]]:
+    """Select a record's schemas, failing closed outside explicit dry runs."""
+
+    keys = sample_keys(source)
+    matched = next(
+        (schemas_by_key[key] for key in sorted(keys) if key in schemas_by_key),
+        None,
+    )
+    if _authoritative_schema_set(matched):
+        return [dict(schema) for schema in matched or []]
+    if allow_generic_schemas:
+        return generic_schemas(source)
+
+    identifier = next(iter(sorted(keys)), "record without a sample identifier")
+    raise ValueError(f"no authoritative tool schema for {identifier}")
+
+
 def build_cases(
     source_records: Sequence[Mapping[str, Any]],
     *,
@@ -172,8 +202,12 @@ def build_cases(
     schemas_by_key: Mapping[str, Sequence[Mapping[str, Any]]],
     scenario_type: str | None = None,
     limit: int | None = None,
+    allow_generic_schemas: bool = False,
 ) -> list[tuple[dict[str, Any], PromptCase]]:
-    """Build prompt-only cases with per-scenario isolated workspaces."""
+    """Build prompt-only cases with per-scenario isolated workspaces.
+
+    Generic schemas are intentionally opt-in for dry-run inspection only.
+    """
 
     builder = PromptCaseBuilder()
     requested = str(scenario_type or "")
@@ -181,10 +215,10 @@ def build_cases(
     for source in source_records:
         if not _scenario_matches(source, requested):
             continue
-        keys = sample_keys(source)
-        schemas = next(
-            (schemas_by_key[key] for key in keys if key in schemas_by_key),
-            generic_schemas(source),
+        schemas = _schemas_for_source(
+            source,
+            schemas_by_key,
+            allow_generic_schemas=allow_generic_schemas,
         )
         case = builder.build(
             source,
@@ -274,19 +308,6 @@ def _summary(
     return summary
 
 
-def _scenario_summary(
-    reports: Sequence[EvaluationReport],
-    *,
-    mode: str,
-    record_count: int,
-) -> dict[str, Any]:
-    """Build one per-family summary without a recursive scenario breakdown."""
-
-    summary = _summary(reports, mode=mode, record_count=record_count)
-    summary.pop("by_scenario_type", None)
-    return summary
-
-
 def _by_scenario_type(
     cases: Sequence[tuple[Mapping[str, Any], PromptCase]],
     reports: Sequence[EvaluationReport | None],
@@ -308,7 +329,7 @@ def _by_scenario_type(
             for index, (_, case) in enumerate(cases)
             if str(case.scenario_type or "unknown") == scenario_type
         ]
-        grouped[scenario_type] = _scenario_summary(
+        summary = _summary(
             [
                 reports[index]
                 for index in indexes
@@ -317,6 +338,8 @@ def _by_scenario_type(
             mode=mode,
             record_count=len(indexes),
         )
+        summary.pop("by_scenario_type", None)
+        grouped[scenario_type] = summary
     return grouped
 
 
@@ -324,10 +347,12 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     """Run every case in one dataset and write ``rollouts.jsonl``/``summary.json``."""
 
     source_records = read_jsonl(Path(args.source))
+    dry_run = bool(getattr(args, "dry_run", False))
+    schema_source = getattr(args, "tool_schema_source", None)
+    if not dry_run and not schema_source:
+        raise ValueError("--tool-schema-source is required for non-dry evaluation")
     schema_records = (
-        read_jsonl(Path(args.tool_schema_source))
-        if getattr(args, "tool_schema_source", None)
-        else source_records
+        read_jsonl(Path(schema_source)) if schema_source else source_records
     )
     schemas_by_key = tool_schema_index(schema_records)
     output_dir = Path(args.output_dir)
@@ -339,19 +364,21 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
         schemas_by_key=schemas_by_key,
         scenario_type=getattr(args, "scenario_type", None),
         limit=getattr(args, "limit", None),
+        allow_generic_schemas=dry_run,
     )
+    if not dry_run and not cases:
+        raise ValueError("no evaluation records matched the requested scenario")
 
     rollouts_path = output_dir / "rollouts.jsonl"
-    results: list[dict[str, Any]] = []
     reports: list[EvaluationReport | None] = []
-    mode = "dry_run" if args.dry_run else "autonomous"
-    with rollouts_path.open("w", encoding="utf-8") as handle:
-        if args.dry_run:
+    record_count = 0
+    mode = "dry_run" if dry_run else "autonomous"
+    with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
+        if dry_run:
             progress = _progress_cases(cases, description="Preparing evaluation")
             for _, case in progress:
-                item = _dry_run_item(case)
-                handle.write(json.dumps(item, ensure_ascii=False, default=str) + "\n")
-                results.append(item)
+                write_rollout(_dry_run_item(case))
+                record_count += 1
                 reports.append(None)
                 _set_postfix(progress, scenario=case.scenario_type, status="dry_run")
         else:
@@ -376,8 +403,8 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                     reference=source,
                 )
                 attach_report(rollout, report)
-                handle.write(json.dumps(rollout, ensure_ascii=False, default=str) + "\n")
-                results.append(rollout)
+                write_rollout(rollout)
+                record_count += 1
                 reports.append(report)
                 _set_postfix(
                     progress,
@@ -389,11 +416,13 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     summary = _summary(
         [report for report in reports if report is not None],
         mode=mode,
-        record_count=len(results),
+        record_count=record_count,
     )
     summary["by_scenario_type"] = _by_scenario_type(cases, reports, mode=mode)
-    with (output_dir / "summary.json").open("w", encoding="utf-8") as handle:
-        json.dump(summary, handle, ensure_ascii=False, indent=2, default=str)
+    atomic_write_text(
+        output_dir / "summary.json",
+        json.dumps(summary, ensure_ascii=False, indent=2, default=str),
+    )
     return summary
 
 

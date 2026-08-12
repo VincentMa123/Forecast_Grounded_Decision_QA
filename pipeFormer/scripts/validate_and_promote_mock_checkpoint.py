@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -97,7 +99,14 @@ def write_active_manifest(
     policy: str = "strict",
 ) -> None:
     manifest_path = Path(manifest_path).resolve()
-    checkpoint_dir = Path(checkpoint_dir).resolve()
+    checkpoint_dir = Path(checkpoint_dir).resolve(strict=True)
+    if not checkpoint_dir.is_dir():
+        raise NotADirectoryError(f"Candidate checkpoint is not a directory: {checkpoint_dir}")
+    reported_checkpoint = report.get("checkpoint_dir")
+    if not isinstance(reported_checkpoint, str) or not reported_checkpoint.strip():
+        raise ValueError("Validation report must contain checkpoint_dir.")
+    if Path(reported_checkpoint).resolve(strict=True) != checkpoint_dir:
+        raise ValueError("Validation report checkpoint_dir does not match the candidate checkpoint.")
     outputs_root = manifest_path.parent
     decision = acceptance_result(report, policy=policy)
     if not decision["accepted"]:
@@ -120,7 +129,25 @@ def write_active_manifest(
         "validation_report": report,
     }
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
-    manifest_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            newline="\n",
+            dir=manifest_path.parent,
+            prefix=f".{manifest_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as temporary:
+            temporary_path = Path(temporary.name)
+            temporary.write(json.dumps(payload, indent=2) + "\n")
+            temporary.flush()
+            os.fsync(temporary.fileno())
+        os.replace(temporary_path, manifest_path)
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
 
 
 def main() -> int:

@@ -174,3 +174,63 @@ def classify_tool_evidence(
 def tool_output_failed(output: Any) -> bool:
     """Compatibility predicate: only evidence-bearing output can ground a trace."""
     return not classify_tool_evidence(output).evidence_found
+
+
+def requested_data_retrieved(
+    question: str,
+    tool_outputs: Iterable[dict[str, Any]],
+    conversation_context: Iterable[dict[str, Any]],
+) -> bool:
+    """Whether requested artifacts have verified content evidence."""
+
+    requested = set(requested_artifacts(question))
+    if not requested:
+        return True
+    context = list(conversation_context)
+    verified_artifacts = {
+        str(artifact).casefold()
+        for item in context
+        if item.get("grounding_verified") is True
+        or item.get("tool_evidence_verified") is True
+        for artifact in item.get("evidence_artifacts") or []
+    }
+    for item in context:
+        if not (
+            item.get("grounding_verified") is True
+            or item.get("tool_evidence_verified") is True
+        ):
+            continue
+        summary = dict(item.get("verified_evidence_summary") or {})
+        csv_evidence = dict(summary.get("csv_evidence") or {})
+        verified_artifacts.update(
+            str(source_file).casefold()
+            for source_file in csv_evidence.get("source_files") or []
+            if source_file
+        )
+    unresolved = requested - verified_artifacts
+    if not unresolved:
+        return True
+    for item in tool_outputs:
+        assessment = classify_tool_evidence(item, requested=unresolved)
+        if assessment.state is ToolEvidenceState.CONTENT_EVIDENCE:
+            unresolved -= set(assessment.matched_artifacts)
+    return not unresolved
+
+
+def tool_evidence_quality_issues(
+    tool_outputs: Iterable[dict[str, Any]],
+) -> list[str]:
+    """Map absent or failed tool evidence to the stable hard-issue IDs."""
+
+    assessments = [classify_tool_evidence(item) for item in tool_outputs]
+    if not assessments or any(item.evidence_found for item in assessments):
+        return []
+    issues = []
+    if any(item.state is ToolEvidenceState.EXECUTION_FAILED for item in assessments):
+        issues.append("tool_execution_failed")
+    if any(
+        item.state in {ToolEvidenceState.NO_EVIDENCE, ToolEvidenceState.LOCATOR_ONLY}
+        for item in assessments
+    ):
+        issues.append("tool_evidence_unavailable")
+    return issues

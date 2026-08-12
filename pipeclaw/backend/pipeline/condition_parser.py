@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, Iterable, List, Mapping, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 
 PIPEFORMER_TASK_SCHEMA_VERSION = "pipeformer_task"
@@ -71,41 +71,8 @@ PREDICTION_MARKERS = ["预测", "forecast", "predict", "prediction"]
 VERIFICATION_MARKERS = ["校核", "检查", "verify", "verification", "check"]
 
 
-class ConditionParser:
-    """Parse bilingual scenario text using an injectable PipeFormer grammar."""
-
-    def __init__(
-        self,
-        *,
-        category_markers: Optional[Mapping[str, List[str]]] = None,
-        attention_targets: Optional[Mapping[str, List[str]]] = None,
-        output_state_variables: Optional[Mapping[str, List[str]]] = None,
-    ) -> None:
-        self.category_markers = dict(category_markers or CATEGORY_MARKERS)
-        self.attention_targets = dict(attention_targets or CATEGORY_ATTENTION_TARGETS)
-        self.output_state_variables = dict(output_state_variables or CATEGORY_OUTPUT_STATE_VARIABLES)
-
-    def parse(self, question: str) -> Dict[str, Any]:
-        return _parse_condition(question, self)
-
-    def constraint_types(self, question: str) -> List[str]:
-        lowered = question.lower()
-        return [
-            category
-            for category, markers in self.category_markers.items()
-            if any(marker.lower() in lowered for marker in markers)
-        ]
-
-
-DEFAULT_CONDITION_PARSER = ConditionParser()
-
-
 def parse_condition(question: str) -> Dict[str, Any]:
-    """Compatibility wrapper around the default parser grammar."""
-    return DEFAULT_CONDITION_PARSER.parse(question)
-
-
-def _parse_condition(question: str, parser: ConditionParser) -> Dict[str, Any]:
+    """Parse bilingual scenario text using the repository's fixed grammar."""
     case_number = _first_matched_int(question, CASE_PATTERNS)
     operating_condition_number = _first_matched_int(question, OPERATING_CONDITION_PATTERNS) or case_number
     variable_match = VARIABLE_RE.search(question)
@@ -119,7 +86,12 @@ def _parse_condition(question: str, parser: ConditionParser) -> Dict[str, Any]:
     disturbance_direction = _parse_direction(direction_match.group(1) if direction_match else "")
     disturbance_magnitude_percent = float(percent_match.group(2)) if percent_match else None
     forecast_horizon_minutes = _parse_horizon_minutes(horizon_match)
-    constraint_verification_types = parser.constraint_types(question)
+    lowered = question.lower()
+    constraint_verification_types = [
+        category
+        for category, markers in CATEGORY_MARKERS.items()
+        if any(marker.lower() in lowered for marker in markers)
+    ]
     # Unspecified boundary controls are held at their observed values by default.
     # Callers can still explicitly override this through the structured tool argument.
     keep_other_boundary_controls = True
@@ -145,8 +117,14 @@ def _parse_condition(question: str, parser: ConditionParser) -> Dict[str, Any]:
         "disturbance_direction": disturbance_direction,
         "disturbance_magnitude_percent": disturbance_magnitude_percent,
         "forecast_horizon_minutes": forecast_horizon_minutes,
-        "attention_targets": _targets_for_checks(constraint_verification_types, parser.attention_targets),
-        "output_state_variables": _targets_for_checks(constraint_verification_types, parser.output_state_variables),
+        "attention_targets": targets_for_checks(
+            constraint_verification_types,
+            CATEGORY_ATTENTION_TARGETS,
+        ),
+        "output_state_variables": targets_for_checks(
+            constraint_verification_types,
+            CATEGORY_OUTPUT_STATE_VARIABLES,
+        ),
         "constraint_verification_types": constraint_verification_types,
         "task_type": _parse_task_type(question),
         "parse_schema_version": PIPEFORMER_TASK_SCHEMA_VERSION,
@@ -210,11 +188,7 @@ def _parse_status_setpoint(
     return next(iter(matched_values)) if len(matched_values) == 1 else None
 
 
-def _parse_constraint_verification_types(question: str) -> List[str]:
-    return DEFAULT_CONDITION_PARSER.constraint_types(question)
-
-
-def _targets_for_checks(checks: List[str], mapping: Dict[str, List[str]]) -> List[str]:
+def targets_for_checks(checks: List[str], mapping: Dict[str, List[str]]) -> List[str]:
     source = checks or DEFAULT_CONSTRAINT_VERIFICATION_TYPES
     result = []
     for check in source:

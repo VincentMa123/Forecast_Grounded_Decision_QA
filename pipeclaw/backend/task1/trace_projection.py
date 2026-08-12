@@ -1,0 +1,861 @@
+from __future__ import annotations
+
+import json
+from copy import deepcopy
+from typing import Any, Dict, List, Mapping, Optional
+
+from pipeclaw.backend.evaluator.numeric_grounding import (
+    grounded_numeric_claim_values,
+    numeric_claims_are_grounded,
+)
+from pipeclaw.backend.evaluator.quality_references import (
+    numeric_claim_values,
+    sft_file_references,
+    variable_references,
+)
+from pipeclaw.backend.grounding.evidence.tool import (
+    classify_tool_evidence,
+    requested_artifacts,
+    tool_output_failed,
+)
+from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
+from pipeclaw.backend.pipeline.forecast_result import (
+    COMPACT_COMPARABLE_METRIC_KEYS,
+    ForecastResult,
+)
+from pipeclaw.backend.task1.trace_history import compact_tool_call_arguments
+
+
+SFT_MAX_TOOL_TEXT_CHARS = 4_000
+SFT_MAX_GENERIC_TOOL_PAIRS = 6
+SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
+SFT_MAX_PIPEFORMER_VARIABLES = 3
+SFT_OMITTED_TOOL_KEYS = {
+    "abs_path",
+    "cmd",
+    "cwd",
+    "duration_s",
+    "output_dir",
+    "run_dir",
+    "session_id",
+    "timestamp",
+    "workspace",
+}
+def parse_tool_output(tool_call: Dict[str, Any]) -> Any:
+    if "result" in tool_call:
+        return tool_call["result"]
+    raw = tool_call.get("result_summary")
+    if not isinstance(raw, str):
+        return raw
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        return raw
+
+
+def sanitize_tool_output(value: Any) -> Any:
+    return deepcopy(value)
+
+
+def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
+    return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
+
+
+def _legacy_task_view(
+    forecast: ForecastResult,
+    arguments: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Expose canonical task facts, with a fallback for pre-contract records."""
+    task = dict(forecast.parsed_task)
+    if task:
+        return task
+    prediction = forecast.prediction
+    resolution = forecast.task_resolution
+    task = {
+        **{
+            key: prediction.get(key)
+            for key in (
+                "case_id",
+                "current_operating_condition_number",
+                "disturbance_variable",
+                "disturbance_direction",
+                "disturbance_magnitude_percent",
+                "disturbance_assumption",
+                "disturbance_source",
+                "forecast_horizon_minutes",
+            )
+        },
+        **{
+            key: arguments.get(key)
+            for key in (
+                "attention_targets",
+                "output_state_variables",
+                "constraint_verification_types",
+                "boundary_conditions",
+            )
+        },
+        **{
+            key: resolution.get(key, 0 if key.endswith("_count") else [])
+            for key in (
+                "unresolved_attention_targets",
+                "unresolved_output_state_variables",
+                "variable_normalizations",
+                "vocabulary_normalizations",
+                "invalid_normalized_variables",
+                "resolved_attention_variable_count",
+                "resolved_output_variable_count",
+            )
+        },
+        "forecast_time_step_minutes": dict(
+            prediction.get("forecast_window") or {}
+        ).get("time_step_minutes"),
+    }
+    return {key: item for key, item in task.items() if item is not None}
+
+
+def _legacy_projection(
+    forecast: ForecastResult,
+    arguments: Mapping[str, Any],
+) -> Dict[str, Any]:
+    """Map the public contract to legacy record field names without reshaping it."""
+    return {
+        "parsed_task": _legacy_task_view(forecast, arguments),
+        "prediction_summary": dict(forecast.prediction),
+        "constraint_check": dict(forecast.verification),
+        "evidence": dict(forecast.evidence),
+        "risk_level": forecast.risk_level,
+        "manual_intervention_label": forecast.manual_intervention_label,
+        "dispatch_recommendation": forecast.dispatch_recommendation,
+        "task_resolution": dict(forecast.task_resolution),
+        "provenance": dict(forecast.provenance),
+    }
+
+
+def export_trace_tools(
+    trace: Dict[str, Any],
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
+    calls: List[Dict[str, Any]] = []
+    outputs: List[Dict[str, Any]] = []
+    pipeformer_results: List[Dict[str, Any]] = []
+    for index, item in enumerate(trace.get("tool_calls", []), start=1):
+        call_id = tool_call_id(item, index)
+        tool_name = str(item.get("tool_name") or "")
+        calls.append(
+            {
+                "tool_call_id": call_id,
+                "name": tool_name,
+                "arguments": item.get("args", {}),
+            }
+        )
+        raw_output = parse_tool_output(item)
+        if (
+            tool_name == "run_pipeformer_forecast"
+            and isinstance(raw_output, dict)
+            and raw_output.get("success")
+        ):
+            arguments = dict(item.get("args") or {})
+            candidate_id = arguments.get("candidate_id") or raw_output.get("candidate_id")
+            candidate_role = arguments.get("candidate_role") or raw_output.get("candidate_role")
+            forecast = ForecastResult.from_payload(raw_output)
+            output = forecast.model_dump()
+            projection = _legacy_projection(forecast, arguments)
+            pipeformer_results.append({"tool_call_id": call_id, "output": output, "projection": projection})
+            if candidate_id:
+                output["candidate_id"] = candidate_id
+            if candidate_role:
+                output["candidate_role"] = candidate_role
+        else:
+            output = sanitize_tool_output(raw_output)
+        outputs.append(
+            {
+                "tool_call_id": call_id,
+                "name": tool_name,
+                "output": output,
+            }
+        )
+    return calls, outputs, pipeformer_results
+
+
+def final_answer(trace: Dict[str, Any]) -> str:
+    for message in reversed(trace.get("messages", [])):
+        if message.get("role") == "assistant" and message.get("content"):
+            return str(message["content"])
+    return ""
+
+
+class TeacherTraceProjector:
+    """Convert raw agent/tool traces into compact, stable training fields."""
+
+    def __init__(
+        self,
+        *,
+        max_tool_text_chars: int = SFT_MAX_TOOL_TEXT_CHARS,
+        omitted_tool_keys: Optional[set[str]] = None,
+    ) -> None:
+        self.max_tool_text_chars = max_tool_text_chars
+        self.omitted_tool_keys = frozenset(omitted_tool_keys or SFT_OMITTED_TOOL_KEYS)
+
+    def compact_sft_output(self, value: Any) -> Any:
+        if isinstance(value, dict):
+            return {
+                key: self.compact_sft_output(item)
+                for key, item in value.items()
+                if key not in self.omitted_tool_keys
+            }
+        if isinstance(value, list):
+            return [self.compact_sft_output(item) for item in value]
+        if isinstance(value, str) and len(value) > self.max_tool_text_chars:
+            return value[: self.max_tool_text_chars] + "... [truncated for SFT]"
+        return value
+
+    def select_sft_trajectory(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        tool_outputs: List[Dict[str, Any]],
+        answer: str,
+        *,
+        max_pipeformer_variables: Optional[int] = None,
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Keep the smallest evidence-bearing tool trajectory for SFT."""
+        outputs_by_id = {
+            str(item.get("tool_call_id") or ""): item for item in tool_outputs
+        }
+        pairs = [
+            (index, call, outputs_by_id.get(str(call.get("tool_call_id") or "")))
+            for index, call in enumerate(tool_calls)
+        ]
+        successful = [
+            pair
+            for pair in pairs
+            if pair[2] is not None and not tool_output_failed(pair[2])
+        ]
+        successful_pipeformer = [
+            pair for pair in successful if pair[1].get("name") == "run_pipeformer_forecast"
+        ]
+        successful_decision_policies = [
+            pair for pair in successful if pair[1].get("name") == "set_decision_policy"
+        ]
+        if successful_pipeformer:
+            referenced_variables = self._reference_tokens(answer)
+            action_forecasts = [
+                pair
+                for pair in successful_pipeformer
+                if self._forecast_action_variables(pair[1]) & referenced_variables
+            ]
+            # A current comparison needs every cited action forecast, but an
+            # actionless baseline duplicate is already represented by the
+            # candidate forecasts' applied-disturbance evidence.
+            if action_forecasts:
+                successful_pipeformer = action_forecasts
+            multiple_pipeformer = len(successful_pipeformer) > 1
+            required_registry_call_ids = self._registry_calls_to_retain(
+                successful,
+                successful_pipeformer,
+            )
+            selected_registry_searches = [
+                pair
+                for pair in successful
+                if (
+                    pair[1].get("name") == "search_pipeformer_registry"
+                    and str(pair[1].get("tool_call_id") or "")
+                    in required_registry_call_ids
+                )
+            ]
+            unique_registry_searches = []
+            seen_registry_searches = set()
+            for pair in selected_registry_searches:
+                raw_output = (pair[2] or {}).get("output")
+                fingerprint = json.dumps(
+                    {
+                        "arguments": pair[1].get("arguments") or {},
+                        "output": raw_output,
+                    },
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    default=str,
+                )
+                if fingerprint in seen_registry_searches:
+                    continue
+                seen_registry_searches.add(fingerprint)
+                unique_registry_searches.append(pair)
+            selected = sorted(
+                [
+                    *unique_registry_searches,
+                    *successful_decision_policies[-1:],
+                    *successful_pipeformer,
+                ],
+                key=lambda pair: pair[0],
+            )
+        elif successful:
+            multiple_pipeformer = False
+            selected = self._select_generic_evidence_pairs(successful, answer)
+        else:
+            multiple_pipeformer = False
+            selected = pairs[-1:]
+
+        compact_calls = []
+        compact_outputs = []
+        for _, call, output in selected:
+            compact_calls.append(
+                {
+                    "tool_call_id": call.get("tool_call_id"),
+                    "name": call.get("name"),
+                    "arguments": compact_tool_call_arguments(
+                        call.get("arguments") or {}
+                    ),
+                }
+            )
+            if output is None:
+                continue
+            raw_output = output.get("output")
+            if call.get("name") == "run_pipeformer_forecast" and isinstance(raw_output, dict):
+                raw_output = self._select_forecast_evidence_for_sft(
+                    raw_output,
+                    answer,
+                    include_auxiliary_variables=not multiple_pipeformer,
+                    max_variables=(
+                        SFT_MAX_PIPEFORMER_VARIABLES
+                        if max_pipeformer_variables is None
+                        else max_pipeformer_variables
+                    ),
+                )
+            elif (
+                call.get("name") == "search_pipeformer_registry"
+                and isinstance(raw_output, dict)
+            ):
+                # Application-boundary contracts are already bounded; recurse
+                # only to apply the shared text sanitization rules.
+                raw_output = self.compact_sft_output(raw_output)
+            else:
+                raw_output = self._compact_generic_sft_output(
+                    raw_output,
+                    answer,
+                    tool_name=str(call.get("name") or ""),
+                    arguments=dict(call.get("arguments") or {}),
+                )
+            compact_outputs.append(
+                {
+                    "tool_call_id": output.get("tool_call_id"),
+                    "name": output.get("name"),
+                    "output": raw_output,
+                }
+            )
+        return compact_calls, compact_outputs
+
+    @classmethod
+    def _registry_calls_to_retain(
+        cls,
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Select every registry search a retained forecast still depends on.
+
+        Two independent rules contribute, and both are needed: one keeps the
+        searches the runtime precondition *requires* to authorize the call, the
+        other keeps the searches that *explain where the forecast's observation
+        targets came from*.  They are kept as separate methods because they
+        answer different questions and fail differently — see each docstring.
+        """
+        return cls._registry_calls_required_for_forecasts(
+            successful,
+            forecasts,
+        ) | cls._registry_calls_grounding_forecast_targets(
+            successful,
+            forecasts,
+        )
+
+    @staticmethod
+    def _registry_calls_required_for_forecasts(
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Select only searches that actually authorize a retained forecast."""
+        required: set[str] = set()
+        for forecast_index, forecast_call, _ in forecasts:
+            preceding = []
+            for index, call, output_record in successful:
+                if index >= forecast_index:
+                    continue
+                preceding.append(
+                    {
+                        "tool_call_id": call.get("tool_call_id"),
+                        "name": call.get("name"),
+                        "arguments": dict(call.get("arguments") or {}),
+                        "output": (output_record or {}).get("output"),
+                    }
+                )
+            authorization = authorize_forecast_registry(
+                dict(forecast_call.get("arguments") or {}),
+                preceding,
+            )
+            required.update(
+                str(value)
+                for value in authorization.get("disturbance_search_call_ids") or []
+                if str(value)
+            )
+            for call_ids in (authorization.get("candidate_search_call_ids") or {}).values():
+                required.update(str(value) for value in call_ids if str(value))
+        return required
+
+    @staticmethod
+    def _registry_calls_grounding_forecast_targets(
+        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> set[str]:
+        """Keep the searches that discover a forecast's observation targets.
+
+        The registry precondition only authorizes the disturbance and the
+        boundary-condition action variables, so
+        :meth:`_registry_calls_required_for_forecasts` drops every
+        ``role="output"`` discovery page.  That deletes the teacher's
+        demonstration of how ``attention_targets`` and
+        ``output_state_variables`` are derived and leaves the retained
+        trajectory naming canonical observation IDs with no visible lookup.
+
+        A search grounds a target when it returned that canonical ID, or when
+        the query asked for it by name.  The query check is what preserves the
+        semantic group targets (``pressure``, ``linepack``, ``compressor_load``)
+        that are legal attention targets but are never returned as variable IDs.
+        Searches that match no retained target stay dropped.
+        """
+        targets: set[str] = set()
+        for _, forecast_call, _ in forecasts:
+            arguments = dict(forecast_call.get("arguments") or {})
+            for field in ("attention_targets", "output_state_variables"):
+                targets.update(
+                    str(value).strip()
+                    for value in arguments.get(field) or []
+                    if isinstance(value, str) and str(value).strip()
+                )
+        if not targets:
+            return set()
+        folded_targets = {value.casefold() for value in targets}
+
+        last_forecast_index = max(index for index, _, _ in forecasts)
+        required: set[str] = set()
+        for index, call, output_record in successful:
+            if index >= last_forecast_index:
+                continue
+            if call.get("name") != "search_pipeformer_registry":
+                continue
+            output = (output_record or {}).get("output")
+            if not isinstance(output, dict) or output.get("success") is False:
+                continue
+            returned = {
+                str(entry.get("variable")).strip()
+                for entry in output.get("variables") or []
+                if isinstance(entry, dict) and entry.get("variable")
+            }
+            if returned & targets:
+                required.add(str(call.get("tool_call_id") or ""))
+                continue
+            arguments = dict(call.get("arguments") or {})
+            requested = {
+                term.casefold()
+                for term in str(arguments.get("query") or "").split()
+                if term.strip()
+            }
+            requested.update(
+                str(value).strip().casefold()
+                for value in arguments.get("attention_targets") or []
+                if isinstance(value, str) and str(value).strip()
+            )
+            if requested & folded_targets:
+                required.add(str(call.get("tool_call_id") or ""))
+        required.discard("")
+        return required
+
+    @staticmethod
+    def _forecast_action_variables(call: Dict[str, Any]) -> set[str]:
+        boundary = dict(dict(call.get("arguments") or {}).get(
+            "boundary_conditions"
+        ) or {})
+        return {
+            str(variable)
+            for key in ("percentage_changes", "setpoints")
+            for variable in dict(boundary.get(key) or {})
+            if str(variable)
+        }
+
+    def _select_generic_evidence_pairs(
+        self,
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        answer: str,
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        references = self._reference_tokens(answer)
+        remaining = set(references)
+        available = list(pairs)
+        selected = []
+        while available and len(selected) < SFT_MAX_GENERIC_TOOL_PAIRS:
+            ranked = []
+            for pair in available:
+                blob = json.dumps((pair[2] or {}).get("output") or {}, ensure_ascii=False).casefold()
+                normalized = blob.replace(",", "")
+                covered = {
+                    value for value in remaining
+                    if value.casefold().replace(",", "") in normalized
+                }
+                ranked.append((len(covered), self._evidence_score(pair[2], answer), -pair[0], pair, covered))
+            _, _, _, best, covered = max(ranked, key=lambda item: item[:3])
+            selected.append(best)
+            remaining.difference_update(covered)
+            available.remove(best)
+            if not remaining and selected:
+                break
+        return sorted(selected, key=lambda pair: pair[0])
+
+    @staticmethod
+    def _reference_tokens(answer: str) -> set[str]:
+        values = set(variable_references(answer))
+        values.update(sft_file_references(answer))
+        values.update(str(value) for value in numeric_claim_values(answer))
+        return {value for value in values if value}
+
+    def _compact_generic_sft_output(
+        self,
+        value: Any,
+        answer: str,
+        *,
+        tool_name: str,
+        arguments: Dict[str, Any],
+    ) -> Any:
+        """Retain a small excerpt containing every answer-grounding token possible."""
+        if not isinstance(value, (dict, list, str)):
+            return value
+        if isinstance(value, dict):
+            status = {
+                key: value[key]
+                for key in ("success", "exit_code", "error", "stderr")
+                if key in value and value[key] not in (None, "")
+            }
+        else:
+            status = {}
+        if isinstance(value, dict):
+            assessment = classify_tool_evidence(
+                {"name": tool_name, "arguments": arguments, "output": value}
+            )
+            evidence_kind = {
+                "file_content_read": "file_content",
+                "command_content_or_computation": "command_content",
+            }.get(assessment.reason)
+            if evidence_kind:
+                status["evidence_kind"] = evidence_kind
+                source_payload = {
+                    "path": value.get("path"),
+                    "abs_path": value.get("abs_path"),
+                    "cmd": value.get("cmd"),
+                    "arguments": arguments,
+                }
+                source_artifacts = list(
+                    requested_artifacts(json.dumps(source_payload, ensure_ascii=False))
+                )
+                if source_artifacts:
+                    status["source_artifacts"] = source_artifacts
+        compact_value = self.compact_sft_output(value)
+        text_value = (
+            compact_value
+            if isinstance(compact_value, str)
+            else json.dumps(compact_value, ensure_ascii=False, indent=2)
+        )
+        lines = text_value.splitlines() or [text_value]
+        references = self._reference_tokens(answer)
+        selected_indices = {0, len(lines) - 1}
+        normalized_lines = [line.casefold().replace(",", "") for line in lines]
+        for reference in references:
+            token = reference.casefold().replace(",", "")
+            for index, line in enumerate(normalized_lines):
+                if token in line:
+                    selected_indices.update({max(0, index - 1), index, min(len(lines) - 1, index + 1)})
+                    break
+        excerpt_lines = [lines[index] for index in sorted(selected_indices)]
+        excerpt = "\n".join(excerpt_lines)
+        if len(selected_indices) <= 2 and len(excerpt) < min(800, len(text_value)):
+            excerpt = text_value[: min(len(text_value), SFT_MAX_GENERIC_OUTPUT_CHARS)]
+        if len(excerpt) > SFT_MAX_GENERIC_OUTPUT_CHARS:
+            excerpt = excerpt[:SFT_MAX_GENERIC_OUTPUT_CHARS].rsplit("\n", 1)[0]
+        return {**status, "evidence_excerpt": excerpt}
+
+    def serialize_sft_record_evidence(self, evidence: Dict[str, Any]) -> Dict[str, Any]:
+        compact = {
+            key: value
+            for key, value in evidence.items()
+            if key not in {
+                "top_watch_variables",
+                "key_observation_variables",
+                "verified_numeric_claims",
+                "candidate_forecasts",
+            }
+        }
+        for key in ("top_watch_variables", "key_observation_variables"):
+            if not evidence.get(key):
+                continue
+            compact[key] = [
+                {
+                    item_key: item[item_key]
+                    for item_key in (
+                        "variable",
+                        "role",
+                        "metric",
+                        "value",
+                        "status",
+                        "mean_prediction",
+                        "mean_abs_delta_vs_observed",
+                    )
+                    if item_key in item
+                }
+                for item in list(evidence.get(key) or [])[:3]
+            ]
+        return self.compact_sft_output(compact)
+
+    def serialize_sft_decision_summary(self, value: Any) -> Dict[str, Any]:
+        """Keep decision labels and ordering while leaving metric detail to tools."""
+        summary = dict(value or {})
+        raw_policy = summary.get("ranking_policy")
+        if isinstance(raw_policy, dict):
+            compact_policy = {
+                "source": raw_policy.get("source"),
+                "hard_constraints": list(
+                    raw_policy.get("hard_constraints") or []
+                ),
+                "objectives": [
+                    {
+                        key: objective[key]
+                        for key in ("metric", "direction", "tolerance")
+                        if key in objective
+                    }
+                    for objective in raw_policy.get("objectives") or []
+                    if isinstance(objective, dict)
+                ],
+            }
+        elif isinstance(raw_policy, str) and raw_policy.strip():
+            compact_policy = {
+                "source": "legacy_named_policy",
+                "policy_id": raw_policy.strip(),
+            }
+        else:
+            compact_policy = {}
+        compact_summary = {
+            key: summary[key]
+            for key in (
+                "status",
+                "selected_candidate_id",
+                "ranked_candidate_ids",
+                "ranked_candidate_groups",
+                "eliminated_candidates",
+                "missing_metrics",
+            )
+            if key in summary
+        }
+        if compact_policy:
+            compact_summary["ranking_policy"] = compact_policy
+        return compact_summary
+
+    @staticmethod
+    def _evidence_score(output: Optional[Dict[str, Any]], answer: str) -> int:
+        blob = json.dumps((output or {}).get("output") or {}, ensure_ascii=False).casefold()
+        references = TeacherTraceProjector._reference_tokens(answer)
+        score = sum(3 for value in references if value.casefold() in blob)
+        if '"stdout"' in blob or '"content"' in blob:
+            score += 1
+        return score
+
+    def _select_forecast_evidence_for_sft(
+        self,
+        output: Dict[str, Any],
+        answer: str,
+        *,
+        include_auxiliary_variables: bool,
+        max_variables: int,
+    ) -> Dict[str, Any]:
+        prediction = dict(output.get("prediction") or {})
+        verification = dict(output.get("verification") or {})
+        evidence = dict(output.get("evidence") or {})
+        referenced = list(dict.fromkeys(variable_references(answer)))
+        if include_auxiliary_variables:
+            for key in ("top_watch_variables", "key_observation_variables"):
+                referenced.extend(
+                    str(item.get("variable"))
+                    for item in evidence.get(key) or []
+                    if item.get("variable")
+                )
+            for finding in verification.get("priority_findings") or []:
+                referenced.extend(str(value) for value in finding.get("affected_variables") or [])
+        referenced = list(dict.fromkeys(referenced))[:max_variables]
+        summary = dict(prediction.get("output_forecast_summary") or {})
+        metric_keys = {
+            "mean_prediction",
+            "minimum_prediction",
+            "maximum_prediction",
+            "max_abs_prediction",
+            "prediction_change",
+            "max_abs_step_change",
+            "max_step_decline",
+            "max_decline_from_start",
+            "recovery_from_minimum",
+        }
+        compact_summary = {
+            variable: {
+                key: value
+                for key, value in dict(summary.get(variable) or {}).items()
+                if key in metric_keys
+            }
+            for variable in referenced
+            if variable in summary
+        }
+        prediction_keys = (
+            "forecast_mode",
+            "case_id",
+            "current_operating_condition_number",
+            "forecast_horizon_minutes",
+            "actual_forecast_horizon_minutes",
+            "actual_forecast_steps",
+            "disturbance_variable",
+            "disturbance_direction",
+            "disturbance_magnitude_percent",
+            "disturbance_assumption",
+            "disturbance_source",
+            "forecast_window",
+            "counterfactual_comparison",
+            "total_output_variable_count",
+        )
+        compact_prediction = {
+            key: prediction[key] for key in prediction_keys if key in prediction
+        }
+        if not include_auxiliary_variables and "counterfactual_comparison" in compact_prediction:
+            comparison = dict(compact_prediction["counterfactual_comparison"] or {})
+            compact_prediction["counterfactual_comparison"] = {
+                key: comparison[key]
+                for key in (
+                    "mode",
+                    "compared_step_count",
+                    "compared_output_variable_count",
+                    "nonzero_impacted_variable_count",
+                    "baseline_reference",
+                    "disturbance_variable",
+                    "applied_disturbance",
+                )
+                if key in comparison
+            }
+        compact_prediction["output_forecast_summary"] = compact_summary
+        verification_keys = (
+            "requested_categories",
+            "category_status",
+            "safety_energy_comparison",
+            "rule_status",
+            "overall_status",
+            "verification_complete",
+            "not_evaluated_rules",
+            "risk_level",
+            "risk_escalations",
+            "failure_count",
+            "warning_count",
+            "failed_rule_ids",
+            "warning_rule_ids",
+            "triggered_flags",
+            "human_intervention_label",
+            "dispatch_recommendation",
+            "priority_findings",
+        )
+        compact_verification = {
+            key: verification[key]
+            for key in verification_keys
+            if key in verification and key not in {"rule_status", "risk_escalations", "priority_findings"}
+        }
+        if "comparable_metrics" in verification:
+            metrics = dict(verification.get("comparable_metrics") or {})
+            compact_verification["comparable_metrics"] = {
+                key: metrics[key]
+                for key in COMPACT_COMPARABLE_METRIC_KEYS
+                if key in metrics
+            }
+            if "energy_evaluation_status" in metrics:
+                compact_verification["comparable_metrics"]["evaluation_status"] = metrics[
+                    "energy_evaluation_status"
+                ]
+        compact_verification["priority_findings"] = [
+            {
+                key: finding[key]
+                for key in (
+                    "name",
+                    "category",
+                    "status",
+                    "evaluation_status",
+                    "flag",
+                    "priority",
+                    "affected_variables",
+                )
+                if key in finding
+            }
+            for finding in (verification.get("priority_findings") or [])[:5]
+        ]
+        compact_evidence = {
+            key: [
+                {
+                    item_key: item[item_key]
+                    for item_key in (
+                        "variable",
+                        "role",
+                        "metric",
+                        "value",
+                        "status",
+                        "mean_prediction",
+                        "mean_abs_delta_vs_observed",
+                    )
+                    if item_key in item
+                }
+                for item in list(evidence.get(key) or [])[:3]
+            ]
+            for key in ("top_watch_variables", "key_observation_variables")
+            if include_auxiliary_variables and evidence.get(key)
+        }
+        if evidence.get("boundary_application_evidence"):
+            compact_evidence["boundary_application_evidence"] = [
+                {
+                    key: item[key]
+                    for key in (
+                        "variable",
+                        "mode",
+                        "requested_value",
+                        "input_values_applied",
+                        "verified",
+                    )
+                    if key in item
+                }
+                for item in evidence.get("boundary_application_evidence") or []
+            ]
+        task_resolution = dict(output.get("task_resolution") or {})
+        compact_resolution = {
+            key: task_resolution[key]
+            for key in (
+                "resolved_attention_variable_count",
+                "resolved_output_variable_count",
+                "unresolved_attention_targets",
+                "unresolved_output_state_variables",
+                "applied_boundary_conditions",
+            )
+            if key in task_resolution
+        }
+        provenance = dict(output.get("provenance") or {})
+        compact_provenance = {
+            key: provenance[key]
+            for key in ("checkpoint_id", "forecast_mode", "device")
+            if key in provenance
+        }
+        return {
+            "success": output.get("success") is True,
+            "task_resolution": compact_resolution,
+            "prediction": compact_prediction,
+            "verification": compact_verification,
+            "evidence": compact_evidence,
+            "provenance": compact_provenance,
+        }
+
+DEFAULT_PROJECTOR = TeacherTraceProjector()
+
+__all__ = [
+    "DEFAULT_PROJECTOR",
+    "TeacherTraceProjector",
+    "export_trace_tools",
+    "final_answer",
+    "sanitize_tool_output",
+]

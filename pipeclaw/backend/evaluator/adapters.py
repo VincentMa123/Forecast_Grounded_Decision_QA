@@ -1,5 +1,3 @@
-"""Input adapters for teacher traces and autonomous rollouts."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping

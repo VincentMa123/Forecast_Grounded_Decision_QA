@@ -5,18 +5,28 @@ import json
 from copy import deepcopy
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 
 VERIFIED_DECISION_STATE_SCHEMA_VERSION = "verified_decision_state_v1"
 DEFAULT_STATE_MAX_CHARS = 16_000
 DEFAULT_RECENT_TURNS_MAX_CHARS = 4_000
 DEFAULT_RECENT_TURN_COUNT = 2
+MAX_SINGLE_FORECAST_HISTORY_CHARS = 1_600
 REGISTRY_STATE_FIELDS = (
     "variable",
     "role",
     "controllable",
 )
+
+
+def _explicit_scope_value(
+    source: Dict[str, Any],
+    key: str,
+    current: Dict[str, Any],
+) -> Any:
+    value = source.get(key)
+    return current.get(key) if value is None else value
 
 
 def _canonical_json(value: Any) -> str:
@@ -36,10 +46,9 @@ def _action_fingerprint(
     action = dict(candidate.get("action") or {})
     candidate_disturbance = dict(candidate.get("disturbance") or {})
     payload = {
-        "case_id": candidate.get("case_id") or scope.get("case_id"),
-        "forecast_horizon_minutes": (
-            candidate.get("forecast_horizon_minutes")
-            or scope.get("forecast_horizon_minutes")
+        "case_id": _explicit_scope_value(candidate, "case_id", scope),
+        "forecast_horizon_minutes": _explicit_scope_value(
+            candidate, "forecast_horizon_minutes", scope
         ),
         "disturbance": _normalized_disturbance(
             candidate_disturbance or scope.get("disturbance") or {}
@@ -60,6 +69,23 @@ def _has_boundary_action(candidate: Dict[str, Any]) -> bool:
     return bool(
         dict(action.get("percentage_changes") or {})
         or dict(action.get("setpoints") or {})
+    )
+
+
+def _requested_action_fingerprint(
+    arguments: Dict[str, Any],
+    scope: Dict[str, Any],
+) -> Optional[str]:
+    candidate = {"action": dict(arguments.get("boundary_conditions") or {})}
+    return _action_fingerprint(candidate, scope) if _has_boundary_action(candidate) else None
+
+
+def _failed_forecast_arguments(turn: Dict[str, Any]) -> Dict[str, Any]:
+    request = turn.get("failed_forecast_request")
+    return (
+        deepcopy(dict(request.get("arguments") or {}))
+        if isinstance(request, dict)
+        else {}
     )
 
 
@@ -127,10 +153,9 @@ def _scope_from_pipeformer(
         or current.get("disturbance")
     )
     scope = {
-        "case_id": first.get("case_id") or current.get("case_id"),
-        "forecast_horizon_minutes": (
-            first.get("forecast_horizon_minutes")
-            or current.get("forecast_horizon_minutes")
+        "case_id": _explicit_scope_value(first, "case_id", current),
+        "forecast_horizon_minutes": _explicit_scope_value(
+            first, "forecast_horizon_minutes", current
         ),
         "disturbance": disturbance,
     }
@@ -160,15 +185,114 @@ def _candidate_audit_status(candidate: Dict[str, Any]) -> str:
     )
 
 
-def _policy_with_decision(
+def _merge_candidate_results(
+    prior: Iterable[Dict[str, Any]],
+    incoming: Iterable[Dict[str, Any]],
+    scope: Dict[str, Any],
+    *,
+    preserve_prior_tool_call_id: bool = False,
+) -> Tuple[List[Dict[str, Any]], bool]:
+    """Merge candidate values without mutating either input collection."""
+    candidates = [deepcopy(dict(item)) for item in prior if isinstance(item, dict)]
+    incoming_candidates = [
+        deepcopy(dict(item)) for item in incoming if isinstance(item, dict)
+    ]
+    if any(_has_boundary_action(item) for item in incoming_candidates):
+        candidates = [item for item in candidates if _has_boundary_action(item)]
+        incoming_candidates = [
+            item for item in incoming_candidates if _has_boundary_action(item)
+        ]
+
+    positions = {
+        str(item.get("action_fingerprint") or _action_fingerprint(item, scope)): index
+        for index, item in enumerate(candidates)
+    }
+
+    policy_reset = False
+    for candidate in incoming_candidates:
+        candidate_id = str(candidate.get("candidate_id") or "")
+        item = deepcopy(candidate)
+        item.setdefault("audit_status", _candidate_audit_status(item))
+        fingerprint = _action_fingerprint(item, scope)
+        item["action_fingerprint"] = fingerprint
+        prior_same_id = next(
+            (
+                value
+                for value in candidates
+                if str(value.get("candidate_id") or "").casefold()
+                == candidate_id.casefold()
+            ),
+            None,
+        )
+        if (
+            prior_same_id is not None
+            and str(
+                prior_same_id.get("action_fingerprint")
+                or _action_fingerprint(prior_same_id, scope)
+            )
+            != fingerprint
+        ):
+            candidates = []
+            positions = {}
+            policy_reset = True
+        if fingerprint in positions:
+            position = positions[fingerprint]
+            stable_id = candidates[position].get("candidate_id")
+            stable_call_id = candidates[position].get("tool_call_id")
+            merged = {**candidates[position], **item}
+            merged["candidate_id"] = stable_id or candidate_id
+            if preserve_prior_tool_call_id and stable_call_id:
+                merged["tool_call_id"] = stable_call_id
+            candidates[position] = merged
+        else:
+            positions[fingerprint] = len(candidates)
+            candidates.append(item)
+    return candidates, policy_reset
+
+
+def _scope_from_single_forecast_snapshot(
+    snapshot: Dict[str, Any],
+    current: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Recover the canonical scope when history stores only a state snapshot."""
+    stored = dict(snapshot.get("scope") or {})
+    if not stored:
+        return deepcopy(current)
+    return {
+        key: deepcopy(value)
+        for key, value in stored.items()
+        if value not in (None, "", [], {})
+    }
+
+
+def _accepted_llm_policy(
     policy: Dict[str, Any],
     decision: Dict[str, Any],
-) -> Dict[str, Any]:
+    *,
+    source_question: str,
+) -> Optional[Dict[str, Any]]:
+    missing = {str(value) for value in decision.get("missing_metrics") or []}
+    if policy.get("source") != "llm_tool" or any(
+        "source_not_in_user_request" in value
+        for value in missing
+        if value.startswith("decision_policy_")
+    ):
+        return None
+    question = " ".join(str(source_question).split()).casefold()
+    if not question:
+        return None
+    objectives = [dict(item or {}) for item in policy.get("objectives") or []]
+    legacy_excerpt = " ".join(str(policy.get("source_excerpt") or "").split()).casefold()
+    for objective in objectives:
+        excerpt = " ".join(
+            str(objective.get("source_excerpt") or "").split()
+        ).casefold()
+        if not excerpt and len(objectives) == 1:
+            excerpt = legacy_excerpt
+        if len(excerpt) < 4 or excerpt not in question:
+            return None
     result = deepcopy(policy)
-    ranking = (
-        decision.get("ordered_viable_candidate_ids")
-        or decision.get("ranking")
-    )
+    ranking = decision.get("ordered_viable_candidate_ids") or decision.get("ranking")
     if ranking:
         result["ranking"] = deepcopy(ranking)
     if "selected_candidate_id" in decision:
@@ -256,6 +380,39 @@ def _registry_state_items(value: Any) -> List[Dict[str, Any]]:
     return items
 
 
+def _merge_replaced_items(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]], key: Callable[[Dict[str, Any]], str]) -> List[Dict[str, Any]]:
+    merged = [deepcopy(dict(item)) for item in existing]
+    positions = {key(item): index for index, item in enumerate(merged)}
+    for item in incoming:
+        item = deepcopy(dict(item))
+        identity = key(item)
+        if identity in positions:
+            merged[positions[identity]] = item
+        else:
+            positions[identity] = len(merged)
+            merged.append(item)
+    return merged
+
+
+def _merge_registry_state_items(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return _merge_replaced_items(existing, (item for item in incoming if item.get("variable")), lambda item: str(item.get("variable") or "").casefold())
+
+
+def _merge_applied_disturbances(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    return _merge_replaced_items(existing, incoming, lambda item: _canonical_json([str(item.get("variable") or "").casefold(), str(item.get("mode") or "").casefold(), item.get("requested_value")]))
+
+
+def _ordered_unique(existing: Iterable[Any], incoming: Iterable[Any]) -> List[Any]:
+    merged = []
+    seen = set()
+    for item in [*existing, *incoming]:
+        key = _canonical_json(item)
+        if key not in seen:
+            seen.add(key)
+            merged.append(deepcopy(item))
+    return merged
+
+
 def _successful_tool_result(item: Dict[str, Any]) -> bool:
     output = item.get("output")
     return (
@@ -318,10 +475,9 @@ def _forecast_scope(
         )
     )
     scope = {
-        "case_id": arguments.get("case_id") or current.get("case_id"),
-        "forecast_horizon_minutes": (
-            arguments.get("forecast_horizon_minutes")
-            or current.get("forecast_horizon_minutes")
+        "case_id": _explicit_scope_value(arguments, "case_id", current),
+        "forecast_horizon_minutes": _explicit_scope_value(
+            arguments, "forecast_horizon_minutes", current
         ),
         "disturbance": disturbance or current.get("disturbance"),
     }
@@ -435,12 +591,40 @@ def _compact_single_forecast_snapshot(
             ),
             "baseline_reference": comparable.get("baseline_reference"),
         },
-        "top_watch_variables": deepcopy(
-            list(evidence.get("top_watch_variables") or [])[:8]
-        ),
-        "key_observation_variables": deepcopy(
-            list(evidence.get("key_observation_variables") or [])[:8]
-        ),
+        "top_watch_variables": [
+            {
+                key: deepcopy(item[key])
+                for key in (
+                    "variable",
+                    "role",
+                    "metric",
+                    "value",
+                    "status",
+                    "mean_prediction",
+                    "mean_abs_delta_vs_observed",
+                )
+                if item.get(key) is not None
+            }
+            for item in list(evidence.get("top_watch_variables") or [])[:3]
+            if isinstance(item, dict)
+        ],
+        "key_observation_variables": [
+            {
+                key: deepcopy(item[key])
+                for key in (
+                    "variable",
+                    "role",
+                    "metric",
+                    "value",
+                    "status",
+                    "mean_prediction",
+                    "mean_abs_delta_vs_observed",
+                )
+                if item.get(key) is not None
+            }
+            for item in list(evidence.get("key_observation_variables") or [])[:2]
+            if isinstance(item, dict)
+        ],
         "provenance": {
             "source_turn_id": source_turn_id,
             "source_tool_call_id": str(call.get("tool_call_id") or ""),
@@ -448,12 +632,32 @@ def _compact_single_forecast_snapshot(
     }
     for category, fields in _SINGLE_FORECAST_ENGINEERING_FIELDS.items():
         category_evidence = dict(engineering.get(category) or {})
-        snapshot[category] = {
+        compact_category = {
             field: deepcopy(category_evidence[field])
             for field in fields
             if category_evidence.get(field) is not None
         }
-    return snapshot
+        if compact_category:
+            snapshot[category] = compact_category
+    if len(_canonical_json(snapshot)) <= MAX_SINGLE_FORECAST_HISTORY_CHARS:
+        return snapshot
+    # Preserve the facts used to compare an earlier single forecast while
+    # staying below PromptBuilder's per-entry memory budget.
+    return {
+        key: snapshot[key]
+        for key in (
+            "scope",
+            "candidate_role",
+            "applied_disturbance",
+            "audit",
+            "risk",
+            "energy",
+            "top_watch_variables",
+            "key_observation_variables",
+            "provenance",
+        )
+        if snapshot.get(key) not in (None, {}, [])
+    }
 
 
 def bounded_recent_turns(
@@ -535,6 +739,33 @@ def serialize_verified_decision_state(
     return payload
 
 
+def transition_forecast_scope(
+    state: "VerifiedDecisionState",
+    arguments: Dict[str, Any],
+    *,
+    applied_disturbances: Iterable[Dict[str, Any]] = (),
+) -> "VerifiedDecisionState":
+    """Return state scoped to one observed forecast request."""
+    requested_scope = _forecast_scope(
+        dict(arguments),
+        [
+            deepcopy(dict(item))
+            for item in applied_disturbances
+            if isinstance(item, dict)
+        ],
+        state.scope,
+    )
+    return _apply_verified_state_delta(
+        state,
+        _VerifiedStateDelta(
+            scope=requested_scope,
+            requested_action_fingerprint=_requested_action_fingerprint(
+                dict(arguments), requested_scope
+            ),
+        ),
+    )
+
+
 @dataclass
 class VerifiedDecisionState:
     """Bounded, verified cross-turn state shared by runtime and SFT export."""
@@ -592,274 +823,15 @@ class VerifiedDecisionState:
         question: str,
         tool_results: Iterable[Dict[str, Any]],
     ) -> "VerifiedDecisionState":
-        """Reduce only successful verified tool results into a new state."""
-        from .contract import GroundingContractBuilder
-
-        successful = [
-            deepcopy(dict(item))
-            for item in tool_results
-            if isinstance(item, dict) and _verified_state_tool_result(item)
-        ]
-        if not successful:
-            return VerifiedDecisionState.from_dict(self.to_dict())
-
-        state = VerifiedDecisionState.from_dict(self.to_dict())
-        current_forecasts = [
-            item
-            for item in successful
-            if item.get("name") == "run_pipeformer_forecast"
-        ]
-        if current_forecasts:
-            preliminary_scope = _forecast_scope(
-                dict(current_forecasts[-1].get("arguments") or {}),
-                [],
-                state.scope,
-            )
-            if (
-                state.scope
-                and preliminary_scope
-                and _scope_fingerprint(preliminary_scope)
-                != _scope_fingerprint(state.scope)
-            ):
-                state.candidates = []
-                state.decision_policy = None
-                state.applied_disturbances = []
-                state.verified_evidence.pop(
-                    "single_forecast_snapshot", None
-                )
-                state.provenance.pop("decision_policy_source_question", None)
-        contract = GroundingContractBuilder().build(
+        """Reduce observed scope and successful verified results into state."""
+        delta = _delta_from_verified_tool_results(
+            session_id,
+            turn_id,
             question,
-            successful,
-            require_decision_policy=True,
-            prior_candidate_results=state.candidates,
-            prior_decision_policy=state.decision_policy,
-            prior_decision_policy_source_question=(
-                state.decision_policy_source_question
-            ),
-            prior_applied_disturbances=state.applied_disturbances,
+            tool_results,
+            self,
         )
-        applied = [
-            deepcopy(dict(item))
-            for item in contract.get("applied_disturbances") or []
-            if isinstance(item, dict)
-        ]
-        if current_forecasts:
-            next_scope = _forecast_scope(
-                dict(current_forecasts[-1].get("arguments") or {}),
-                applied,
-                state.scope,
-            )
-            if (
-                state.scope
-                and next_scope
-                and _scope_fingerprint(next_scope)
-                != _scope_fingerprint(state.scope)
-            ):
-                state.candidates = []
-                state.decision_policy = None
-                state.applied_disturbances = []
-                state.verified_evidence.pop(
-                    "single_forecast_snapshot", None
-                )
-                state.provenance.pop("decision_policy_source_question", None)
-            state.scope = next_scope
-
-        registry_by_id = {
-            str(item.get("variable") or "").casefold(): index
-            for index, item in enumerate(state.registry_variables)
-            if item.get("variable")
-        }
-        for call in successful:
-            if call.get("name") != "search_pipeformer_registry":
-                continue
-            arguments = dict(call.get("arguments") or {})
-            output = dict(call.get("output") or {})
-            for variable in output.get("variables") or []:
-                if not isinstance(variable, dict):
-                    continue
-                variable_id = str(variable.get("variable") or "")
-                if not variable_id:
-                    continue
-                item = _compact_registry_state_item(
-                    dict(variable),
-                    provenance={
-                        "tool_call_id": call.get("tool_call_id"),
-                        "query": arguments.get("query"),
-                        "role": arguments.get("role"),
-                        "controllable": arguments.get("controllable"),
-                    },
-                )
-                key = variable_id.casefold()
-                if key in registry_by_id:
-                    state.registry_variables[registry_by_id[key]] = item
-                else:
-                    registry_by_id[key] = len(state.registry_variables)
-                    state.registry_variables.append(item)
-
-        if contract.get("candidate_results"):
-            incoming_candidates = [
-                dict(candidate)
-                for candidate in contract.get("candidate_results") or []
-                if isinstance(candidate, dict)
-            ]
-            if any(_has_boundary_action(candidate) for candidate in incoming_candidates):
-                # An actionless snapshot is a prior forecast, not a third
-                # action in a later explicit control comparison.
-                state.candidates = [
-                    candidate
-                    for candidate in state.candidates
-                    if _has_boundary_action(candidate)
-                ]
-                incoming_candidates = [
-                    candidate
-                    for candidate in incoming_candidates
-                    if _has_boundary_action(candidate)
-                ]
-            current_by_id = {}
-            for call in current_forecasts:
-                arguments = dict(call.get("arguments") or {})
-                output = dict(call.get("output") or {})
-                candidate_id = str(
-                    arguments.get("candidate_id")
-                    or output.get("candidate_id")
-                    or ""
-                )
-                if candidate_id:
-                    current_by_id[candidate_id.casefold()] = call
-            candidate_positions = {
-                str(item.get("action_fingerprint") or _action_fingerprint(
-                    item, state.scope
-                )): index
-                for index, item in enumerate(state.candidates)
-            }
-            for candidate in incoming_candidates:
-                item = deepcopy(candidate)
-                candidate_id = str(item.get("candidate_id") or "")
-                item.setdefault(
-                    "audit_status",
-                    _candidate_audit_status(item),
-                )
-                call = current_by_id.get(candidate_id.casefold())
-                if call:
-                    arguments = dict(call.get("arguments") or {})
-                    item["case_id"] = arguments.get("case_id")
-                    item["forecast_horizon_minutes"] = arguments.get(
-                        "forecast_horizon_minutes"
-                    )
-                    if applied:
-                        item["disturbance"] = deepcopy(applied[-1])
-                fingerprint = _action_fingerprint(item, state.scope)
-                item["action_fingerprint"] = fingerprint
-                prior_same_id = next(
-                    (
-                        candidate_value
-                        for candidate_value in state.candidates
-                        if str(
-                            candidate_value.get("candidate_id") or ""
-                        ).casefold()
-                        == candidate_id.casefold()
-                    ),
-                    None,
-                )
-                if (
-                    prior_same_id is not None
-                    and str(
-                        prior_same_id.get("action_fingerprint")
-                        or _action_fingerprint(prior_same_id, state.scope)
-                    )
-                    != fingerprint
-                ):
-                    state.candidates = []
-                    candidate_positions = {}
-                    state.decision_policy = None
-                    state.provenance.pop(
-                        "decision_policy_source_question", None
-                    )
-                if fingerprint in candidate_positions:
-                    position = candidate_positions[fingerprint]
-                    stable_id = state.candidates[position].get("candidate_id")
-                    merged = {**state.candidates[position], **item}
-                    merged["candidate_id"] = stable_id or candidate_id
-                    state.candidates[position] = merged
-                else:
-                    candidate_positions[fingerprint] = len(state.candidates)
-                    state.candidates.append(item)
-
-        current_policy = dict(contract.get("decision_policy") or {})
-        if current_policy.get("source") == "llm_tool":
-            state.decision_policy = _policy_with_decision(
-                current_policy,
-                dict(contract.get("decision_summary") or {}),
-            )
-            if question:
-                state.provenance["decision_policy_source_question"] = question
-
-        disturbance_positions = {
-            _canonical_json(
-                [
-                    str(item.get("variable") or "").casefold(),
-                    str(item.get("mode") or "").casefold(),
-                    item.get("requested_value"),
-                ]
-            ): index
-            for index, item in enumerate(state.applied_disturbances)
-        }
-        for disturbance in applied:
-            key = _canonical_json(
-                [
-                    str(disturbance.get("variable") or "").casefold(),
-                    str(disturbance.get("mode") or "").casefold(),
-                    disturbance.get("requested_value"),
-                ]
-            )
-            if key in disturbance_positions:
-                state.applied_disturbances[disturbance_positions[key]] = disturbance
-            else:
-                disturbance_positions[key] = len(state.applied_disturbances)
-                state.applied_disturbances.append(disturbance)
-
-        current_candidate_calls = [
-            call
-            for call in current_forecasts
-            if dict(call.get("arguments") or {}).get("candidate_id")
-        ]
-        if current_candidate_calls:
-            state.verified_evidence.pop("single_forecast_snapshot", None)
-        elif len(current_forecasts) == 1:
-            turn_key = f"{session_id}::turn_{int(turn_id):03d}"
-            state.verified_evidence["single_forecast_snapshot"] = (
-                _compact_single_forecast_snapshot(
-                    current_forecasts[0],
-                    scope=state.scope,
-                    applied_disturbances=state.applied_disturbances,
-                    source_turn_id=turn_key,
-                )
-            )
-
-        for call in successful:
-            output = dict(call.get("output") or {})
-            for key in ("csv_evidence", "topology_summary"):
-                if isinstance(output.get(key), (dict, list)) and output[key]:
-                    state.verified_evidence[key] = deepcopy(output[key])
-            unresolved = output.get("unresolved_inputs") or output.get(
-                "unresolved_task_vocabulary"
-            )
-            for value in unresolved or []:
-                text = str(value)
-                if text and text not in state.unresolved_inputs:
-                    state.unresolved_inputs.append(text)
-
-        turn_key = f"{session_id}::turn_{int(turn_id):03d}"
-        turn_ids = state.provenance.setdefault("turn_ids", [])
-        if turn_key not in turn_ids:
-            turn_ids.append(turn_key)
-        call_ids = state.provenance.setdefault("tool_call_ids", [])
-        for call in successful:
-            call_id = str(call.get("tool_call_id") or "")
-            if call_id and call_id not in call_ids:
-                call_ids.append(call_id)
-        return state
+        return _apply_verified_state_delta(self, delta)
 
     @classmethod
     def from_dict(cls, value: Dict[str, Any]) -> "VerifiedDecisionState":
@@ -909,212 +881,342 @@ class VerifiedDecisionState:
         conversation_context: Iterable[Dict[str, Any]],
     ) -> "VerifiedDecisionState":
         state = cls()
-        candidate_positions: Dict[str, int] = {}
-        disturbance_positions: Dict[str, int] = {}
-        registry_positions: Dict[str, int] = {}
 
         for turn in conversation_context:
+            failed_forecast_arguments = _failed_forecast_arguments(turn)
             if (
                 "verified_state_eligible" in turn
                 and turn.get("verified_state_eligible") is not True
+                and not failed_forecast_arguments
             ):
                 continue
             legacy_verified = (
                 "tool_evidence_verified" not in turn
                 and turn.get("grounding_verified") is True
             )
-            if turn.get("tool_evidence_verified") is not True and not legacy_verified:
+            if (
+                turn.get("tool_evidence_verified") is not True
+                and not legacy_verified
+                and not failed_forecast_arguments
+            ):
                 continue
-            summary = dict(turn.get("verified_evidence_summary") or {})
-            pipeformer = dict(summary.get("pipeformer") or {})
-            next_scope = _scope_from_pipeformer(pipeformer, state.scope)
-            if (
-                state.scope
-                and next_scope
-                and _scope_fingerprint(next_scope)
-                != _scope_fingerprint(state.scope)
-            ):
-                state.candidates = []
-                candidate_positions = {}
-                state.decision_policy = None
-                state.applied_disturbances = []
-                disturbance_positions = {}
-                state.provenance.pop("decision_policy_source_question", None)
-            if next_scope:
-                state.scope = next_scope
-
-            for evidence_key in ("csv_evidence", "topology_summary"):
-                if summary.get(evidence_key):
-                    state.verified_evidence[evidence_key] = deepcopy(
-                        summary[evidence_key]
-                    )
-
-            single_forecast_snapshot = dict(
-                summary.get("single_forecast_snapshot") or {}
+            state = _apply_verified_state_delta(
+                state,
+                _delta_from_history_turn(turn, state),
             )
-            if single_forecast_snapshot:
-                state.verified_evidence["single_forecast_snapshot"] = (
-                    deepcopy(single_forecast_snapshot)
-                )
-
-            for registry in summary.get("registry_variables") or []:
-                if not isinstance(registry, dict):
-                    continue
-                variable = str(registry.get("variable") or "")
-                if not variable:
-                    continue
-                key = variable.casefold()
-                item = _compact_registry_state_item(dict(registry))
-                if key in registry_positions:
-                    state.registry_variables[registry_positions[key]] = item
-                else:
-                    registry_positions[key] = len(state.registry_variables)
-                    state.registry_variables.append(item)
-
-            incoming_candidates = [
-                dict(candidate)
-                for candidate in pipeformer.get("candidate_results") or []
-                if isinstance(candidate, dict)
-            ]
-            if any(_has_boundary_action(candidate) for candidate in incoming_candidates):
-                state.candidates = [
-                    candidate
-                    for candidate in state.candidates
-                    if _has_boundary_action(candidate)
-                ]
-                candidate_positions = {
-                    str(
-                        candidate.get("action_fingerprint")
-                        or _action_fingerprint(candidate, state.scope)
-                    ): index
-                    for index, candidate in enumerate(state.candidates)
-                }
-                incoming_candidates = [
-                    candidate
-                    for candidate in incoming_candidates
-                    if _has_boundary_action(candidate)
-                ]
-
-            for candidate in incoming_candidates:
-                item = deepcopy(candidate)
-                candidate_id = str(item.get("candidate_id") or "")
-                if not candidate_id:
-                    continue
-                item.setdefault(
-                    "audit_status",
-                    _candidate_audit_status(item),
-                )
-                fingerprint = _action_fingerprint(item, state.scope)
-                item["action_fingerprint"] = fingerprint
-                prior_same_id = next(
-                    (
-                        candidate_value
-                        for candidate_value in state.candidates
-                        if str(
-                            candidate_value.get("candidate_id") or ""
-                        ).casefold()
-                        == candidate_id.casefold()
-                    ),
-                    None,
-                )
-                if (
-                    prior_same_id is not None
-                    and str(
-                        prior_same_id.get("action_fingerprint")
-                        or _action_fingerprint(prior_same_id, state.scope)
-                    )
-                    != fingerprint
-                ):
-                    state.candidates = []
-                    candidate_positions = {}
-                    state.decision_policy = None
-                    state.provenance.pop(
-                        "decision_policy_source_question", None
-                    )
-                if fingerprint in candidate_positions:
-                    position = candidate_positions[fingerprint]
-                    stable_id = state.candidates[position].get("candidate_id")
-                    stable_tool_call_id = state.candidates[position].get(
-                        "tool_call_id"
-                    )
-                    merged = {**state.candidates[position], **item}
-                    merged["candidate_id"] = stable_id
-                    if stable_tool_call_id:
-                        merged["tool_call_id"] = stable_tool_call_id
-                    state.candidates[position] = merged
-                else:
-                    candidate_positions[fingerprint] = len(state.candidates)
-                    state.candidates.append(item)
-
-            if pipeformer.get("candidate_results"):
-                state.verified_evidence.pop("single_forecast_snapshot", None)
-
-            decision = dict(pipeformer.get("decision_summary") or {})
-            missing = {
-                str(value) for value in decision.get("missing_metrics") or []
-            }
-            raw_policy = (
-                pipeformer.get("decision_policy")
-                or decision.get("ranking_policy")
-                or {}
-            )
-            policy = dict(raw_policy) if isinstance(raw_policy, dict) else {}
-            if (
-                policy.get("source") == "llm_tool"
-                and not any(
-                    "source_not_in_user_request" in value
-                    for value in missing
-                    if value.startswith("decision_policy_")
-                )
-            ):
-                state.decision_policy = _policy_with_decision(
-                    policy,
-                    decision,
-                )
-                source_question = str(turn.get("user_input") or "")
-                if source_question:
-                    state.provenance[
-                        "decision_policy_source_question"
-                    ] = source_question
-
-            for disturbance in pipeformer.get("applied_disturbances") or []:
-                if not isinstance(disturbance, dict):
-                    continue
-                item = deepcopy(dict(disturbance))
-                variable = str(item.get("variable") or "")
-                mode = str(item.get("mode") or "")
-                if not variable or not mode:
-                    continue
-                key = _canonical_json(
-                    [variable.casefold(), mode.casefold(), item.get("requested_value")]
-                )
-                if key in disturbance_positions:
-                    state.applied_disturbances[
-                        disturbance_positions[key]
-                    ] = item
-                else:
-                    disturbance_positions[key] = len(
-                        state.applied_disturbances
-                    )
-                    state.applied_disturbances.append(item)
-
-            turn_key = "::".join(
-                [
-                    str(turn.get("session_id") or ""),
-                    f"turn_{int(turn.get('turn_id') or 0):03d}",
-                ]
-            ).strip(":")
-            if turn_key:
-                turn_ids = state.provenance.setdefault("turn_ids", [])
-                if turn_key not in turn_ids:
-                    turn_ids.append(turn_key)
-            tool_call_ids = state.provenance.setdefault("tool_call_ids", [])
-            for call in turn.get("tool_calls") or []:
-                call_id = str(dict(call).get("tool_call_id") or "")
-                if call_id and call_id not in tool_call_ids:
-                    tool_call_ids.append(call_id)
 
         return state
+
+
+@dataclass(frozen=True)
+class _VerifiedStateDelta:
+    scope: Dict[str, Any] = field(default_factory=dict)
+    requested_action_fingerprint: Optional[str] = None
+    registry_variables: Tuple[Dict[str, Any], ...] = ()
+    candidate_results: Tuple[Dict[str, Any], ...] = ()
+    candidate_results_present: bool = False
+    preserve_prior_tool_call_id: bool = False
+    decision_policy: Optional[Dict[str, Any]] = None
+    decision_policy_source_question: Optional[str] = None
+    applied_disturbances: Tuple[Dict[str, Any], ...] = ()
+    verified_evidence: Dict[str, Any] = field(default_factory=dict)
+    single_forecast_snapshot: Optional[Dict[str, Any]] = None
+    clear_single_forecast_snapshot: bool = False
+    unresolved_inputs: Tuple[str, ...] = ()
+    turn_ids: Tuple[str, ...] = ()
+    tool_call_ids: Tuple[str, ...] = ()
+
+
+def _delta_from_verified_tool_results(
+    session_id: str, turn_id: int, question: str,
+    tool_results: Iterable[Dict[str, Any]], current: "VerifiedDecisionState",
+) -> _VerifiedStateDelta:
+    from .contract import GroundingContractBuilder
+
+    observed = [deepcopy(dict(item)) for item in tool_results if isinstance(item, dict)]
+    forecasts = [item for item in observed if item.get("name") == "run_pipeformer_forecast"]
+    scope = _forecast_scope(dict(forecasts[-1].get("arguments") or {}), [], current.scope) if forecasts else {}
+    requested_action_fingerprint = (
+        _requested_action_fingerprint(
+            dict(forecasts[-1].get("arguments") or {}), scope
+        )
+        if forecasts
+        else None
+    )
+    successful = [item for item in observed if _verified_state_tool_result(item)]
+    if not successful:
+        return _VerifiedStateDelta(
+            scope=scope,
+            requested_action_fingerprint=requested_action_fingerprint,
+        )
+
+    current_forecasts = [item for item in successful if item.get("name") == "run_pipeformer_forecast"]
+    contract = GroundingContractBuilder().build(
+        question, successful, require_decision_policy=True,
+        prior_candidate_results=current.candidates, prior_decision_policy=current.decision_policy,
+        prior_decision_policy_source_question=current.decision_policy_source_question,
+        prior_applied_disturbances=current.applied_disturbances)
+    applied = tuple(deepcopy(dict(item)) for item in contract.get("applied_disturbances") or [] if isinstance(item, dict))
+    if current_forecasts:
+        scope = _forecast_scope(
+            dict(current_forecasts[-1].get("arguments") or {}),
+            list(applied),
+            current.scope,
+        )
+        requested_action_fingerprint = _requested_action_fingerprint(
+            dict(current_forecasts[-1].get("arguments") or {}), scope
+        )
+
+    registry = [
+        _compact_registry_state_item(dict(variable), provenance={
+            "tool_call_id": call.get("tool_call_id"), "query": dict(call.get("arguments") or {}).get("query"),
+            "role": dict(call.get("arguments") or {}).get("role"),
+            "controllable": dict(call.get("arguments") or {}).get("controllable")})
+        for call in successful if call.get("name") == "search_pipeformer_registry"
+        for variable in dict(call.get("output") or {}).get("variables") or []
+        if isinstance(variable, dict) and variable.get("variable")
+    ]
+
+    candidates = [
+        deepcopy(dict(candidate))
+        for candidate in contract.get("candidate_results") or []
+        if isinstance(candidate, dict)
+    ]
+    current_by_id = {}
+    for call in current_forecasts:
+        candidate_id = str(dict(call.get("arguments") or {}).get("candidate_id") or dict(call.get("output") or {}).get("candidate_id") or "")
+        if candidate_id: current_by_id[candidate_id.casefold()] = call
+    for candidate in candidates:
+        call = current_by_id.get(str(candidate.get("candidate_id") or "").casefold())
+        if call:
+            arguments = dict(call.get("arguments") or {})
+            for key in ("case_id", "forecast_horizon_minutes"):
+                if arguments.get(key) is not None:
+                    candidate[key] = arguments[key]
+            if applied: candidate["disturbance"] = deepcopy(applied[-1])
+
+    policy = dict(contract.get("decision_policy") or {})
+    for call in reversed(successful):
+        output_policy = dict(call.get("output") or {}).get("decision_policy")
+        if call.get("name") == "set_decision_policy" and isinstance(output_policy, dict):
+            policy = output_policy
+            break
+    accepted_policy = _accepted_llm_policy(
+        policy,
+        dict(contract.get("decision_summary") or {}),
+        source_question=question,
+    )
+    evidence: Dict[str, Any] = {}
+    unresolved = []
+    for call in successful:
+        output = dict(call.get("output") or {})
+        for key in ("csv_evidence", "topology_summary"):
+            if isinstance(output.get(key), (dict, list)) and output[key]:
+                evidence[key] = deepcopy(output[key])
+        values = output.get("unresolved_inputs") or output.get(
+            "unresolved_task_vocabulary"
+        )
+        unresolved.extend(str(value) for value in values or [] if str(value))
+
+    turn_key = f"{session_id}::turn_{int(turn_id):03d}"
+    candidate_forecasts = [
+        call
+        for call in current_forecasts
+        if dict(call.get("arguments") or {}).get("candidate_id")
+    ]
+    snapshot = None
+    if len(current_forecasts) == 1 and not candidate_forecasts:
+        snapshot = _compact_single_forecast_snapshot(
+            current_forecasts[0],
+            scope=scope,
+            applied_disturbances=list(applied),
+            source_turn_id=turn_key,
+        )
+
+    return _VerifiedStateDelta(
+        scope=scope,
+        requested_action_fingerprint=requested_action_fingerprint,
+        registry_variables=tuple(registry),
+        candidate_results=tuple(candidates),
+        candidate_results_present=bool(contract.get("candidate_results")),
+        decision_policy=accepted_policy,
+        decision_policy_source_question=question if accepted_policy and question else None,
+        applied_disturbances=applied,
+        verified_evidence=evidence,
+        single_forecast_snapshot=snapshot,
+        clear_single_forecast_snapshot=bool(candidate_forecasts),
+        unresolved_inputs=tuple(unresolved),
+        turn_ids=(turn_key,),
+        tool_call_ids=tuple(
+            str(call.get("tool_call_id") or "")
+            for call in successful
+            if call.get("tool_call_id")
+        ),
+    )
+
+
+def _delta_from_history_turn(
+    turn: Dict[str, Any],
+    current: "VerifiedDecisionState",
+) -> _VerifiedStateDelta:
+    summary = dict(turn.get("verified_evidence_summary") or {})
+    pipeformer = dict(
+        turn.get("comparison_state") or summary.get("pipeformer") or {}
+    )
+    single_forecast_snapshot = dict(
+        summary.get("single_forecast_snapshot") or {}
+    )
+    decision = dict(pipeformer.get("decision_summary") or {})
+    raw_policy = pipeformer.get("decision_policy") or decision.get(
+        "ranking_policy"
+    ) or {}
+    policy = dict(raw_policy) if isinstance(raw_policy, dict) else {}
+    accepted_policy = _accepted_llm_policy(
+        policy,
+        decision,
+        source_question=str(turn.get("user_input") or ""),
+    )
+    failed_forecast_arguments = _failed_forecast_arguments(turn)
+    if failed_forecast_arguments:
+        scope = _forecast_scope(failed_forecast_arguments, [], current.scope)
+    elif pipeformer:
+        scope = _scope_from_pipeformer(pipeformer, current.scope)
+    else:
+        scope = _scope_from_single_forecast_snapshot(
+            single_forecast_snapshot,
+            current.scope,
+        )
+    turn_key = "::".join(
+        [
+            str(turn.get("session_id") or ""),
+            f"turn_{int(turn.get('turn_id') or 0):03d}",
+        ]
+    ).strip(":")
+    tool_call_ids = tuple(
+        str(dict(call).get("tool_call_id") or "")
+        for call in turn.get("tool_calls") or []
+        if isinstance(call, dict) and dict(call).get("tool_call_id")
+    )
+    return _VerifiedStateDelta(
+        scope=scope,
+        requested_action_fingerprint=(
+            _requested_action_fingerprint(failed_forecast_arguments, scope)
+            if failed_forecast_arguments
+            else None
+        ),
+        registry_variables=tuple(
+            _compact_registry_state_item(dict(registry))
+            for registry in (
+                turn.get("registry_variables")
+                or summary.get("registry_variables")
+                or []
+            )
+            if isinstance(registry, dict) and registry.get("variable")
+        ),
+        candidate_results=tuple(
+            deepcopy(dict(candidate))
+            for candidate in pipeformer.get("candidate_results") or []
+            if isinstance(candidate, dict) and candidate.get("candidate_id")
+        ),
+        candidate_results_present=bool(pipeformer.get("candidate_results")),
+        preserve_prior_tool_call_id=True,
+        decision_policy=accepted_policy,
+        decision_policy_source_question=(
+            str(turn.get("user_input") or "") if accepted_policy else None
+        ),
+        applied_disturbances=tuple(
+            deepcopy(dict(disturbance))
+            for disturbance in (
+                pipeformer.get("applied_disturbances")
+                or [single_forecast_snapshot.get("applied_disturbance")]
+            )
+            if isinstance(disturbance, dict)
+            and disturbance.get("variable")
+            and disturbance.get("mode")
+        ),
+        verified_evidence={
+            key: deepcopy(summary[key])
+            for key in ("csv_evidence", "topology_summary")
+            if summary.get(key)
+        },
+        single_forecast_snapshot=deepcopy(single_forecast_snapshot) or None,
+        clear_single_forecast_snapshot=bool(pipeformer.get("candidate_results")),
+        turn_ids=(turn_key,) if turn_key and not failed_forecast_arguments else (),
+        tool_call_ids=tool_call_ids if not failed_forecast_arguments else (),
+    )
+
+
+def _apply_verified_state_delta(
+    state: "VerifiedDecisionState",
+    delta: _VerifiedStateDelta,
+) -> "VerifiedDecisionState":
+    result = VerifiedDecisionState.from_dict(state.to_dict())
+    scope_changed = bool(
+        delta.scope
+        and result.scope
+        and _scope_fingerprint(delta.scope)
+        != _scope_fingerprint(result.scope)
+    )
+    action_changed = bool(
+        delta.requested_action_fingerprint
+        and result.candidates
+        and not any(
+            str(
+                candidate.get("action_fingerprint")
+                or _action_fingerprint(candidate, result.scope)
+            )
+            == delta.requested_action_fingerprint
+            for candidate in result.candidates
+        )
+    )
+    if scope_changed or action_changed:
+        result.candidates = []
+        result.decision_policy = None
+        result.applied_disturbances = []
+        result.verified_evidence.pop("single_forecast_snapshot", None)
+        result.provenance = {"turn_ids": [], "tool_call_ids": []}
+    if delta.scope:
+        result.scope = deepcopy(delta.scope)
+
+    result.registry_variables = _merge_registry_state_items(
+        result.registry_variables, delta.registry_variables
+    )
+    if delta.candidate_results_present:
+        result.candidates, policy_reset = _merge_candidate_results(
+            result.candidates,
+            delta.candidate_results,
+            result.scope,
+            preserve_prior_tool_call_id=delta.preserve_prior_tool_call_id,
+        )
+        if policy_reset:
+            result.decision_policy = None
+            result.provenance.pop("decision_policy_source_question", None)
+    if delta.decision_policy is not None:
+        result.decision_policy = deepcopy(delta.decision_policy)
+        if delta.decision_policy_source_question:
+            result.provenance[
+                "decision_policy_source_question"
+            ] = delta.decision_policy_source_question
+    result.applied_disturbances = _merge_applied_disturbances(
+        result.applied_disturbances, delta.applied_disturbances
+    )
+    result.verified_evidence.update(deepcopy(delta.verified_evidence))
+    if delta.single_forecast_snapshot is not None:
+        result.verified_evidence["single_forecast_snapshot"] = deepcopy(
+            delta.single_forecast_snapshot
+        )
+    if delta.clear_single_forecast_snapshot:
+        result.verified_evidence.pop("single_forecast_snapshot", None)
+    result.unresolved_inputs = _ordered_unique(
+        result.unresolved_inputs, delta.unresolved_inputs
+    )
+    result.provenance["turn_ids"] = _ordered_unique(
+        result.provenance.get("turn_ids") or [], delta.turn_ids
+    )
+    result.provenance["tool_call_ids"] = _ordered_unique(
+        result.provenance.get("tool_call_ids") or [], delta.tool_call_ids
+    )
+    return result
 
 
 # Backward-compatible name used by existing evaluator/generator imports.

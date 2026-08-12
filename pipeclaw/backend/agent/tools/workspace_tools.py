@@ -10,17 +10,13 @@ from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, List, Optional
 
 from .registry import create_json_schema_from_params, register_tool
-try:
-    from executor.runner import get_runner
-    from executor.workspace_models import EditFileResult, ReadFileResult, RunCommandResult, WriteFileResult
-except ModuleNotFoundError:  # package import from the repository root
-    from pipeclaw.backend.executor.runner import get_runner
-    from pipeclaw.backend.executor.workspace_models import (
-        EditFileResult,
-        ReadFileResult,
-        RunCommandResult,
-        WriteFileResult,
-    )
+from pipeclaw.backend.executor.runner import get_runner
+from pipeclaw.backend.executor.workspace_models import (
+    EditFileResult,
+    ReadFileResult,
+    RunCommandResult,
+    WriteFileResult,
+)
 
 logger = logging.getLogger(__name__)
 _REGISTERED = False

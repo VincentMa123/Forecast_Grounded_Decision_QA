@@ -1,5 +1,3 @@
-"""Canonical evaluation orchestration and the sole per-record score formula."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping

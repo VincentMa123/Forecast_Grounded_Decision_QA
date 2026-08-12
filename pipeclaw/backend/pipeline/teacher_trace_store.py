@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from evaluator.scorer import load_records
-from pipeline.io_utils import write_json, write_jsonl
+from .io_utils import load_records, write_json, write_jsonl
 
 
 @dataclass(frozen=True)
@@ -46,12 +45,12 @@ class TeacherTraceStore:
 
     def write_master(self, records: List[Dict[str, Any]]) -> None:
         paths = self._require_paths()
-        write_jsonl(paths.output_jsonl, records, force=True)
         write_json(
             paths.output_json,
             records[0] if len(records) == 1 else records,
             force=True,
         )
+        write_jsonl(paths.output_jsonl, records, force=True)
 
     def write_sessions(self, records: List[Dict[str, Any]]) -> None:
         write_jsonl(self._require_paths().session_output_jsonl, records, force=True)
@@ -221,12 +220,3 @@ class TeacherTraceStore:
             f"{source}:{str(session.get('session_id') or f'{scenario_id}_session_{index:03d}')}"
             for index, session in enumerate(scenario.get("sessions") or [], start=1)
         ]
-
-
-# Compatibility functions keep existing imports stable while callers migrate to the class.
-load_existing_records = TeacherTraceStore.load
-merge_records = TeacherTraceStore.merge_records
-merge_session_records = TeacherTraceStore.merge_sessions
-validate_combined_splits = TeacherTraceStore.validate_splits
-scenario_sample_ids = TeacherTraceStore.sample_ids
-scenario_session_record_ids = TeacherTraceStore.session_ids

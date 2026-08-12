@@ -3,56 +3,32 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-import os
-import sys
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-_repo_root_text = str(REPO_ROOT)
-_inserted_repo_root = _repo_root_text not in sys.path
-if _inserted_repo_root:
-    sys.path.insert(0, _repo_root_text)
-try:
-    from pipeclaw.backend.agent.prompt_policy import static_forecast_policy
-finally:
-    if _inserted_repo_root and _repo_root_text in sys.path:
-        sys.path.remove(_repo_root_text)
-
-try:
-    from .validate_dataset import (
-        DatasetValidationError,
-        read_jsonl,
-        validate_projection_records,
-        validate_source_records,
-    )
-except ImportError:  # pragma: no cover - supports direct script execution.
-    from validate_dataset import (  # type: ignore
-        DatasetValidationError,
-        read_jsonl,
-        validate_projection_records,
-        validate_source_records,
-    )
-
-try:
-    from ..path_contract import (
-        is_host_absolute_path,
-        normalize_relative_path,
-        redact_host_paths,
-    )
-except ImportError:  # pragma: no cover - supports direct script execution.
-    if _repo_root_text not in sys.path:
-        sys.path.insert(0, _repo_root_text)
-    from pipeclaw.task2_student.path_contract import (  # type: ignore
-        is_host_absolute_path,
-        normalize_relative_path,
-        redact_host_paths,
-    )
+from pipeclaw.backend.agent.prompt_policy import static_forecast_policy
+from pipeclaw.task2_student.path_contract import (
+    canonicalize_recorded_tool_arguments,
+    redact_host_paths,
+)
+from pipeclaw.task2_student.release_artifacts import (
+    JsonlArtifactError,
+    atomic_write_text as _atomic_write_text,
+    read_jsonl as _read_jsonl_artifact,
+    sha256_bytes as _sha256_bytes,
+    sha256_file as _sha256_file,
+    stable_json,
+    utc_now as _utc_now,
+)
+from pipeclaw.task2_student.scripts.validate_dataset import (
+    DatasetValidationError,
+    validate_projection_records,
+    validate_source_records,
+)
 
 TASK_PROMPTS = {
     "condition_parsing": (
@@ -102,45 +78,13 @@ DEFAULT_MANIFEST_PATH = (
 )
 
 
-def stable_json(value: Any) -> str:
-    """Serialize JSON deterministically without escaping Chinese text."""
+def read_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read source JSONL through the shared artifact boundary as a domain error."""
 
-    return json.dumps(
-        value,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
-
-def canonicalize_training_tool_arguments(
-    tool_name: str,
-    arguments: Mapping[str, Any],
-) -> dict[str, Any]:
-    """Remove host-specific cwd values from model-training tool calls.
-
-    ``cmd`` remains intact because its workspace-relative script is part of the
-    learned action. Relative cwd values are retained with POSIX separators;
-    omitted and host-absolute cwd values are represented by omission.
-    """
-
-    del tool_name  # reserved for future per-tool path contracts
-    canonical = dict(arguments)
-    cwd = canonical.get("cwd")
-    if cwd is None or cwd == "<host-path>" or is_host_absolute_path(cwd):
-        canonical.pop("cwd", None)
-    elif isinstance(cwd, str):
-        canonical["cwd"] = normalize_relative_path(cwd)
-    command = canonical.get("cmd")
-    if isinstance(command, list):
-        normalized_command: list[Any] = []
-        for index, item in enumerate(command):
-            if index == 0 or not isinstance(item, str) or item.startswith("-"):
-                normalized_command.append(item)
-            else:
-                normalized_command.append(normalize_relative_path(item))
-        canonical["cmd"] = normalized_command
-    return canonical
+    try:
+        return _read_jsonl_artifact(path)
+    except JsonlArtifactError as exc:
+        raise DatasetValidationError(str(exc)) from exc
 
 
 def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
@@ -343,24 +287,13 @@ def load_registered_tool_schemas(repo_root: Path) -> list[dict[str, Any]]:
 
     resolved_repo_root = repo_root.resolve()
     backend_root = resolved_repo_root / "pipeclaw" / "backend"
-    inserted_paths: list[str] = []
-    for path in (resolved_repo_root, backend_root):
-        path_text = str(path)
-        if path_text not in sys.path:
-            sys.path.insert(0, path_text)
-            inserted_paths.append(path_text)
-    try:
-        from agent.tools.pipeformer_tools import register_pipeformer_tools
-        from agent.tools.registry import tool_registry
-        from agent.tools.workspace_tools import WorkspaceTools
+    from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
+    from pipeclaw.backend.agent.tools.registry import tool_registry
+    from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools
 
-        WorkspaceTools("task2-dataset-schema")
-        register_pipeformer_tools(backend_root)
-        schemas = tool_registry.openai_tools_schema()
-    finally:
-        for path_text in inserted_paths:
-            if path_text in sys.path:
-                sys.path.remove(path_text)
+    WorkspaceTools("task2-dataset-schema")
+    register_pipeformer_tools(backend_root)
+    schemas = tool_registry.openai_tools_schema()
     normalized, _ = _normalize_tool_schemas(schemas)
     return json.loads(stable_json(normalized))
 
@@ -440,7 +373,10 @@ def generate_datasets(
                 registered_tool_names=registered_names,
             )
             output_path = output_root / projection / f"{split}.jsonl"
-            _atomic_write_jsonl(output_path, derived_records)
+            _atomic_write_text(
+                output_path,
+                "".join(f"{stable_json(record)}\n" for record in derived_records),
+            )
             reloaded = read_jsonl(output_path)
             validate_projection_records(
                 reloaded,
@@ -628,7 +564,7 @@ def _paired_tool_messages(
                     "content": stable_json(
                         {
                             "name": name,
-                            "arguments": canonicalize_training_tool_arguments(
+                            "arguments": canonicalize_recorded_tool_arguments(
                                 name, call.get("arguments") or {}
                             ),
                         }
@@ -681,48 +617,6 @@ def _validate_disjoint_source_splits(
                     f"source split leakage between {left_split} and {right_split}: "
                     f"{sorted(overlap)[:3]}"
                 )
-
-
-def _atomic_write_jsonl(
-    path: Path,
-    records: Sequence[dict[str, Any]],
-) -> None:
-    _atomic_write_text(
-        path,
-        "".join(f"{stable_json(record)}\n" for record in records),
-    )
-
-
-def _atomic_write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    temporary_path = path.with_name(f"{path.name}.tmp")
-    try:
-        temporary_path.write_text(content, encoding="utf-8", newline="\n")
-        os.replace(temporary_path, path)
-    finally:
-        if temporary_path.exists():
-            temporary_path.unlink()
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
-
-
-def _utc_now() -> str:
-    return (
-        datetime.now(timezone.utc)
-        .replace(microsecond=0)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

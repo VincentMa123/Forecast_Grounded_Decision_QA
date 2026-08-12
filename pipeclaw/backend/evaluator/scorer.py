@@ -1,8 +1,5 @@
-"""Legacy native-evaluator facade over the canonical schema-v2 engine."""
-
 from __future__ import annotations
 
-import json
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
@@ -11,11 +8,11 @@ from typing import Any, Dict, Iterable, List, Optional
 from .aggregation import summarize
 from .engine import evaluate
 from .models import EvaluationProfile, EvaluationReport
+from .profiles import DEFAULT_TEACHER_MINIMUM_SCORE as DEFAULT_MINIMUM_SCORE
+from pipeclaw.backend.pipeline.io_utils import load_records
 
 
-DEFAULT_MINIMUM_SCORE = 85.0
 DEFAULT_MAX_RECORD_CHARS = 24_000
-PIPEFORMER_TOOL = "run_pipeformer_forecast"
 
 _PIPEFORMER_LEGACY_NAMES = {
     "task_parsing": "parsed_task_correct",
@@ -115,6 +112,9 @@ def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[st
             "quality_failed_checks": failed,
             "failed_critical_checks": failed_critical,
             "quality_issues": list(report.diagnostics.get("hard_issues") or []),
+            "teacher_trace_checks": dict(
+                report.diagnostics.get("teacher_trace_checks") or {}
+            ),
             "checks": checks,
         }
     )
@@ -230,24 +230,3 @@ def summarize_evaluations(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         }
     )
     return summary
-
-
-def load_records(path: Path) -> List[Dict[str, Any]]:
-    path = Path(path)
-    if path.suffix.lower() == ".jsonl":
-        return [
-            value
-            for line in path.read_text(encoding="utf-8-sig").splitlines()
-            if line.strip()
-            for value in [json.loads(line)]
-            if isinstance(value, dict)
-        ]
-    value = json.loads(path.read_text(encoding="utf-8-sig"))
-    if isinstance(value, dict):
-        return [value]
-    if isinstance(value, list):
-        return [item for item in value if isinstance(item, dict)]
-    raise TypeError(
-        "Teacher trace must contain a JSON object, list, or JSONL records: "
-        f"{path}"
-    )

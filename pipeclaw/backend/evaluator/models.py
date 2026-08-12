@@ -1,5 +1,3 @@
-"""Public contracts for canonical PipeClaw evaluation results."""
-
 from __future__ import annotations
 
 import math

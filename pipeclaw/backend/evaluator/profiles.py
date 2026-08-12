@@ -1,5 +1,3 @@
-"""Weights, critical gates, and pass thresholds for evaluation profiles."""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

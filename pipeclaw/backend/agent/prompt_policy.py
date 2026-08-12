@@ -2,6 +2,14 @@
 
 from __future__ import annotations
 
+import json
+from typing import Any, Dict, Iterable, Optional
+
+from pipeclaw.backend.grounding.contract import (
+    GroundingContractBuilder,
+    applied_disturbance_disclosure,
+)
+
 
 def _section(*lines: str) -> str:
     return "\n".join(lines)
@@ -58,3 +66,123 @@ def static_forecast_policy() -> str:
     """Return the state-free production forecast policy."""
 
     return "\n\n".join(_STATIC_POLICY_SECTIONS)
+
+
+def candidate_contract_message(
+    question: str,
+    tool_results: Iterable[Dict[str, Any]],
+    *,
+    decision_policy: Optional[Dict[str, Any]] = None,
+    prior_candidate_results: Optional[Iterable[Dict[str, Any]]] = None,
+    prior_decision_policy: Optional[Dict[str, Any]] = None,
+    prior_decision_policy_source_question: Optional[str] = None,
+    prior_applied_disturbances: Optional[Iterable[Dict[str, Any]]] = None,
+) -> Optional[str]:
+    """Render accumulated multi-candidate facts for the next model request."""
+    results = [dict(item) for item in tool_results]
+    contract = GroundingContractBuilder().build(
+        question,
+        results,
+        decision_policy=decision_policy,
+        require_decision_policy=True,
+        prior_candidate_results=prior_candidate_results,
+        prior_decision_policy=prior_decision_policy,
+        prior_decision_policy_source_question=(
+            prior_decision_policy_source_question
+        ),
+        prior_applied_disturbances=prior_applied_disturbances,
+    )
+    if contract.get("answer_mode") == "single_forecast":
+        successful_forecasts = [
+            item
+            for item in results
+            if item.get("name") == "run_pipeformer_forecast"
+            and dict(item.get("output") or {}).get("success") is True
+        ]
+        if len(successful_forecasts) != 1:
+            return None
+        forecast = successful_forecasts[0]
+        if dict(forecast.get("arguments") or {}).get("candidate_id"):
+            return None
+        output = dict(forecast.get("output") or {})
+        verification = dict(
+            output.get("verification") or output.get("constraint_check") or {}
+        )
+        has_prediction_contract = any(
+            key in verification
+            for key in (
+                "priority_findings",
+                "top_watch_variables",
+                "safety_energy_comparison",
+            )
+        )
+        if not has_prediction_contract:
+            return None
+        applied_disturbance = json.dumps(
+            contract.get("applied_disturbances") or [],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+        required_disclosure = applied_disturbance_disclosure(
+            question,
+            contract,
+        )
+        return (
+            "CURRENT PIPEFORMER FORECAST ANSWER CONTRACT\n"
+            f"Required disturbance disclosure (copy verbatim): {required_disclosure}\n"
+            f"Structured application evidence: {applied_disturbance}\n"
+            "Use only the successful forecast's structured fields. If the current request asks "
+            "for operating result, intervention, watch variables, and the safety-energy "
+            "comparison, return exactly four short bullets and no heading: (1) passing "
+            "categories once plus every priority_findings warning/failure with values and "
+            "thresholds; (2) risk_level and human_intervention_label; (3) top_watch_variables "
+            "in returned order with variable, mean_prediction, and "
+            "mean_abs_delta_vs_observed; (4) safety_energy_comparison. When its comparison is "
+            "complete and consistent, say `安全侧与能耗侧结论一致`; when inconsistent, include "
+            "the first priority audit constraint and numerical key_observation_variables. "
+            "For a narrower follow-up, answer only requested slots. Never abbreviate a "
+            "canonical variable ID or add unreturned physical meaning."
+        )
+    if contract.get("answer_mode") != "dispatch_comparison":
+        return None
+    candidates = list(contract.get("candidate_results") or [])
+    decision_summary = contract.get("decision_summary") or {}
+    payload = {
+        "successful_candidate_count": len(candidates),
+        "candidate_results": candidates,
+        "decision_summary": decision_summary,
+        "comparison_leaders": contract.get("comparison_leaders") or {},
+        "required_application_disclosure": applied_disturbance_disclosure(
+            question,
+            contract,
+        ),
+        "worst_case_risk_level": contract.get("worst_case_risk_level"),
+        "worst_case_intervention_label": contract.get(
+            "worst_case_intervention_label"
+        ),
+    }
+    policy_nudge = ""
+    missing_metrics = list(decision_summary.get("missing_metrics") or [])
+    if "llm_decision_policy_tool_call" in missing_metrics:
+        policy_nudge = (
+            " No decision policy is recorded yet; treat this as a call to action, not a "
+            "failure to disclose in the answer. If the user's current or earlier wording "
+            "states or implies any priority or objective (for example 优先, 主要, 尽量, "
+            "minimize, or first consider), call set_decision_policy NOW with each objective "
+            "grounded in an exact contiguous source_excerpt of that wording, then rank all "
+            "viable candidates. End with `selected_candidate_id: none` only when no priority "
+            "can be derived from the conversation at all."
+        )
+    return (
+        "CURRENT PIPEFORMER CANDIDATE CONTRACT\n"
+        + json.dumps(payload, ensure_ascii=False, indent=2)
+        + "\nUse only these successful candidates and their recorded facts in the final comparison. "
+        "Copy required_application_disclosure verbatim at the start of the answer. "
+        "Mention every candidate_id and action, report the ordered objective evidence for every "
+        "viable candidate, state hard-constraint and audit outcomes, and do not invent rankings "
+        "or effects. Copy every canonical variable ID exactly; never abbreviate it. Continue "
+        "calling PipeFormer if the user's requested candidate count has not yet been evaluated. End the "
+        "answer with exactly `selected_candidate_id: <candidate_id>` or "
+        "`selected_candidate_id: none`, matching decision_summary."
+        + policy_nudge
+    )

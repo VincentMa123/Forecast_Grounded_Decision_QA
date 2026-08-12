@@ -1,8 +1,12 @@
-"""Canonical compact projection of PipeFormer tool output."""
+"""Typed compact boundary for successful PipeFormer forecast results."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
 
 
 COMPACT_COMPARABLE_METRIC_KEYS = (
@@ -13,13 +17,44 @@ COMPACT_COMPARABLE_METRIC_KEYS = (
     "baseline_reference",
 )
 
+COMPACT_OUTPUT_SUMMARY_KEYS = (
+    "mean_prediction",
+    "minimum_prediction",
+    "minimum_step_index",
+    "maximum_prediction",
+    "maximum_step_index",
+    "max_abs_prediction",
+    "peak_value",
+    "peak_step_index",
+    "prediction_change",
+    "max_abs_step_change",
+    "max_abs_step_change_index",
+    "max_step_decline",
+    "max_step_decline_index",
+    "max_decline_from_start",
+    "recovery_from_minimum",
+)
+
 
 def _without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
-    """Keep stable list/dict fields while omitting values that are truly absent."""
     return {key: item for key, item in value.items() if item is not None}
 
 
-def _compact_parsed_task(output: Dict[str, Any]) -> Dict[str, Any]:
+def _resolved_variable_count(
+    parsed: Mapping[str, Any],
+    *,
+    count_key: str,
+    variable_key: str,
+) -> int:
+    """Keep canonical counts when their source lists were intentionally omitted."""
+    explicit = parsed.get(count_key)
+    if isinstance(explicit, int) and not isinstance(explicit, bool) and explicit >= 0:
+        return explicit
+    return len(parsed.get(variable_key) or [])
+
+
+def compact_parsed_task(output: Mapping[str, Any]) -> Dict[str, Any]:
+    """Create the one bounded parsed-task representation used by public results."""
     parsed = dict(output.get("parsed_task") or {})
     boundary = dict(parsed.get("boundary_conditions") or {})
     compact_boundary = {
@@ -48,18 +83,22 @@ def _compact_parsed_task(output: Dict[str, Any]) -> Dict[str, Any]:
         "invalid_normalized_variables",
     )
     compact = {key: parsed.get(key) for key in keys}
-    compact["resolved_attention_variable_count"] = len(
-        parsed.get("resolved_attention_variables") or []
+    compact["resolved_attention_variable_count"] = _resolved_variable_count(
+        parsed,
+        count_key="resolved_attention_variable_count",
+        variable_key="resolved_attention_variables",
     )
-    compact["resolved_output_variable_count"] = len(
-        parsed.get("resolved_output_variables") or []
+    compact["resolved_output_variable_count"] = _resolved_variable_count(
+        parsed,
+        count_key="resolved_output_variable_count",
+        variable_key="resolved_output_variables",
     )
     compact["boundary_conditions"] = compact_boundary
     return _without_none_values(compact)
 
 
 def _relevant_forecast_variables(
-    output: Dict[str, Any],
+    output: Mapping[str, Any],
     limit: int = 8,
 ) -> List[str]:
     relevant: List[str] = []
@@ -89,7 +128,45 @@ def _relevant_forecast_variables(
     return relevant
 
 
-def _compact_prediction_summary(output: Dict[str, Any]) -> Dict[str, Any]:
+def _compact_forecast_window(metadata: Mapping[str, Any]) -> Dict[str, Any]:
+    stored = metadata.get("forecast_window")
+    if isinstance(stored, Mapping):
+        return dict(stored)
+
+    real_rows = metadata.get("real_rows")
+    predict_rows = metadata.get("predict_rows")
+    labels = metadata.get("forecast_time_labels")
+    if not isinstance(labels, list):
+        labels = []
+    if not labels:
+        source_rows = predict_rows if isinstance(predict_rows, list) else real_rows
+        labels = [
+            str(label).removesuffix("_real").removesuffix("_predict")
+            for label in source_rows or []
+        ]
+    window = {
+        "start_time": labels[0] if labels else None,
+        "end_time": labels[-1] if labels else None,
+        "time_step_minutes": metadata.get("time_step_minutes"),
+        "real_row_count": len(real_rows) if isinstance(real_rows, list) else 0,
+        "predict_row_count": len(predict_rows) if isinstance(predict_rows, list) else 0,
+    }
+    return _without_none_values(window)
+
+
+def _source_name(value: Any) -> Optional[str]:
+    return Path(str(value)).name if value else None
+
+
+def _compact_output_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        key: summary[key]
+        for key in COMPACT_OUTPUT_SUMMARY_KEYS
+        if summary.get(key) is not None
+    }
+
+
+def _compact_prediction(output: Mapping[str, Any]) -> Dict[str, Any]:
     prediction = dict(output.get("prediction_summary") or {})
     metadata = dict(output.get("forecast_metadata") or {})
     keys = (
@@ -103,24 +180,19 @@ def _compact_prediction_summary(output: Dict[str, Any]) -> Dict[str, Any]:
         "disturbance_assumption",
         "disturbance_source",
         "counterfactual_comparison",
-        "output_forecast_summary",
     )
-    compact = {
-        key: prediction.get(key)
-        for key in keys
-        if key != "output_forecast_summary"
-    }
+    compact = {key: prediction.get(key) for key in keys}
     summaries = dict(prediction.get("output_forecast_summary") or {})
-    relevant_variables = _relevant_forecast_variables(output)
     compact["output_forecast_summary"] = {
-        variable: summaries[variable]
-        for variable in relevant_variables
+        variable: _compact_output_summary(dict(summaries[variable] or {}))
+        for variable in _relevant_forecast_variables(output)
         if variable in summaries
     }
     compact["total_output_variable_count"] = len(summaries)
+    forecast_window = _compact_forecast_window(metadata)
     compact.update(
         {
-            "forecast_window": metadata.get("forecast_window"),
+            "forecast_window": forecast_window or None,
             "actual_forecast_steps": metadata.get("actual_forecast_steps"),
             "actual_forecast_horizon_minutes": metadata.get(
                 "actual_forecast_horizon_minutes"
@@ -130,7 +202,7 @@ def _compact_prediction_summary(output: Dict[str, Any]) -> Dict[str, Any]:
     return _without_none_values(compact)
 
 
-def _compact_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
+def _compact_finding(finding: Mapping[str, Any]) -> Dict[str, Any]:
     evaluated = [
         item
         for item in finding.get("evaluated_values", [])
@@ -161,22 +233,18 @@ def _compact_finding(finding: Dict[str, Any]) -> Dict[str, Any]:
     return _without_none_values(compact)
 
 
-def _compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
+def _compact_verification(output: Mapping[str, Any]) -> Dict[str, Any]:
     verification = dict(output.get("constraint_check") or {})
     checks = list(verification.get("checks") or [])
-    findings = [
-        _compact_finding(item) for item in verification.get("priority_findings", [])
-    ]
-    rule_status = {
-        str(check.get("name")): check.get("status")
-        for check in checks
-        if check.get("name")
-    }
     compact = {
         "requested_categories": verification.get("requested_categories"),
         "category_status": verification.get("category_status"),
         "safety_energy_comparison": verification.get("safety_energy_comparison"),
-        "rule_status": rule_status,
+        "rule_status": {
+            str(check.get("name")): check.get("status")
+            for check in checks
+            if check.get("name")
+        },
         "overall_status": verification.get("overall_status"),
         "verification_complete": verification.get("verification_complete"),
         "not_evaluated_rules": verification.get("not_evaluated_rules"),
@@ -190,7 +258,10 @@ def _compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
         "triggered_flags": verification.get("triggered_flags", []),
         "human_intervention_label": verification.get("human_intervention_label"),
         "dispatch_recommendation": verification.get("dispatch_recommendation"),
-        "priority_findings": findings,
+        "priority_findings": [
+            _compact_finding(item)
+            for item in verification.get("priority_findings", [])
+        ],
         "engineering_evidence": verification.get("engineering_evidence", {}),
     }
     comparable_metrics = dict(verification.get("comparable_metrics") or {})
@@ -207,8 +278,8 @@ def _compact_constraint_check(output: Dict[str, Any]) -> Dict[str, Any]:
     return _without_none_values(compact)
 
 
-def project_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
-    parsed_task = _compact_parsed_task(output)
+def _compact_execution(output: Mapping[str, Any]) -> Dict[str, Any]:
+    parsed_task = compact_parsed_task(output)
     metadata = dict(output.get("forecast_metadata") or {})
     task_resolution = {
         "resolved_attention_variable_count": parsed_task.get(
@@ -225,42 +296,78 @@ def project_pipeformer_output(output: Dict[str, Any]) -> Dict[str, Any]:
         ),
         "applied_boundary_conditions": metadata.get("applied_boundary_conditions", []),
         "variable_normalizations": parsed_task.get("variable_normalizations", []),
-        "vocabulary_normalizations": parsed_task.get(
-            "vocabulary_normalizations", []
-        ),
+        "vocabulary_normalizations": parsed_task.get("vocabulary_normalizations", []),
         "invalid_normalized_variables": parsed_task.get(
             "invalid_normalized_variables", []
         ),
     }
     provenance = {
-        "checkpoint_id": metadata.get("checkpoint_id"),
-        "data_case_id": metadata.get("data_case_id"),
+        "checkpoint_id": metadata.get("checkpoint_id")
+        or _source_name(metadata.get("checkpoint_dir")),
+        "data_case_id": metadata.get("data_case_id")
+        or _source_name(metadata.get("data_case_dir")),
         "device": metadata.get("device"),
         "model_input_projection_type": metadata.get("model_input_projection_type"),
         "data_provenance": metadata.get("data_provenance"),
     }
     return {
+        "success": True,
         "parsed_task": parsed_task,
-        "prediction_summary": _compact_prediction_summary(output),
-        "constraint_check": _compact_constraint_check(output),
+        "task_resolution": _without_none_values(task_resolution),
+        "prediction": _compact_prediction(output),
+        "verification": _compact_verification(output),
         "evidence": dict(output.get("evidence") or {}),
         "risk_level": output.get("risk_level"),
         "manual_intervention_label": output.get("manual_intervention_label"),
         "dispatch_recommendation": output.get("dispatch_recommendation"),
-        "task_resolution": _without_none_values(task_resolution),
         "provenance": _without_none_values(provenance),
     }
 
 
-def compact_pipeformer_output(projection: Dict[str, Any]) -> Dict[str, Any]:
-    return {
-        "success": True,
-        "task_resolution": projection["task_resolution"],
-        "prediction": projection["prediction_summary"],
-        "verification": projection["constraint_check"],
-        "evidence": projection["evidence"],
-        "risk_level": projection.get("risk_level"),
-        "manual_intervention_label": projection.get("manual_intervention_label"),
-        "dispatch_recommendation": projection.get("dispatch_recommendation"),
-        "provenance": projection["provenance"],
-    }
+class ForecastResult(BaseModel):
+    """The released compact forecast-result mapping with a typed boundary."""
+
+    success: Literal[True]
+    parsed_task: Dict[str, Any] = Field(default_factory=dict)
+    task_resolution: Dict[str, Any]
+    prediction: Dict[str, Any]
+    verification: Dict[str, Any]
+    evidence: Dict[str, Any]
+    risk_level: Optional[str] = None
+    manual_intervention_label: Optional[str] = None
+    dispatch_recommendation: Optional[str] = None
+    provenance: Dict[str, Any]
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    @classmethod
+    def from_execution(cls, legacy: Mapping[str, Any]) -> "ForecastResult":
+        """Validate a successful detailed execution as the compact contract."""
+        if not isinstance(legacy, Mapping):
+            raise TypeError("legacy execution must be a mapping")
+        if legacy.get("success") is not True:
+            raise ValueError("ForecastResult requires a successful execution payload")
+        return cls.model_validate(_compact_execution(legacy))
+
+    @classmethod
+    def from_payload(cls, value: Mapping[str, Any]) -> "ForecastResult":
+        """Accept either a detailed execution or a public result in a trace envelope."""
+        if not isinstance(value, Mapping):
+            raise TypeError("forecast payload must be a mapping")
+        public_fields = {"task_resolution", "prediction", "verification", "provenance"}
+        if public_fields <= value.keys():
+            return cls.model_validate(
+                {
+                    key: item
+                    for key, item in value.items()
+                    if key not in {"candidate_id", "candidate_role"}
+                }
+            )
+        return cls.from_execution(value)
+
+__all__ = [
+    "COMPACT_COMPARABLE_METRIC_KEYS",
+    "COMPACT_OUTPUT_SUMMARY_KEYS",
+    "ForecastResult",
+    "compact_parsed_task",
+]

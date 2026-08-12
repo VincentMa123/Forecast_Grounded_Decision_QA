@@ -1,5 +1,3 @@
-"""Dataset-level aggregation for schema-v2 evaluation reports."""
-
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence

@@ -12,11 +12,17 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from agent.orchestrator import init_orchestrator
-from agent.llm_provider import LLMProviderSettings
-from agent.router import router as agent_router
-from data_loader import DataLoader
-from models import ApiResponse, AvailableDates, ConsumerFlowData, NodeFlowData, PipelineFlowData
+from pipeclaw.backend.agent.orchestrator import init_orchestrator
+from pipeclaw.backend.agent.llm_provider import LLMProviderSettings
+from pipeclaw.backend.agent.router import router as agent_router
+from pipeclaw.backend.data_loader import DataLoader
+from pipeclaw.backend.models import (
+    ApiResponse,
+    AvailableDates,
+    ConsumerFlowData,
+    NodeFlowData,
+    PipelineFlowData,
+)
 
 logging.basicConfig(
     level=logging.INFO,

@@ -6,7 +6,7 @@ import json
 import re
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Mapping
 
 from .tool import attach_tool_arguments, tool_output_failed
 from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
@@ -156,6 +156,20 @@ def build_csv_evidence(
         if derived_results:
             evidence["derived_results"] = derived_results
     return evidence
+
+
+def record_csv_evidence(
+    record: Mapping[str, Any],
+    *,
+    scope_text: str,
+) -> Dict[str, Any]:
+    """Rebuild deterministic CSV evidence for one stored Task 1 record."""
+    return build_csv_evidence(
+        record.get("tool_calls") or [],
+        record.get("tool_outputs") or [],
+        str(record.get("final_answer") or ""),
+        scope_text=scope_text,
+    )
 
 
 def _selection_summary(
@@ -433,7 +447,6 @@ def _structured_computation_results(
     scalar values is repeated in the answer.
     """
     results = []
-    seen_values = set()
     for item in reversed(list(outputs)):
         if len(results) >= MAX_COMPUTED_RESULTS:
             break
@@ -457,10 +470,6 @@ def _structured_computation_results(
             compact_value = stdout[:MAX_COMPUTED_OUTPUT_CHARS]
         if not supports_answer:
             continue
-        signature = json.dumps(compact_value, ensure_ascii=False, sort_keys=True)
-        if signature in seen_values:
-            continue
-        seen_values.add(signature)
         results.append({
             "tool_call_id": item.get("tool_call_id"),
             "value": compact_value,

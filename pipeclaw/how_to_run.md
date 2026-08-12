@@ -22,13 +22,13 @@
 在仓库根目录执行：
 
 ```bash
-pip install -r backend/requirements.txt
+pip install -r pipeclaw/backend/requirements.txt
 ```
 
 复制环境变量模板：
 
 ```bash
-cp backend/.env.example backend/.env
+cp pipeclaw/backend/.env.example pipeclaw/backend/.env
 ```
 
 至少补齐这些变量：
@@ -40,7 +40,7 @@ cp backend/.env.example backend/.env
 启动后端：
 
 ```bash
-python backend/main.py
+python -m pipeclaw.backend.main
 ```
 
 默认监听：`http://localhost:8003`
@@ -48,7 +48,7 @@ python backend/main.py
 ### 4. 前端启动
 
 ```bash
-cd frontend
+cd pipeclaw/frontend
 npm install
 npm run dev
 ```
@@ -92,13 +92,13 @@ npm run dev
 From the repository root:
 
 ```bash
-pip install -r backend/requirements.txt
+pip install -r pipeclaw/backend/requirements.txt
 ```
 
 Copy the environment template:
 
 ```bash
-cp backend/.env.example backend/.env
+cp pipeclaw/backend/.env.example pipeclaw/backend/.env
 ```
 
 At minimum, configure:
@@ -139,7 +139,7 @@ ZAI_TEMPERATURE=1.0
 Start the backend:
 
 ```bash
-python backend/main.py
+python -m pipeclaw.backend.main
 ```
 
 Default backend URL: `http://localhost:8003`
@@ -147,7 +147,7 @@ Default backend URL: `http://localhost:8003`
 ### 4. Start the frontend
 
 ```bash
-cd frontend
+cd pipeclaw/frontend
 npm install
 npm run dev
 ```

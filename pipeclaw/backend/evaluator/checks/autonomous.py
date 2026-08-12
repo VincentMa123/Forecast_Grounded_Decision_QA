@@ -7,29 +7,20 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-try:
-    from pipeclaw.backend.grounding.evidence.tool import (
-        attach_tool_arguments,
-        classify_tool_evidence,
-        requested_artifacts,
-    )
-    from pipeclaw.backend.pipeline.forecast_registry_contract import (
-        authorize_forecast_registry,
-    )
-except ImportError:  # pragma: no cover - direct backend execution
-    from grounding.evidence.tool import (
-        attach_tool_arguments,
-        classify_tool_evidence,
-        requested_artifacts,
-    )
-    from pipeline.forecast_registry_contract import authorize_forecast_registry
+from pipeclaw.backend.grounding.evidence.tool import (
+    attach_tool_arguments,
+    classify_tool_evidence,
+    requested_artifacts,
+)
+from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
 
 from ..models import EvaluationContext, MetricResult
-from ..teacher_quality import VARIABLE_REFERENCE
+from ..quality_references import VARIABLE_REFERENCE
 from .assumptions import assumption_consistency, inferred_task_fields, prediction_view
 from .common import (
     CANONICAL_METRIC_NAMES,
     PIPEFORMER_TOOL,
+    checkpoint_inference_used,
     disturbance_was_applied,
     horizon_is_consistent,
     mapping,
@@ -104,15 +95,35 @@ def _same_forecast_action(
     )
 
 
+def _resolved_forecast_arguments(
+    record: Mapping[str, Any],
+    call: Mapping[str, Any],
+) -> dict[str, Any]:
+    call_id = str(call.get("tool_call_id") or "")
+    parsed_task = next(
+        (
+            mapping(output.get("parsed_task"))
+            for paired_call, output in _successful_forecast_pairs(record)
+            if str(paired_call.get("tool_call_id") or "") == call_id
+        ),
+        {},
+    )
+    return {**parsed_task, **mapping(call.get("arguments"))}
+
+
 def _matching_reference_output(
     context: EvaluationContext,
     actual_call: Mapping[str, Any],
 ) -> Mapping[str, Any] | None:
+    resolved_call = {
+        **actual_call,
+        "arguments": _resolved_forecast_arguments(context.record, actual_call),
+    }
     return next(
         (
             output
             for call, output in _successful_forecast_pairs(context.reference or {})
-            if _same_forecast_action(call, actual_call)
+            if _same_forecast_action(call, resolved_call)
         ),
         None,
     )
@@ -120,7 +131,7 @@ def _matching_reference_output(
 
 def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     tasks = [
-        mapping(call.get("arguments"))
+        _resolved_forecast_arguments(record, call)
         for call in _calls(record)
         if call.get("name") == PIPEFORMER_TOOL
         and isinstance(call.get("arguments"), Mapping)
@@ -301,9 +312,7 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         "checkpoint_inference",
         applicable=applicable,
         passed=applicable and bool(outputs) and all(
-            prediction_view(output).get("forecast_mode") == "checkpoint_inference"
-            and bool(mapping(output.get("provenance")).get("checkpoint_id"))
-            for output in outputs
+            checkpoint_inference_used(output) for output in outputs
         ),
     )
     disturbance = metric(

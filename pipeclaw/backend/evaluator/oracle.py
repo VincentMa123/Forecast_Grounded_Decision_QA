@@ -1,43 +1,11 @@
-"""Teacher-reference target extraction with no metric or score logic."""
-
 from __future__ import annotations
 
 import json
-import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from .checks.common import mapping, normalize, sequence, verification_view
 from .models import EvaluationInputError
-
-
-def _mapping(value: Any) -> Mapping[str, Any]:
-    return value if isinstance(value, Mapping) else {}
-
-
-def _sequence(value: Any) -> Sequence[Any]:
-    if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return value
-    return ()
-
-
-def _normalise(value: Any) -> Any:
-    if isinstance(value, Mapping):
-        return {
-            str(key): _normalise(item)
-            for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
-        }
-    if isinstance(value, (list, tuple, set, frozenset)):
-        values = [_normalise(item) for item in value]
-        try:
-            return sorted(
-                values,
-                key=lambda item: json.dumps(item, sort_keys=True, ensure_ascii=False),
-            )
-        except TypeError:
-            return values
-    if isinstance(value, float) and math.isfinite(value):
-        return round(value, 6)
-    return value
 
 
 def _task_views(source: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -45,15 +13,70 @@ def _task_views(source: Mapping[str, Any]) -> list[dict[str, Any]]:
     candidates = source.get("candidate_forecasts")
     if not candidates and isinstance(parsed, Mapping):
         candidates = parsed.get("candidate_forecasts")
-    if _sequence(candidates):
-        return [dict(item) for item in _sequence(candidates) if isinstance(item, Mapping)]
+    if sequence(candidates):
+        return [dict(item) for item in sequence(candidates) if isinstance(item, Mapping)]
     return [dict(parsed)] if isinstance(parsed, Mapping) and parsed else []
+
+
+def _merge_task_fields(
+    parsed_tasks: Sequence[Mapping[str, Any]],
+    forecast_tasks: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Fill partial forecast arguments from parsed task defaults.
+
+    Teacher traces may preserve only the fields emitted in a forecast tool call.
+    The parsed task remains the authoritative source for omitted fields, while
+    every explicit call value (including ``None``) wins over that default.
+    """
+
+    if not forecast_tasks:
+        return [dict(task) for task in parsed_tasks]
+
+    merged_tasks: list[dict[str, Any]] = []
+    for index, call in enumerate(forecast_tasks):
+        defaults = (
+            parsed_tasks[index]
+            if index < len(parsed_tasks)
+            else parsed_tasks[0]
+            if parsed_tasks
+            else {}
+        )
+        merged = dict(defaults)
+        merged.update(call)
+
+        default_boundary = mapping(defaults.get("boundary_conditions"))
+        call_boundary = call.get("boundary_conditions")
+        if isinstance(call_boundary, Mapping):
+            boundary = dict(default_boundary)
+            for key, value in call_boundary.items():
+                if key in {"percentage_changes", "setpoints"} and isinstance(
+                    value, Mapping
+                ):
+                    boundary[key] = {
+                        **dict(mapping(default_boundary.get(key))),
+                        **dict(value),
+                    }
+                else:
+                    boundary[key] = value
+            merged["boundary_conditions"] = boundary
+
+        # Binary disturbances commonly store the target only in the parsed
+        # boundary setpoints.  Expose the canonical scalar when the call omitted
+        # it, without overriding an explicit call value.
+        if "disturbance_setpoint" not in call and "disturbance_setpoint" not in merged:
+            variable = merged.get("disturbance_variable")
+            setpoints = mapping(mapping(merged.get("boundary_conditions")).get("setpoints"))
+            if variable in setpoints:
+                merged["disturbance_setpoint"] = setpoints[variable]
+
+        merged_tasks.append(merged)
+    return merged_tasks
 
 
 def _output_views(source: Mapping[str, Any]) -> list[dict[str, Any]]:
     views: list[dict[str, Any]] = []
     forecasts: list[dict[str, Any]] = []
-    for item in _sequence(source.get("tool_outputs")):
+    for item in sequence(source.get("tool_outputs")):
         if not isinstance(item, Mapping):
             continue
         output = item.get("output", item)
@@ -64,11 +87,6 @@ def _output_views(source: Mapping[str, Any]) -> list[dict[str, Any]]:
         if item.get("name") == "run_pipeformer_forecast":
             forecasts.append(view)
     return forecasts or views
-
-
-def _verification(output: Mapping[str, Any]) -> Mapping[str, Any]:
-    value = output.get("verification") or output.get("constraint_check")
-    return value if isinstance(value, Mapping) else {}
 
 
 def _required_constraints(
@@ -92,10 +110,10 @@ def _required_constraints(
             if isinstance(value, str):
                 add(value)
             else:
-                for item in _sequence(value):
+                for item in sequence(value):
                     add(item)
     for output in outputs:
-        statuses = _verification(output).get("category_status")
+        statuses = verification_view(output).get("category_status")
         if isinstance(statuses, Mapping):
             for key in statuses:
                 add(key)
@@ -103,9 +121,9 @@ def _required_constraints(
 
 
 def _inherited_assumption(source: Mapping[str, Any]) -> Mapping[str, Any] | None:
-    state_before = _mapping(source.get("state_before"))
-    scope = _mapping(state_before.get("scope"))
-    disturbance = _mapping(scope.get("disturbance"))
+    state_before = mapping(source.get("state_before"))
+    scope = mapping(state_before.get("scope"))
+    disturbance = mapping(scope.get("disturbance"))
     if not disturbance.get("variable"):
         return None
     source_name = str(disturbance.get("source") or "").casefold()
@@ -139,8 +157,8 @@ def _with_inherited_assumptions(
     marker = _inherited_assumption(source)
     if marker is None:
         return copied
-    disturbance = _mapping(
-        _mapping(_mapping(source.get("state_before")).get("scope")).get("disturbance")
+    disturbance = mapping(
+        mapping(mapping(source.get("state_before")).get("scope")).get("disturbance")
     )
     inherited_variable = disturbance.get("variable")
     for task in copied:
@@ -164,10 +182,10 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     tasks = _task_views(source)
     outputs = _output_views(source)
     first_output = outputs[0] if outputs else {}
-    verification = _verification(first_output)
+    verification = verification_view(first_output)
     tool_calls = [
         item
-        for item in _sequence(source.get("tool_calls"))
+        for item in sequence(source.get("tool_calls"))
         if isinstance(item, Mapping)
     ]
     forecast_tasks = [
@@ -176,10 +194,13 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
         if item.get("name") == "run_pipeformer_forecast"
         and isinstance(item.get("arguments"), Mapping)
     ]
-    canonical_tasks = _with_inherited_assumptions(source, forecast_tasks or tasks)
+    canonical_tasks = _with_inherited_assumptions(
+        source,
+        _merge_task_fields(tasks, forecast_tasks),
+    )
     task = canonical_tasks[0] if canonical_tasks else {}
-    evidence = _mapping(source.get("evidence"))
-    decision_summary = _mapping(source.get("decision_summary"))
+    evidence = mapping(source.get("evidence"))
+    decision_summary = mapping(source.get("decision_summary"))
     teacher_tool_names = [
         str(item.get("name"))
         for item in tool_calls
@@ -187,9 +208,9 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     ]
 
     return {
-        "task": _normalise(task),
-        "tasks": [_normalise(item) for item in canonical_tasks],
-        "required_constraints": _required_constraints(tasks, outputs),
+        "task": normalize(task),
+        "tasks": [normalize(item) for item in canonical_tasks],
+        "required_constraints": _required_constraints(canonical_tasks, outputs),
         "risk_level": verification.get(
             "risk_level",
             first_output.get("risk_level", source.get("risk_level")),
@@ -211,9 +232,8 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
                 source.get("dispatch_recommendation"),
             ),
         ),
-        "verified_evidence": _normalise(dict(evidence)),
+        "verified_evidence": normalize(dict(evidence)),
         "teacher_tool_names": teacher_tool_names,
         "has_tool_target": bool(teacher_tool_names),
-        "decision_summary": _normalise(dict(decision_summary)),
+        "decision_summary": normalize(dict(decision_summary)),
     }
-

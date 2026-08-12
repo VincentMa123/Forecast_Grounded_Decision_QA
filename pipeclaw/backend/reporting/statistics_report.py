@@ -1,14 +1,8 @@
 from __future__ import annotations
 
-import math
-from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from statistics import mean, median
-from typing import Any, Dict, List, Mapping, Sequence
-
-from reporting.teacher_trace_audit import TeacherTraceQualityAuditor
-
+from typing import Any, Mapping
 
 class Task1StatisticsWorkbook:
     """Create the standalone Task 1.9 data-statistics workbook."""
@@ -16,9 +10,7 @@ class Task1StatisticsWorkbook:
     @staticmethod
     def write(
         path: Path,
-        records: Sequence[Dict[str, Any]],
-        evaluations: Sequence[Dict[str, Any]],
-        statistics: Mapping[str, Any],
+        facts: Mapping[str, Any],
         source_path: Path,
     ) -> None:
         from openpyxl import Workbook
@@ -48,36 +40,11 @@ class Task1StatisticsWorkbook:
         workbook.properties.title = "Task 1 Teacher Trace Data Statistics"
         workbook.properties.subject = "Task 1.9 data statistics tables"
 
-        by_id = {str(item.get("sample_id")): item for item in evaluations}
-        total = len(records)
-        eligible = [record for record in records if Task1StatisticsWorkbook._sft_eligible(record, by_id)]
-        evidence_counts = [TeacherTraceQualityAuditor.evidence_item_count(record.get("evidence") or {}) for record in records]
-        answer_lengths = [len(str(record.get("final_answer") or "")) for record in records]
-        tool_counts = [len(record.get("tool_calls") or []) for record in records]
-        constraint_records = [record for record in records if record.get("constraint_check")]
-        nonpass_constraints = sum(
-            (record.get("constraint_check") or {}).get("overall_status") in {"warning", "fail"}
-            for record in constraint_records
-        )
-
         overview_rows = [
             ("Task 1 Teacher Trace Data Statistics", None),
             ("Generated at (UTC)", datetime.now(timezone.utc).isoformat()),
             ("Teacher trace source", source_path.as_posix()),
-            ("Total samples", total),
-            ("Dataset sources", len({str(record.get("dataset_source") or "unknown") for record in records})),
-            ("Scenarios", len({str(record.get("scenario_id") or "") for record in records})),
-            ("Sessions", len({str(record.get("session_id") or "") for record in records})),
-            ("SFT-eligible samples", len(eligible)),
-            ("SFT-eligible rate", len(eligible) / total if total else 0.0),
-            ("Native quality pass rate", statistics["native_quality_pass_rate"]),
-            ("Task 1 quality pass rate", statistics["task1_quality_pass_rate"]),
-            ("Average evidence items", mean(evidence_counts) if evidence_counts else 0.0),
-            ("Median evidence items", median(evidence_counts) if evidence_counts else 0.0),
-            ("Average final-answer characters", mean(answer_lengths) if answer_lengths else 0.0),
-            ("Average tool calls", mean(tool_counts) if tool_counts else 0.0),
-            ("Records with constraint verification", len(constraint_records)),
-            ("Records with warning/fail constraints", nonpass_constraints),
+            *facts["statistics_overview_rows"],
         ]
         for row in overview_rows:
             overview.append(row)
@@ -88,92 +55,45 @@ class Task1StatisticsWorkbook:
             if "rate" in str(overview.cell(row, 1).value).lower():
                 overview.cell(row, 2).number_format = "0.0%"
 
-        source_groups = Task1StatisticsWorkbook._groups(records, "dataset_source")
-        source_statistics: Dict[str, Dict[str, float | int]] = {}
-        for source, group in sorted(source_groups.items()):
-            results = [by_id[str(record.get("sample_id"))] for record in group]
-            evidence = [item.get("evidence_item_count", 0) for item in results]
-            passed = sum(item.get("task1_quality_flag") == "pass" for item in results)
-            source_statistics[source] = {
-                "sample_count": len(group),
-                "percentage": len(group) / total if total else 0.0,
-                "scenario_count": len({str(item.get("scenario_id") or "") for item in group}),
-                "session_count": len({str(item.get("session_id") or "") for item in group}),
-                "openclaw": sum(item.get("scenario_type") == "openclaw" for item in group),
-                "pipeformer": sum(item.get("scenario_type") == "pipeformer" for item in group),
-                "train": sum(item.get("split") == "train" for item in group),
-                "valid": sum(item.get("split") == "valid" for item in group),
-                "test": sum(item.get("split") == "test" for item in group),
-                "quality_pass": passed,
-                "needs_review": len(group) - passed,
-                "quality_pass_rate": passed / len(group),
-                "average_evidence_items": mean(evidence) if evidence else 0.0,
-                "median_evidence_items": median(evidence) if evidence else 0.0,
-                "p95_evidence_items": Task1StatisticsWorkbook._percentile(evidence, 0.95),
-                "average_answer_chars": mean(len(str(item.get("final_answer") or "")) for item in group),
-                "average_tool_calls": mean(len(item.get("tool_calls") or []) for item in group),
-            }
-        sources = sorted(source_statistics)
-        source_sheet.append(["metric", *sources])
-        for metric in next(iter(source_statistics.values()), {}):
-            source_sheet.append([metric, *(source_statistics[source][metric] for source in sources)])
-            if metric in {"percentage", "quality_pass_rate"}:
+        source_sheet.append(["metric", *facts["source_columns"]])
+        for row in facts["source_rows"]:
+            source_sheet.append(row)
+            if row[0] in {"percentage", "quality_pass_rate"}:
                 for cell in source_sheet[source_sheet.max_row][1:]:
                     cell.number_format = "0.0%"
 
         Task1StatisticsWorkbook._distribution_sheet(
             scenario_sheet,
-            statistics["scenario_type_distribution"],
+            facts["distribution_tables"]["scenario_type_distribution"],
             "scenario_type",
         )
         Task1StatisticsWorkbook._distribution_sheet(
             task_sheet,
-            statistics["task_type_distribution"],
+            facts["distribution_tables"]["task_type_distribution"],
             "pipeformer_task_type",
         )
         Task1StatisticsWorkbook._distribution_sheet(
             constraint_sheet,
-            statistics["constraint_type_distribution"],
+            facts["distribution_tables"]["constraint_type_distribution"],
             "constraint_type",
         )
         Task1StatisticsWorkbook._distribution_sheet(
             risk_sheet,
-            statistics["risk_level_distribution"],
+            facts["distribution_tables"]["risk_level_distribution"],
             "risk_level",
         )
         Task1StatisticsWorkbook._distribution_sheet(
             intervention_sheet,
-            statistics["human_intervention_distribution"],
+            facts["distribution_tables"]["human_intervention_distribution"],
             "intervention_label",
         )
-
-        requested = Counter()
-        category_outcomes: Dict[str, Counter[str]] = defaultdict(Counter)
-        rule_outcomes: Dict[str, Counter[str]] = defaultdict(Counter)
-        for record in records:
-            constraint = dict(record.get("constraint_check") or {})
-            statuses = dict(constraint.get("category_status") or {})
-            for category in constraint.get("requested_categories") or []:
-                category = str(category)
-                requested[category] += 1
-                category_outcomes[category][str(statuses.get(category) or "missing")] += 1
-            for rule, status in (constraint.get("rule_status") or {}).items():
-                rule_outcomes[str(rule)][str(status or "missing")] += 1
 
         outcome_sheet.append([
             "constraint_category", "requested", "evaluated", "pass", "warning", "fail",
             "not_evaluated_or_missing", "coverage_rate", "pass_rate", "non_pass_rate",
         ])
-        for category in sorted(requested):
-            counts = category_outcomes[category]
-            evaluated = sum(counts.get(value, 0) for value in ("pass", "warning", "fail"))
-            nonpass = counts.get("warning", 0) + counts.get("fail", 0)
-            outcome_sheet.append([
-                category, requested[category], evaluated, counts.get("pass", 0),
-                counts.get("warning", 0), counts.get("fail", 0), requested[category] - evaluated,
-                evaluated / requested[category], counts.get("pass", 0) / evaluated if evaluated else None,
-                nonpass / evaluated if evaluated else None,
-            ])
+        for row in facts["statistics_category_rows"]:
+            outcome_sheet.append(row)
             for column in (8, 9, 10):
                 outcome_sheet.cell(outcome_sheet.max_row, column).number_format = "0.0%"
 
@@ -181,93 +101,38 @@ class Task1StatisticsWorkbook:
             "rule_id", "evaluated", "pass", "warning", "fail", "not_evaluated_or_missing",
             "pass_rate", "non_pass_rate",
         ])
-        for rule in sorted(rule_outcomes):
-            counts = rule_outcomes[rule]
-            evaluated = sum(counts.get(value, 0) for value in ("pass", "warning", "fail"))
-            nonpass = counts.get("warning", 0) + counts.get("fail", 0)
-            rule_sheet.append([
-                rule, evaluated, counts.get("pass", 0), counts.get("warning", 0),
-                counts.get("fail", 0), sum(counts.values()) - evaluated,
-                counts.get("pass", 0) / evaluated if evaluated else None,
-                nonpass / evaluated if evaluated else None,
-            ])
+        for row in facts["rule_rows"]:
+            rule_sheet.append(row)
             rule_sheet.cell(rule_sheet.max_row, 7).number_format = "0.0%"
             rule_sheet.cell(rule_sheet.max_row, 8).number_format = "0.0%"
 
-        risk_values = sorted({str(record.get("risk_level") or "not_applicable") for record in records})
-        intervention_values = sorted({str(record.get("manual_intervention_label") or "not_applicable") for record in records})
-        cross_sheet.append(["risk_level", *intervention_values, "row_total"])
-        for risk in risk_values:
-            row = [risk]
-            for intervention in intervention_values:
-                row.append(sum(
-                    str(record.get("risk_level") or "not_applicable") == risk
-                    and str(record.get("manual_intervention_label") or "not_applicable") == intervention
-                    for record in records
-                ))
-            cross_sheet.append([*row, sum(row[1:])])
+        cross_sheet.append(["risk_level", *facts["risk_intervention_columns"], "row_total"])
+        for row in facts["risk_intervention_rows"]:
+            cross_sheet.append(row)
 
         split_sheet.append([
             "split", "master_samples", "scenario_count", "session_count", "quality_pass",
             "needs_review", "sft_eligible", "sft_eligible_rate", "average_evidence_items",
             "average_answer_chars",
         ])
-        for split in ("train", "valid", "test"):
-            group = [record for record in records if record.get("split") == split]
-            results = [by_id[str(record.get("sample_id"))] for record in group]
-            passed = sum(item.get("task1_quality_flag") == "pass" for item in results)
-            split_eligible = sum(Task1StatisticsWorkbook._sft_eligible(record, by_id) for record in group)
-            split_sheet.append([
-                split, len(group), len({str(item.get("scenario_id") or "") for item in group}),
-                len({str(item.get("session_id") or "") for item in group}), passed, len(group) - passed,
-                split_eligible, split_eligible / len(group) if group else 0.0,
-                mean(item.get("evidence_item_count", 0) for item in results) if results else 0.0,
-                mean(len(str(item.get("final_answer") or "")) for item in group) if group else 0.0,
-            ])
+        for row in facts["split_rows"]:
+            split_sheet.append(row)
             split_sheet.cell(split_sheet.max_row, 8).number_format = "0.0%"
 
         evidence_sheet.append([
             "dataset_source", "scenario_type", "sample_count", "zero_evidence_samples",
             "minimum", "p25", "median", "mean", "p75", "p90", "p95", "maximum",
         ])
-        evidence_groups: Dict[tuple[str, str], List[int]] = defaultdict(list)
-        for record in records:
-            evidence_groups[(
-                str(record.get("dataset_source") or "unknown"),
-                str(record.get("scenario_type") or "unknown"),
-            )].append(TeacherTraceQualityAuditor.evidence_item_count(record.get("evidence") or {}))
-        for key, values in sorted(evidence_groups.items()):
-            evidence_sheet.append([
-                *key, len(values), sum(value == 0 for value in values), min(values),
-                Task1StatisticsWorkbook._percentile(values, 0.25), median(values), mean(values),
-                Task1StatisticsWorkbook._percentile(values, 0.75),
-                Task1StatisticsWorkbook._percentile(values, 0.90),
-                Task1StatisticsWorkbook._percentile(values, 0.95), max(values),
-            ])
+        for row in facts["evidence_rows"]:
+            evidence_sheet.append(row)
 
         check_names = ("schema", "numerical_consistency", "rule_consistency", "dispatch_consistency")
         quality_sheet.append([
             "quality_dimension", "pass", "fail_or_needs_review", "not_applicable",
             "applicable_count", "applicable_pass_rate",
         ])
-        for name in check_names:
-            counts = Counter(item["checks"][name]["status"] for item in evaluations)
-            applicable = counts.get("pass", 0) + counts.get("fail", 0)
-            quality_sheet.append([
-                name, counts.get("pass", 0), counts.get("fail", 0),
-                counts.get("not_applicable", 0), applicable,
-                counts.get("pass", 0) / applicable if applicable else None,
-            ])
-            quality_sheet.cell(quality_sheet.max_row, 6).number_format = "0.0%"
-        for name, distribution in (
-            ("native_quality", statistics["native_quality_distribution"]),
-            ("task1_quality", statistics["task1_quality_distribution"]),
-        ):
-            applicable = sum(distribution.values())
-            quality_sheet.append([
-                name, distribution.get("pass", 0), distribution.get("needs_review", 0),
-                0, applicable, distribution.get("pass", 0) / applicable if applicable else None,
-            ])
+        for row in facts["quality_rows"]:
+            quality_sheet.append(row)
             quality_sheet.cell(quality_sheet.max_row, 6).number_format = "0.0%"
 
         notes.append(["topic", "definition"])
@@ -321,43 +186,11 @@ class Task1StatisticsWorkbook:
         workbook.save(path)
 
     @staticmethod
-    def _sft_eligible(record: Dict[str, Any], by_id: Mapping[str, Dict[str, Any]]) -> bool:
-        result = by_id.get(str(record.get("sample_id"))) or {}
-        return bool(
-            result.get("task1_quality_flag") == "pass"
-            and not record.get("sft_exclusion_reason")
-            and all(
-                item.get("quality_flag") == "pass"
-                for item in record.get("conversation_context") or []
-            )
-        )
-
-    @staticmethod
-    def _groups(records: Sequence[Dict[str, Any]], key: str) -> Dict[str, List[Dict[str, Any]]]:
-        groups: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
-        for record in records:
-            groups[str(record.get(key) or "unknown")].append(record)
-        return groups
-
-    @staticmethod
-    def _distribution_sheet(sheet: Any, values: Mapping[str, int], label: str) -> None:
-        total = sum(values.values()) or 1
+    def _distribution_sheet(sheet: Any, rows: Any, label: str) -> None:
         sheet.append([label, "count", "percentage"])
-        for value, count in sorted(values.items()):
-            sheet.append([value, count, count / total])
+        for row in rows:
+            sheet.append(row)
             sheet.cell(sheet.max_row, 3).number_format = "0.0%"
-
-    @staticmethod
-    def _percentile(values: Sequence[int], fraction: float) -> float:
-        if not values:
-            return 0.0
-        ordered = sorted(values)
-        position = (len(ordered) - 1) * fraction
-        lower = math.floor(position)
-        upper = math.ceil(position)
-        if lower == upper:
-            return float(ordered[lower])
-        return ordered[lower] + (ordered[upper] - ordered[lower]) * (position - lower)
 
     @staticmethod
     def _add_bar_chart(sheet: Any, chart_cls: Any, reference_cls: Any, title: str, value_column: int, anchor: str) -> None:

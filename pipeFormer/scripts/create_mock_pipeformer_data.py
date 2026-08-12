@@ -194,9 +194,26 @@ def state_registry(control_names: list[str]) -> list[dict[str, Any]]:
     ]
 
 
-def make_dirs(root: Path, force: bool) -> dict[str, Path]:
-    if root.exists() and force:
-        shutil.rmtree(root)
+def make_dirs(
+    root: Path, force: bool, allowed_root: Path | None = None
+) -> dict[str, Path]:
+    if force:
+        project_root = Path(__file__).resolve().parents[1]
+        root = root.resolve()
+        allowed_root = (allowed_root or project_root / "data" / "mock_lifecycle").resolve()
+        broad_roots = (
+            Path(root.anchor),
+            project_root.parent.resolve(),
+            (project_root / "data").resolve(),
+        )
+        if root in broad_roots:
+            raise ValueError(f"Refusing to remove broad root: {root}")
+        if root != allowed_root and allowed_root not in root.parents:
+            raise ValueError(
+                f"Refusing to remove path outside allowed fixture root: {allowed_root}"
+            )
+        if root.exists():
+            shutil.rmtree(root)
     paths = {
         "train": root / "dataset" / "train",
         "test": root / "dataset" / "test",

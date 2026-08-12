@@ -21,18 +21,17 @@ def _parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def _load_config(path: Path):
+def _load_config(payload: dict[str, object]):
     from training.config import TrainingConfig
 
-    payload = json.loads(path.read_text(encoding="utf-8"))
-    causal = dict(payload.pop("causal_training", {}))
+    training_payload = dict(payload)
+    causal = dict(training_payload.pop("causal_training", {}))
     if not causal:
         raise ValueError("Training config must define causal_training settings.")
-    return TrainingConfig.from_dict(payload), causal
+    return TrainingConfig.from_dict(training_payload), causal
 
 
-def _configure_device(config_path: Path) -> None:
-    payload = json.loads(config_path.read_text(encoding="utf-8"))
+def _configure_device(payload: dict[str, object]) -> None:
     device = payload.get("device", "auto")
     if isinstance(device, int) and device >= 0:
         os.environ["CUDA_VISIBLE_DEVICES"] = str(device)
@@ -43,13 +42,14 @@ def _configure_device(config_path: Path) -> None:
 def main() -> int:
     args = _parse_args()
     config_path = Path(args.config).resolve()
-    _configure_device(config_path)
+    payload = json.loads(config_path.read_text(encoding="utf-8"))
+    _configure_device(payload)
 
     from training.causal import CausalFluidTrainer, CausalWindowDataset, load_intervention_manifest
     from training.utils import run_training, setup_training
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    config, causal = _load_config(config_path)
+    config, causal = _load_config(payload)
     setup = setup_training(config)
     manifest = load_intervention_manifest(PROJECT_ROOT / causal["manifest_path"])
     wrapped_train = CausalWindowDataset(

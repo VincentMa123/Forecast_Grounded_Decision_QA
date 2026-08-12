@@ -40,6 +40,8 @@ only and records the exact MS-SWIFT-rendered length distribution used for
 sequence-length and hardware selection. Its sibling per-record JSONL remains
 local because it is a generated audit artifact.
 
-The 2026-07-30 release profile contains 4,199 records with median 2,840, p95
-9,675, p99 12,029, and maximum 13,792 tokens. All records fit a 16,384-token
-context without truncation; 90.33% fit 8,192.
+The checked-in 2026-07-30 profile is stale. Its historical distribution (4,199
+records; median 2,840, p95 9,675, p99 12,029, maximum 13,792) is not current
+evidence. Refresh the profile with the designated tokenizer before using any
+context-length or hardware claim; do not assume that all records fit without
+truncation.

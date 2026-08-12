@@ -159,9 +159,8 @@ def summarize_logit_margins(entries: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _read_registry(path: Path) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    entries = json.loads(path.read_text(encoding="utf-8-sig"))["variables"]
-    return entries, {str(item["variable"]): item for item in entries}
+def _read_registry(path: Path) -> list[dict[str, Any]]:
+    return json.loads(path.read_text(encoding="utf-8-sig"))["variables"]
 
 
 def _read_graph(path: Path) -> dict[str, set[str]]:
@@ -517,7 +516,7 @@ def evaluate_checkpoint(
     pipeformer_root = repo_root / "pipeFormer"
     static_dir = pipeformer_root / "data" / "mock_lifecycle" / "static" / "mock_lifecycle"
     data_dir = pipeformer_root / "data" / "mock_lifecycle"
-    entries, _ = _read_registry(static_dir / "variable_registry.json")
+    entries = _read_registry(static_dir / "variable_registry.json")
     controls = [item for item in entries if item.get("role") == "input" and item.get("controllable") is True]
     outputs = [item for item in entries if item.get("role") == "output"]
     graph = _read_graph(static_dir / "save_connect_all_nodes.csv")

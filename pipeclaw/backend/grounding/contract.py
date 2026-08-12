@@ -14,14 +14,16 @@ from .answer_limits import (
     chinese_comparison_max_chars,
 )
 from .decision_policy import (
+    RISK_RANK,
     collect_objective_evidence,
+    decision_policy_source_has_priority_signal,
     normalize_decision_policy,
     rank_candidate_groups,
 )
+from .decision_trace_state import VerifiedDecisionState
 from .evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 
 
-RISK_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 INTERVENTION_RANK = {
     "no_intervention": 0,
     "monitoring_only": 1,
@@ -29,17 +31,12 @@ INTERVENTION_RANK = {
     "immediate_intervention_required": 3,
 }
 
-_DECISION_PRIORITY_SIGNAL = re.compile(
-    r"(?:\b(?:priority|prioritize|first|primary|secondary|most|least|"
-    r"focus|reduce|increase|maintain|preserve|avoid|minimi[sz]e|maximi[sz]e)\b"
-    r"|优先|首先|第一|最(?:大|小|低|高|少|多)|重点|关注|降低|减少|提高|增加|保持|避免)",
-    re.IGNORECASE,
-)
 
-
-def decision_policy_source_has_priority_signal(source_excerpt: str) -> bool:
-    """Return whether a source excerpt actually expresses a preference."""
-    return bool(_DECISION_PRIORITY_SIGNAL.search(str(source_excerpt or "")))
+def _forecast_views(output: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+    return (
+        dict(output.get("prediction") or output.get("prediction_summary") or {}),
+        dict(output.get("verification") or output.get("constraint_check") or {}),
+    )
 @dataclass(frozen=True)
 class CandidateResult:
     candidate_id: str
@@ -400,11 +397,9 @@ class GroundingContractBuilder:
         for item in results:
             output = dict(item.get("output") or {})
             arguments = dict(item.get("arguments") or {})
-            prediction = dict(
-                output.get("prediction") or output.get("prediction_summary") or {}
-            )
+            prediction, _ = _forecast_views(output)
             parsed_task = dict(output.get("parsed_task") or {})
-            sources = [parsed_task, prediction]
+            sources = [parsed_task, prediction, output]
             for source in sources:
                 assumption = source.get("disturbance_assumption")
                 if not isinstance(assumption, dict) or assumption.get("source") != "llm_assumption":
@@ -461,11 +456,10 @@ class GroundingContractBuilder:
                 continue
             output = dict(item.get("output") or {})
             arguments = dict(item.get("arguments") or {})
+            prediction, _ = _forecast_views(output)
             variable = str(
                 arguments.get("disturbance_variable")
-                or dict(output.get("prediction") or {}).get(
-                    "disturbance_variable"
-                )
+                or prediction.get("disturbance_variable")
                 or ""
             )
             if not variable:
@@ -524,9 +518,7 @@ class GroundingContractBuilder:
                 "requested_value": requested_value,
                 "direction": (
                     arguments.get("disturbance_direction")
-                    or dict(output.get("prediction") or {}).get(
-                        "disturbance_direction"
-                    )
+                    or prediction.get("disturbance_direction")
                     or dict(output.get("parsed_task") or {}).get(
                         "disturbance_direction"
                     )
@@ -544,8 +536,7 @@ class GroundingContractBuilder:
 
     def _candidate(self, index: int, item: Dict[str, Any]) -> CandidateResult:
         output = dict(item.get("output") or {})
-        prediction = dict(output.get("prediction") or output.get("prediction_summary") or {})
-        verification = dict(output.get("verification") or output.get("constraint_check") or {})
+        prediction, verification = _forecast_views(output)
         evidence = dict(output.get("evidence") or {})
         arguments = dict(item.get("arguments") or {})
         metrics = dict(verification.get("comparable_metrics") or {})
@@ -940,6 +931,47 @@ class GroundingContractBuilder:
             return None
 
 
+def _policy_unavailable_at_generation(record: Dict[str, Any]) -> bool:
+    """Preserve a deliberately unsupported saved policy decision."""
+
+    if record.get("decision_policy"):
+        return False
+    stored_decision = dict(record.get("decision_summary") or {})
+    if stored_decision.get("status") != "insufficient_evidence":
+        return False
+    return "llm_decision_policy_tool_call" in list(
+        stored_decision.get("missing_metrics") or []
+    )
+
+
+def record_grounding_contract(
+    record: Dict[str, Any],
+    tool_outputs: Optional[List[Dict[str, Any]]] = None,
+) -> Dict[str, Any]:
+    """Rebuild a current-turn contract from tools and verified prior state."""
+
+    outputs = (
+        list(tool_outputs)
+        if tool_outputs is not None
+        else attach_tool_arguments(
+            record.get("tool_outputs") or [],
+            record.get("tool_calls") or [],
+        )
+    )
+    state = VerifiedDecisionState.from_dict(dict(record.get("state_before") or {}))
+    stored_policy = dict(record.get("decision_policy") or {}) or None
+    return GroundingContractBuilder().build(
+        str(record.get("user_input") or ""),
+        outputs,
+        decision_policy=stored_policy if not state.decision_policy else None,
+        require_decision_policy=_policy_unavailable_at_generation(record),
+        prior_candidate_results=state.candidates,
+        prior_decision_policy=state.decision_policy,
+        prior_decision_policy_source_question=state.decision_policy_source_question,
+        prior_applied_disturbances=state.applied_disturbances,
+    )
+
+
 def _format_number(value: Any) -> str:
     try:
         number = float(value)
@@ -1033,8 +1065,6 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
         f"risk {candidate.get('risk_level', 'unknown')}; "
         f"intervention {candidate.get('manual_intervention_label', 'unknown')}."
     )
-
-
 def _outcome_key(candidate: Dict[str, Any]) -> tuple[Any, ...]:
     return (
         candidate.get("failure_count", 0),
@@ -1043,126 +1073,6 @@ def _outcome_key(candidate: Dict[str, Any]) -> tuple[Any, ...]:
         tuple(candidate.get("warning_rule_ids") or []),
         candidate.get("risk_level", "unknown"),
         candidate.get("manual_intervention_label", "unknown"),
-    )
-
-
-def candidate_contract_message(
-    question: str,
-    tool_results: Iterable[Dict[str, Any]],
-    *,
-    decision_policy: Optional[Dict[str, Any]] = None,
-    prior_candidate_results: Optional[Iterable[Dict[str, Any]]] = None,
-    prior_decision_policy: Optional[Dict[str, Any]] = None,
-    prior_decision_policy_source_question: Optional[str] = None,
-    prior_applied_disturbances: Optional[Iterable[Dict[str, Any]]] = None,
-) -> Optional[str]:
-    """Render accumulated multi-candidate facts for the next model request."""
-    results = [dict(item) for item in tool_results]
-    contract = GroundingContractBuilder().build(
-        question,
-        results,
-        decision_policy=decision_policy,
-        require_decision_policy=True,
-        prior_candidate_results=prior_candidate_results,
-        prior_decision_policy=prior_decision_policy,
-        prior_decision_policy_source_question=(
-            prior_decision_policy_source_question
-        ),
-        prior_applied_disturbances=prior_applied_disturbances,
-    )
-    if contract.get("answer_mode") == "single_forecast":
-        successful_forecasts = [
-            item
-            for item in results
-            if item.get("name") == "run_pipeformer_forecast"
-            and dict(item.get("output") or {}).get("success") is True
-        ]
-        if len(successful_forecasts) != 1:
-            return None
-        forecast = successful_forecasts[0]
-        if dict(forecast.get("arguments") or {}).get("candidate_id"):
-            return None
-        output = dict(forecast.get("output") or {})
-        verification = dict(
-            output.get("verification") or output.get("constraint_check") or {}
-        )
-        has_prediction_contract = any(
-            key in verification
-            for key in (
-                "priority_findings",
-                "top_watch_variables",
-                "safety_energy_comparison",
-            )
-        )
-        if not has_prediction_contract:
-            return None
-        applied_disturbance = json.dumps(
-            contract.get("applied_disturbances") or [],
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-        required_disclosure = applied_disturbance_disclosure(
-            question,
-            contract,
-        )
-        return (
-            "CURRENT PIPEFORMER FORECAST ANSWER CONTRACT\n"
-            f"Required disturbance disclosure (copy verbatim): {required_disclosure}\n"
-            f"Structured application evidence: {applied_disturbance}\n"
-            "Use only the successful forecast's structured fields. If the current request asks "
-            "for operating result, intervention, watch variables, and the safety-energy "
-            "comparison, return exactly four short bullets and no heading: (1) passing "
-            "categories once plus every priority_findings warning/failure with values and "
-            "thresholds; (2) risk_level and human_intervention_label; (3) top_watch_variables "
-            "in returned order with variable, mean_prediction, and "
-            "mean_abs_delta_vs_observed; (4) safety_energy_comparison. When its comparison is "
-            "complete and consistent, say `安全侧与能耗侧结论一致`; when inconsistent, include "
-            "the first priority audit constraint and numerical key_observation_variables. "
-            "For a narrower follow-up, answer only requested slots. Never abbreviate a "
-            "canonical variable ID or add unreturned physical meaning."
-        )
-    if contract.get("answer_mode") != "dispatch_comparison":
-        return None
-    candidates = list(contract.get("candidate_results") or [])
-    decision_summary = contract.get("decision_summary") or {}
-    payload = {
-        "successful_candidate_count": len(candidates),
-        "candidate_results": candidates,
-        "decision_summary": decision_summary,
-        "comparison_leaders": contract.get("comparison_leaders") or {},
-        "required_application_disclosure": applied_disturbance_disclosure(
-            question,
-            contract,
-        ),
-        "worst_case_risk_level": contract.get("worst_case_risk_level"),
-        "worst_case_intervention_label": contract.get(
-            "worst_case_intervention_label"
-        ),
-    }
-    policy_nudge = ""
-    missing_metrics = list(decision_summary.get("missing_metrics") or [])
-    if "llm_decision_policy_tool_call" in missing_metrics:
-        policy_nudge = (
-            " No decision policy is recorded yet; treat this as a call to action, not a "
-            "failure to disclose in the answer. If the user's current or earlier wording "
-            "states or implies any priority or objective (for example 优先, 主要, 尽量, "
-            "minimize, or first consider), call set_decision_policy NOW with each objective "
-            "grounded in an exact contiguous source_excerpt of that wording, then rank all "
-            "viable candidates. End with `selected_candidate_id: none` only when no priority "
-            "can be derived from the conversation at all."
-        )
-    return (
-        "CURRENT PIPEFORMER CANDIDATE CONTRACT\n"
-        + json.dumps(payload, ensure_ascii=False, indent=2)
-        + "\nUse only these successful candidates and their recorded facts in the final comparison. "
-        "Copy required_application_disclosure verbatim at the start of the answer. "
-        "Mention every candidate_id and action, report the ordered objective evidence for every "
-        "viable candidate, state hard-constraint and audit outcomes, and do not invent rankings "
-        "or effects. Copy every canonical variable ID exactly; never abbreviate it. Continue "
-        "calling PipeFormer if the user's requested candidate count has not yet been evaluated. End the "
-        "answer with exactly `selected_candidate_id: <candidate_id>` or "
-        "`selected_candidate_id: none`, matching decision_summary."
-        + policy_nudge
     )
 
 
@@ -1219,6 +1129,11 @@ _CANONICAL_DISCLOSURE_PREFIXES = (
     "Application status:",
 )
 _CANONICAL_ASSUMPTION_PREFIX = "Assumption source:"
+_PROVISIONAL_ASSUMPTION_DISCLOSURE = re.compile(
+    r"(?:假设|临时假设|暂按|暂定|暂设|本次按|LLM假设|LLM暂定|LLM暂设|LLM临时假设"
+    r"|assum(?:e|ed|ption)|provisional)",
+    re.IGNORECASE,
+)
 _NOT_EVALUATED_DISCLOSURE = "not_evaluated（未执行该项校核，不能判定 pass/fail）"
 _AMBIGUOUS_NOT_EVALUATED = re.compile(
     r"(?<![A-Za-z0-9_])not_evaluated(?![A-Za-z0-9_])(?:"
@@ -1367,6 +1282,33 @@ def _canonical_assumption_source_lines(
         if line not in lines:
             lines.append(line)
     return lines
+
+
+def provisional_assumption_disclosed(
+    answer: str,
+    pipeformer: Dict[str, Any],
+    numeric_values: List[float],
+) -> bool:
+    """Check canonical disclosures while retaining legacy teacher-trace wording."""
+    forecasts = [pipeformer] + [item for item in pipeformer.get("candidate_forecasts") or [] if isinstance(item, dict)]
+    assumptions = GroundingContractBuilder._provisional_assumptions(
+        [{"output": forecast} for forecast in forecasts]
+    )
+    magnitudes = list(dict.fromkeys(
+        abs(float(item["magnitude_percent"]))
+        for item in assumptions
+        if item.get("magnitude_percent") is not None
+    ))
+    if not magnitudes:
+        return True
+    disclosed = any(
+        line.strip().startswith(f"{_CANONICAL_ASSUMPTION_PREFIX} LLM provisional;")
+        for line in answer.splitlines()
+    ) or _PROVISIONAL_ASSUMPTION_DISCLOSURE.search(answer)
+    return bool(disclosed) and all(
+        any(abs(abs(value) - expected) < 1e-6 for value in numeric_values)
+        for expected in magnitudes
+    )
 
 
 def finalize_applied_disturbance_disclosure(
@@ -1556,7 +1498,7 @@ def _finalize_comparison_answer(
     maximum_chars: int = 500,
     maximum_words: Optional[int] = None,
 ) -> str:
-    suffix = "\n".join(_comparison_markers(selected_candidate_id, contract))
+    suffix = "\n".join(_comparison_markers(selected_candidate_id))
     body = "\n".join(str(line).strip() for line in lines if str(line).strip())
     answer = body + "\n" + suffix
     over_budget = len(answer) > maximum_chars
@@ -1571,7 +1513,6 @@ def _finalize_comparison_answer(
 
 def _comparison_markers(
     selected_candidate_id: str,
-    contract: Dict[str, Any],
 ) -> List[str]:
     return [f"selected_candidate_id: {selected_candidate_id or 'none'}"]
 
@@ -1614,14 +1555,6 @@ def _action_variables(action: Dict[str, Any]) -> str:
         for variable in dict(action.get(key) or {})
     ]
     return ",".join(variables) or "未记录"
-
-
-def _applied_disturbance_lines(
-    contract: Dict[str, Any],
-    chinese: bool,
-) -> List[str]:
-    del chinese
-    return _canonical_applied_disturbance_lines(contract)
 
 
 def applied_disturbance_disclosure(
@@ -1855,14 +1788,14 @@ def _selected_comparison_answer(
         rejection_line = "; ".join(rejection_parts) + "."
 
     lines = [
-        *_applied_disturbance_lines(contract, chinese),
+        *_canonical_applied_disturbance_lines(contract),
         *_compact_assumption_lines(contract, chinese),
         policy_line,
         *candidate_lines,
         _audit_category_summary(ranked, chinese),
         ranking_line,
         rejection_line,
-        *_comparison_markers(selected_id, contract),
+        *_comparison_markers(selected_id),
     ]
     answer = "\n".join(lines)
     over_budget = len(answer) > (
@@ -1892,7 +1825,7 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
             )
         )
     assumption_lines = [
-        *_applied_disturbance_lines(contract, chinese),
+        *_canonical_applied_disturbance_lines(contract),
         *_compact_assumption_lines(contract, chinese),
     ]
     shared_outcome = not ranking and len(candidates) > 1 and len({
@@ -1976,206 +1909,3 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
         ),
         maximum_words=None if chinese else ENGLISH_MAX_WORDS,
     )
-
-_UNIT_CLAIM = re.compile(
-    r"(?P<value>[-+]?\d+(?:\.\d+)?)\s*(?P<unit>万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)",
-    re.IGNORECASE,
-)
-_LINEPACK_DECLINE_REQUEST = re.compile(
-    r"管存.{0,12}(?:持续|下降|走低|消耗)|(?:持续|下降|走低).{0,12}管存|linepack.{0,12}(?:declin|fall|decreas)",
-    re.IGNORECASE,
-)
-
-
-def _successful_pipeformer_results(tool_results: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return [
-        dict(item)
-        for item in tool_results
-        if item.get("name") == "run_pipeformer_forecast"
-        and dict(item.get("output") or {}).get("success") is True
-    ]
-
-
-def _status_summary(category_status: Dict[str, Any], chinese: bool) -> str:
-    groups: Dict[str, List[str]] = {}
-    for category, status in category_status.items():
-        groups.setdefault(str(status), []).append(str(category))
-    if chinese:
-        labels = {"pass": "通过", "warning": "告警", "fail": "失败", "not_evaluated": "未评估"}
-        return "；".join(
-            f"{'/'.join(values)}{labels.get(status, status)}"
-            for status, values in groups.items()
-        )
-    return "; ".join(f"{'/'.join(values)}={status}" for status, values in groups.items())
-
-
-def _finding_summary(findings: List[Dict[str, Any]], chinese: bool) -> str:
-    parts: List[str] = []
-    for finding in findings[:2]:
-        name = str(finding.get("name") or "unknown_rule")
-        status = str(finding.get("status") or "unknown")
-        variables = ", ".join(str(value) for value in finding.get("affected_variables") or [])
-        detail = ""
-        values = list(finding.get("evaluated_values") or [])
-        if values:
-            evaluated = dict(values[0])
-            metric = str(evaluated.get("metric") or "value")
-            detail = f"; {metric}={_format_number(evaluated.get('value'))}"
-        parts.append(f"{name}({status}{'; ' + variables if variables else ''}{detail})")
-    return "，".join(parts) if chinese else ", ".join(parts)
-
-
-def _watch_summary(output: Dict[str, Any]) -> List[str]:
-    evidence = dict(output.get("evidence") or {})
-    watch = list(evidence.get("top_watch_variables") or [])
-    if not watch:
-        prediction = dict(output.get("prediction") or output.get("prediction_summary") or {})
-        summaries = dict(prediction.get("output_forecast_summary") or {})
-        watch = [{"variable": variable, **dict(summary or {})} for variable, summary in list(summaries.items())[:3]]
-    result = []
-    for item in watch[:3]:
-        variable = str(item.get("variable") or "")
-        value = item.get("mean_prediction")
-        result.append(f"{variable}={_format_number(value)}" if value is not None else variable)
-    return [value for value in result if value]
-
-
-def _single_forecast_answer(question: str, tool_result: Dict[str, Any]) -> str:
-    output = dict(tool_result.get("output") or {})
-    prediction = dict(output.get("prediction") or output.get("prediction_summary") or {})
-    verification = dict(output.get("verification") or output.get("constraint_check") or {})
-    chinese = any("\u4e00" <= character <= "\u9fff" for character in question)
-    contract = GroundingContractBuilder().build(question, [tool_result])
-    lines: List[str] = _applied_disturbance_lines(contract, chinese)
-    comparison = dict(prediction.get("counterfactual_comparison") or {})
-    impact_count = comparison.get("nonzero_impacted_variable_count")
-    linepack = dict(dict(verification.get("engineering_evidence") or {}).get("linepack") or {})
-    linepack_status = dict(verification.get("category_status") or {}).get("linepack")
-    decline_minutes = linepack.get("maximum_continuous_decline_minutes")
-    if _LINEPACK_DECLINE_REQUEST.search(question):
-        if linepack_status == "pass" and (decline_minutes is None or float(decline_minutes) <= 0):
-            lines.append("持续管存下降未在当前预测中出现。" if chinese else "Sustained linepack decline did not appear in the current forecast.")
-        elif linepack_status in {"warning", "fail"} or (decline_minutes is not None and float(decline_minutes) > 0):
-            duration = _format_number(decline_minutes) if decline_minutes is not None else "unknown"
-            lines.append(f"预测检测到管存下降，最长连续下降 {duration} 分钟。" if chinese else f"The forecast detected linepack decline; maximum continuous duration was {duration} minutes.")
-    if impact_count is not None:
-        lines.append(f"基线对比检出 {int(impact_count)} 个变化输出变量。" if chinese else f"Baseline comparison found {int(impact_count)} changed output variables.")
-    category_status = dict(verification.get("category_status") or {})
-    if category_status:
-        summary = _status_summary(category_status, chinese)
-        lines.append(f"校核：{summary}。" if chinese else f"Verification: {summary}.")
-    risk = str(verification.get("risk_level") or output.get("risk_level") or "unknown")
-    intervention = str(verification.get("human_intervention_label") or output.get("manual_intervention_label") or "unknown")
-    lines.append(f"风险 {risk}；人工干预 {intervention}。" if chinese else f"Risk: {risk}; intervention: {intervention}.")
-    findings = [dict(item) for item in verification.get("priority_findings") or []]
-    if findings:
-        summary = _finding_summary(findings, chinese)
-        lines.append(f"优先发现：{summary}。" if chinese else f"Priority findings: {summary}.")
-    watch = _watch_summary(output)
-    if watch:
-        lines.append(f"关注变量：{', '.join(watch)}。" if chinese else f"Watch variables: {', '.join(watch)}.")
-    return "".join(lines) if chinese else " ".join(lines)
-
-
-_UNSUPPORTED_UNIT_TOKEN = re.compile(
-    r"(?:万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)",
-    re.IGNORECASE,
-)
-
-
-def _strip_unsupported_units(answer: str) -> str:
-    stripped = _UNSUPPORTED_UNIT_TOKEN.sub("", answer)
-    return re.sub(r"[ \t]+([，。；、,.!?])", r"\1", stripped)
-
-
-def _compact_answer(answer: str, maximum_chars: int) -> str:
-    """Extractively compact an answer without inventing replacement facts."""
-    cleaned = re.sub(r"(?m)^\s*(?:#{1,6}\s*|---+\s*$)", "", answer)
-    cleaned = cleaned.replace("**", "").replace("```", "")
-    lines: List[str] = []
-    seen = set()
-    for raw_line in cleaned.splitlines():
-        line = re.sub(r"\s+", " ", raw_line).strip()
-        if not line or re.fullmatch(r"\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?", line):
-            continue
-        if line not in seen:
-            seen.add(line)
-            lines.append(line)
-    compact = " ".join(lines)
-    if len(compact) <= maximum_chars:
-        return compact
-    sentences = [part.strip() for part in re.split(r"(?<=[。！？!?])\s*|(?<=[A-Za-z])\.\s+", compact) if part.strip()]
-    if not sentences:
-        return compact[:maximum_chars].rstrip(" ，,；;")
-    ending = sentences[-1]
-    selected: List[str] = []
-    reserve = len(ending) + 1 if len(ending) < maximum_chars // 2 else 0
-    for sentence in sentences[:-1]:
-        candidate = " ".join(selected + [sentence])
-        if len(candidate) + reserve > maximum_chars:
-            break
-        selected.append(sentence)
-    if ending not in selected and len(" ".join(selected + [ending])) <= maximum_chars:
-        selected.append(ending)
-    compacted = " ".join(selected)
-    if compacted:
-        return compacted
-    return compact[:maximum_chars].rstrip(" ，,；;")
-
-
-def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
-    """Repair supported answers from stored evidence without an LLM call."""
-    repaired = dict(record)
-    tool_results = attach_tool_arguments(repaired.get("tool_outputs") or [], repaired.get("tool_calls") or [])
-    contract = GroundingContractBuilder().build(
-        str(repaired.get("user_input") or ""),
-        tool_results,
-        decision_policy=dict(repaired.get("decision_policy") or {}) or None,
-    )
-    repaired["answer_mode"] = contract.get("answer_mode")
-    repaired["grounding_contract"] = contract
-    repaired["decision_summary"] = dict(contract.get("decision_summary") or {})
-    issues = {str(value) for value in repaired.get("quality_issues") or []}
-    legacy_method = str(dict(repaired.get("repair_provenance") or {}).get("method") or "")
-    pipeformer_results = _successful_pipeformer_results(tool_results)
-
-    if contract.get("answer_mode") == "dispatch_comparison":
-        decision = dict(contract.get("decision_summary") or {})
-        repaired["final_answer"] = grounded_fallback_answer(str(repaired.get("user_input") or ""), contract)
-        repaired["risk_level"] = contract.get("worst_case_risk_level")
-        repaired["manual_intervention_label"] = contract.get("worst_case_intervention_label")
-        repaired["dispatch_recommendation"] = str(decision.get("selected_dispatch_recommendation") or "")
-        repaired["repair_provenance"] = {"method": "deterministic_grounding_contract", "external_llm_calls": 0, "reason": "Multi-candidate answer rebuilt from stored tool evidence."}
-
-    should_render_single = bool(pipeformer_results) and (legacy_method == "offline_deterministic_repair" or bool(issues & {"answer_too_long", "unsupported_unit_claim"}))
-    if contract.get("answer_mode") != "dispatch_comparison" and should_render_single:
-        repaired["final_answer"] = _single_forecast_answer(str(repaired.get("user_input") or ""), pipeformer_results[0])
-        output = dict(pipeformer_results[0].get("output") or {})
-        verification = dict(output.get("verification") or output.get("constraint_check") or {})
-        repaired["risk_level"] = verification.get("risk_level") or output.get("risk_level")
-        repaired["manual_intervention_label"] = verification.get("human_intervention_label") or output.get("manual_intervention_label")
-        repaired["dispatch_recommendation"] = str(verification.get("dispatch_recommendation") or "")
-        repaired["repair_provenance"] = {"method": "scenario_aware_deterministic_repair", "external_llm_calls": 0, "reason": "Single-forecast answer rebuilt from stored tool evidence."}
-    if "unsupported_unit_claim" in issues:
-        stripped = _strip_unsupported_units(str(repaired.get("final_answer") or ""))
-        if stripped != repaired.get("final_answer"):
-            repaired["final_answer"] = stripped
-            repaired["repair_provenance"] = {"method": "unsupported_unit_removal", "external_llm_calls": 0, "reason": "Unsupported unit labels removed without changing the numeric claims."}
-    repaired["final_answer"] = normalize_not_evaluated_wording(
-        str(repaired.get("final_answer") or "")
-    )
-    if "answer_too_long" in issues:
-        maximum_chars = (
-            chinese_comparison_max_chars(
-                len(contract.get("candidate_results") or [])
-            )
-            if contract.get("answer_mode") == "dispatch_comparison"
-            else CHINESE_SINGLE_FORECAST_MAX_CHARS
-            if repaired.get("scenario_type") == "pipeformer"
-            else GENERIC_MAX_CHARS
-        )
-        compacted = _compact_answer(str(repaired.get("final_answer") or ""), maximum_chars)
-        if compacted != repaired.get("final_answer"):
-            repaired["final_answer"] = compacted
-            repaired["repair_provenance"] = {"method": "extractive_answer_compaction", "external_llm_calls": 0, "reason": "Formatting and redundant text removed; retained content is extractive."}
-    return repaired

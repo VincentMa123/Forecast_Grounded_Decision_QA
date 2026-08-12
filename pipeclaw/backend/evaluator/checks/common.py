@@ -13,7 +13,6 @@ from .assumptions import inferred_task_fields, prediction_view
 
 
 PIPEFORMER_TOOL = "run_pipeformer_forecast"
-REGISTRY_TOOL = "search_pipeformer_registry"
 CANONICAL_METRIC_NAMES = (
     "task_parsing",
     "assumption_consistency",
@@ -70,23 +69,6 @@ def metric(
     )
 
 
-def inapplicable_metrics(
-    context: EvaluationContext,
-    names: Sequence[str],
-    *,
-    teacher_variant: str = "pipeformer",
-) -> list[MetricResult]:
-    return [
-        metric(
-            context,
-            name,
-            applicable=False,
-            teacher_variant=teacher_variant,
-        )
-        for name in names
-    ]
-
-
 def verification_view(output: Mapping[str, Any]) -> Mapping[str, Any]:
     value = output.get("verification") or output.get("constraint_check")
     return value if isinstance(value, Mapping) else {}
@@ -113,10 +95,9 @@ def normalize(value: Any) -> Any:
 
 
 def numbers_match(actual: Any, expected: Any) -> bool:
-    try:
-        actual_value = float(actual)
-        expected_value = float(expected)
-    except (TypeError, ValueError):
+    actual_value = _finite_number(actual)
+    expected_value = _finite_number(expected)
+    if actual_value is None or expected_value is None:
         return False
     return math.isclose(
         actual_value,
@@ -124,6 +105,18 @@ def numbers_match(actual: Any, expected: Any) -> bool:
         rel_tol=1e-6,
         abs_tol=1e-6,
     )
+
+
+def _finite_number(value: Any) -> float | None:
+    """Coerce an evaluator value only when it is a finite non-boolean number."""
+
+    if isinstance(value, bool):
+        return None
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return numeric if math.isfinite(numeric) else None
 
 
 def task_field_comparison(
@@ -176,14 +169,6 @@ def task_field_comparison(
         else:
             matched_fields.append(field)
     return not mismatches, mismatches, matched_fields
-
-
-def task_match(
-    expected: Mapping[str, Any],
-    actual: Mapping[str, Any],
-) -> tuple[bool, list[str]]:
-    matched, mismatches, _matched_fields = task_field_comparison(expected, actual)
-    return matched, mismatches
 
 
 def disturbance_was_applied(
@@ -246,7 +231,10 @@ def disturbance_was_applied(
         expected_mode = "percent_change"
         expected_value = percentages[variable]
         if magnitude is not None:
-            signed = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
+            magnitude_value = _finite_number(magnitude)
+            if magnitude_value is None:
+                return False
+            signed = abs(magnitude_value) * (1.0 if direction == "up" else -1.0)
             if direction not in {"up", "down"} or not numbers_match(
                 expected_value,
                 signed,
@@ -254,7 +242,10 @@ def disturbance_was_applied(
                 return False
     elif magnitude is not None and direction in {"up", "down"}:
         expected_mode = "percent_change"
-        expected_value = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
+        magnitude_value = _finite_number(magnitude)
+        if magnitude_value is None:
+            return False
+        expected_value = abs(magnitude_value) * (1.0 if direction == "up" else -1.0)
     else:
         return False
     applied = sequence(
@@ -266,6 +257,15 @@ def disturbance_was_applied(
         and str(item.get("mode") or "") == expected_mode
         and numbers_match(item.get("value", item.get("requested_value")), expected_value)
         for item in applied
+    )
+
+
+def checkpoint_inference_used(output: Mapping[str, Any]) -> bool:
+    """Require both the checkpoint forecast mode and its compact provenance."""
+
+    return (
+        prediction_view(output).get("forecast_mode") == "checkpoint_inference"
+        and bool(mapping(output.get("provenance")).get("checkpoint_id"))
     )
 
 

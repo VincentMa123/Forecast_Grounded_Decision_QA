@@ -5,10 +5,10 @@ with MS-SWIFT 4.x.
 
 ## Phase 7 local smoke test
 
-The smoke test uses the answer-only projection because every answer-only
-record fits intact at 2,048 tokens. The measured range is 1,430 to 2,008
-tokens. The original proposed 1,024-token limit is invalid for the current
-derived release because no complete record fits it.
+The smoke test uses the answer-only projection. The checked-in token profile is
+stale, so its historical 1,430--2,008-token range is only background and must
+be rechecked with a current tokenizer before treating the 2,048-token limit as
+safe. The original proposed 1,024-token limit is not a supported default.
 
 - `qwen35_08b_smoke_step10.yaml` trains
   `Qwen/Qwen3.5-0.8B` with 4-bit QLoRA for 10 optimizer steps and writes
@@ -53,16 +53,16 @@ two commands.
 
 - `qwen35_9b_remote_benchmark_step20.yaml` runs 20 optimizer steps of the real
   9B configuration to measure peak VRAM and tokens/sec before renting hours.
-- `qwen35_9b_remote_trace_level.yaml` is the full trace-level run, 3 epochs over
-  the 902 training records.
+- `qwen35_9b.yaml` is the full trace-level run, five epochs over the 902
+  training records.
 
-Both use `Qwen/Qwen3.5-9B`, the full trace-level projection at the lossless
-`max_length=16384` (trace-level maximum is 12,136 tokens, so nothing is
-truncated), 4-bit NF4 QLoRA with rank 32 / alpha 64, `attn_impl: flash_attn`,
+Both use `Qwen/Qwen3.5-9B` with `max_length=16384`, 4-bit NF4 QLoRA with rank
+32 / alpha 64, `attn_impl: flash_attn`,
 gradient checkpointing, and `deepspeed: zero2` over `NPROC_PER_NODE: 4` — four
-ranks × batch 1 × 8 accumulation steps, an effective batch size of 32. Every
-memory- and throughput-relevant value is the same in both files so the benchmark
-transfers to the full run.
+ranks × batch 1 × 8 accumulation steps, an effective batch size of 32. The
+checked-in profile is stale; confirm current record coverage before describing
+this limit as lossless. Every memory- and throughput-relevant value is the same
+in both files so the benchmark transfers to the full run.
 
 `NPROC_PER_NODE` belongs in the config's `ENV:` block: MS-SWIFT applies that
 block before deciding whether to launch `torch.distributed.run`, so no wrapper

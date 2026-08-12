@@ -2,50 +2,46 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
 
-# Importable as a plain script (``python evaluate_teacher_trace.py``) from any
-# working directory.  Python only ever puts *this* file's directory on the path,
-# which covers the sibling ``generate_teacher_trace`` import below but not the
-# ``grounding``/``evaluator``/``reporting`` packages one level up in ``backend``.
-# Mirrors the bootstrap in ``backend/scripts/curate_teacher_trace.py``.
-_MODULE_ROOTS = (
-    Path(__file__).resolve().parents[1],  # backend/  -> grounding, evaluator, reporting
-    Path(__file__).resolve().parent,  # backend/task1/ -> generate_teacher_trace
-)
-for _root in _MODULE_ROOTS:
-    if str(_root) not in sys.path:
-        sys.path.insert(0, str(_root))
-
-from grounding.evidence.csv import build_csv_evidence
-from grounding.contract import repair_grounded_record
-from evaluator.scorer import (
+from pipeclaw.backend.grounding.evidence.csv import record_csv_evidence
+from pipeclaw.backend.grounding.record_repair import repair_grounded_record
+from pipeclaw.backend.evaluator.scorer import (
     DEFAULT_MINIMUM_SCORE,
     NativeEvaluationConfig,
     NativeTraceEvaluator,
     apply_quality_aliases,
 )
-from reporting.teacher_trace_audit import (
+from pipeclaw.backend.reporting.teacher_trace_audit import (
     TeacherTraceAuditConfig,
     TeacherTraceQualityAuditor,
+    build_teacher_report_facts,
+    materialize_teacher_report_value,
 )
-from reporting.reviewer_annotations import (
+from pipeclaw.backend.reporting.reviewer_annotations import (
     export_reviewer_annotations,
     load_reviewer_annotations,
     load_sample_id_set,
 )
-from evaluator.teacher_quality import numeric_claims_are_grounded, numeric_grounding_evidence
-from grounding.evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
-from generate_teacher_trace import _history_turn, write_split_records
-from reporting.statistics_report import Task1StatisticsWorkbook
-from reporting.teacher_trace_quality_report import (
+from pipeclaw.backend.evaluator.numeric_grounding import (
+    numeric_claims_are_grounded,
+    numeric_grounding_evidence,
+)
+from pipeclaw.backend.task1.trace_export import write_split_records
+from pipeclaw.backend.task1.trace_history import (
+    build_history_turn,
+    summarize_record_tool_evidence,
+)
+from pipeclaw.backend.pipeline.io_utils import write_json, write_jsonl
+from pipeclaw.backend.reporting.statistics_report import Task1StatisticsWorkbook
+from pipeclaw.backend.reporting.teacher_trace_quality_report import (
     TeacherTraceQualityReportWriter,
 )
 
 
-BACKEND_ROOT = _MODULE_ROOTS[0]
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
 REPOSITORY_ROOT = BACKEND_ROOT.parents[1]
 DEFAULT_TRACE = BACKEND_ROOT / "generated_teacher_traces" / "teacher_trace.json"
 GENERATED_ROOT = BACKEND_ROOT / "generated_teacher_traces"
@@ -118,6 +114,23 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+@dataclass(frozen=True)
+class _ReportInputs:
+    facts: Dict[str, object]
+    evaluations: list[dict[str, object]]
+    quality_sample_ids: set[str]
+
+
+@dataclass(frozen=True)
+class _ReportArtifacts:
+    statistics: Dict[str, object]
+    manual_records: list[dict[str, object]]
+    artifacts: Dict[str, object]
+    report_source: Path
+    workbook_verification: Dict[str, object]
+    statistics_workbook_verification: Dict[str, object]
+
+
 class TeacherTraceEvaluationRunner:
     """Load, filter, evaluate, and persist one teacher-trace evaluation run."""
 
@@ -135,9 +148,37 @@ class TeacherTraceEvaluationRunner:
         self.report_writer = TeacherTraceQualityReportWriter(self.auditor)
 
     def run(self) -> Dict[str, object]:
-        args = self.args
-        if args.repair_grounded_records and args.repair_output is None:
+        self._validate_options()
+        annotation_export, reviewer_annotations, reset_review_sample_ids = self._load_review_inputs()
+        records, native_results = self._load_filter_and_normalize_records()
+        if self.args.repair_grounded_records:
+            assert self.args.repair_output is not None
+            if self.args.repair_output.suffix.casefold() == ".jsonl":
+                write_jsonl(self.args.repair_output, records, force=True)
+            else:
+                write_json(self.args.repair_output, records, force=True)
+        report_inputs = self._build_report_inputs(records, native_results)
+        report_artifacts = self._write_report_artifacts(
+            records,
+            report_inputs,
+            reviewer_annotations,
+            reset_review_sample_ids,
+        )
+        summary = self._build_summary(
+            records,
+            report_inputs,
+            report_artifacts,
+            annotation_export,
+        )
+        write_json(self.args.summary_json, summary, force=True)
+        return summary
+
+    def _validate_options(self) -> None:
+        if self.args.repair_grounded_records and self.args.repair_output is None:
             raise ValueError("--repair-output is required with --repair-grounded-records.")
+
+    def _load_review_inputs(self) -> tuple[object, list[object], set[str]]:
+        args = self.args
         annotation_export = None
         if args.report_xlsx.is_file():
             annotation_export = export_reviewer_annotations(
@@ -146,6 +187,12 @@ class TeacherTraceEvaluationRunner:
             )
         reviewer_annotations = load_reviewer_annotations(args.reviewer_annotations)
         reset_review_sample_ids = load_sample_id_set(args.reset_review_sample_ids)
+        return annotation_export, reviewer_annotations, reset_review_sample_ids
+
+    def _load_filter_and_normalize_records(
+        self,
+    ) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
+        args = self.args
         all_records = self.evaluator.load(args.teacher_trace.resolve())
         resolved_records, native_results = self._resolve_legacy_grounding(all_records)
         records = [
@@ -156,32 +203,36 @@ class TeacherTraceEvaluationRunner:
         ]
         if not records:
             raise ValueError("No teacher-trace records matched the requested filters.")
-        repaired_sft_count = None
-        if args.repair_grounded_records:
-            self._write_teacher_records(args.repair_output, records)
-        evaluations = []
-        for record in records:
-            native = native_results[str(record.get("sample_id") or "")]
-            task1 = self.auditor.evaluate(record, native)
-            evaluations.append(
-                {
-                    **task1,
-                    "native_profile": native.get("profile"),
-                    "native_failed_checks": native.get("failed_checks"),
-                    "native_failed_critical_checks": native.get("failed_critical_checks"),
-                    "native_quality_issues": native.get("quality_issues"),
-                    "native_checks": native.get("checks"),
-                }
-            )
-        self._write_jsonl(args.output_jsonl, evaluations)
+        return records, native_results
 
-        self.report_writer.write_schema(args.schema_json)
-        filtered_run = bool(args.scenario_id or args.sample_id)
+    @staticmethod
+    def _build_report_inputs(
+        records: list[dict[str, object]],
+        native_results: dict[str, dict[str, object]],
+    ) -> _ReportInputs:
+        facts = build_teacher_report_facts(
+            records,
+            [native_results[str(record.get("sample_id") or "")] for record in records],
+        )
+        evaluations = materialize_teacher_report_value(facts["evaluations"])
         quality_sample_ids = {
             str(item.get("sample_id"))
             for item in evaluations
             if item.get("task1_quality_flag") == "pass"
         }
+        return _ReportInputs(facts, evaluations, quality_sample_ids)
+
+    def _write_report_artifacts(
+        self,
+        records: list[dict[str, object]],
+        report_inputs: _ReportInputs,
+        reviewer_annotations: list[object],
+        reset_review_sample_ids: set[str],
+    ) -> _ReportArtifacts:
+        args = self.args
+        write_jsonl(args.output_jsonl, report_inputs.evaluations, force=True)
+        self.report_writer.write_schema(args.schema_json)
+        filtered_run = bool(args.scenario_id or args.sample_id)
         compact_split_counts: Dict[str, int] = {}
         audit_split_counts: Dict[str, int] = {}
         if not filtered_run:
@@ -190,7 +241,7 @@ class TeacherTraceEvaluationRunner:
                 [
                     {**record, "quality_flag": "pass"}
                     for record in records
-                    if str(record.get("sample_id") or "") in quality_sample_ids
+                    if str(record.get("sample_id") or "") in report_inputs.quality_sample_ids
                 ],
                 force=True,
             )
@@ -199,13 +250,13 @@ class TeacherTraceEvaluationRunner:
                 args.deliverable_dir,
                 records,
                 args.compact_split_dir,
-                quality_sample_ids,
+                report_inputs.quality_sample_ids,
             )
-        statistics = self.auditor.statistics(records, evaluations)
+        statistics = materialize_teacher_report_value(report_inputs.facts["statistics"])
         manual_records = (
-            self.auditor.manual_review_queue(records, evaluations)
+            self.auditor.manual_review_queue(records, report_inputs.evaluations)
             if args.repair_grounded_records
-            else self.auditor.manual_sample(records, evaluations)
+            else self.auditor.manual_sample(records, report_inputs.evaluations)
         )
         rule_files = {
             name: (CONSTRAINT_LIBRARY / name).is_file()
@@ -232,16 +283,12 @@ class TeacherTraceEvaluationRunner:
         )
         Task1StatisticsWorkbook.write(
             args.statistics_xlsx,
-            records,
-            evaluations,
-            statistics,
+            report_inputs.facts,
             Path(display_path(report_source)),
         )
         self.report_writer.write_report(
             args.report_xlsx,
-            records,
-            evaluations,
-            statistics,
+            report_inputs.facts,
             manual_records,
             Path(display_path(report_source)),
             artifacts,
@@ -252,9 +299,26 @@ class TeacherTraceEvaluationRunner:
         statistics_workbook_verification = self.report_writer.verify_workbook(
             args.statistics_xlsx
         )
-        summary = {
+        return _ReportArtifacts(
+            statistics,
+            manual_records,
+            artifacts,
+            report_source,
+            workbook_verification,
+            statistics_workbook_verification,
+        )
+
+    def _build_summary(
+        self,
+        records: list[dict[str, object]],
+        report_inputs: _ReportInputs,
+        report_artifacts: _ReportArtifacts,
+        annotation_export: object,
+    ) -> Dict[str, object]:
+        args = self.args
+        return {
             "schema_version": "pipeclaw_task1_quality_v1",
-            "teacher_trace": display_path(report_source),
+            "teacher_trace": display_path(report_artifacts.report_source),
             "minimum_pass_score": args.minimum_score,
             "native_evaluation": self.evaluator.summarize([
                 {
@@ -263,9 +327,9 @@ class TeacherTraceEvaluationRunner:
                     "profile": item["native_profile"],
                     "quality_issues": item["native_quality_issues"],
                 }
-                for item in evaluations
+                for item in report_inputs.evaluations
             ]),
-            "task1_statistics": statistics,
+            "task1_statistics": report_artifacts.statistics,
             "manual_spot_check": {
                 "queue_mode": (
                     "all_remaining_needs_review"
@@ -275,29 +339,24 @@ class TeacherTraceEvaluationRunner:
                 "sample_rate_target": (
                     None if args.repair_grounded_records else args.manual_sample_rate
                 ),
-                "sample_count": len(manual_records),
-                "actual_sample_rate": round(len(manual_records) / len(records), 6),
+                "sample_count": len(report_artifacts.manual_records),
+                "actual_sample_rate": round(len(report_artifacts.manual_records) / len(records), 6),
                 "status": "pending_human_signoff",
             },
-            "rule_library_complete": all(rule_files.values()),
-            "workbook_verification": workbook_verification,
-            "statistics_workbook_verification": statistics_workbook_verification,
-            "artifacts": artifacts,
+            "rule_library_complete": all(
+                report_artifacts.artifacts["pipeline_constraint_rule_library"].values()
+            ),
+            "workbook_verification": report_artifacts.workbook_verification,
+            "statistics_workbook_verification": report_artifacts.statistics_workbook_verification,
+            "artifacts": report_artifacts.artifacts,
             "output_jsonl": display_path(args.output_jsonl),
             "repair_output": (
                 display_path(args.repair_output)
                 if args.repair_grounded_records
                 else None
             ),
-            "repaired_sft_record_count": repaired_sft_count,
             "reviewer_annotation_export": annotation_export,
         }
-        args.summary_json.parent.mkdir(parents=True, exist_ok=True)
-        args.summary_json.write_text(
-            json.dumps(summary, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        return summary
 
     def _resolve_legacy_grounding(
         self, records: list[dict[str, object]]
@@ -323,8 +382,6 @@ class TeacherTraceEvaluationRunner:
             record["conversation_context"] = context
             self._refresh_csv_grounding(record)
             if self.args.repair_grounded_records:
-                discovered = self.evaluator.evaluate(record, trace_status=record.get("trace_status"))
-                record["quality_issues"] = discovered["quality_issues"]
                 record = repair_grounded_record(record)
             native = self.evaluator.evaluate(record, trace_status=record.get("trace_status"))
             record_id = str(record.get("sample_id") or "")
@@ -333,25 +390,15 @@ class TeacherTraceEvaluationRunner:
                 # Repaired records adopt the aliases of the re-run canonical
                 # report rather than a second offline score calculation.
                 apply_quality_aliases(record, native)
-            outputs = attach_tool_arguments(
-                record.get("tool_outputs") or [],
-                record.get("tool_calls") or [],
-            )
-            requested = requested_artifacts(str(record.get("user_input") or ""))
-            assessments = [
-                classify_tool_evidence(item, requested=requested)
-                for item in outputs
-            ]
-            evidence_artifacts = sorted({
-                artifact
-                for assessment in assessments if assessment.evidence_found
-                for artifact in assessment.matched_artifacts
-            })
+            evidence_summary = summarize_record_tool_evidence(record)
             grounding_verified = (
                 native.get("quality_flag") == "pass"
-                and any(assessment.evidence_found for assessment in assessments)
+                and evidence_summary.evidence_found
             )
-            history_projection = _history_turn(record)
+            history_projection = build_history_turn(
+                record,
+                evidence_summary=evidence_summary,
+            )
             tool_evidence_verified = bool(
                 history_projection.get("tool_evidence_verified")
             )
@@ -364,7 +411,7 @@ class TeacherTraceEvaluationRunner:
                 "assistant_output": str(record.get("final_answer") or ""),
                 "grounding_verified": grounding_verified,
                 "tool_evidence_verified": tool_evidence_verified,
-                "evidence_artifacts": evidence_artifacts,
+                "evidence_artifacts": list(evidence_summary.evidence_artifacts),
             }
             verified_evidence_summary = (
                 dict(history_projection.get("verified_evidence_summary") or {})
@@ -380,10 +427,8 @@ class TeacherTraceEvaluationRunner:
     @staticmethod
     def _refresh_csv_grounding(record: dict[str, object]) -> None:
         """Rebuild deterministic CSV evidence from stored successful tool outputs."""
-        csv_evidence = build_csv_evidence(
-            record.get("tool_calls") or [],
-            record.get("tool_outputs") or [],
-            str(record.get("final_answer") or ""),
+        csv_evidence = record_csv_evidence(
+            record,
             scope_text=str(record.get("user_input") or ""),
         )
         if not csv_evidence:
@@ -421,26 +466,6 @@ class TeacherTraceEvaluationRunner:
                 else 0
             )
         return counts
-
-    @staticmethod
-    def _write_teacher_records(path: Path, records: list[dict[str, object]]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        if path.suffix.casefold() == ".jsonl":
-            with path.open("w", encoding="utf-8", newline="\n") as handle:
-                for record in records:
-                    handle.write(json.dumps(record, ensure_ascii=False) + "\n")
-            return
-        path.write_text(
-            json.dumps(records, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-    @staticmethod
-    def _write_jsonl(path: Path, evaluations: list[dict[str, object]]) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("w", encoding="utf-8", newline="\n") as handle:
-            for result in evaluations:
-                handle.write(json.dumps(result, ensure_ascii=False) + "\n")
-
 
 def main() -> int:
     args = build_parser().parse_args()

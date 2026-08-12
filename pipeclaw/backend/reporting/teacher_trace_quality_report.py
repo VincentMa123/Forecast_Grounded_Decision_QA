@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import json
-from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from reporting.teacher_trace_audit import TeacherTraceQualityAuditor
-from evaluator.teacher_quality import tool_output_failed
-from grounding.evidence.tool import attach_tool_arguments
+from .teacher_trace_audit import TeacherTraceQualityAuditor
 
 
 class TeacherTraceQualityReportWriter:
@@ -75,9 +72,7 @@ class TeacherTraceQualityReportWriter:
     def write_report(
         self,
         path: Path,
-        records: Sequence[Dict[str, Any]],
-        evaluations: Sequence[Dict[str, Any]],
-        statistics: Mapping[str, Any],
+        facts: Mapping[str, Any],
         manual_records: Sequence[Dict[str, Any]],
         source_path: Path,
         artifacts: Mapping[str, Any],
@@ -115,36 +110,19 @@ class TeacherTraceQualityReportWriter:
         workbook.properties.title = "Task 1 Teacher Trace Quality Report"
         workbook.properties.subject = "Section 1.8 quality control and Section 1.9 statistics"
 
-        by_id = {str(item.get("sample_id")): item for item in evaluations}
         generated_at = datetime.now(timezone.utc).isoformat()
-        check_counts = {
-            name: Counter(item["checks"][name]["status"] for item in evaluations)
-            for name in (
-                "schema",
-                "numerical_consistency",
-                "rule_consistency",
-                "dispatch_consistency",
-            )
-        }
         summary_rows = [
             ("Task 1 Teacher Trace Quality Report", None),
             ("Generated at (UTC)", generated_at),
             ("Teacher trace source", source_path.as_posix()),
-            ("Total sample count", statistics["total_sample_count"]),
-            ("Native quality pass count", statistics["native_quality_distribution"].get("pass", 0)),
-            ("Native quality pass rate", statistics["native_quality_pass_rate"]),
-            ("Task 1 verification pass count", statistics["task1_quality_distribution"].get("pass", 0)),
-            ("Task 1 verification pass rate", statistics["task1_quality_pass_rate"]),
-            ("Schema check pass count", check_counts["schema"].get("pass", 0)),
-            ("Numerical consistency pass count", check_counts["numerical_consistency"].get("pass", 0)),
-            ("Numerical consistency failure count", check_counts["numerical_consistency"].get("fail", 0)),
-            ("Applicable rule-consistency checks", sum(check_counts["rule_consistency"].values()) - check_counts["rule_consistency"].get("not_applicable", 0)),
-            ("Rule-consistency failure count", check_counts["rule_consistency"].get("fail", 0)),
-            ("Applicable dispatch-consistency checks", sum(check_counts["dispatch_consistency"].values()) - check_counts["dispatch_consistency"].get("not_applicable", 0)),
-            ("Dispatch-consistency failure count", check_counts["dispatch_consistency"].get("fail", 0)),
-            ("Average evidence item count", statistics["average_evidence_item_count"]),
+            *facts["quality_summary_rows"],
             ("Manual spot-check sample count", len(manual_records)),
-            ("Manual spot-check sample rate", len(manual_records) / len(records) if records else 0.0),
+            (
+                "Manual spot-check sample rate",
+                len(manual_records) / facts["statistics"]["total_sample_count"]
+                if facts["statistics"]["total_sample_count"]
+                else 0.0,
+            ),
             ("Manual review status", "pending_human_signoff"),
         ]
         for row in summary_rows:
@@ -167,23 +145,8 @@ class TeacherTraceQualityReportWriter:
             "applicable_pass_rate",
             "purpose",
         ])
-        check_purposes = {
-            "schema": "Required Task 1.7 fields and JSON container types.",
-            "numerical_consistency": "Final-answer numeric claims are present in trusted evidence.",
-            "rule_consistency": "Risk and intervention conclusions agree with constraint_check.",
-            "dispatch_consistency": "Recommendations obey pressure and compressor safety priorities.",
-        }
-        for name, counts in check_counts.items():
-            applicable = counts.get("pass", 0) + counts.get("fail", 0)
-            check_summary.append([
-                name,
-                counts.get("pass", 0),
-                counts.get("fail", 0),
-                counts.get("not_applicable", 0),
-                applicable,
-                counts.get("pass", 0) / applicable if applicable else None,
-                check_purposes[name],
-            ])
+        for row in facts["check_summary_rows"]:
+            check_summary.append(row)
             check_summary.cell(check_summary.max_row, 6).number_format = "0.0%"
 
         check_headers = [
@@ -215,60 +178,8 @@ class TeacherTraceQualityReportWriter:
             "issues",
         ]
         checks_sheet.append(check_headers)
-        for record in records:
-            result = by_id[str(record.get("sample_id"))]
-            task_checks = result["checks"]
-            check_issues = [
-                issue
-                for check in task_checks.values()
-                for issue in check.get("issues") or []
-            ]
-            outputs = attach_tool_arguments(
-                record.get("tool_outputs") or [], record.get("tool_calls") or []
-            )
-            checks_sheet.append([
-                record.get("sample_id"),
-                record.get("dataset_source"),
-                record.get("scenario_id"),
-                record.get("session_id"),
-                record.get("turn_id"),
-                record.get("scenario_type"),
-                record.get("split"),
-                (record.get("parsed_task") or {}).get("task_type") or record.get("scenario_type"),
-                len(record.get("tool_calls") or []),
-                sum(not tool_output_failed(item) for item in outputs),
-                sum(tool_output_failed(item) for item in outputs),
-                result.get("native_profile"),
-                result.get("native_quality_flag"),
-                result.get("native_quality_score"),
-                result.get("task1_quality_flag"),
-                result.get("evidence_item_count"),
-                result.get("final_answer_chars"),
-                task_checks["schema"]["status"],
-                task_checks["numerical_consistency"]["status"],
-                task_checks["rule_consistency"]["status"],
-                task_checks["dispatch_consistency"]["status"],
-                (record.get("constraint_check") or {}).get("overall_status"),
-                record.get("risk_level"),
-                record.get("manual_intervention_label"),
-                ", ".join(result.get("task1_failed_checks") or []),
-                ", ".join((result.get("native_quality_issues") or []) + check_issues),
-            ])
-
-        requested_categories = Counter()
-        category_counts: Dict[str, Counter[str]] = defaultdict(Counter)
-        category_scenarios: Dict[str, set[str]] = defaultdict(set)
-        rule_counts: Dict[str, Counter[str]] = defaultdict(Counter)
-        for record in records:
-            constraint = dict(record.get("constraint_check") or {})
-            category_status = dict(constraint.get("category_status") or {})
-            for category in constraint.get("requested_categories") or []:
-                category = str(category)
-                requested_categories[category] += 1
-                category_counts[category][str(category_status.get(category) or "missing")] += 1
-                category_scenarios[category].add(str(record.get("scenario_id") or ""))
-            for rule, status in (constraint.get("rule_status") or {}).items():
-                rule_counts[str(rule)][str(status or "missing")] += 1
+        for row in facts["record_check_rows"]:
+            checks_sheet.append(row)
 
         constraint_coverage.append([
             "constraint_category",
@@ -282,23 +193,8 @@ class TeacherTraceQualityReportWriter:
             "non_pass_rate",
             "scenario_count",
         ])
-        for category in sorted(requested_categories):
-            counts = category_counts[category]
-            requested = requested_categories[category]
-            evaluated = counts.get("pass", 0) + counts.get("warning", 0) + counts.get("fail", 0)
-            nonpass = counts.get("warning", 0) + counts.get("fail", 0)
-            constraint_coverage.append([
-                category,
-                requested,
-                evaluated,
-                counts.get("pass", 0),
-                counts.get("warning", 0),
-                counts.get("fail", 0),
-                requested - evaluated,
-                evaluated / requested if requested else None,
-                nonpass / evaluated if evaluated else None,
-                len(category_scenarios[category]),
-            ])
+        for row in facts["quality_category_rows"]:
+            constraint_coverage.append(row)
             constraint_coverage.cell(constraint_coverage.max_row, 8).number_format = "0.0%"
             constraint_coverage.cell(constraint_coverage.max_row, 9).number_format = "0.0%"
 
@@ -312,31 +208,11 @@ class TeacherTraceQualityReportWriter:
             "pass_rate",
             "non_pass_rate",
         ])
-        for rule in sorted(rule_counts):
-            counts = rule_counts[rule]
-            evaluated = counts.get("pass", 0) + counts.get("warning", 0) + counts.get("fail", 0)
-            nonpass = counts.get("warning", 0) + counts.get("fail", 0)
-            other = sum(counts.values()) - evaluated
-            rule_outcomes.append([
-                rule,
-                evaluated,
-                counts.get("pass", 0),
-                counts.get("warning", 0),
-                counts.get("fail", 0),
-                other,
-                counts.get("pass", 0) / evaluated if evaluated else None,
-                nonpass / evaluated if evaluated else None,
-            ])
+        for row in facts["rule_rows"]:
+            rule_outcomes.append(row)
             rule_outcomes.cell(rule_outcomes.max_row, 7).number_format = "0.0%"
             rule_outcomes.cell(rule_outcomes.max_row, 8).number_format = "0.0%"
 
-        coverage_groups: Dict[tuple[str, str, str], List[Dict[str, Any]]] = defaultdict(list)
-        for record in records:
-            coverage_groups[(
-                str(record.get("dataset_source") or "unknown"),
-                str(record.get("scenario_type") or "unknown"),
-                str(record.get("split") or "unknown"),
-            )].append(record)
         dataset_coverage.append([
             "dataset_source",
             "scenario_type",
@@ -350,20 +226,8 @@ class TeacherTraceQualityReportWriter:
             "average_final_answer_chars",
             "average_tool_calls",
         ])
-        for key, group in sorted(coverage_groups.items()):
-            group_results = [by_id[str(item.get("sample_id"))] for item in group]
-            passed = sum(item.get("task1_quality_flag") == "pass" for item in group_results)
-            dataset_coverage.append([
-                *key,
-                len(group),
-                len({str(item.get("scenario_id") or "") for item in group}),
-                len({str(item.get("session_id") or "") for item in group}),
-                passed,
-                passed / len(group),
-                sum(item.get("evidence_item_count", 0) for item in group_results) / len(group),
-                sum(item.get("final_answer_chars", 0) for item in group_results) / len(group),
-                sum(len(item.get("tool_calls") or []) for item in group) / len(group),
-            ])
+        for row in facts["coverage_rows"]:
+            dataset_coverage.append(row)
             dataset_coverage.cell(dataset_coverage.max_row, 8).number_format = "0.0%"
 
         needs_review.append([
@@ -383,63 +247,14 @@ class TeacherTraceQualityReportWriter:
             "reviewer_notes",
             "final_disposition",
         ])
-        for record in records:
-            result = by_id[str(record.get("sample_id"))]
-            if result.get("task1_quality_flag") == "pass":
-                continue
-            needs_review.append([
-                record.get("sample_id"),
-                record.get("dataset_source"),
-                record.get("scenario_id"),
-                record.get("session_id"),
-                record.get("turn_id"),
-                record.get("scenario_type"),
-                record.get("split"),
-                result.get("native_quality_score"),
-                ", ".join(result.get("native_failed_checks") or []),
-                ", ".join(result.get("task1_failed_checks") or []),
-                ", ".join(result.get("native_quality_issues") or []),
-                record.get("user_input"),
-                record.get("final_answer"),
-                "",
-                "pending",
-            ])
+        for row in facts["needs_review_rows"]:
+            needs_review.append(row)
 
         distributions.append(["dimension", "value", "count", "percentage"])
-        distribution_keys = (
-            "dataset_source_distribution",
-            "task_type_distribution",
-            "scenario_type_distribution",
-            "constraint_type_distribution",
-            "risk_level_distribution",
-            "human_intervention_distribution",
-            "native_quality_distribution",
-            "task1_quality_distribution",
-        )
-        for dimension in distribution_keys:
-            values = statistics[dimension]
-            denominator = sum(values.values()) or 1
-            for value, count in values.items():
-                distributions.append([dimension, value, count, count / denominator])
-                distributions.cell(distributions.max_row, 4).number_format = "0.0%"
+        for row in facts["distribution_rows"]:
+            distributions.append(row)
+            distributions.cell(distributions.max_row, 4).number_format = "0.0%"
 
-        issue_counts = Counter()
-        issue_samples: Dict[str, List[str]] = defaultdict(list)
-        issue_datasets: Dict[str, set[str]] = defaultdict(set)
-        issue_scenarios: Dict[str, set[str]] = defaultdict(set)
-        for record in records:
-            result = by_id[str(record.get("sample_id"))]
-            record_issues = {str(issue) for issue in result.get("native_quality_issues") or []}
-            record_issues.update(
-                str(issue)
-                for check in result["checks"].values()
-                for issue in check.get("issues") or []
-            )
-            issue_counts.update(record_issues)
-            for issue in record_issues:
-                issue_samples[issue].append(str(record.get("sample_id") or ""))
-                issue_datasets[issue].add(str(record.get("dataset_source") or "unknown"))
-                issue_scenarios[issue].add(str(record.get("scenario_id") or "unknown"))
         issues_sheet.append([
             "issue",
             "record_occurrences",
@@ -448,15 +263,8 @@ class TeacherTraceQualityReportWriter:
             "scenario_count",
             "affected_sample_ids",
         ])
-        for issue, count in sorted(issue_counts.items()):
-            issues_sheet.append([
-                issue,
-                count,
-                count / len(records) if records else 0.0,
-                ", ".join(sorted(issue_datasets[issue])),
-                len(issue_scenarios[issue]),
-                ", ".join(issue_samples[issue]),
-            ])
+        for row in facts["issue_rows"]:
+            issues_sheet.append(row)
             issues_sheet.cell(issues_sheet.max_row, 3).number_format = "0.0%"
 
         manual.append([
@@ -492,49 +300,7 @@ class TeacherTraceQualityReportWriter:
             "final_disposition",
         ])
         for record in manual_records:
-            result = by_id[str(record.get("sample_id"))]
-            task_checks = result["checks"]
-            manual.append([
-                record.get("sample_id"),
-                record.get("dataset_source"),
-                record.get("scenario_id"),
-                record.get("session_id"),
-                record.get("turn_id"),
-                record.get("scenario_type"),
-                record.get("split"),
-                result.get("task1_quality_flag"),
-                result.get("native_quality_score"),
-                ", ".join(sorted(
-                    {str(issue) for issue in result.get("native_quality_issues") or []}
-                    | {
-                        str(issue)
-                        for check in task_checks.values()
-                        for issue in check.get("issues") or []
-                    }
-                    | {f"native_check:{name}" for name in result.get("native_failed_checks") or []}
-                    | {f"task1_check:{name}" for name in result.get("task1_failed_checks") or []}
-                )),
-                task_checks["schema"]["status"],
-                task_checks["numerical_consistency"]["status"],
-                task_checks["rule_consistency"]["status"],
-                task_checks["dispatch_consistency"]["status"],
-                record.get("user_input"),
-                record.get("final_answer"),
-                json.dumps(record.get("parsed_task") or {}, ensure_ascii=False, separators=(",", ":")),
-                ", ".join(str(item.get("name") or "") for item in record.get("tool_calls") or []),
-                json.dumps((record.get("constraint_check") or {}).get("category_status") or {}, ensure_ascii=False, separators=(",", ":")),
-                self.auditor.manual_evidence_summary(record),
-                record.get("risk_level"),
-                record.get("manual_intervention_label"),
-                record.get("dispatch_recommendation"),
-                "pending",
-                "pending",
-                "pending",
-                "pending",
-                "",
-                "",
-                "pending",
-            ])
+            manual.append(facts["manual_rows_by_id"][str(record.get("sample_id") or "")])
 
         deliverables.append(["artifact", "path_or_value"])
         for name, value in artifacts.items():

@@ -19,12 +19,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import sys
 from pathlib import Path
 from typing import Sequence
-
-if __package__ in {None, ""}:  # support both ``-m`` and direct script invocation
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
 from pipeclaw.task2_student.rollout.suite import evaluate_dataset
 

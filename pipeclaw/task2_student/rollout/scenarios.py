@@ -2,25 +2,23 @@
 
 PipeFormer and OpenClaw cases share the rollout runner but differ in which tools
 are authorized, how workspaces are isolated, and how tool output is projected
-into the bounded model-visible form.  Compaction is delegated to the canonical
-``pipeclaw.backend.grounding.pipeformer_projection`` so training, teacher
-generation, and evaluation stay on one projection.
+into the bounded model-visible form.
 """
 
 from __future__ import annotations
 
 import hashlib
 import re
-import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from pipeclaw.backend.grounding.pipeformer_projection import (
-    compact_pipeformer_output,
-    project_pipeformer_output,
-)
+from pipeclaw.backend.pipeline.forecast_result import ForecastResult
 
-from ..path_contract import is_host_absolute_path, redact_host_paths
+from ..path_contract import (
+    canonicalize_recorded_tool_arguments,
+    is_host_absolute_path,
+    redact_host_paths,
+)
 from .models import PromptCase, ToolCall
 from .tools import ToolDispatcher
 
@@ -174,27 +172,6 @@ def openclaw_portability_metadata(
     return {"portable_path_normalization": normalized != str(cwd)}
 
 
-def portable_call_arguments(call: ToolCall) -> dict[str, Any]:
-    """Keep saved normal-rollout arguments logical; raw diagnostics are opt-in."""
-
-    arguments = dict(call.arguments)
-    if call.name == "run_command":
-        cwd = arguments.get("cwd")
-        if cwd is None or is_host_absolute_path(cwd):
-            arguments.pop("cwd", None)
-        elif isinstance(cwd, str):
-            arguments["cwd"] = cwd.replace("\\", "/")
-        command = arguments.get("cmd")
-        if isinstance(command, list):
-            arguments["cmd"] = [
-                item.replace("\\", "/")
-                if isinstance(item, str) and not is_host_absolute_path(item)
-                else "<host-path>"
-                for item in command
-            ]
-    return arguments
-
-
 def compact_model_tool_result(
     tool_name: str,
     value: Any,
@@ -218,7 +195,11 @@ def compact_model_tool_result(
     if tool_name != "run_pipeformer_forecast":
         return value
 
-    return compact_pipeformer_output(project_pipeformer_output(dict(value)))
+    if {"task_resolution", "prediction", "verification", "provenance"} & value.keys():
+        forecast = ForecastResult.model_validate(value)
+    else:
+        forecast = ForecastResult.from_execution(value)
+    return forecast.model_dump()
 
 
 class ScenarioPolicy:
@@ -238,7 +219,7 @@ class ScenarioPolicy:
 
     def recorded_arguments(self, call: ToolCall, case: PromptCase) -> Mapping[str, Any]:
         del case
-        return portable_call_arguments(call)
+        return canonicalize_recorded_tool_arguments(call.name, call.arguments)
 
     def compact_tool_result(
         self,
@@ -412,14 +393,6 @@ def normalize_openclaw_execution_arguments(
     return arguments
 
 
-def _ensure_import_roots(repo_root: Path) -> Path:
-    backend_root = repo_root / "pipeclaw" / "backend"
-    for import_root in (repo_root, backend_root):
-        if str(import_root) not in sys.path:
-            sys.path.insert(0, str(import_root))
-    return backend_root
-
-
 def _schema_names(schemas: Sequence[Mapping[str, Any]]) -> set[str]:
     return {
         str(schema.get("function", {}).get("name"))
@@ -450,11 +423,11 @@ def build_pipeformer_dispatcher(
 ) -> ToolDispatcher:
     """Build the read-only forecast dispatcher used by PipeFormer rollouts."""
 
-    _ensure_import_roots(repo_root)
+    backend_root = Path(repo_root).resolve() / "pipeclaw" / "backend"
     from pipeclaw.backend.agent.tools.registry import tool_registry
     from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
 
-    register_pipeformer_tools(repo_root / "pipeclaw" / "backend")
+    register_pipeformer_tools(backend_root)
     workspace_ready = True
     workspace_runner = None
     if "read_file" in _schema_names(schemas):
@@ -482,7 +455,7 @@ def build_pipeformer_dispatcher(
         dispatcher = dispatcher_ref.get("dispatcher")
         current_request = dispatcher.current_user_request if dispatcher else ""
         if call.name == "run_pipeformer_forecast":
-            from pipeline.forecast_registry_contract import (
+            from pipeclaw.backend.pipeline.forecast_registry_contract import (
                 forecast_registry_failure_result,
             )
 
@@ -532,7 +505,7 @@ def build_openclaw_dispatcher(
 ) -> ToolDispatcher:
     """Build the sandboxed workspace dispatcher used by OpenClaw rollouts."""
 
-    backend_root = _ensure_import_roots(repo_root)
+    backend_root = Path(repo_root).resolve() / "pipeclaw" / "backend"
     from pipeclaw.backend.agent.tools.registry import tool_registry
     from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
     from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools

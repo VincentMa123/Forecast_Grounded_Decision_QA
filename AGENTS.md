@@ -6,9 +6,9 @@ This repository contains two related packages. `pipeFormer/` holds the forecasti
 
 ## Build, Test, and Development Commands
 
-- `cd pipeclaw && pip install -r backend/requirements.txt`: install backend dependencies.
-- `cd pipeclaw && python backend/main.py`: start the FastAPI backend on `http://localhost:8003`.
-- `cd pipeclaw/frontend && npm install`: install frontend dependencies from `package-lock.json`.
+- `pip install -r pipeclaw/backend/requirements.txt`: from the repository root, install backend dependencies.
+- `python -m pipeclaw.backend.main`: from the repository root, start the FastAPI backend on `http://localhost:8003`.
+- `cd pipeclaw/frontend && npm install`: from the repository root, install frontend dependencies from `package-lock.json`.
 - `cd pipeclaw/frontend && npm run dev`: start the Vite dev server on port `3000`; `/api` and `/assets` proxy to the backend.
 - `cd pipeclaw/frontend && npm run build`: run TypeScript checking and build the frontend.
 - `cd pipeclaw/frontend && npm run lint`: run the declared ESLint check.

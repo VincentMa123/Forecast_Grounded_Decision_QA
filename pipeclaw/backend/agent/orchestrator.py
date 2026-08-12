@@ -20,19 +20,20 @@ from .prompt_builder import PromptBuilder
 from .trace_writer import TraceWriter
 from .tools.registry import tool_registry
 from .skills.skill_manager import SkillManager
-from executor.runner import get_runner
-from grounding.decision_policy import METRIC_CATALOG
-from grounding.decision_trace_state import (
+from pipeclaw.backend.executor.runner import get_runner
+from pipeclaw.backend.grounding.decision_policy import METRIC_CATALOG
+from pipeclaw.backend.grounding.decision_trace_state import (
     VerifiedDecisionState,
     bounded_recent_turns,
     serialize_verified_decision_state,
+    transition_forecast_scope,
 )
-from grounding.contract import (
+from pipeclaw.backend.grounding.contract import (
     GroundingContractBuilder,
-    candidate_contract_message,
     finalize_applied_disturbance_disclosure,
 )
-from pipeline.forecast_registry_contract import forecast_registry_failure_result
+from pipeclaw.backend.agent.prompt_policy import candidate_contract_message
+from pipeclaw.backend.pipeline.forecast_registry_contract import forecast_registry_failure_result
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,12 @@ def finalize_runtime_answer(
 ) -> str:
     """Apply the canonical disclosure from current and prior verified evidence."""
     state = prior_state or VerifiedDecisionState()
+    for item in completed_tool_calls:
+        if item.get("name") == "run_pipeformer_forecast":
+            state = transition_forecast_scope(
+                state,
+                dict(item.get("arguments") or {}),
+            )
     contract = GroundingContractBuilder().build(
         question,
         completed_tool_calls,
@@ -340,13 +347,14 @@ class AgentOrchestrator:
         current_user_request: str = "",
         prior_state: Optional[VerifiedDecisionState] = None,
     ):
+        active_state = prior_state or VerifiedDecisionState()
         missing_key_message = self.llm_provider.missing_key_message()
         if missing_key_message:
             message = missing_key_message
             timestamp = event_time or datetime.now().isoformat()
             self.trace_writer.append_message(self.session_id, role="assistant", content=message, timestamp=timestamp)
             yield {"event": "assistant_message", "data": {"content": message, "timestamp": timestamp, "final": True}}
-            return message, "error", []
+            return message, "error", [], active_state
 
         client = self.llm_provider.create_client()
         messages: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt}, {"role": "user", "content": user_context}]
@@ -361,20 +369,16 @@ class AgentOrchestrator:
                     user_context,
                     completed_tool_calls,
                     prior_candidate_results=(
-                        prior_state.candidates if prior_state else None
+                        active_state.candidates
                     ),
                     prior_decision_policy=(
-                        prior_state.decision_policy if prior_state else None
+                        active_state.decision_policy
                     ),
                     prior_decision_policy_source_question=(
-                        prior_state.decision_policy_source_question
-                        if prior_state
-                        else None
+                        active_state.decision_policy_source_question
                     ),
                     prior_applied_disturbances=(
-                        prior_state.applied_disturbances
-                        if prior_state
-                        else None
+                        active_state.applied_disturbances
                     ),
                 )
                 request_messages = list(messages)
@@ -480,7 +484,7 @@ class AgentOrchestrator:
                         final_text,
                         current_user_request or user_context,
                         completed_tool_calls,
-                        prior_state=prior_state,
+                        prior_state=active_state,
                     )
                     quality_issues = answer_validator(final_text, completed_tool_calls) if answer_validator else []
                     if quality_issues:
@@ -516,7 +520,7 @@ class AgentOrchestrator:
                                     repaired_text,
                                     current_user_request or user_context,
                                     completed_tool_calls,
-                                    prior_state=prior_state,
+                                    prior_state=active_state,
                                 )
                             repaired_issues = (
                                 answer_validator(repaired_text, completed_tool_calls)
@@ -563,7 +567,12 @@ class AgentOrchestrator:
                         },
                     }
                     self.trace_writer.append_message(self.session_id, role="assistant", content=final_text, timestamp=event_time)
-                    return final_text, "completed", completed_tool_calls
+                    return (
+                        final_text,
+                        "completed",
+                        completed_tool_calls,
+                        active_state,
+                    )
 
                 assistant_tool_calls = [
                     {
@@ -583,6 +592,14 @@ class AgentOrchestrator:
                 for call in tool_calls:
                     args = self._safe_parse_args(call.function.arguments)
                     tool_input: Dict[str, Any] = args if args is not None else {"_raw_arguments": call.function.arguments}
+                    if (
+                        args is not None
+                        and call.function.name == "run_pipeformer_forecast"
+                    ):
+                        active_state = transition_forecast_scope(
+                            active_state,
+                            args,
+                        )
                     logger.info(
                         "Tool call started: session_id=%s tool=%s call_id=%s args=%s",
                         self.session_id,
@@ -714,7 +731,12 @@ class AgentOrchestrator:
             logger.exception("LLM tool loop failed")
             self.trace_writer.append_message(self.session_id, role="assistant", content=error_message, timestamp=event_time)
             yield {"event": "error", "data": {"message": error_message, "timestamp": event_time or datetime.now().isoformat(), "last_request_path": last_request_path}}
-            return error_message, "error", completed_tool_calls
+            return (
+                error_message,
+                "error",
+                completed_tool_calls,
+                active_state,
+            )
 
         timeout_message = "Tool-call step limit reached; workflow stopped."
         timeout_timestamp = event_time or datetime.now().isoformat()
@@ -727,7 +749,12 @@ class AgentOrchestrator:
                 "final": True,
             },
         }
-        return timeout_message, "timeout", completed_tool_calls
+        return (
+            timeout_message,
+            "timeout",
+            completed_tool_calls,
+            active_state,
+        )
 
     def run_agent(
         self,
@@ -816,7 +843,12 @@ class AgentOrchestrator:
             recent_turns=recent_turns,
         )
         user_context = self._build_user_context(request)
-        assistant_message, final_status, completed_tool_calls = yield from self._tool_loop_stream(
+        (
+            assistant_message,
+            final_status,
+            completed_tool_calls,
+            active_state,
+        ) = yield from self._tool_loop_stream(
             system_prompt,
             user_context,
             event_time=event_time,
@@ -833,7 +865,7 @@ class AgentOrchestrator:
             for item in trace_payload.get("messages") or []
             if str(item.get("role") or "").casefold() == "user"
         )
-        next_state = prior_state.updated_from_tool_results(
+        next_state = active_state.updated_from_tool_results(
             self.session_id,
             turn_number,
             (

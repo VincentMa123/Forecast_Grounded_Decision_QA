@@ -24,7 +24,7 @@ pipeclaw/tests/
 pipeclaw/task2_student/graphify-out/
 pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
 pipeFormer/models/tests
-docs/superpowers
+docs
 
 # Task 2 student-distillation generated artifacts
 pipeclaw/task2_student/.cache/

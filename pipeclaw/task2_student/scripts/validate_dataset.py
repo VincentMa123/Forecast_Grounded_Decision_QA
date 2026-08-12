@@ -3,21 +3,17 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-try:
-    from ..path_contract import is_host_absolute_path, redact_host_paths
-except ImportError:  # pragma: no cover - direct script execution
-    import sys
-
-    sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
-    from pipeclaw.task2_student.path_contract import (  # type: ignore
-        is_host_absolute_path,
-        redact_host_paths,
-    )
+from pipeclaw.task2_student.path_contract import is_host_absolute_path, redact_host_paths
+from pipeclaw.task2_student.release_artifacts import (
+    JsonlArtifactError,
+    read_jsonl as _read_jsonl_artifact,
+    sha256_bytes as _sha256_bytes,
+    sha256_file as _sha256_file,
+)
 
 
 SOURCE_REQUIRED_FIELDS = frozenset(
@@ -56,23 +52,10 @@ class DatasetValidationError(ValueError):
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read a UTF-8 JSONL file and reject blank, invalid, or non-object rows."""
 
-    records: list[dict[str, Any]] = []
-    with path.open("r", encoding="utf-8") as handle:
-        for line_number, raw_line in enumerate(handle, start=1):
-            if not raw_line.strip():
-                raise DatasetValidationError(f"{path}:{line_number}: blank JSONL row")
-            try:
-                record = json.loads(raw_line)
-            except json.JSONDecodeError as exc:
-                raise DatasetValidationError(
-                    f"{path}:{line_number}: invalid JSON: {exc.msg}"
-                ) from exc
-            if not isinstance(record, dict):
-                raise DatasetValidationError(
-                    f"{path}:{line_number}: JSONL row must be an object"
-                )
-            records.append(record)
-    return records
+    try:
+        return _read_jsonl_artifact(path)
+    except JsonlArtifactError as exc:
+        raise DatasetValidationError(str(exc)) from exc
 
 
 def validate_source_records(
@@ -682,39 +665,16 @@ def _validate_derived_identities(
             )
 
 
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def _sha256_bytes(value: bytes) -> str:
-    return hashlib.sha256(value).hexdigest()
-
-
 def main(argv: Sequence[str] | None = None) -> int:
-    try:
-        from .prepare_dataset import (
-            DEFAULT_MANIFEST_PATH,
-            DEFAULT_OUTPUT_ROOT,
-            DEFAULT_SOURCE_ROOT,
-            EXPECTED_SOURCE_COUNTS,
-            REPO_ROOT,
-            load_registered_tool_schemas,
-            stable_json,
-        )
-    except ImportError:  # pragma: no cover - supports direct script execution.
-        from prepare_dataset import (  # type: ignore
-            DEFAULT_MANIFEST_PATH,
-            DEFAULT_OUTPUT_ROOT,
-            DEFAULT_SOURCE_ROOT,
-            EXPECTED_SOURCE_COUNTS,
-            REPO_ROOT,
-            load_registered_tool_schemas,
-            stable_json,
-        )
+    from pipeclaw.task2_student.scripts.prepare_dataset import (
+        DEFAULT_MANIFEST_PATH,
+        DEFAULT_OUTPUT_ROOT,
+        DEFAULT_SOURCE_ROOT,
+        EXPECTED_SOURCE_COUNTS,
+        REPO_ROOT,
+        load_registered_tool_schemas,
+        stable_json,
+    )
 
     parser = argparse.ArgumentParser(
         description="Validate generated Task 2 MS-SWIFT datasets."

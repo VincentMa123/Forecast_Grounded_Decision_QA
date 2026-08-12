@@ -25,7 +25,7 @@ PipeClaw 是一个面向天然气管网运行分析的 trace-first 生命周期�
 
 这个仓库应该被理解成一个完整项目，而不只是论文附属代码。
 
-- 后端入口是 `python backend/main.py`，会启动监听在 `http://localhost:8003` 的 FastAPI 服务。
+- 在仓库根目录执行 `python -m pipeclaw.backend.main`，启动监听在 `http://localhost:8003` 的 FastAPI 服务。
 - 前端入口是在 `frontend/` 下执行 `npm run dev`，启动 Vite 开发服务器。
 - `frontend/src/api/client.ts` 以 `/api` 为基础路径，`frontend/vite.config.ts` 会在开发环境把 `/api` 和 `/assets` 代理到 `http://localhost:8003`。
 - 后端提供 `/api/flow/nodes`、`/api/flow/pipelines`、`/api/flow/consumers`、`/api/dates` 等流量与日期接口，同时提供 `/api/agent/*` 下的智能体接口。
@@ -112,9 +112,9 @@ PipeClaw 是一个面向天然气管网运行分析的 trace-first 生命周期�
 
 ## 快速开始
 
-1. 安装后端依赖：`pip install -r backend/requirements.txt`
-2. 安装前端依赖：`cd frontend && npm install`
-3. 启动后端：`python backend/main.py`
-4. 启动前端：`cd frontend && npm run dev`
+1. 安装后端依赖：`pip install -r pipeclaw/backend/requirements.txt`
+2. 安装前端依赖：`cd pipeclaw/frontend && npm install`
+3. 在仓库根目录启动后端：`python -m pipeclaw.backend.main`
+4. 启动前端：`cd pipeclaw/frontend && npm run dev`
 
 详细运行方式请看 [how_to_run.md](how_to_run.md)。对应英文说明见 [README.md](README.md)。仓库默认附带的是可跑通界面的 mock `backend/pipeline_data/`，不包含原始业务流量底库。

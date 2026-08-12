@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 
@@ -113,6 +114,13 @@ SUPPORTED_HARD_CONSTRAINTS = {"no_constraint_failure"}
 MAX_OBJECTIVES = 5
 RISK_RANK = {"low": 0, "medium": 1, "high": 2, "critical": 3}
 
+_DECISION_PRIORITY_SIGNAL = re.compile(
+    r"(?:\b(?:priority|prioritize|first|primary|secondary|most|least|"
+    r"focus|reduce|increase|maintain|preserve|avoid|minimi[sz]e|maximi[sz]e)\b"
+    r"|优先|首先|第一|最(?:大|小|低|高|少|多)|重点|关注|降低|减少|提高|增加|保持|避免)",
+    re.IGNORECASE,
+)
+
 
 def _nested(value: Mapping[str, Any], path: Sequence[str]) -> Any:
     current: Any = value
@@ -203,6 +211,61 @@ def normalize_decision_policy(
     return normalized_policy, list(dict.fromkeys(errors))
 
 
+def normalize_policy_tool_request(
+    hard_constraints: List[str],
+    objectives: List[Dict[str, Any]],
+    source_excerpt: str = "",
+) -> Dict[str, Any]:
+    legacy_excerpt = str(source_excerpt).strip()
+    normalized_objectives = [dict(item or {}) for item in objectives]
+    source_errors = []
+    for index, objective in enumerate(normalized_objectives):
+        if str(objective.get("source_excerpt") or "").strip():
+            continue
+        if legacy_excerpt and len(normalized_objectives) == 1:
+            objective["source_excerpt"] = legacy_excerpt
+            continue
+        source_errors.append(
+            "decision_policy_objective_source_excerpt_missing:"
+            f"{index}:{objective.get('metric') or 'missing'}"
+        )
+    policy, errors = normalize_decision_policy({
+        "hard_constraints": hard_constraints,
+        "objectives": normalized_objectives,
+    })
+    errors.extend(source_errors)
+    if errors:
+        return {
+            "success": False,
+            "error_code": "invalid_decision_policy",
+            "error": (
+                "Decision policy rejected. Retry set_decision_policy using only catalog "
+                "metrics, their catalog direction, an ordered list of at most five "
+                "objectives, and one exact contiguous source_excerpt per objective "
+                "from the current user request."
+            ),
+            "validation_errors": list(dict.fromkeys(errors)),
+        }
+    policy["source"] = "llm_tool"
+    if legacy_excerpt:
+        policy["source_excerpt"] = legacy_excerpt
+    return {
+        "success": True,
+        "decision_policy": policy,
+        "next_step": (
+            "Reuse prior verified candidate forecasts when the case, "
+            "disturbance, horizon, and actions are unchanged. Rank them "
+            "with this policy; rerun only candidates whose forecast inputs "
+            "changed."
+        ),
+    }
+
+
+def decision_policy_source_has_priority_signal(source_excerpt: str) -> bool:
+    """Return whether a source excerpt actually expresses a preference."""
+    return bool(_DECISION_PRIORITY_SIGNAL.search(str(source_excerpt or "")))
+
+
 def metric_evidence(
     candidate: Mapping[str, Any],
     metric: str,
@@ -290,16 +353,4 @@ def rank_candidate_groups(
     return [
         sorted(group, key=str.casefold)
         for group in groups
-    ]
-
-
-def rank_candidate_ids(
-    candidate_ids: Iterable[str],
-    policy: Mapping[str, Any],
-    evidence: Mapping[str, Mapping[str, Mapping[str, Any]]],
-) -> List[str]:
-    return [
-        candidate_id
-        for group in rank_candidate_groups(candidate_ids, policy, evidence)
-        for candidate_id in group
     ]

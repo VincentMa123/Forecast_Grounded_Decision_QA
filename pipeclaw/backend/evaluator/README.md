@@ -38,7 +38,7 @@ record already exists.
   both profiles.
 - `aggregation.py` — `summarize()`, the denominator-aware dataset roll-up.
 - `scorer.py` — teacher-side compatibility facade (see below).
-- `teacher_quality.py` — validates unsupported answer claims while a trace is
+- `answer_quality.py` — validates unsupported answer claims while a trace is
   being generated, i.e. before there is a record to score.
 
 ## Schema v2 scoring and the critical gate
@@ -114,10 +114,11 @@ Each generated master record keeps these deprecated alias fields:
 
 ## Teacher-trace commands
 
-Evaluate every record in the current master trace with:
+Run these commands from the repository root. Evaluate every record in the
+current master trace with:
 
 ```powershell
-python pipeclaw/backend/evaluate_teacher_trace.py
+python -m pipeclaw.backend.task1.evaluate_teacher_trace
 ```
 
 The full run also creates `generated_teacher_traces/task1_deliverables/` with:
@@ -150,7 +151,7 @@ quality auditing does not make the 7B/14B training input unnecessarily verbose.
 Evaluate a different file or one scenario with:
 
 ```powershell
-python pipeclaw/backend/evaluate_teacher_trace.py `
+python -m pipeclaw.backend.task1.evaluate_teacher_trace `
   --teacher-trace path/to/teacher_trace.jsonl `
   --scenario-id scenario_pipeformer_prediction_003
 ```
@@ -181,28 +182,19 @@ than silently scoring a broken record. The user-facing command is documented in
 
 For causal or disturbance-impact questions, `run_pipeformer_forecast` accepts `include_baseline_comparison=true`. It runs one unchanged baseline in addition to the disturbed forecast and returns only a compact `counterfactual_comparison`.
 
-## Resumable OpenClaw regeneration
+## Repair and regeneration
 
-Regenerate the selected OpenClaw sources without replacing PipeFormer or other
-records by running the checkpointed driver from the repository root:
+Inspect trajectory defects without generating or calling an API:
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File `
-  pipeclaw/backend/regenerate_openclaw_teacher_traces.ps1
+python -m pipeclaw.backend.scripts.repair_teacher_trace `
+  --list-regeneration-targets
 ```
 
-The driver processes the 30 v4 scenarios first and the 40 v2 scenarios second.
-It invokes `--replace-selected-scenario` once per scenario, records each success
-in `generated_teacher_traces/openclaw_regeneration.completed.txt`, skips those
-entries when resumed, and prints all failures after continuing through the run.
-Use `-DryRun` to verify the 70-scenario selection without making LLM calls.
-
-After all 70 replacements succeed, the driver automatically rebuilds the
-repaired master, quality report, statistics workbook, and compact
-train/validation/test projections. The equivalent standalone command is:
+After an approved repair, rebuild the evaluation deliverables with:
 
 ```powershell
-python pipeclaw/backend/evaluate_teacher_trace.py `
+python -m pipeclaw.backend.task1.evaluate_teacher_trace `
   --teacher-trace pipeclaw/backend/generated_teacher_traces/teacher_trace.json `
   --repair-grounded-records `
   --repair-output pipeclaw/backend/generated_teacher_traces/teacher_trace_repaired.json

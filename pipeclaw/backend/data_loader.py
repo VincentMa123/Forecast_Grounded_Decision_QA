@@ -12,7 +12,7 @@ from typing import Dict, List
 
 import pandas as pd
 
-from models import (
+from .models import (
     ConsumerFlowData,
     ConsumerFlowRecord,
     NodeFlowData,
