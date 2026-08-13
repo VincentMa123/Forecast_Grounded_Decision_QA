@@ -117,10 +117,9 @@ class PromptBuilder:
                     f"- MEMORY_ROOT: {(self.workspace_root / 'memory').as_posix()}",
                     f"- ASSETS_ROOT: {(self.workspace_root / 'assets').as_posix()}",
                     f"- TRACE_ROOT: {(self.workspace_root / 'context_trace').as_posix()}",
-                    f"- TEMPORARY_DIR: {(self.workspace_root / 'temporary_dir').as_posix()}",
                     f"- REPORTS_DIR: {(self.workspace_root / 'reports').as_posix()}",
                     f"- PLAN_PATH: {(self.workspace_root / 'plan.md').as_posix()}",
-                    "- Write intermediate artifacts under TEMPORARY_DIR and deliverables under REPORTS_DIR. Do not rely on per-session roots or scatter generated files under WORKSPACE_DIR.",
+                    "- Write intermediate artifacts under the temporary_dir/ subdirectory of WORKSPACE_DIR and deliverables under REPORTS_DIR. Reference that location as the workspace-relative path temporary_dir/ (for example temporary_dir/scratch.py); it is a directory, not an environment variable. Do not rely on per-session roots or scatter generated files under WORKSPACE_DIR.",
                 ]
             )
         )
