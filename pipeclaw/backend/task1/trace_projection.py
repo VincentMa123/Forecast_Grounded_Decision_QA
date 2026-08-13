@@ -15,6 +15,8 @@ from pipeclaw.backend.evaluator.quality_references import (
 )
 from pipeclaw.backend.grounding.evidence.tool import (
     classify_tool_evidence,
+    command_python_scripts,
+    normalized_tool_path,
     requested_artifacts,
     tool_output_failed,
 )
@@ -215,6 +217,7 @@ class TeacherTraceProjector:
         answer: str,
         *,
         max_pipeformer_variables: Optional[int] = None,
+        minimal_generic_computation_path: bool = False,
     ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Keep the smallest evidence-bearing tool trajectory for SFT."""
         outputs_by_id = {
@@ -288,7 +291,13 @@ class TeacherTraceProjector:
             )
         elif successful:
             multiple_pipeformer = False
-            selected = self._select_generic_evidence_pairs(successful, answer)
+            successful = self._deduplicate_identical_writes(successful)
+            selected = (
+                self._select_minimal_generic_computation_path(successful, answer)
+                if minimal_generic_computation_path
+                else self._select_generic_evidence_pairs(successful, answer)
+            )
+            selected = self._include_script_producers(successful, selected)
         else:
             multiple_pipeformer = False
             selected = pairs[-1:]
@@ -296,13 +305,19 @@ class TeacherTraceProjector:
         compact_calls = []
         compact_outputs = []
         for _, call, output in selected:
+            arguments = dict(call.get("arguments") or {})
+            compact_arguments = compact_tool_call_arguments(arguments)
+            if (
+                call.get("name") == "write_file"
+                and normalized_tool_path(arguments.get("path")).endswith(".py")
+                and isinstance(arguments.get("content"), str)
+            ):
+                compact_arguments["content"] = arguments["content"]
             compact_calls.append(
                 {
                     "tool_call_id": call.get("tool_call_id"),
                     "name": call.get("name"),
-                    "arguments": compact_tool_call_arguments(
-                        call.get("arguments") or {}
-                    ),
+                    "arguments": compact_arguments,
                 }
             )
             if output is None:
@@ -503,6 +518,115 @@ class TeacherTraceProjector:
             if not remaining and selected:
                 break
         return sorted(selected, key=lambda pair: pair[0])
+
+    def _select_minimal_generic_computation_path(
+        self,
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        answer: str,
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        runs = [pair for pair in pairs if pair[1].get("name") == "run_command"]
+        saved_runs = [
+            pair
+            for pair in runs
+            if command_python_scripts(dict(pair[1].get("arguments") or {}))
+        ]
+        if not runs:
+            return self._select_generic_evidence_pairs(pairs, answer)
+        computation = max(
+            saved_runs or runs,
+            key=lambda pair: (self._evidence_score(pair[2], answer), pair[0]),
+        )
+        source_reads = [
+            pair
+            for pair in pairs
+            if pair[0] < computation[0]
+            and pair[1].get("name") == "read_file"
+            and normalized_tool_path(
+                dict(pair[1].get("arguments") or {}).get("path")
+            ).startswith("pipeline_data/")
+        ]
+        return [*source_reads, computation]
+
+    @staticmethod
+    def _deduplicate_identical_writes(
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        write_groups: Dict[
+            str,
+            List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        ] = {}
+        retained_indices = set()
+        for pair in pairs:
+            call = pair[1]
+            if call.get("name") != "write_file":
+                retained_indices.add(pair[0])
+                continue
+            fingerprint = json.dumps(
+                call.get("arguments") or {},
+                ensure_ascii=False,
+                sort_keys=True,
+                default=str,
+            )
+            write_groups.setdefault(fingerprint, []).append(pair)
+        for group in write_groups.values():
+            path = normalized_tool_path(
+                dict(group[0][1].get("arguments") or {}).get("path")
+            )
+            first_run = min(
+                (
+                    pair[0]
+                    for pair in pairs
+                    if pair[1].get("name") == "run_command"
+                    and path
+                    in command_python_scripts(
+                        dict(pair[1].get("arguments") or {})
+                    )
+                ),
+                default=None,
+            )
+            preceding = (
+                [pair for pair in group if pair[0] < first_run]
+                if first_run is not None
+                else []
+            )
+            retained_indices.add((preceding[-1] if preceding else group[-1])[0])
+        return [pair for pair in pairs if pair[0] in retained_indices]
+
+    @staticmethod
+    def _include_script_producers(
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        selected: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        selected_by_index = {pair[0]: pair for pair in selected}
+        for run_index, call, _ in selected:
+            if call.get("name") != "run_command":
+                continue
+            for script_path in command_python_scripts(
+                dict(call.get("arguments") or {})
+            ):
+                producers = [
+                    pair
+                    for pair in pairs
+                    if pair[0] < run_index
+                    and pair[1].get("name") == "write_file"
+                    and normalized_tool_path(
+                        dict(pair[1].get("arguments") or {}).get("path")
+                    )
+                    == script_path
+                    and isinstance(
+                        dict(pair[1].get("arguments") or {}).get("content"),
+                        str,
+                    )
+                    and bool(dict(pair[1].get("arguments") or {}).get("content"))
+                ]
+                if producers:
+                    producer = producers[-1]
+                    selected_by_index[producer[0]] = producer
+                elif script_path.startswith("temporary_dir/") or "/temporary_dir/" in script_path:
+                    raise ValueError(
+                        f"Generated script execution requires a preceding write_file: {script_path}"
+                    )
+        return [selected_by_index[index] for index in sorted(selected_by_index)]
 
     @staticmethod
     def _reference_tokens(answer: str) -> set[str]:

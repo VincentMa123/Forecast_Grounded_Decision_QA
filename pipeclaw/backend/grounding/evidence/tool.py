@@ -26,6 +26,10 @@ CONTENT_COMMAND = re.compile(
     r"(?i)\b(?:type|get-content|import-csv|select-string|python)\b"
     r"|\bopen\s*\(|csv\.(?:reader|dictreader)"
 )
+PYTHON_SCRIPT_TOKEN = re.compile(
+    r'''(?:"([^"]+\.py)"|'([^']+\.py)'|([^\s"']+\.py))''',
+    re.IGNORECASE,
+)
 
 
 class ToolEvidenceState(str, Enum):
@@ -48,6 +52,25 @@ class ToolEvidenceAssessment:
 
 def requested_artifacts(text: str) -> Tuple[str, ...]:
     return tuple(dict.fromkeys(value.casefold() for value in DATA_FILE_REFERENCE.findall(text)))
+
+
+def normalized_tool_path(value: Any) -> str:
+    return str(value or "").strip().strip('"\'').replace("\\", "/").removeprefix("./").casefold()
+
+
+def command_python_scripts(arguments: dict[str, Any]) -> Tuple[str, ...]:
+    command = arguments.get("cmd") or []
+    if isinstance(command, list):
+        tokens = [str(value) for value in command]
+    else:
+        tokens = [next(part for part in match if part) for match in PYTHON_SCRIPT_TOKEN.findall(str(command))]
+    return tuple(
+        dict.fromkeys(
+            normalized_tool_path(token)
+            for token in tokens
+            if normalized_tool_path(token).endswith(".py")
+        )
+    )
 
 
 def _tool_arguments(wrapper: dict[str, Any]) -> dict[str, Any]:

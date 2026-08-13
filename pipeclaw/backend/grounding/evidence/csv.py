@@ -4,15 +4,20 @@ import csv
 import io
 import json
 import re
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping
 
-from .tool import attach_tool_arguments, tool_output_failed
+from .tool import (
+    attach_tool_arguments,
+    command_python_scripts,
+    normalized_tool_path,
+    tool_output_failed,
+)
 from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
 
 
-MAX_EVIDENCE_FILES = 12
 MAX_EVIDENCE_ROWS = 12
 MAX_COMPUTED_RESULTS = 1
 MAX_EVIDENCE_FIELDS = 10
@@ -22,6 +27,22 @@ NUMBER_RE = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?\d+(?:\.\d+)?(?![A-Za-z0-9_.])"
 )
 CSV_FILE_RE = re.compile(r"(?i)(?<![\w.-])[\w.-]+\.csv(?![\w.-])")
+DATE_RE = re.compile(r"(?<!\d)20\d{6}(?!\d)")
+JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.IGNORECASE | re.DOTALL)
+NEGATIVE_DATE_KEYS = (
+    "skip",
+    "missing",
+    "fail",
+    "error",
+    "跳过",
+    "缺失",
+    "失败",
+)
+CSV_KIND_MARKERS = {
+    "pipeline": ("pipeline_flow_dir", "_pipeline.csv"),
+    "node": ("node_flow_dir", "_node.csv"),
+    "consumer": ("consumer_flow_dir", "_consumer.csv"),
+}
 ANSWER_TOKEN_RE = re.compile(r"[\u4e00-\u9fffA-Za-z_]{2,}")
 GENERIC_TEXT_VALUES = {
     "管段",
@@ -58,6 +79,7 @@ def build_csv_evidence(
     answer_numbers = {_normalized_number(value) for value in NUMBER_RE.findall(answer)}
     folded_scope = scope_text.casefold()
     scope_numbers = {_normalized_number(value) for value in NUMBER_RE.findall(scope_text)}
+    scoped_dates = _expanded_scope_dates(scope_text)
     candidates: List[tuple[int, int, str, Dict[str, Any]]] = []
     scoped_rows: List[tuple[str, Dict[str, Any]]] = []
     source_files: List[str] = []
@@ -78,8 +100,7 @@ def build_csv_evidence(
             continue
         if source_file not in seen_source_files:
             seen_source_files.add(source_file)
-            if len(source_files) < MAX_EVIDENCE_FILES:
-                source_files.append(source_file)
+            source_files.append(source_file)
         for row in rows:
             signature = (source_file, tuple(row.items()))
             if signature in seen_rows:
@@ -93,6 +114,15 @@ def build_csv_evidence(
                 candidates.append((score, row_index, source_file, row))
             row_index += 1
 
+    for source_file in _dynamic_script_csv_files(
+        outputs,
+        answer,
+        scope_text,
+    ):
+        if source_file not in seen_source_files:
+            seen_source_files.add(source_file)
+            source_files.append(source_file)
+
     for item in outputs:
         if str(item.get("name") or "").casefold() != "run_command" or tool_output_failed(item):
             continue
@@ -101,11 +131,12 @@ def build_csv_evidence(
             continue
         for match in CSV_FILE_RE.findall(str(output.get("stdout") or "")):
             source_file = Path(match).name
+            if scoped_dates and not any(date in source_file for date in scoped_dates):
+                continue
             if source_file in seen_source_files:
                 continue
             seen_source_files.add(source_file)
-            if len(source_files) < MAX_EVIDENCE_FILES:
-                source_files.append(source_file)
+            source_files.append(source_file)
 
     computed_results = _structured_computation_results(
         outputs,
@@ -156,6 +187,119 @@ def build_csv_evidence(
         if derived_results:
             evidence["derived_results"] = derived_results
     return evidence
+
+
+def _dynamic_script_csv_files(
+    outputs: Iterable[Dict[str, Any]],
+    answer: str,
+    scope_text: str,
+) -> List[str]:
+    positive_dates: set[str] = set()
+    negative_dates: set[str] = set()
+    for text in (
+        answer,
+        *(
+            str(dict(item.get("output") or {}).get("stdout") or "")
+            for item in outputs
+            if str(item.get("name") or "").casefold() == "run_command"
+            and not tool_output_failed(item)
+        ),
+    ):
+        for payload in _json_payloads(text):
+            positive, negative = _payload_dates(payload)
+            positive_dates.update(positive)
+            negative_dates.update(negative)
+    scoped_dates = _expanded_scope_dates(scope_text)
+    dates = (scoped_dates or positive_dates) - negative_dates
+
+    scripts: Dict[str, str] = {}
+    source_files = []
+    for item in outputs:
+        if tool_output_failed(item):
+            continue
+        name = str(item.get("name") or "").casefold()
+        arguments = dict(item.get("arguments") or {})
+        if name == "write_file":
+            path = normalized_tool_path(arguments.get("path"))
+            content = arguments.get("content")
+            if path.endswith(".py") and isinstance(content, str):
+                scripts[path] = content
+            continue
+        if name != "run_command":
+            continue
+        for script_path in command_python_scripts(arguments):
+            source = scripts.get(script_path, "").casefold()
+            kinds = [
+                kind
+                for kind, markers in CSV_KIND_MARKERS.items()
+                if any(marker in source for marker in markers)
+            ]
+            source_files.extend(
+                f"{date}_{kind}.csv"
+                for date in sorted(dates)
+                for kind in kinds
+            )
+    return list(dict.fromkeys(source_files))
+
+
+def _expanded_scope_dates(scope_text: str) -> set[str]:
+    values = list(dict.fromkeys(DATE_RE.findall(scope_text)))
+    if len(values) != 2:
+        return set(values)
+    try:
+        start = datetime.strptime(values[0], "%Y%m%d")
+        end = datetime.strptime(values[1], "%Y%m%d")
+    except ValueError:
+        return set()
+    if end < start or (end - start).days > 366:
+        return set(values)
+    return {
+        (start + timedelta(days=offset)).strftime("%Y%m%d")
+        for offset in range((end - start).days + 1)
+    }
+
+
+def _json_payloads(text: str) -> List[Any]:
+    candidates = [str(text or "").strip(), *JSON_BLOCK_RE.findall(str(text or ""))]
+    candidates.extend(
+        line.strip()
+        for line in str(text or "").splitlines()
+        if line.strip().startswith(("{", "["))
+    )
+    payloads = []
+    for candidate in candidates:
+        try:
+            payload = json.loads(candidate)
+        except (TypeError, ValueError):
+            continue
+        if payload not in payloads:
+            payloads.append(payload)
+    return payloads
+
+
+def _payload_dates(value: Any, *, negative: bool = False) -> tuple[set[str], set[str]]:
+    positive_dates: set[str] = set()
+    negative_dates: set[str] = set()
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            key_text = str(key)
+            child_negative = negative or any(
+                marker in key_text.casefold() for marker in NEGATIVE_DATE_KEYS
+            )
+            target = negative_dates if child_negative else positive_dates
+            target.update(DATE_RE.findall(key_text))
+            positive, rejected = _payload_dates(item, negative=child_negative)
+            positive_dates.update(positive)
+            negative_dates.update(rejected)
+    elif isinstance(value, list):
+        for item in value:
+            positive, rejected = _payload_dates(item, negative=negative)
+            positive_dates.update(positive)
+            negative_dates.update(rejected)
+    else:
+        target = negative_dates if negative else positive_dates
+        target.update(DATE_RE.findall(str(value)))
+    return positive_dates, negative_dates
 
 
 def record_csv_evidence(

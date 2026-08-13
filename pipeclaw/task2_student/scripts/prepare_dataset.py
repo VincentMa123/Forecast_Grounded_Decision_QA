@@ -68,7 +68,7 @@ JUDGMENT_FIELDS = (
 CONVERTER_VERSION = "1.0.0"
 SPLITS = ("train", "valid", "test")
 PROJECTIONS = ("answer_only", "trace_level", "constraint_multitask")
-EXPECTED_SOURCE_COUNTS = {"train": 902, "valid": 124, "test": 114}
+EXPECTED_SOURCE_COUNTS = {"train": 934, "valid": 127, "test": 117}
 DEFAULT_SOURCE_ROOT = (
     REPO_ROOT / "pipeclaw" / "backend" / "generated_teacher_traces" / "splits"
 )

@@ -45,8 +45,7 @@ def _atomic_write(
             encoding="utf-8",
             newline=newline,
             dir=path.parent,
-            prefix=f".{path.name}.",
-            suffix=".tmp",
+            prefix=".tmp.",
             delete=False,
         ) as handle:
             temporary_path = Path(handle.name)

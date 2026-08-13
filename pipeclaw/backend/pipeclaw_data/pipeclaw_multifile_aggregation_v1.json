@@ -1,0 +1,662 @@
+[
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_001_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_001",
+    "scenario_description": "由 question_template_all.json 的 historical_001 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_001",
+    "template_parameters": {
+      "start_date": "20190124",
+      "end_date": "20190130",
+      "pipeline_division": "西气东输一线"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_001_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190124 至 20190130（含首尾）的每个 pipeline CSV 文件，只统计“西气东输一线”。每天先按起点站名和终点站名汇总管道流量，再对各管段汇总值取绝对值并求和，得到 daily_total_abs_flow。请返回起始日值、结束日值、区间均值、峰值日期与峰值、以及首尾变化率；同时列出成功读取和跳过的日期。只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_001_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_001",
+    "scenario_description": "由 question_template_all.json 的 historical_001 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_001",
+    "template_parameters": {
+      "start_date": "20190202",
+      "end_date": "20190208",
+      "pipeline_division": "中俄东线"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_001_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190202 至 20190208（含首尾）的每个 pipeline CSV 文件，只统计“中俄东线”。每天先按起点站名和终点站名汇总管道流量，再对各管段汇总值取绝对值并求和，得到 daily_total_abs_flow。请返回起始日值、结束日值、区间均值、峰值日期与峰值、以及首尾变化率；同时列出成功读取和跳过的日期。只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_001_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_001",
+    "scenario_description": "由 question_template_all.json 的 historical_001 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_001",
+    "template_parameters": {
+      "start_date": "20191201",
+      "end_date": "20191207",
+      "pipeline_division": "川气东送"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_001_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191201 至 20191207（含首尾）的每个 pipeline CSV 文件，只统计“川气东送”。每天先按起点站名和终点站名汇总管道流量，再对各管段汇总值取绝对值并求和，得到 daily_total_abs_flow。请返回起始日值、结束日值、区间均值、峰值日期与峰值、以及首尾变化率；同时列出成功读取和跳过的日期。只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_002_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_002",
+    "scenario_description": "由 question_template_all.json 的 historical_002 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_002",
+    "template_parameters": {
+      "end_date": "20191203",
+      "N": 3,
+      "station_name": "乌鲁木齐站",
+      "z": 2
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_002_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "以 20191203 为最后一天，逐日读取过去 3 天的 node CSV 文件。对站点“乌鲁木齐站”按天汇总计算流量，取 demand=max(sum(计算流量),0)，计算均值、最大值、最小值，并用 z-score>2 标出异常日期。必须报告每个日期是否读取成功，且只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_002_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_002",
+    "scenario_description": "由 question_template_all.json 的 historical_002 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_002",
+    "template_parameters": {
+      "end_date": "20191205",
+      "N": 3,
+      "station_name": "中卫站",
+      "z": 1.5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_002_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "以 20191205 为最后一天，逐日读取过去 3 天的 node CSV 文件。对站点“中卫站”按天汇总计算流量，取 demand=max(sum(计算流量),0)，计算均值、最大值、最小值，并用 z-score>1.5 标出异常日期。必须报告每个日期是否读取成功，且只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_002_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_002",
+    "scenario_description": "由 question_template_all.json 的 historical_002 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_002",
+    "template_parameters": {
+      "end_date": "20191207",
+      "N": 3,
+      "station_name": "上海站",
+      "z": 2.5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_002_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "以 20191207 为最后一天，逐日读取过去 3 天的 node CSV 文件。对站点“上海站”按天汇总计算流量，取 demand=max(sum(计算流量),0)，计算均值、最大值、最小值，并用 z-score>2.5 标出异常日期。必须报告每个日期是否读取成功，且只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_005_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_005",
+    "scenario_description": "由 question_template_all.json 的 historical_005 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_005",
+    "template_parameters": {
+      "start_date": "20190124",
+      "end_date": "20190130",
+      "pipeline_division": "西气东输一线",
+      "top_k": 5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_005_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190124 至 20190130 的全部 pipeline CSV 文件，筛选“西气东输一线”，按同一对起点站名和终点站名聚合。基于窗口内平均绝对流量、峰值绝对流量、标准差、变异系数和净流向稳定性，给出综合高负荷 Top 5 管段及量化排序依据。请同时报告参与统计与跳过的日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_005_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_005",
+    "scenario_description": "由 question_template_all.json 的 historical_005 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_005",
+    "template_parameters": {
+      "start_date": "20190202",
+      "end_date": "20190208",
+      "pipeline_division": "中俄东线",
+      "top_k": 6
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_005_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190202 至 20190208 的全部 pipeline CSV 文件，筛选“中俄东线”，按同一对起点站名和终点站名聚合。基于窗口内平均绝对流量、峰值绝对流量、标准差、变异系数和净流向稳定性，给出综合高负荷 Top 6 管段及量化排序依据。请同时报告参与统计与跳过的日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_005_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_005",
+    "scenario_description": "由 question_template_all.json 的 historical_005 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_005",
+    "template_parameters": {
+      "start_date": "20191201",
+      "end_date": "20191207",
+      "pipeline_division": "川气东送",
+      "top_k": 8
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_005_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191201 至 20191207 的全部 pipeline CSV 文件，筛选“川气东送”，按同一对起点站名和终点站名聚合。基于窗口内平均绝对流量、峰值绝对流量、标准差、变异系数和净流向稳定性，给出综合高负荷 Top 8 管段及量化排序依据。请同时报告参与统计与跳过的日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_006_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_006",
+    "scenario_description": "由 question_template_all.json 的 historical_006 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_006",
+    "template_parameters": {
+      "start_date": "20191201",
+      "end_date": "20191203",
+      "pipeline_division": "西气东输二线"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_006_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191201 至 20191203 的 node 和 pipeline CSV 文件，并限定“西气东输二线”。按天从 node 数据计算 supply=sum(abs(total_flow<0))、demand=sum(total_flow>0) 和 gap=demand-supply，再用 pipeline 数据核对当天管段流量。返回最大缺口日、缺口 Top3、平均缺口、缺供天数占比，以及成功和跳过日期；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_006_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_006",
+    "scenario_description": "由 question_template_all.json 的 historical_006 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_006",
+    "template_parameters": {
+      "start_date": "20191203",
+      "end_date": "20191205",
+      "pipeline_division": "中俄东线"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_006_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191203 至 20191205 的 node 和 pipeline CSV 文件，并限定“中俄东线”。按天从 node 数据计算 supply=sum(abs(total_flow<0))、demand=sum(total_flow>0) 和 gap=demand-supply，再用 pipeline 数据核对当天管段流量。返回最大缺口日、缺口 Top3、平均缺口、缺供天数占比，以及成功和跳过日期；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_006_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_006",
+    "scenario_description": "由 question_template_all.json 的 historical_006 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_006",
+    "template_parameters": {
+      "start_date": "20191205",
+      "end_date": "20191207",
+      "pipeline_division": "陕京二线"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_006_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191205 至 20191207 的 node 和 pipeline CSV 文件，并限定“陕京二线”。按天从 node 数据计算 supply=sum(abs(total_flow<0))、demand=sum(total_flow>0) 和 gap=demand-supply，再用 pipeline 数据核对当天管段流量。返回最大缺口日、缺口 Top3、平均缺口、缺供天数占比，以及成功和跳过日期；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_007_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_007",
+    "scenario_description": "由 question_template_all.json 的 historical_007 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_007",
+    "template_parameters": {
+      "start_date": "20191223",
+      "end_date": "20191229",
+      "user_name": "上海电力"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_007_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191223 至 20191229 的每个 consumer CSV 文件，汇总用户“上海电力”每天的消耗量。返回完整日序列、最高日、最低日、均值和线性趋势方向，并明确缺失或读取失败的日期。只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_007_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_007",
+    "scenario_description": "由 question_template_all.json 的 historical_007 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_007",
+    "template_parameters": {
+      "start_date": "20191224",
+      "end_date": "20191230",
+      "user_name": "北京城市燃气"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_007_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191224 至 20191230 的每个 consumer CSV 文件，汇总用户“北京城市燃气”每天的消耗量。返回完整日序列、最高日、最低日、均值和线性趋势方向，并明确缺失或读取失败的日期。只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_007_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_007",
+    "scenario_description": "由 question_template_all.json 的 historical_007 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_007",
+    "template_parameters": {
+      "start_date": "20191225",
+      "end_date": "20191231",
+      "user_name": "乌鲁木齐燃气"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_007_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191225 至 20191231 的每个 consumer CSV 文件，汇总用户“乌鲁木齐燃气”每天的消耗量。返回完整日序列、最高日、最低日、均值和线性趋势方向，并明确缺失或读取失败的日期。只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_008_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_008",
+    "scenario_description": "由 question_template_all.json 的 historical_008 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_008",
+    "template_parameters": {
+      "start_date": "20191223",
+      "end_date": "20191229"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_008_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191223 至 20191229 的 consumer CSV 文件。每天先按供气点汇总消耗量，再计算各供气点需求占比及 HHI。返回参与统计天数、跳过日期、每日 HHI、平均 HHI、峰值 HHI 和峰值日期；只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_008_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_008",
+    "scenario_description": "由 question_template_all.json 的 historical_008 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_008",
+    "template_parameters": {
+      "start_date": "20191224",
+      "end_date": "20191230"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_008_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191224 至 20191230 的 consumer CSV 文件。每天先按供气点汇总消耗量，再计算各供气点需求占比及 HHI。返回参与统计天数、跳过日期、每日 HHI、平均 HHI、峰值 HHI 和峰值日期；只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_008_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_008",
+    "scenario_description": "由 question_template_all.json 的 historical_008 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_008",
+    "template_parameters": {
+      "start_date": "20191225",
+      "end_date": "20191231"
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_008_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191225 至 20191231 的 consumer CSV 文件。每天先按供气点汇总消耗量，再计算各供气点需求占比及 HHI。返回参与统计天数、跳过日期、每日 HHI、平均 HHI、峰值 HHI 和峰值日期；只输出符合 ResultModel 的 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_009_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_009",
+    "scenario_description": "由 question_template_all.json 的 historical_009 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "historical_009",
+    "template_parameters": {
+      "start_date": "20191201",
+      "end_date": "20191203",
+      "pipeline_division": "西气东输三线",
+      "top_k": 5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_009_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191201 至 20191203 的 node 与 pipeline CSV 文件，只分析“西气东输三线”。从 node 数据计算每日供给、需求与缺口，从 pipeline 数据计算各管段绝对流量的均值、P95和最大值，并列出综合负荷最高的 Top 5 管段。返回每日摘要、最严重缺口日、瓶颈清单、读取失败日期和可验证建议；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_009_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_009",
+    "scenario_description": "由 question_template_all.json 的 historical_009 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "historical_009",
+    "template_parameters": {
+      "start_date": "20191203",
+      "end_date": "20191205",
+      "pipeline_division": "冀宁线",
+      "top_k": 6
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_009_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191203 至 20191205 的 node 与 pipeline CSV 文件，只分析“冀宁线”。从 node 数据计算每日供给、需求与缺口，从 pipeline 数据计算各管段绝对流量的均值、P95和最大值，并列出综合负荷最高的 Top 6 管段。返回每日摘要、最严重缺口日、瓶颈清单、读取失败日期和可验证建议；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_historical_009_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_historical_009",
+    "scenario_description": "由 question_template_all.json 的 historical_009 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "historical_009",
+    "template_parameters": {
+      "start_date": "20191205",
+      "end_date": "20191207",
+      "pipeline_division": "中俄东线",
+      "top_k": 8
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_historical_009_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191205 至 20191207 的 node 与 pipeline CSV 文件，只分析“中俄东线”。从 node 数据计算每日供给、需求与缺口，从 pipeline 数据计算各管段绝对流量的均值、P95和最大值，并列出综合负荷最高的 Top 8 管段。返回每日摘要、最严重缺口日、瓶颈清单、读取失败日期和可验证建议；只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_profile_006_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_profile_006",
+    "scenario_description": "由 question_template_all.json 的 profile_006 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "profile_006",
+    "template_parameters": {
+      "start_date": "20191223",
+      "end_date": "20191229",
+      "province": "新疆",
+      "pipeline_name": "西气东输一线",
+      "top_k": 5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_profile_006_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191223 至 20191229 的 consumer CSV 文件，限定所属地“新疆”和管线“西气东输一线”。统计窗口内用气量最高的 Top 5 用户；每个用户给出总消耗、日均、单日峰谷、标准差、变异系数、活跃天数、零值天数、供气点数量、主供气点占比和 HHI，并给出风险标签。列出成功与跳过日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_profile_006_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_profile_006",
+    "scenario_description": "由 question_template_all.json 的 profile_006 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "profile_006",
+    "template_parameters": {
+      "start_date": "20191224",
+      "end_date": "20191230",
+      "province": "北京",
+      "pipeline_name": "陕京二线",
+      "top_k": 6
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_profile_006_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191224 至 20191230 的 consumer CSV 文件，限定所属地“北京”和管线“陕京二线”。统计窗口内用气量最高的 Top 6 用户；每个用户给出总消耗、日均、单日峰谷、标准差、变异系数、活跃天数、零值天数、供气点数量、主供气点占比和 HHI，并给出风险标签。列出成功与跳过日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_profile_006_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_profile_006",
+    "scenario_description": "由 question_template_all.json 的 profile_006 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "profile_006",
+    "template_parameters": {
+      "start_date": "20191225",
+      "end_date": "20191231",
+      "province": "江苏",
+      "pipeline_name": "中俄东线",
+      "top_k": 8
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_profile_006_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191225 至 20191231 的 consumer CSV 文件，限定所属地“江苏”和管线“中俄东线”。统计窗口内用气量最高的 Top 8 用户；每个用户给出总消耗、日均、单日峰谷、标准差、变异系数、活跃天数、零值天数、供气点数量、主供气点占比和 HHI，并给出风险标签。列出成功与跳过日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_asset_010_01",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_asset_010",
+    "scenario_description": "由 question_template_all.json 的 asset_010 派生的多文件聚合训练场景；第 1 个参数变体。",
+    "source_template_id": "asset_010",
+    "template_parameters": {
+      "start_date": "20190124",
+      "end_date": "20190130",
+      "K": 5
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_asset_010_01_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190124 至 20190130 的 pipeline CSV 文件。同一“起点站名、终点站名、管道划分”视为同一管段；每天先聚合流量再取绝对值，abs_flow==0 记为 zero day。返回窗口天数、采用的长期闲置阈值，以及 zero_ratio 最高的 Top 5 管段，包含零值天数、有效天数、平均绝对流量和最大绝对流量；列出缺失日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_asset_010_02",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_asset_010",
+    "scenario_description": "由 question_template_all.json 的 asset_010 派生的多文件聚合训练场景；第 2 个参数变体。",
+    "source_template_id": "asset_010",
+    "template_parameters": {
+      "start_date": "20190202",
+      "end_date": "20190208",
+      "K": 7
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_asset_010_02_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20190202 至 20190208 的 pipeline CSV 文件。同一“起点站名、终点站名、管道划分”视为同一管段；每天先聚合流量再取绝对值，abs_flow==0 记为 zero day。返回窗口天数、采用的长期闲置阈值，以及 zero_ratio 最高的 Top 7 管段，包含零值天数、有效天数、平均绝对流量和最大绝对流量；列出缺失日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_openclaw_multifile_asset_010_03",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "multifile_aggregation_asset_010",
+    "scenario_description": "由 question_template_all.json 的 asset_010 派生的多文件聚合训练场景；第 3 个参数变体。",
+    "source_template_id": "asset_010",
+    "template_parameters": {
+      "start_date": "20191201",
+      "end_date": "20191207",
+      "K": 10
+    },
+    "sessions": [
+      {
+        "session_id": "scenario_openclaw_multifile_asset_010_03_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请逐日读取 20191201 至 20191207 的 pipeline CSV 文件。同一“起点站名、终点站名、管道划分”视为同一管段；每天先聚合流量再取绝对值，abs_flow==0 记为 zero day。返回窗口天数、采用的长期闲置阈值，以及 zero_ratio 最高的 Top 10 管段，包含零值天数、有效天数、平均绝对流量和最大绝对流量；列出缺失日期，只输出 JSON。"
+          }
+        ]
+      }
+    ]
+  }
+]

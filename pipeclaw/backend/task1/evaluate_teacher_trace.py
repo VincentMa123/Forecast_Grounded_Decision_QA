@@ -118,6 +118,7 @@ def build_parser() -> argparse.ArgumentParser:
 class _ReportInputs:
     facts: Dict[str, object]
     evaluations: list[dict[str, object]]
+    native_reports: list[dict[str, object]]
     quality_sample_ids: set[str]
 
 
@@ -210,9 +211,13 @@ class TeacherTraceEvaluationRunner:
         records: list[dict[str, object]],
         native_results: dict[str, dict[str, object]],
     ) -> _ReportInputs:
+        native_reports = [
+            native_results[str(record.get("sample_id") or "")]
+            for record in records
+        ]
         facts = build_teacher_report_facts(
             records,
-            [native_results[str(record.get("sample_id") or "")] for record in records],
+            native_reports,
         )
         evaluations = materialize_teacher_report_value(facts["evaluations"])
         quality_sample_ids = {
@@ -220,7 +225,7 @@ class TeacherTraceEvaluationRunner:
             for item in evaluations
             if item.get("task1_quality_flag") == "pass"
         }
-        return _ReportInputs(facts, evaluations, quality_sample_ids)
+        return _ReportInputs(facts, evaluations, native_reports, quality_sample_ids)
 
     def _write_report_artifacts(
         self,
@@ -320,15 +325,7 @@ class TeacherTraceEvaluationRunner:
             "schema_version": "pipeclaw_task1_quality_v1",
             "teacher_trace": display_path(report_artifacts.report_source),
             "minimum_pass_score": args.minimum_score,
-            "native_evaluation": self.evaluator.summarize([
-                {
-                    "quality_score": item["native_quality_score"],
-                    "quality_flag": item["native_quality_flag"],
-                    "profile": item["native_profile"],
-                    "quality_issues": item["native_quality_issues"],
-                }
-                for item in report_inputs.evaluations
-            ]),
+            "native_evaluation": self.evaluator.summarize(report_inputs.native_reports),
             "task1_statistics": report_artifacts.statistics,
             "manual_spot_check": {
                 "queue_mode": (

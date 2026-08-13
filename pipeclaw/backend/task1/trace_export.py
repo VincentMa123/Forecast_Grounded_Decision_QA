@@ -125,6 +125,9 @@ def write_split_records(
         for item in eligible_records:
             if item.get("split") != split:
                 continue
+            minimal_generic_computation_path = (
+                item.get("dataset_source") == "pipeclaw_multifile_aggregation_v1"
+            )
             projected = {key: item[key] for key in sft_fields if key in item}
             rebuilt = serialize_verified_decision_state(
                 VerifiedDecisionState.from_history(item.get("conversation_context") or []),
@@ -158,6 +161,7 @@ def write_split_records(
                     list(projected.get("tool_calls") or []),
                     list(projected.get("tool_outputs") or []),
                     str(projected.get("final_answer") or ""),
+                    minimal_generic_computation_path=minimal_generic_computation_path,
                 )
             )
             projected_evidence = DEFAULT_PROJECTOR.serialize_sft_record_evidence(
@@ -203,6 +207,7 @@ def write_split_records(
                         list(item.get("tool_outputs") or []),
                         answer_text,
                         max_pipeformer_variables=max_variables,
+                        minimal_generic_computation_path=minimal_generic_computation_path,
                     )
                 )
                 trial_evidence = numeric_grounding_evidence(trial)

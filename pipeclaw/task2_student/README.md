@@ -12,7 +12,7 @@ The source splits are read-only:
 - `pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_valid.jsonl`
 - `pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl`
 
-The frozen source counts are 902 / 124 / 114. Derived records must preserve
+The frozen source counts are 923 / 127 / 117. Derived records must preserve
 sample IDs and split assignments. The test split is reserved for final
 evaluation.
 
@@ -124,7 +124,7 @@ environment:
 conda run -n pipeclaw python -m pipeclaw.task2_student.scripts.prepare_dataset
 ```
 
-It reads the three authoritative splits, requires the frozen 902 / 124 / 114
+It reads the three authoritative splits, requires the frozen 923 / 127 / 117
 counts, loads all eight schemas from PipeClaw's actual tool registry, and
 writes:
 

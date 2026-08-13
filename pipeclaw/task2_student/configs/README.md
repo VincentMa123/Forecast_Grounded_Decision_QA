@@ -53,7 +53,7 @@ two commands.
 
 - `qwen35_9b_remote_benchmark_step20.yaml` runs 20 optimizer steps of the real
   9B configuration to measure peak VRAM and tokens/sec before renting hours.
-- `qwen35_9b.yaml` is the full trace-level run, five epochs over the 902
+- `qwen35_9b.yaml` is the full trace-level run, five epochs over the 923
   training records.
 
 Both use `Qwen/Qwen3.5-9B` with `max_length=16384`, 4-bit NF4 QLoRA with rank
