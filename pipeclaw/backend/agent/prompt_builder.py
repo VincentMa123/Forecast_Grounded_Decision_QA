@@ -120,6 +120,7 @@ class PromptBuilder:
                     f"- REPORTS_DIR: {(self.workspace_root / 'reports').as_posix()}",
                     f"- PLAN_PATH: {(self.workspace_root / 'plan.md').as_posix()}",
                     "- Write intermediate artifacts under the temporary_dir/ subdirectory of WORKSPACE_DIR and deliverables under REPORTS_DIR. Reference that location as the workspace-relative path temporary_dir/ (for example temporary_dir/scratch.py); it is a directory, not an environment variable. Do not rely on per-session roots or scatter generated files under WORKSPACE_DIR.",
+                    "- When you write a helper script and run it with run_command, the runner compiles it before executing and reports the exact SyntaxError line; fix that precise line. Use string keys in any dict passed to json.dumps (JSON keys cannot be tuples); test tuple membership with explicit parentheses such as `(a, b) in pairs`.",
                 ]
             )
         )

@@ -279,6 +279,60 @@ class WorkspaceRunner:
             return self._wrap_shell_command(cmd)
         return cmd
 
+    def _python_syntax_precheck(
+        self, cmd: List[str], workspace_dir: Path, cwd: Path
+    ) -> Optional[RunCommandResult]:
+        """py_compile pre-check for `python <script.py>` calls.
+
+        Returns a clean first-class SyntaxError result when the target script does not
+        compile, so the model gets a precise signal without burning a real subprocess run.
+        Returns None when the check does not apply (non-python command, `-c`, `-m`, or a
+        script path that does not resolve inside the workspace) or when compilation passes.
+        """
+        command = str(cmd[0]).lower()
+        if command not in {"python", "python3", "py"} or len(cmd) < 2:
+            return None
+        script_arg = str(cmd[1])
+        if script_arg.startswith("-"):
+            return None  # -c / -m / flags: no workspace script to pre-check
+        if not script_arg.lower().endswith(".py"):
+            return None
+        raw = Path(script_arg.replace("\\", "/"))
+        if raw.is_absolute():
+            target = raw.resolve()
+            if not self._is_within_root(target, workspace_dir):
+                return None
+        else:
+            # Runner default cwd is the workspace; honor an explicit cwd for resolution.
+            target = self._safe_resolve(cwd, raw.as_posix())
+            if target is None or not self._is_within_root(target, workspace_dir):
+                return None
+        if not target.exists() or not target.is_file():
+            return None  # let the real run surface "can't open file" naturally
+        try:
+            compile(target.read_text(encoding="utf-8"), str(target), "exec")
+        except SyntaxError as exc:
+            line = (exc.text or "").rstrip("\n")
+            location = f"{target.name}:{exc.lineno}"
+            detail = f"SyntaxError at {location}, offset {exc.offset}: {exc.msg}"
+            if line:
+                caret = " " * max((exc.offset or 1) - 1, 0) + "^"
+                detail = f"{detail}\n{line}\n{caret}"
+            return RunCommandResult(
+                success=False,
+                session_id="",
+                cmd=list(cmd),
+                cwd=None,
+                exit_code=1,
+                duration_s=0.0,
+                stdout="",
+                stderr=detail,
+                error=f"Python file did not compile (pre-execution check). {detail}",
+                error_code="python_syntax_error",
+                workspace=None,
+            )
+        return None
+
     def _success_exit_codes(self, command: str) -> set:
         codes = NON_ERROR_EXIT_CODES.get(command)
         return codes if codes is not None else {0}
@@ -398,6 +452,11 @@ class WorkspaceRunner:
                 error=cwd_resolution.error or "Invalid working directory",
                 workspace=None,
             )
+        precheck = self._python_syntax_precheck(cmd, workspace_dir, cwd_resolution.path)
+        if precheck is not None:
+            precheck.session_id = session_id
+            precheck.cwd = cwd_resolution.logical_path
+            return precheck
         effective_cmd = self._prepare_command(cmd)
         run_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         run_dir = runs_dir / f"run_{run_id}"
