@@ -420,7 +420,13 @@ class AgentOrchestrator:
                 )
                 request_messages = list(messages)
                 if contract_message:
-                    request_messages.append({"role": "system", "content": contract_message})
+
+                    request_messages[0] = {
+                        "role": "system",
+                        "content": (
+                            f"{request_messages[0]['content']}\n\n{contract_message}"
+                        ),
+                    }
                 request_payload = self._chat_request_payload(
                     request_messages,
                     tools=tools_schema,
