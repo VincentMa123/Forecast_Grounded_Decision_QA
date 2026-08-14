@@ -26,6 +26,7 @@ from pipeclaw.task2_student.release_artifacts import (
 )
 from pipeclaw.task2_student.scripts.validate_dataset import (
     DatasetValidationError,
+    projection_writes_python,
     validate_projection_records,
     validate_source_records,
 )
@@ -65,10 +66,11 @@ JUDGMENT_FIELDS = (
     "human_intervention_label",
     "dispatch_recommendation",
 )
-CONVERTER_VERSION = "1.0.0"
+CONVERTER_VERSION = "1.1.0"
 SPLITS = ("train", "valid", "test")
 PROJECTIONS = ("answer_only", "trace_level", "constraint_multitask")
-EXPECTED_SOURCE_COUNTS = {"train": 934, "valid": 127, "test": 117}
+CORRECTION_SPLITS = ("train", "valid")
+EXPECTED_SOURCE_COUNTS = {"train": 923, "valid": 127, "test": 117}
 DEFAULT_SOURCE_ROOT = (
     REPO_ROOT / "pipeclaw" / "backend" / "generated_teacher_traces" / "splits"
 )
@@ -342,6 +344,7 @@ def generate_datasets(
         },
         "sources": {},
         "projections": {projection: {} for projection in PROJECTIONS},
+        "corrective_datasets": {"python_script": {}},
     }
     for split in SPLITS:
         manifest["sources"][split] = {
@@ -359,6 +362,7 @@ def generate_datasets(
             record, split, tool_schemas
         ),
     }
+    trace_records: dict[str, list[dict[str, Any]]] = {}
     for projection in PROJECTIONS:
         for split in SPLITS:
             derived_records = [
@@ -401,7 +405,31 @@ def generate_datasets(
                         ).items()
                     )
                 )
+            elif projection == "trace_level":
+                trace_records[split] = derived_records
             manifest["projections"][projection][split] = details
+
+    for split in CORRECTION_SPLITS:
+        records = select_python_correction_records(trace_records[split])
+        validate_projection_records(
+            records,
+            projection="trace_level",
+            split=split,
+            registered_tool_names=registered_names,
+        )
+        output_path = output_root / "python_correction" / f"{split}.jsonl"
+        _atomic_write_text(
+            output_path,
+            "".join(f"{stable_json(record)}\n" for record in records),
+        )
+        manifest["corrective_datasets"]["python_script"][split] = {
+            "file": output_path.relative_to(output_root).as_posix(),
+            "record_count": len(records),
+            "python_record_count": sum(
+                projection_writes_python(record) for record in records
+            ),
+            "sha256": _sha256_file(output_path),
+        }
 
     for split in SPLITS:
         current_hash = _sha256_file(source_root / f"teacher_trace_{split}.jsonl")
@@ -433,6 +461,36 @@ def _identity_fields(
         "split": split,
         "projection": projection,
     }
+
+
+def select_python_correction_records(
+    records: Sequence[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep every Python-writing trace plus two deterministic replay traces each."""
+
+    code_ids = {
+        str(record.get("example_id") or "")
+        for record in records
+        if projection_writes_python(record)
+    }
+    replay = sorted(
+        (
+            record
+            for record in records
+            if str(record.get("example_id") or "") not in code_ids
+        ),
+        key=lambda record: _sha256_bytes(
+            str(record.get("example_id") or "").encode("utf-8")
+        ),
+    )[: 2 * len(code_ids)]
+    selected_ids = code_ids | {
+        str(record.get("example_id") or "") for record in replay
+    }
+    return [
+        record
+        for record in records
+        if str(record.get("example_id") or "") in selected_ids
+    ]
 
 
 def _task_identity(

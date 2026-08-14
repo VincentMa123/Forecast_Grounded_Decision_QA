@@ -30,6 +30,7 @@ PROFILE_PROJECTIONS = (
     "trace_level",
     "constraint_multitask",
 )
+PROFILE_PROJECTION_CHOICES = (*PROFILE_PROJECTIONS, "python_correction")
 PROFILE_SPLITS = ("train", "valid")
 FIELD_ROLES = {
     "system": "system_prompt",
@@ -693,7 +694,7 @@ def load_profile_inputs(
         raise TokenProfileError(
             f"unsupported profile splits {sorted(unsupported_splits)}"
         )
-    unsupported_projections = set(projections) - set(PROFILE_PROJECTIONS)
+    unsupported_projections = set(projections) - set(PROFILE_PROJECTION_CHOICES)
     if unsupported_projections:
         raise TokenProfileError(
             f"unsupported projections {sorted(unsupported_projections)}"
@@ -713,7 +714,11 @@ def load_profile_inputs(
     data_root = data_root.resolve()
     inputs: list[ProfileInput] = []
     for projection in projections:
-        projection_manifest = (manifest.get("projections") or {}).get(projection)
+        projection_manifest = (
+            (manifest.get("corrective_datasets") or {}).get("python_script")
+            if projection == "python_correction"
+            else (manifest.get("projections") or {}).get(projection)
+        )
         if not isinstance(projection_manifest, dict):
             raise TokenProfileError(f"{projection}: manifest entry is missing")
         for split in splits:
@@ -888,7 +893,7 @@ def main(
     parser.add_argument(
         "--projections",
         nargs="+",
-        choices=PROFILE_PROJECTIONS,
+        choices=PROFILE_PROJECTION_CHOICES,
         default=list(PROFILE_PROJECTIONS),
     )
     parser.add_argument(

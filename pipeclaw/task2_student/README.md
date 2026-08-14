@@ -350,3 +350,54 @@ optimizer state does not fit.
 Switching projection is a two-line change (`dataset`, `val_dataset`, plus
 `output_dir`) to `answer_only` or `constraint_multitask`; every other value must
 stay identical so the three-way comparison holds the recipe constant.
+
+## Correct Python tool-call continuation
+
+The release validator rejects truncated or syntactically invalid Python and any
+`run_command` execution of a saved script without a preceding complete
+`write_file`. The derived correction set is intentionally small: 129 training
+records (43 Python-writing traces plus 86 deterministic replay traces) and 18
+validation records (6 plus 12).
+
+After copying the corrected data to the training host, regenerate the dedicated
+token profile and require its reported maximum to be at most 24,576 tokens:
+
+```bash
+python -m pipeclaw.task2_student.scripts.profile_tokens \
+  --projections python_correction \
+  --summary-output pipeclaw/task2_student/data/token_profiles/qwen35_08b_python_correction_profile.json \
+  --records-output pipeclaw/task2_student/data/token_profiles/qwen35_08b_python_correction_records.jsonl
+```
+
+Then continue from the best rank-32 adapter with fresh optimizer state:
+
+```bash
+CKPT=pipeclaw/task2_student/outputs/qwen35_9b_32l_trace_level_improved/checkpoint-60
+swift sft pipeclaw/task2_student/configs/qwen35_9b_python_correction.yaml \
+  --resume_from_checkpoint "$CKPT"
+```
+
+Serve the corrected adapter deterministically with a 2,048-token response
+budget. Do not pass `--repetition_penalty`; penalizing repeated JSON keys and
+code tokens can damage tool-call syntax.
+
+```bash
+CKPT=pipeclaw/task2_student/outputs/qwen35_9b_python_correction/checkpoint-200
+CUDA_VISIBLE_DEVICES=0 swift deploy \
+  --model Qwen/Qwen3.5-9B \
+  --adapters "$CKPT" \
+  --infer_backend transformers \
+  --quant_method bnb \
+  --quant_bits 4 \
+  --bnb_4bit_compute_dtype bfloat16 \
+  --torch_dtype bfloat16 \
+  --host 127.0.0.1 \
+  --port 8000 \
+  --api_key "$STUDENT_API_KEY" \
+  --served_model_name pipeclaw-student \
+  --temperature 0 \
+  --max_new_tokens 2048
+```
+
+Set the PipeClaw client-side ceiling to the same value with
+`ZAI_MAX_TOKENS=2048`.

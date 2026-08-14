@@ -78,3 +78,22 @@ optimizer state does not fit.
 To run the other two projections, change `dataset`, `val_dataset`, and
 `output_dir` to `answer_only` or `constraint_multitask` and leave everything else
 untouched, so the comparison isolates the projection.
+
+## Python correction continuation
+
+`qwen35_9b_python_correction.yaml` is the low-cost corrective run. It contains
+all 43 Python-writing training traces plus 86 deterministic replay traces; its
+validation split contains 6 Python traces plus 12 replay traces. It loads only
+the adapter weights from the selected checkpoint, then runs a fresh optimizer
+and scheduler for exactly 200 steps. Packing is disabled so complete tool-call
+scripts remain separate training examples.
+
+Regenerate the dedicated profile with `--projections python_correction` after
+syncing the corrected data and require every correction record to fit the
+configured 24,576-token ceiling. Then run:
+
+```bash
+CKPT=pipeclaw/task2_student/outputs/qwen35_9b_32l_trace_level_improved/checkpoint-60
+swift sft pipeclaw/task2_student/configs/qwen35_9b_python_correction.yaml \
+  --resume_from_checkpoint "$CKPT"
+```

@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from pipeclaw.backend.grounding.evidence.tool import (
+    command_python_scripts,
+    normalized_tool_path,
+)
 from pipeclaw.task2_student.path_contract import is_host_absolute_path, redact_host_paths
 from pipeclaw.task2_student.release_artifacts import (
     JsonlArtifactError,
@@ -266,6 +271,52 @@ def validate_release(
             validated_files += 1
     if observed_tool_schema_hashes != {tool_manifest.get("sha256")}:
         raise DatasetValidationError("tool schema checksum mismatch")
+    correction_manifest = (manifest.get("corrective_datasets") or {}).get(
+        "python_script"
+    )
+    if correction_manifest is not None and not isinstance(
+        correction_manifest, dict
+    ):
+        raise DatasetValidationError("python correction manifest is invalid")
+    for split in ("train", "valid") if correction_manifest is not None else ():
+        details = correction_manifest.get(split)
+        if not isinstance(details, dict):
+            raise DatasetValidationError(
+                f"python_correction/{split}: manifest entry is missing"
+            )
+        expected_relative = f"python_correction/{split}.jsonl"
+        if details.get("file") != expected_relative:
+            raise DatasetValidationError(
+                f"python_correction/{split}: unsafe or unexpected output path"
+            )
+        path = output_root / expected_relative
+        records = read_jsonl(path)
+        validate_projection_records(
+            records,
+            projection="trace_level",
+            split=split,
+            registered_tool_names=registered_names,
+        )
+        if details.get("record_count") != len(records):
+            raise DatasetValidationError(
+                f"python_correction/{split}: record count mismatch"
+            )
+        if details.get("python_record_count") != sum(
+            projection_writes_python(record) for record in records
+        ):
+            raise DatasetValidationError(
+                f"python_correction/{split}: Python record count mismatch"
+            )
+        if details.get("sha256") != _sha256_file(path):
+            raise DatasetValidationError(
+                f"python_correction/{split}: checksum mismatch"
+            )
+        source_ids = source_by_split[split]
+        if any(record.get("source_sample_id") not in source_ids for record in records):
+            raise DatasetValidationError(
+                f"python_correction/{split}: unknown source record"
+            )
+        validated_files += 1
     return {
         "validated_projection_files": validated_files,
         "validated_source_records": sum(
@@ -329,6 +380,8 @@ def _validate_source_tool_pairs(
                 f"{sorted(missing_arguments)}"
             )
         calls_by_id[call_id] = call
+
+    _validate_python_tool_sequence(calls, sample_id)
 
     outputs_by_id: dict[str, dict[str, Any]] = {}
     for output in outputs:
@@ -509,6 +562,7 @@ def _validate_tool_messages(
     registered_tool_names: set[str],
 ) -> int:
     call_count = 0
+    parsed_calls: list[dict[str, Any]] = []
     index = 0
     while index < len(messages):
         message = messages[index]
@@ -535,6 +589,7 @@ def _validate_tool_messages(
             raise DatasetValidationError(
                 f"{example_id}: tool_call arguments must be an object"
             )
+        parsed_calls.append(call)
         if message.get("loss") is not True:
             raise DatasetValidationError(f"{example_id}: tool_call must receive loss")
         if index + 1 >= len(messages) or messages[index + 1].get(
@@ -556,7 +611,62 @@ def _validate_tool_messages(
                 f"{example_id}: tool_response must be successful"
             )
         index += 2
+    _validate_python_tool_sequence(parsed_calls, example_id)
     return call_count
+
+
+def _validate_python_tool_sequence(
+    calls: Sequence[dict[str, Any]],
+    location: str,
+) -> None:
+    written_scripts: set[str] = set()
+    for call in calls:
+        name = str(call.get("name") or "")
+        arguments = call.get("arguments") or {}
+        if not isinstance(arguments, dict):
+            continue
+        if name == "write_file":
+            path = normalized_tool_path(arguments.get("path"))
+            if not path.endswith(".py"):
+                continue
+            content = arguments.get("content")
+            try:
+                if (
+                    not isinstance(content, str)
+                    or "truncated for sft" in content.casefold()
+                ):
+                    raise SyntaxError("truncated or missing Python content")
+                ast.parse(content)
+            except (SyntaxError, ValueError, TypeError) as exc:
+                raise DatasetValidationError(
+                    f"{location}: write_file for {path!r} must contain complete valid Python"
+                ) from exc
+            written_scripts.add(path)
+        elif name == "run_command":
+            for script in command_python_scripts(arguments):
+                if script not in written_scripts:
+                    raise DatasetValidationError(
+                        f"{location}: Python execution for {script!r} requires a "
+                        "preceding write_file with the complete script"
+                    )
+
+
+def projection_writes_python(record: dict[str, Any]) -> bool:
+    for message in record.get("messages") or []:
+        if not isinstance(message, dict) or message.get("role") != "tool_call":
+            continue
+        try:
+            call = json.loads(str(message.get("content") or ""))
+        except json.JSONDecodeError:
+            continue
+        arguments = call.get("arguments") if isinstance(call, dict) else None
+        if (
+            call.get("name") == "write_file"
+            and isinstance(arguments, dict)
+            and normalized_tool_path(arguments.get("path")).endswith(".py")
+        ):
+            return True
+    return False
 
 
 def _parse_json(value: str, location: str) -> Any:
