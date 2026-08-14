@@ -121,7 +121,7 @@ class PromptBuilder:
                     f"- PLAN_PATH: {(self.workspace_root / 'plan.md').as_posix()}",
                     "- Write intermediate artifacts under the temporary_dir/ subdirectory of WORKSPACE_DIR and deliverables under REPORTS_DIR. Reference that location as the workspace-relative path temporary_dir/ (for example temporary_dir/scratch.py); it is a directory, not an environment variable. Do not rely on per-session roots or scatter generated files under WORKSPACE_DIR.",
                     "- When you write a helper script and run it with run_command, the runner compiles it before executing and reports the exact SyntaxError line; fix that precise line. Use string keys in any dict passed to json.dumps (JSON keys cannot be tuples); test tuple membership with explicit parentheses such as `(a, b) in pairs`.",
-                    "- If run_command reports FileNotFoundError for `pipeline_data/...`, do not use `Path.cwd()` or `.resolve()`; that logical path is only for read_file. Build the filename from `os.environ[\"NODE_FLOW_DIR\"]`, `os.environ[\"PIPELINE_FLOW_DIR\"]`, or `os.environ[\"CONSUMER_FLOW_DIR\"]`.",
+                    "- If run_command reports FileNotFoundError for `pipeline_data/...`, do not use `Path.cwd()` or `.resolve()`; that logical path is only for read_file. Rewrite the script's directory line to `DIR = Path(os.environ[\"PIPELINE_FLOW_DIR\"])` (or NODE_FLOW_DIR / CONSUMER_FLOW_DIR as appropriate), ensure `import os` and `from pathlib import Path` are present at the top, then rerun. Do not guess absolute paths; do not paste the printed value of an env var into the script.",
                 ]
             )
         )
