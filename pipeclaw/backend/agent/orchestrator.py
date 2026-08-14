@@ -396,7 +396,11 @@ class AgentOrchestrator:
         tools_schema = tool_registry.openai_tools_schema()
         completed_tool_calls: List[Dict[str, Any]] = []
         failed_tool_signatures: Dict[str, int] = {}
+        successful_tool_signatures: Dict[str, tuple[int, str]] = {}
         successful_tool_revision = 0
+        workspace_revision = 0
+        successful_duplicate_count = 0
+        force_answer_next = False
         last_request_snapshot: Optional[Dict[str, Any]] = None
         logger.info("Agent tool loop ready: session_id=%s model=%s tools=%d", self.session_id, self.model, len(tools_schema))
 
@@ -427,10 +431,20 @@ class AgentOrchestrator:
                             f"{request_messages[0]['content']}\n\n{contract_message}"
                         ),
                     }
+                if force_answer_next:
+                    request_messages[0] = {
+                        "role": "system",
+                        "content": (
+                            f"{request_messages[0]['content']}\n\n"
+                            "Tool execution is closed because repeated successful "
+                            "calls were detected. Answer using the verified results "
+                            "already present."
+                        ),
+                    }
                 request_payload = self._chat_request_payload(
                     request_messages,
-                    tools=tools_schema,
-                    tool_choice="auto",
+                    tools=None if force_answer_next else tools_schema,
+                    tool_choice=None if force_answer_next else "auto",
                 )
                 logger.info("LLM request started: session_id=%s step=%d model=%s", self.session_id, step_index + 1, self.model)
                 last_request_snapshot = self.trace_writer.append_llm_call(
@@ -448,6 +462,19 @@ class AgentOrchestrator:
                 content, tool_calls, tool_parse_errors = self._normalize_tool_response(
                     response,
                 )
+                if force_answer_next and tool_calls:
+                    logger.warning(
+                        "Model attempted a tool call after duplicate-loop closure: "
+                        "session_id=%s step=%d",
+                        self.session_id,
+                        step_index + 1,
+                    )
+                    tool_calls = []
+                    content = content or (
+                        "Repeated successful tool calls were blocked; the available "
+                        "evidence was insufficient for a final answer."
+                    )
+                    finish_reason = "stop"
                 if tool_parse_errors:
                     logger.warning(
                         "Model tool-call parse errors: session_id=%s step=%d errors=%s",
@@ -680,7 +707,26 @@ class AgentOrchestrator:
 
                     signature = _tool_call_signature(call.name, args)
                     argument_error = self._tool_argument_error(call)
-                    if failed_tool_signatures.get(signature) == successful_tool_revision:
+                    successful_duplicate = successful_tool_signatures.get(signature)
+                    guarded_successful_duplicate = bool(
+                        successful_duplicate
+                        and successful_duplicate[0] == workspace_revision
+                    )
+                    if guarded_successful_duplicate:
+                        successful_duplicate_count += 1
+                        force_answer_next = successful_duplicate_count >= 2
+                        result = {
+                            "success": False,
+                            "record_in_teacher_trace": False,
+                            "error_code": "duplicate_successful_tool_call",
+                            "error": (
+                                "This exact tool call already succeeded. Reuse its "
+                                "result, change strategy, or answer now."
+                            ),
+                            "duplicate_of_tool_call_id": successful_duplicate[1],
+                            "tool": call.name,
+                        }
+                    elif failed_tool_signatures.get(signature) == successful_tool_revision:
                         result = {
                             "success": False,
                             "record_in_teacher_trace": False,
@@ -731,8 +777,14 @@ class AgentOrchestrator:
                         and result.get("exit_code") in (None, 0)
                     )
                     if result_success:
+                        if call.name in {"write_file", "edit_file", "run_command"}:
+                            workspace_revision += 1
+                        successful_tool_signatures[signature] = (
+                            workspace_revision,
+                            call.call_id,
+                        )
                         successful_tool_revision += 1
-                    else:
+                    elif not guarded_successful_duplicate:
                         failed_tool_signatures[signature] = successful_tool_revision
                     record_result = should_record_tool_result(
                         call.name,
