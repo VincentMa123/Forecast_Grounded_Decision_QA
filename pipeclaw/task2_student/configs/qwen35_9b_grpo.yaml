@@ -70,10 +70,7 @@ num_generations: 8
 temperature: 1.0
 max_turns: 8
 max_completion_length: 2048
-vllm_server_pass_dataset:
-  - reference
-  - scenario_id
-  - sample_id
+vllm_server_pass_dataset: true
 use_vllm: true
 vllm_mode: colocate
 vllm_enable_lora: true

@@ -18,10 +18,15 @@ this env pins ms-swift==4.4.2):
 
 from __future__ import annotations
 
+import sys
 import threading
 import uuid
 from pathlib import Path
-from typing import Any, Dict, List, Mapping, Sequence
+from typing import Any, Mapping, Sequence
+
+_ROOT = Path(__file__).resolve().parents[2]
+if str(_ROOT) not in sys.path:
+    sys.path.insert(0, str(_ROOT))
 
 from pipeclaw.task2_student.rollout.scenarios import (
     ScenarioPolicy,
