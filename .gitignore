@@ -9,6 +9,7 @@ __pycache__/
 .codex
 .claude
 .agents
+.opencode
 agent_docs
 graphify-out
 pipeFormer/data/**/tokenizer_output.txt

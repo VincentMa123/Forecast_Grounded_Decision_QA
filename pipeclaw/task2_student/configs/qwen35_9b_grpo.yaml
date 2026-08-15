@@ -1,0 +1,105 @@
+# GRPO stage: python-scenario reliability training on the SFT checkpoint.
+# Launch from the repository root in the task2-ms-swift env:
+#
+#   swift rlhf --rlhf_type grpo pipeclaw/task2_student/configs/qwen35_9b_grpo.yaml
+#
+# Before the first real run, execute the preflight in grpo_plugin.py's docstring
+# (python -c import check + a 1-step smoke with --max_steps 1).
+#
+# Reward/model notes:
+# - reward = backend evaluator overall_score/hard gate + compile/exit/thrash
+#   rules (deterministic, no reward model; mirrors scripts/pass_at_k.py).
+# - completion tokens carry the scheduler response only; tool outputs are not
+#   supervised (agent template masks tool messages).
+
+# Design notes:
+# - rl_train.jsonl prompts reuse the SFT-frozen system prompt released in
+#   trace_level/train.jsonl (never the drifted live prompt_policy source),
+#   keeping RL on-distribution with SFT.
+
+ENV:
+  PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+
+model: Qwen/Qwen3.5-9B
+# Start from the best SFT adapter. If `swift rlhf` rejects adapter init in this
+# version, merge first (swift export --merge_lora true --adapters "$CKPT") and point
+# `model:` at the merged directory instead.
+adapters:
+  - pipeclaw/task2_student/outputs/qwen35_9b_32l_trace_level/checkpoint-44
+use_hf: false
+output_dir: pipeclaw/task2_student/outputs/qwen35_9b_grpo
+add_version: false
+
+dataset:
+  - pipeclaw/task2_student/data/grpo/rl_train.jsonl
+external_plugins:
+  - pipeclaw/task2_student/grpo_plugin.py
+
+trainer_cls: grpo
+multi_turn_scheduler: python_scenario_scheduler
+reward_funcs:
+  - python_episode_reward
+
+template: qwen3_5
+tuner_type: lora
+target_modules:
+  - all-linear
+lora_rank: 32
+lora_alpha: 64
+lora_dropout: 0.05
+freeze_vit: true
+freeze_aligner: true
+
+quant_method: bnb
+quant_bits: 4
+bnb_4bit_compute_dtype: bfloat16
+bnb_4bit_quant_type: nf4
+bnb_4bit_use_double_quant: true
+torch_dtype: bfloat16
+attn_impl: flash_attention_2
+
+max_length: 18432
+truncation_strategy: delete
+loss_scale: default+ignore_empty_think
+add_non_thinking_prefix: true
+packing: false
+use_liger_kernel: true
+
+# Rollout
+num_generations: 8
+temperature: 1.0
+max_turns: 8
+max_completion_length: 2048
+vllm_server_pass_dataset:
+  - reference
+  - scenario_id
+  - sample_id
+use_vllm: true
+vllm_mode: colocate
+vllm_enable_lora: true
+sleep_level: 1
+
+per_device_train_batch_size: 1
+# accumulation 8 > effective batch = 8 completions per optimizer step.
+gradient_accumulation_steps: 8
+gradient_checkpointing: true
+optim: adamw_torch
+learning_rate: 0.000001
+beta: 0.0
+max_steps: 200
+
+save_strategy: steps
+save_steps: 20
+save_total_limit: 5
+save_only_model: false
+safe_serialization: true
+
+logging_steps: 1
+logging_first_step: true
+include_num_input_tokens_seen: true
+report_to: tensorboard
+dataloader_num_workers: 4
+
+seed: 42
+data_seed: 42
+push_to_hub: false
