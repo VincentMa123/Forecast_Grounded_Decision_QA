@@ -35,7 +35,6 @@ dataset:
 external_plugins:
   - pipeclaw/task2_student/grpo_plugin.py
 
-trainer_cls: grpo
 multi_turn_scheduler: python_scenario_scheduler
 reward_funcs:
   - python_episode_reward
@@ -71,10 +70,10 @@ temperature: 1.0
 max_turns: 8
 max_completion_length: 2048
 vllm_server_pass_dataset: true
+vllm_gpu_memory_utilization: 0.65                 
 use_vllm: true
 vllm_mode: colocate
 vllm_enable_lora: true
-sleep_level: 1
 
 per_device_train_batch_size: 1
 # accumulation 8 > effective batch = 8 completions per optimizer step.

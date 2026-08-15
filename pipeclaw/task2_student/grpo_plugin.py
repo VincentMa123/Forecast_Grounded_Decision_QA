@@ -63,7 +63,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
             },
         )
 
-    def on_trajectory_start(self, requests: List[Any]) -> None:
+    async def on_trajectory_start(self, requests: List[Any]) -> None:
         for request in requests:
             data = getattr(request, "data_dict", {}) or {}
             scenario = str(
@@ -134,7 +134,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         state["trace_status"] = "completed"
         return True
 
-    def on_turn_end(
+    async def on_turn_end(
         self, infer_request: Any, response_choice: Any, current_turn: int
     ) -> Dict[str, Any]:
         data = getattr(infer_request, "data_dict", {}) or {}
