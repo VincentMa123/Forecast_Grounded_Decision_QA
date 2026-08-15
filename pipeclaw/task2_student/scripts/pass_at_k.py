@@ -290,6 +290,8 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
+
     builder = PromptCaseBuilder()
     all_schemas = _union_schemas(sources, schemas_by_key)
     runner = _build_runner(args, all_schemas)
