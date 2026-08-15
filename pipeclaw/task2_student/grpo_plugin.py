@@ -46,7 +46,15 @@ class PythonScenarioScheduler(MultiTurnScheduler):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         super().__init__(*args, **kwargs)
-        self._dispatcher = build_openclaw_dispatcher([], Path("."))
+        backend_root = Path(__file__).resolve().parents[2] / "pipeclaw" / "backend"
+        from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
+        from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools
+        from pipeclaw.backend.agent.tools.registry import tool_registry
+
+        register_pipeformer_tools(backend_root)
+        WorkspaceTools(session_id="grpo-plugin")
+        schemas = tool_registry.openai_tools_schema()
+        self._dispatcher = build_openclaw_dispatcher(schemas, Path("."))
         self._policy = ScenarioPolicy()
         self._lock = threading.Lock()
         self._states: dict[int, dict[str, Any]] = {}
