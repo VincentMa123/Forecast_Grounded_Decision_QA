@@ -127,10 +127,7 @@ def _inherited_assumption(source: Mapping[str, Any]) -> Mapping[str, Any] | None
     if not disturbance.get("variable"):
         return None
     source_name = str(disturbance.get("source") or "").casefold()
-    try:
-        recent_text = json.dumps(source.get("recent_turns"), ensure_ascii=False).casefold()
-    except (TypeError, ValueError):
-        recent_text = str(source.get("recent_turns")).casefold()
+    recent_text = json.dumps(source.get("recent_turns"), ensure_ascii=False, default=str).casefold()
     markers = (
         "llm provisional",
         "llm_assumption",

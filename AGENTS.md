@@ -1,5 +1,15 @@
 # Repository Guidelines
 
+## Working Contract (binding rules — user-verified, do not breach)
+
+1. **Ground before you assert.** Before proposing eval questions, data checks, or answers that reference repository content (files, dates, lane names, case ids, API shapes), READ the actual files/records first — not filenames, not docs, not memory. Never hand the user an item whose evidence you did not verify in the codebase. When the claim is wrong, fix the claim, not the user's evidence.
+2. **TDD mandatory.** For scheduler, reward, scenario, dispatcher, and config changes: write the failing test FIRST (RED), then the minimum fix (GREEN). GPU to is Prohibitively expensive for trial-and-error; remote runs must be gated by tests that simulate episodes/rewards locally (no GPU needed for reward math, schema validation, and dispatcher routing).
+3. **Reward sanity is a release gate.** Before any GRPO run, unit-test the scorer against synthetic episodes: success > thrash, success > evidence substitution, precondition failure < honest `not_evaluated` answer, thrash loop < stop-and-declare. If the scorer rates a cheating episode above honest ones, THAT is the bug; fix it before training, not after.
+4. **ponytail ultracaptain compact implementations.** Minimal diffs, no speculative abstractions, no helper for a helper, one-liner when one-liner works. When both paths work, the smaller diff wins.
+5. **graphify for codebase questions.** Use `graphify query` before broad grep when exploring the codebase (see #graphify below).
+6. **Remote proof.** For AutoDL debugging: plugin/env/config claims must be verified in the EXACT training process state (the same interpreter/env/cwd as the runner), not in a probe that differs by cwd or activation. Watch for append-only logs (`completions.jsonl`) — timestamp records before citing them.
+7. **Ask about data, not the model, first.** When the model "fails," check the evidence exists: does the file exist, does the data cover the asked window/entity, does the trace record a DIFFERENT failure than the user pasted? Many "model bugs" in this repo have been question-design bugs (missing dates/lanes).
+
 ## Project Structure & Module Organization
 
 This repository contains two related packages. `pipeFormer/` holds the forecasting model, data preprocessing, sparse decoder implementation, configs, mock data, and decoder tests. Important subtrees include `pipeFormer/data/`, `pipeFormer/models/decoder/`, `pipeFormer/training/`, and `pipeFormer/configs/`. `pipeclaw/` is the runnable QA and visualization stack: `backend/` contains the FastAPI service, agent runtime, execution pipeline, mock `pipeline_data/`, and released task data; `frontend/` contains the Vite React app; `huggingface_dataset/` contains dataset publishing helpers; `docs/images/` stores paper and UI figures.

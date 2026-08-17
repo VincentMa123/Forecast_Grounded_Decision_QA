@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import datetime
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -23,6 +24,11 @@ from .common import mapping, metric, sequence
 
 _ROW_CLAUSE_SEPARATOR = re.compile(r"(?:\r?\n|[；;。，])")
 _LEADING_THINK = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
+_BARE_DATE = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}")
+_IDENTIFIER_TOKEN = re.compile(r"[\w.\u4e00-\u9fa5-]+\.(?:csv|xlsx?|json|txt)|[A-Z]_[A-Za-z0-9]+[::][A-Za-z0-9_:-]+|[\u4e00-\u9fa5]{1,7}?站")
+
+
+_DATE_SPAN = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{8})\s*(?:至|-)\s*(\d{4}-\d{2}-\d{2}|\d{8})")
 
 
 def _source_outputs(source: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -210,7 +216,9 @@ def _autonomous_evidence(
     rollout = context.record
     evidence_numbers = observed_numeric_values(oracle.get("verified_evidence", {}))
     evidence_numbers.extend(derived_numeric_values(oracle.get("verified_evidence", {})))
-    for output in _source_outputs(source):
+    # Successful student tool output is independently verified evidence.  It
+    # need not reproduce a different valid teacher forecast sample.
+    for output in [*_source_outputs(source), *_source_outputs(rollout)]:
         evidence_numbers.extend(observed_numeric_values(output))
         evidence_numbers.extend(derived_numeric_values(output))
     state_before = mapping(source.get("state_before"))
@@ -218,14 +226,18 @@ def _autonomous_evidence(
     evidence_numbers.extend(derived_numeric_values(state_before.get("verified_evidence")))
     for task in sequence(oracle.get("tasks")):
         evidence_numbers.extend(observed_numeric_values(task))
-    # Successful student tool output is independently verified evidence.  It
-    # need not reproduce a different valid teacher forecast sample.
-    for output in _source_outputs(rollout):
-        evidence_numbers.extend(observed_numeric_values(output))
-        evidence_numbers.extend(derived_numeric_values(output))
     evidence_numbers.extend(_prior_turn_evidence(rollout))
     evidence_numbers.extend(_prior_turn_evidence(source))
-    evidence_numbers.extend(observed_numeric_claim_values(str(source.get("user_input") or "")))
+    user_input = str(source.get("user_input") or "")
+    evidence_numbers.extend(observed_numeric_claim_values(user_input))
+    # Calendar arithmetic is really verified evidence: a date span named in the
+    # question makes its inclusive day count citable (otherwise the hard gate
+    # punishes the honest "窗口共 N 天" deliverable).
+    for match in _DATE_SPAN.finditer(user_input):
+        start_date = datetime.strptime(match.group(1).replace("-", ""), "%Y%m%d")
+        end_date = datetime.strptime(match.group(2).replace("-", ""), "%Y%m%d")
+        if start_date <= end_date:
+            evidence_numbers.append(float((end_date - start_date).days + 1))
     row_evidence = [
         *_answer_rows(oracle.get("verified_evidence", {})),
         *_answer_rows(state_before.get("verified_evidence")),
@@ -253,7 +265,7 @@ def _autonomous_evidence(
         *_ranking_row_issues(
             final_answer,
             row_evidence,
-            str(source.get("user_input") or ""),
+            user_input,
         ),
     ]
     contract = record_grounding_contract({**source, **rollout})
@@ -263,6 +275,19 @@ def _autonomous_evidence(
         else []
     )
     applicable = bool(unique_numbers or candidate_issues) and bool(final_answer.strip())
+    # A template answer is vacuously grounded: no numeric claim, no identifier,
+    # no date token — the hard gate must not score it. (Numeric-only guards
+    # flip honest recall answers; identifier+date tri-guard is measured-safe.)
+    # Template-cheat guard is scoped to episodes that USED the evidence plane:
+    # "ran tools but produced no grounded claim" is the cheat shape; recall-only
+    # episodes routinely (and legitimately) have no numeric/identifier/date in
+    # their answer — they keep their existing gates, no new ones.
+    vacuous = (
+        bool(sequence(rollout.get("tool_calls")))
+        and not claims
+        and not _BARE_DATE.search(final_answer)
+        and not _IDENTIFIER_TOKEN.search(final_answer)
+    )
     return metric(
         context,
         "evidence_consistency",
@@ -272,12 +297,14 @@ def _autonomous_evidence(
             and not unsupported
             and not unsupported_rows
             and not candidate_issues
+            and not vacuous
         ),
         details={
             "claimed_numeric_values": claims,
             "unsupported_numeric_values": unsupported,
             "unsupported_row_claims": unsupported_rows,
             "candidate_contract_issues": candidate_issues,
+            "vacuous_answer": vacuous,
         },
     )
 

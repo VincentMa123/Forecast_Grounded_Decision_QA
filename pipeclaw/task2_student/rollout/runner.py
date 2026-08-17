@@ -66,7 +66,7 @@ class PassthroughPolicy:
         return result
 
 
-_SCHEMA_ERROR_CODES = {"unknown_tool", "invalid_arguments"}
+_SCHEMA_ERROR_CODES = {"unknown_tool", "invalid_arguments", "tool_not_allowed"}
 _EXECUTION_ERROR_CODES = {
     "tool_execution_error",
     "forecast_registry_precondition_failed",
@@ -138,12 +138,10 @@ class RolloutRunner:
 
             if calls:
                 self._dispatch_calls(case, result, messages, calls, text)
-                result.messages = messages
                 continue
 
             if text:
                 messages.append({"role": "assistant", "content": text})
-                result.messages = messages
                 result.final_answer = text
                 result.trace_status = "completed"
                 break
@@ -159,8 +157,6 @@ class RolloutRunner:
         else:
             result.trace_status = "max_turns_exceeded"
 
-        if not result.trace_status:
-            result.trace_status = "max_turns_exceeded"
         return result
 
     def _prepare_dispatcher(self, case: PromptCase) -> None:
@@ -191,12 +187,15 @@ class RolloutRunner:
         text: str,
     ) -> None:
         for index, call in enumerate(calls):
-            portability = dict(self.policy.portability_metadata(call, case))
-            tool_result = self.dispatcher.dispatch(call)
+            # Record the schema-normalized form: identical logical calls stay one
+            # thrash signature even when the model stringifies typed values.
+            normalized = self.dispatcher.schema_normalized_call(call)
+            portability = dict(self.policy.portability_metadata(normalized, case))
+            tool_result = self.dispatcher.dispatch(normalized)
             call_record: dict[str, Any] = {
                 "tool_call_id": call.call_id,
                 "name": call.name,
-                "arguments": dict(self.policy.recorded_arguments(call, case)),
+                "arguments": dict(self.policy.recorded_arguments(normalized, case)),
                 "schema_valid": _schema_valid(tool_result),
                 "execution_success": _execution_success(tool_result),
             }

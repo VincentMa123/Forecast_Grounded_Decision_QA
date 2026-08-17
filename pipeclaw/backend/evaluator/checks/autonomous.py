@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from typing import Any
 
 from pipeclaw.backend.grounding.evidence.tool import (
@@ -241,6 +241,14 @@ def _tool_metrics(
         call_capabilities = capabilities({name}) if is_openclaw else {name}
         for capability in call_capabilities & recovery_targets:
             last_required[capability] = call
+    # Recovery is a feature, not a defect: one failed call retried with a
+    # different signature may still pass the gate. Only the identical repeated
+    # failing call — the thrash signature — blocks.
+    failure_signatures: dict[str, int] = {}
+    for call in failed_calls:
+        signature = json.dumps([call.get("name"), call.get("arguments")], sort_keys=True, default=str)
+        failure_signatures[signature] = failure_signatures.get(signature, 0) + 1
+    repeated_failures = [s for s, count in failure_signatures.items() if count > 1]
     tool_result = metric(
         context,
         "tool_call",
@@ -248,13 +256,14 @@ def _tool_metrics(
         passed=(
             applicable
             and required <= emitted_valid
-            and not failed_calls
+            and not repeated_failures
         ),
         details={
             "expected_tool_names": sorted(teacher_names),
             "required_tool_names": sorted(required),
             "emitted_tool_names": [str(call.get("name")) for call in calls if call.get("name")],
             "failed_call_count": len(failed_calls),
+            "repeated_failure_signatures": len(repeated_failures),
         },
     )
     recovered = bool(failed_calls) and recovery_targets <= set(last_required) and all(
@@ -307,41 +316,23 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
     }
     outputs = [output for _, output in pairs]
     tasks = [mapping(call.get("arguments")) for call, _ in pairs]
-    checkpoint = metric(
-        context,
-        "checkpoint_inference",
-        applicable=applicable,
-        passed=applicable and bool(outputs) and all(
-            checkpoint_inference_used(output) for output in outputs
-        ),
-    )
-    disturbance = metric(
-        context,
-        "disturbance_application",
-        applicable=applicable,
-        passed=applicable and bool(outputs) and all(
-            disturbance_was_applied(output, task)
-            for output, task in zip(outputs, tasks)
-        ),
-    )
-    horizon = metric(
-        context,
-        "forecast_horizon",
-        applicable=applicable,
-        passed=applicable and bool(outputs) and all(horizon_is_consistent(output) for output in outputs),
-    )
-    constraint_execution = metric(
-        context,
-        "constraint_execution",
-        applicable=applicable,
-        passed=applicable and bool(outputs) and all(requested_constraints_executed(output) for output in outputs),
-    )
-    complete = metric(
-        context,
-        "verification_completeness",
-        applicable=applicable,
-        passed=applicable and bool(outputs) and all(verification_is_complete(output) for output in outputs),
-    )
+    predicates = {
+        "checkpoint_inference": lambda out, _task: checkpoint_inference_used(out),
+        "disturbance_application": disturbance_was_applied,
+        "forecast_horizon": lambda out, _task: horizon_is_consistent(out),
+        "constraint_execution": lambda out, _task: requested_constraints_executed(out),
+        "verification_completeness": lambda out, _task: verification_is_complete(out),
+    }
+    checkpoint, disturbance, horizon, constraint_execution, complete = [
+        metric(
+            context,
+            name,
+            applicable=applicable,
+            passed=applicable and bool(outputs)
+            and all(pred(out, task) for out, task in zip(outputs, tasks)),
+        )
+        for name, pred in predicates.items()
+    ]
 
     expected_constraints = {
         str(item) for item in sequence(context.oracle.get("required_constraints"))
@@ -436,6 +427,99 @@ _IDENTIFIER_CLAIM = re.compile(
 
 def _json_text(value: Any) -> str:
     return json.dumps(value, ensure_ascii=False, default=str)
+
+
+# Missing-resource behaviour contract: when a tool output tells the agent the
+# asked resource does not exist, the final answer must still NAME that exact
+# resource — token from the failed output's own payload, never inferred from
+# question text. Failing to name it is evidence substitution: answering for
+# some other date or station the user never asked about.
+_CJK = re.compile(r"[一-龥]")
+_BARE_DATE = re.compile(r"\d{8}")
+
+
+def _missing_resource_anchors(record: Mapping[str, Any]) -> list[str]:
+    # order-independent lookup into the matching call when the output payload
+    # drops the structured details (e.g. compacted projections).
+    calls_by_id = {
+        str(call.get("tool_call_id") or ""): mapping(call.get("arguments"))
+        for call in _calls(record)
+    }
+    anchors: list[str] = []
+    for item in _output_wrappers(record):
+        if not (output := item.get("output")) or not isinstance(output, Mapping) or output.get("success", True) is not False:
+            continue
+        error_code = str(output.get("error_code") or "")
+        if not (str(output.get("error") or "").strip() or error_code):
+            continue
+        name = str(item.get("name") or "")
+        details = mapping(output.get("details"))
+        station = (
+            details.get("requested_target_station")
+            or details.get("canonical_target_station")
+            or ""
+        )
+        station = station or calls_by_id.get(str(item.get("tool_call_id") or ""), {}).get(
+            "target_station", ""
+        )
+        if isinstance(station, str) and station.strip():
+            anchors.append(station.strip())
+        error_text = str(output.get("error") or "")
+        if name == "read_file" and "not found" in error_text.casefold():
+            path = str(details.get("requested_path") or output.get("path") or error_text)
+            anchors.extend(_BARE_DATE.findall(path))
+    return sorted(dict.fromkeys(anchors))
+
+
+def _covers(answer: str, compact_answer: str, anchor: str) -> bool:
+    token = str(anchor)
+    if _CJK.search(token):
+        # \w in Python re lumps CJK with word chars, so the boundary guard can
+        # never match an honest anchor glued to a following Chinese character.
+        return token in answer or token.replace("-", "") in compact_answer
+    for text, key in ((answer, token), (compact_answer, token.replace("-", ""))):
+        if re.search(r"(?<![\w-])" + re.escape(key) + r"(?![\w-])", text):
+            return True
+    return False
+
+
+def _question_anchor_metric(context: EvaluationContext) -> MetricResult:
+    answer = str(context.record.get("final_answer") or "")
+    compact_answer = answer.replace("-", "")
+    anchors = _missing_resource_anchors(context.record)
+    # Forgive a failure only when the question never asked for that resource
+    # (a misprobe), or when some successful output produced it (healed). Every
+    # other failure stays anchored: answering from a substitute target is the
+    # signal being priced. Dates and station names share this rule.
+    question = str((context.reference or {}).get("user_input") or "")
+    success_corpus = "\n".join(
+        _json_text(item.get("output"))
+        for item in sequence(context.record.get("tool_outputs"))
+        if isinstance(item, Mapping)
+        and isinstance(item.get("output"), Mapping)
+        and item["output"].get("success", True) is not False
+    )
+    question_compact = question.replace("-", "")
+    success_compact = success_corpus.replace("-", "")
+    retained = [
+        anchor
+        for anchor in anchors
+        if (key := anchor.replace("-", "")) in question_compact
+        and key not in success_compact
+    ]
+    covered = sorted(anchor for anchor in retained if _covers(answer, compact_answer, anchor))
+    applicable = bool(retained)
+    return metric(
+        context,
+        "question_anchor",
+        applicable=applicable,
+        passed=applicable and len(covered) == len(retained),
+        details={
+            "missing_resource_anchors": anchors,
+            "retained_anchors": retained,
+            "covered_anchors": covered,
+        },
+    )
 
 
 def _claim_support_metric(context: EvaluationContext) -> MetricResult:
@@ -607,15 +691,12 @@ def _record_contract(context: EvaluationContext) -> MetricResult:
 def _portability_diagnostics(record: Mapping[str, Any]) -> dict[str, int]:
     calls = _calls(record)
     rebased = [call for call in calls if call.get("cwd_rebased")]
+    failures = sum(call.get("execution_success") is False for call in rebased)
     return {
         "cwd_rebased_calls": len(rebased),
         "records_with_cwd_rebased": int(bool(rebased)),
-        "rebased_execution_successes": sum(
-            call.get("execution_success") is not False for call in rebased
-        ),
-        "rebased_execution_failures": sum(
-            call.get("execution_success") is False for call in rebased
-        ),
+        "rebased_execution_successes": len(rebased) - failures,
+        "rebased_execution_failures": failures,
         "portable_path_normalization_calls": sum(
             bool(call.get("portable_path_normalization")) for call in calls
         ),
@@ -635,16 +716,13 @@ def evaluate_autonomous_checks(
         tool_call,
         *_pipeformer_metrics(context),
         _registry_metric(context),
-        _label_metric(context, "risk", "risk_level"),
-        _label_metric(
-            context,
-            "manual_intervention",
-            "human_intervention_label",
-        ),
-        _label_metric(
-            context,
-            "dispatch",
-            "dispatch_recommendation",
+        *(
+            _label_metric(context, name, key)
+            for name, key in (
+                ("risk", "risk_level"),
+                ("manual_intervention", "human_intervention_label"),
+                ("dispatch", "dispatch_recommendation"),
+            )
         ),
         evidence_consistency(context),
         _answer_metric(context),
@@ -657,4 +735,5 @@ def evaluate_autonomous_checks(
     ordered = [by_name[name] for name in CANONICAL_METRIC_NAMES]
     ordered.append(tool_recovery)
     ordered.append(claim_support)
+    ordered.append(_question_anchor_metric(context))
     return ordered, {"portability": _portability_diagnostics(context.record)}

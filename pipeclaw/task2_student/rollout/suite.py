@@ -73,15 +73,6 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
         raise ValueError(f"invalid JSONL at {exc.path}:{exc.line_number}: {exc.message}") from exc
 
 
-def _progress_cases(
-    cases: Sequence[tuple[dict[str, Any], PromptCase]],
-    *,
-    description: str,
-):
-    """Wrap case iterations with a terminal progress bar."""
-
-    return tqdm(cases, total=len(cases), desc=description, unit="case")
-
 
 def sample_keys(record: Mapping[str, Any]) -> set[str]:
     """Return every identifier a record may be joined on across files."""
@@ -375,7 +366,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     mode = "dry_run" if dry_run else "autonomous"
     with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
         if dry_run:
-            progress = _progress_cases(cases, description="Preparing evaluation")
+            progress = tqdm(cases, total=len(cases), desc="Preparing evaluation", unit="case")
             for _, case in progress:
                 write_rollout(_dry_run_item(case))
                 record_count += 1
@@ -383,7 +374,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                 _set_postfix(progress, scenario=case.scenario_type, status="dry_run")
         else:
             runner = _build_runner(args, cases)
-            progress = _progress_cases(cases, description="Evaluating")
+            progress = tqdm(cases, total=len(cases), desc="Evaluating", unit="case")
             for source, case in progress:
                 config = RolloutConfig(
                     max_turns=args.max_turns,

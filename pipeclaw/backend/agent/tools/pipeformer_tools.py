@@ -34,7 +34,6 @@ def register_pipeformer_tools(
     global _REGISTERED
     if _REGISTERED:
         return
-    _REGISTERED = True
     resolved_backend_root = Path(backend_root).resolve() if backend_root else _default_backend_root()
     forecast_service = PipeFormerForecastService(resolved_backend_root)
     registry_search_service = registry_search_service or PipeFormerRegistrySearchService(
@@ -517,3 +516,5 @@ def register_pipeformer_tools(
             mapping_csv=mapping_csv,
             device=device,
         )
+
+    _REGISTERED = True

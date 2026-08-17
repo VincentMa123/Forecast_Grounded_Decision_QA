@@ -51,9 +51,9 @@ def parse_tool_schemas(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
     return [
-        dict(jsonable(item))
+        dict(m)
         for item in value
-        if isinstance(jsonable(item), Mapping)
+        if isinstance((m := jsonable(item)), Mapping)
     ]
 
 

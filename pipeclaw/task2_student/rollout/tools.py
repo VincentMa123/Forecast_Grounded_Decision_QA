@@ -178,9 +178,6 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
                 errors.append(error)
         visible_text = _TAGGED_TOOL_CALL.sub("", content).strip()
         visible_text = _QWEN_FUNCTION_CALL.sub("", visible_text).strip()
-        # If every visible character was a malformed tool block, it is not an answer.
-        if errors and not visible_text and not calls:
-            visible_text = ""
         return visible_text, calls, errors
 
     if not calls:
@@ -393,15 +390,17 @@ class ToolDispatcher:
 
     def _validate(self, call: ToolCall) -> str | None:
         schema = self.schemas.get(call.name)
-        if schema is None or call.name not in self.allowed_names:
+        if schema is None:
             return "unknown_tool"
+        if call.name not in self.allowed_names:
+            return "tool_not_allowed"
         function = schema.get("function", schema)
         parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
         if not isinstance(parameters, Mapping) or not isinstance(call.arguments, Mapping):
             return "invalid_arguments"
         return "invalid_arguments" if schema_error(call.arguments, parameters) else None
 
-    def _schema_normalized_call(self, call: ToolCall) -> ToolCall:
+    def schema_normalized_call(self, call: ToolCall) -> ToolCall:
         schema = self.schemas.get(call.name)
         if schema is None:
             return call
@@ -429,7 +428,7 @@ class ToolDispatcher:
             return executor.submit(asyncio.run, value).result()
 
     def dispatch(self, call: ToolCall) -> dict[str, Any]:
-        normalized_call = self._schema_normalized_call(call)
+        normalized_call = self.schema_normalized_call(call)
         error_code = self._validate(normalized_call)
         if error_code:
             result = {

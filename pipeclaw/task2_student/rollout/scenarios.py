@@ -150,13 +150,9 @@ def compact_openclaw_tool_result(
     return compact
 
 
-def openclaw_portability_metadata(
-    call: ToolCall,
-    workspace_root: Path | None,
-) -> dict[str, Any]:
+def openclaw_portability_metadata(call: ToolCall) -> dict[str, Any]:
     """Report how one call's paths had to be normalized to stay portable."""
 
-    del workspace_root
     if call.name != "run_command":
         return {}
     cwd = call.arguments.get("cwd")
@@ -215,7 +211,7 @@ class ScenarioPolicy:
     ) -> Mapping[str, Any]:
         if not is_openclaw_scenario(case.scenario_type):
             return {}
-        return openclaw_portability_metadata(call, case.workspace_root)
+        return openclaw_portability_metadata(call)
 
     def recorded_arguments(self, call: ToolCall, case: PromptCase) -> Mapping[str, Any]:
         del case
@@ -232,8 +228,6 @@ class ScenarioPolicy:
 
 
 def path_within(root: Path, target: Path) -> bool:
-    """Return True when ``target`` resolves inside ``root``."""
-
     try:
         target.resolve().relative_to(root.resolve())
     except (ValueError, RuntimeError):
@@ -454,14 +448,18 @@ def build_pipeformer_dispatcher(
     ) -> Mapping[str, Any] | None:
         dispatcher = dispatcher_ref.get("dispatcher")
         current_request = dispatcher.current_user_request if dispatcher else ""
-        if call.name == "run_pipeformer_forecast":
-            from pipeclaw.backend.pipeline.forecast_registry_contract import (
-                forecast_registry_failure_result,
-            )
+        if call.name in ("run_pipeformer_forecast", "set_decision_policy"):
+            # Share the orchestrator's full pre-execution guard chain:
+            # decision-metric misuse, registry preconditions, duplicate-
+            # equivalent forecast — not just the registry subset.
+            from pipeclaw.backend.agent.orchestrator import forecast_preexecution_failure
 
-            return forecast_registry_failure_result(dict(call.arguments), completed)
-        if call.name == "set_decision_policy":
-            return _decision_policy_error(call, current_request)
+            return forecast_preexecution_failure(
+                call.name,
+                dict(call.arguments),
+                list(completed),
+                current_user_request=current_request,
+            )
         return None
 
     dispatcher = ToolDispatcher(
@@ -476,28 +474,8 @@ def build_pipeformer_dispatcher(
     return dispatcher
 
 
-def _decision_policy_error(
-    call: ToolCall, current_request: str
-) -> Mapping[str, Any] | None:
-    """Require every decision objective to quote the current user request."""
-
-    objectives = call.arguments.get("objectives") or []
-    invalid = [
-        str(item.get("metric") or "missing")
-        for item in objectives
-        if not isinstance(item, Mapping)
-        or not str(item.get("source_excerpt") or "").strip()
-        or str(item.get("source_excerpt") or "") not in current_request
-    ]
-    if not invalid:
-        return None
-    return {
-        "success": False,
-        "record_in_teacher_trace": False,
-        "error_code": "decision_policy_source_not_in_current_user_request",
-        "error": "Each decision objective must quote an exact phrase from the current user request.",
-        "invalid_objectives": invalid,
-    }
+# ``decision_policy_source_not_in_current_user_request`` is produced via the
+# shared ``forecast_preexecution_failure`` chain (orchestrator).
 
 
 def build_openclaw_dispatcher(

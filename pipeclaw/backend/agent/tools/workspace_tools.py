@@ -71,7 +71,6 @@ class WorkspaceTools:
         global _REGISTERED
         if _REGISTERED:
             return
-        _REGISTERED = True
         runner = self.runner
 
         @register_tool(
@@ -137,3 +136,5 @@ class WorkspaceTools:
         def read_file(path: str, offset: Optional[int] = None, limit: Optional[int] = None, session_id: str = "", agent_id: str = "default") -> Dict[str, Any]:
             result: ReadFileResult = runner.read_file(session_id=session_id, agent_id=agent_id, path=path, offset=offset, limit=limit)
             return _public_model_dump(result)
+
+        _REGISTERED = True
