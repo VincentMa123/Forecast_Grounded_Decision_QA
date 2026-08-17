@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from collections.abc import Mapping
@@ -522,6 +523,98 @@ def _question_anchor_metric(context: EvaluationContext) -> MetricResult:
     )
 
 
+_ENTITY_COUNT_CLAIM = re.compile(
+    r"([一-鿿A-Za-z0-9_]{2,20})[：:\s，、]*[,，]?\s*(\d+(?:\.\d+)?)\s*(?:个|点|条|名|位)"
+)
+_CLAIM_SUPPORT_WINDOW = 30
+
+
+def _entity_count_claims(text: str) -> set[tuple[str, float]]:
+    return {
+        (m.group(1), float(m.group(2)))
+        for m in _ENTITY_COUNT_CLAIM.finditer(text)
+        # Digits inside the entity token mean regex segmentation glued two
+        # numbers ("每条线约1:4") or units together; drop rather than guess.
+        if not re.search(r"\d", m.group(1))
+    }
+
+
+def _count_near_entity(count: float, entity: str, text: str) -> bool:
+    # Bounded digit match: claim "1" must not draw support from "1132" or "0.1".
+    count_pattern = re.compile(rf"(?<![\d.]){re.escape(f'{count:g}')}(?![\d.])")
+    for occurrence in re.finditer(re.escape(entity), text):
+        window = text[max(0, occurrence.start() - _CLAIM_SUPPORT_WINDOW): occurrence.end() + _CLAIM_SUPPORT_WINDOW]
+        if count_pattern.search(window):
+            return True
+    return False
+
+
+def _evidence_header_fields(context: EvaluationContext) -> set[str]:
+    """Column headers from successful read_file CSV outputs seen in the episode.
+
+    An (entity, count) claim naming one of these is the header-row-counting bug
+    ("用户 1个"), not a data value — deterministic from tool output, no NLP.
+    """
+    fields: set[str] = set()
+    for source in (context.record, context.reference or {}):
+        for wrapper in sequence(source.get("tool_outputs")):
+            if not isinstance(wrapper, Mapping) or wrapper.get("name") != "read_file":
+                continue
+            payload = _output(wrapper)
+            if payload.get("success", True) is False:
+                continue
+            content_lines = [
+                line for line in str(payload.get("content") or "").splitlines() if line.strip()
+            ]
+            for row in csv.reader(content_lines[:1]):
+                fields.update(cell.strip() for cell in row if cell.strip())
+    return fields
+
+
+def _claim_alignment_metric(context: EvaluationContext) -> MetricResult:
+    """(entity, count) claims in the student answer vs. the reference answer.
+
+    The GRPO prompt records always carry the teacher's ``final_answer``, so a
+    fabricated ranking ("上海管网 1个") contradicting the reference is a
+    deterministic cheat signal — no LLM needed.  Support = entity named by the
+    teacher with the claimed count nearby; entity-tag artifacts glued to a
+    real number (header-as-user "用户 1个") still match and are a known
+    blind spot, priced cheaper than count/entity fabrication.
+    """
+    reference_answer = str((context.reference or {}).get("final_answer") or "")
+    claims = _entity_count_claims(str(context.record.get("final_answer") or ""))
+    header_fields = _evidence_header_fields(context)
+    question = str((context.reference or {}).get("user_input") or "")
+    # The header bug is ranked-dimension-specific: the question ranks by a
+    # dimension column ("按用户统计…前 5 个用户") and the answer names THAT
+    # column as a data value. A claim naming a different concept word which
+    # merely shares the header's spelling ("供气点 1个") is legitimate.
+    ranked_dimensions = {
+        field for field in header_fields if f"按{field}" in question or f"个{field}" in question
+    }
+    unsupported = sorted(
+        (entity, count)
+        for entity, count in claims
+        if not _count_near_entity(count, entity, reference_answer)
+    )
+    header_claims = sorted(
+        (entity, count) for entity, count in claims if entity in ranked_dimensions
+    )
+    applicable = bool(claims) and bool(reference_answer.strip())
+    passed = applicable and not unsupported and not header_claims
+    return metric(
+        context,
+        "claim_alignment",
+        applicable=applicable,
+        passed=passed,
+        details={
+            "claim_count": len(claims),
+            "unsupported_claims": [f"{e}:{g:g}" for (e, g) in unsupported[:10]],
+            "column_header_claims": [f"{e}:{g:g}" for (e, g) in header_claims[:10]],
+        },
+    )
+
+
 def _claim_support_metric(context: EvaluationContext) -> MetricResult:
     """Are the identifiers named in the answer present in observed evidence?
 
@@ -735,5 +828,6 @@ def evaluate_autonomous_checks(
     ordered = [by_name[name] for name in CANONICAL_METRIC_NAMES]
     ordered.append(tool_recovery)
     ordered.append(claim_support)
+    ordered.append(_claim_alignment_metric(context))
     ordered.append(_question_anchor_metric(context))
     return ordered, {"portability": _portability_diagnostics(context.record)}

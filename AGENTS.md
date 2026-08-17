@@ -33,6 +33,8 @@ Python code uses 4-space indentation, `snake_case` modules/functions, and `Pasca
 
 The Python test surface currently lives under `pipeFormer/models/tests/` and uses pytest-style `test_*.py` files and `Test*` classes. Run a focused decoder test with `cd pipeFormer && python -m pytest models/tests/test_decoder_functions.py` after installing pytest if it is not already available. No frontend `test` script is declared in `package.json`; use `npm run lint` and `npm run build` for the checked frontend workflow.
 
+`pipeclaw/tests/` (gitignored) hosts the evaluator reward-sanity test: `test_answer_claim_alignment.py` guards that fabricated (entity, count) answer claims cannot outscore an honest answer under the autonomous-rollout profile.
+
 ## Commit & Pull Request Guidelines
 
 Recent commits are short, imperative summaries such as `Test run the pipeFormer and the pipeclaw` and `Add project source files`. Keep commit subjects concise and task-focused. Pull requests should describe which package changed, list commands run, call out data/config changes, and include screenshots when frontend views or `docs/images/` assets change.

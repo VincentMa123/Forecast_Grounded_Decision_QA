@@ -90,6 +90,7 @@ AUTONOMOUS_CRITICAL_METRICS = frozenset(
         "json_validity",
         "artifact_evidence",
         "question_anchor",
+        "claim_alignment",
     }
 )
 AUTONOMOUS_DIAGNOSTIC_METRICS = frozenset(

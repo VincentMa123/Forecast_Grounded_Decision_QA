@@ -1,6 +1,7 @@
 """Pure preconditions for registry-grounded PipeFormer forecast calls."""
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Any, Dict, Iterable, List, Optional
 
 
@@ -115,13 +116,24 @@ def _candidate_search_authorizes(
     )
 
 
+def _as_mapping(value: Any) -> Dict[str, Any]:
+    """Trust boundary: accept mappings and single-keyed-dict lists; {} otherwise."""
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, list) and all(
+        isinstance(item, Mapping) and len(item) == 1 for item in value
+    ):
+        return {key: item[key] for item in value for key in item}
+    return {}
+
+
 def candidate_action_variables(forecast_arguments: Dict[str, Any]) -> List[str]:
     """Return stable, unique candidate boundary-action variable IDs."""
-    boundary = dict(forecast_arguments.get("boundary_conditions") or {})
+    boundary = _as_mapping(forecast_arguments.get("boundary_conditions"))
     variables = {
         str(variable)
         for key in ("percentage_changes", "setpoints")
-        for variable in dict(boundary.get(key) or {})
+        for variable in _as_mapping(boundary.get(key))
         if str(variable).strip()
     }
     disturbance_variable = str(
@@ -129,7 +141,7 @@ def candidate_action_variables(forecast_arguments: Dict[str, Any]) -> List[str]:
     ).strip()
     if (
         disturbance_variable.endswith(":ST")
-        and disturbance_variable in dict(boundary.get("setpoints") or {})
+        and disturbance_variable in _as_mapping(boundary.get("setpoints"))
     ):
         variables.discard(disturbance_variable)
     return sorted(variables, key=str.casefold)
