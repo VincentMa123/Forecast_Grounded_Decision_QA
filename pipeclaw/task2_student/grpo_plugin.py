@@ -144,6 +144,21 @@ class PythonScenarioScheduler(MultiTurnScheduler):
             normalized = state["dispatcher"].schema_normalized_call(call)
             with self._lock:
                 tool_result = state["dispatcher"].dispatch(normalized)
+            if (
+                isinstance(tool_result, Mapping)
+                and tool_result.get("error_code") == "unknown_tool"
+                and not state.get("_unknown_reported")
+            ):
+                state["_unknown_reported"] = True
+                state["unknown_tool_reports"] = [
+                    {
+                        "call": call.name,
+                        "plugin": __file__,
+                        "scenario_type": state.get("scenario_type"),
+                        "schemas": sorted(state["dispatcher"].schemas),
+                        "allowed": sorted(state["dispatcher"].allowed_names),
+                    }
+                ]
             compact = self._policy.compact_tool_result(normalized, tool_result)
             state["tool_calls"].append(
                 {
