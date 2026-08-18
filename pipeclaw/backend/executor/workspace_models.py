@@ -112,6 +112,13 @@ class ReadFileResult(ToolResultBase):
     abs_path: Optional[str] = Field(
         None, description="Absolute path on the configured runtime, when applicable"
     )
+    script_path: Optional[str] = Field(
+        None,
+        description=(
+            "Env-rooted template for scripts, e.g. CONSUMER_FLOW_DIR/20190114_consumer.csv. "
+            "Paste-ready for os.environ in sandbox scripts; null for non-pipeline_data reads."
+        ),
+    )
     size_bytes: Optional[int] = Field(
         None, ge=0, description="File size"
     )

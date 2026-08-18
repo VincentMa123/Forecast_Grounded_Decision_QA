@@ -37,6 +37,11 @@ PIPELINE_DATA_FILE_SUFFIXES = {
     "pipeline_flow": "_pipeline.csv",
     "consumer_flow": "_consumer.csv",
 }
+PIPELINE_DATA_ENV_TEMPLATE = {
+    "node_flow": "NODE_FLOW_DIR",
+    "pipeline_flow": "PIPELINE_FLOW_DIR",
+    "consumer_flow": "CONSUMER_FLOW_DIR",
+}
 ALLOWED_EXTERNAL_TOOL_PATH = Path("D:/ml_pro_master/chroes/fluid_model").resolve()
 ALLOWED_COMMANDS = {
     "python", "python3", "py", "pip", "pip3", "powershell", "powershell.exe", "pwsh",
@@ -241,6 +246,16 @@ class WorkspaceRunner:
             return None
         return self._safe_resolve(workspace_dir, raw_path.as_posix())
 
+    def _env_template_path(self, target: Path) -> Optional[str]:
+        try:
+            rel = target.resolve().relative_to(self.pipeline_data_root)
+        except ValueError:
+            return None
+        parts = rel.parts
+        if len(parts) >= 2 and parts[0] in PIPELINE_DATA_ENV_TEMPLATE:
+            return f"{PIPELINE_DATA_ENV_TEMPLATE[parts[0]]}/{'/'.join(parts[1:])}"
+        return None
+
     @staticmethod
     def _is_pipeline_data_logical_path(path: str) -> bool:
         normalized = str(path).replace("\\", "/")
@@ -430,7 +445,7 @@ class WorkspaceRunner:
             warnings: List[str] = []
             if used_default_limit:
                 warnings.append(f"Default chunk returned lines {start_line}-{end_line}. Set offset/limit to read other sections.")
-            return ReadFileResult(success=True, session_id=session_id, path=normalized_path, abs_path=str(target), size_bytes=target.stat().st_size, content=content, truncated=truncated, parsed_json=parsed_json, start_line=start_line if lines_returned else None, end_line=end_line if lines_returned else None, warnings=warnings, workspace=None)
+            return ReadFileResult(success=True, session_id=session_id, path=normalized_path, abs_path=str(target), script_path=self._env_template_path(target), size_bytes=target.stat().st_size, content=content, truncated=truncated, parsed_json=parsed_json, start_line=start_line if lines_returned else None, end_line=end_line if lines_returned else None, warnings=warnings, workspace=None)
         except Exception as exc:
             return ReadFileResult(success=False, session_id=session_id, path=normalized_path, error=str(exc), workspace=None)
 
