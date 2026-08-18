@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 import json
 import re
 from typing import Any, Dict, List, Optional
@@ -18,6 +20,48 @@ from .quality_references import (
     time_values_in_minutes,
 )
 from .quality_context import trusted_conversation_context
+
+
+def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
+    """Per-(file, pipeline) sums + segment counts parsed from raw read_file content.
+
+    The record's evidence.answer_rows slice is deliberately narrow (top-N scenario
+    rows), so derived group-sums for multi-pipeline comparisons can't rebuild the
+    other line's totals. The read_file outputs carry the full CSV text already —
+    sum it here instead of reaching back to disk.
+    """
+    totals: List[float] = []
+    flows_column = "管道流量"
+    for wrapper in record.get("tool_outputs") or []:
+        if not isinstance(wrapper, dict) or wrapper.get("name") != "read_file":
+            continue
+        payload = wrapper.get("output")
+        if not isinstance(payload, dict) or payload.get("success") is False:
+            continue
+        content = str(payload.get("content") or "")
+        if flows_column not in content:
+            continue
+        per_line_sums: Dict[str, float] = {}
+        per_line_counts: Dict[str, int] = {}
+        try:
+            for row in csv.DictReader(io.StringIO(content)):
+                value = row.get(flows_column)
+                if value is None:
+                    continue
+                try:
+                    flow = abs(float(value))
+                except ValueError:
+                    continue
+                pipeline = row.get("管道划分") or row.get("管线") or row.get("所属地") or "?"
+                per_line_sums[pipeline] = per_line_sums.get(pipeline, 0.0) + flow
+                per_line_counts[pipeline] = per_line_counts.get(pipeline, 0) + 1
+        except csv.Error:
+            continue
+        meta: List[tuple] = sorted([(line, total, count) for line, (total, count) in zip(per_line_sums.keys(), zip(per_line_sums.values(), per_line_counts.values()))])
+        for line, total, count in meta:
+            totals.append(round(total, 6))
+            totals.append(float(count))
+    return totals
 
 
 def grounded_numeric_claim_values(
@@ -89,6 +133,9 @@ def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
             **dict(record_evidence.get("csv_evidence") or {}),
             **rebuilt_csv_evidence,
         }
+    derived_stats = _csv_line_totals_from_record(record)
+    if derived_stats:
+        record_evidence.setdefault("derived_line_stats", derived_stats)
     return {
         "prediction_summary": record.get("prediction_summary") or {},
         "constraint_check": record.get("constraint_check") or {},
@@ -226,6 +273,12 @@ def _number_is_deterministically_derived(value: float, supported: List[float]) -
             return True
         if has_two_operands(candidate, candidate - value):
             return True
+    for a in dict.fromkeys(bounded):
+        for b in dict.fromkeys(bounded):
+            if b:
+                ratio = a / b
+                if abs(value - ratio) <= max(0.005, abs(ratio) * 0.005):
+                    return True
     return False
 
 

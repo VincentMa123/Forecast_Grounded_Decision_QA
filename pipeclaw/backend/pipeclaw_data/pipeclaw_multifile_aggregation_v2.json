@@ -1,0 +1,1542 @@
+[
+  {
+    "scenario_id": "scenario_multifile_001",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-04 至 2019-02-08。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_001_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-04 至 2019-02-08 为窗口，只看 “黑河首站—哈尔滨站” 和 “临潼站—高陵站” 这两组并行区段，比较 中俄东线、西气东输二线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_002",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-01-14 至 2019-01-15。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_002_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-14 至 2019-01-15 为窗口，只看 中俄东线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_003",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-04 至 2019-02-05。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_003_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-04 至 2019-02-05 为窗口，按日对齐累计 西气东输三线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_004",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-05 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_004_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-05 至 2019-02-07 为窗口，只看 “靖边站—石家庄站” 和 “霍尔果斯首站—乌鲁木齐站” 这两组并行区段，比较 冀宁线、西气东输二线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_005",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-04 至 2019-02-05。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_005_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-04 至 2019-02-05 为窗口，只看 西气东输一线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_006",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-01 至 2019-12-05。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_006_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-01 至 2019-12-05 为窗口，只看 “靖边站—石家庄站” 和 “安平站—南京站” 这两组并行区段，比较 陕京二线、冀宁线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_007",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-07 至 2019-02-08。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_007_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-07 至 2019-02-08 为窗口，只看 冀宁线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_008",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-01-24 至 2019-01-25。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_008_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-25 为窗口，只看 中俄东线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_009",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-05 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_009_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-05 至 2019-12-06 为窗口，只看 “石家庄站—阳曲压气站” 和 “武汉站—湘潭站” 这两组并行区段，比较 陕京二线、川气东送 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_010",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-03 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_010_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-07 为窗口，只看 “乌苏站—精河站” 和 “昌吉站—乌苏站” 这两组并行区段，比较 西气东输一线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_011",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-05 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_011_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-05 至 2019-02-07 为窗口，只看 “甪直站—上海站” 和 “古浪站—永昌站” 这两组并行区段，比较 川气东送、西气东输二线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_012",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-02 至 2019-02-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_012_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-02 至 2019-02-06 为窗口，按日对齐累计 中俄东线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_013",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-12-02 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_013_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-02 至 2019-12-06 为窗口，按日对齐累计 川气东送 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_014",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-24 至 2019-01-25。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_014_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-25 为窗口，按日对齐累计 西气东输一线 与 川气东送 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_015",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-12-04 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_015_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-04 至 2019-12-06 为窗口，比较 陕京二线 和 川气东送；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 3 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_016",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-12-05 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_016_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-05 至 2019-12-06 为窗口，只看 冀宁线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_017",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-02 至 2019-12-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_017_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-02 至 2019-12-04 为窗口，只看 “永清站—通州南站” 和 “靖边站—石家庄站” 这两组并行区段，比较 西气东输二线、冀宁线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_018",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-28 至 2019-01-29。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_018_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-28 至 2019-01-29 为窗口，按日对齐累计 西气东输一线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_019",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-12-04 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_019_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-04 至 2019-12-06 为窗口，按日对齐累计 西气东输二线 与 西气东输三线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_020",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-25 至 2019-01-29。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_020_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-25 至 2019-01-29 为窗口，按日对齐累计 川气东送 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_021",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-02 至 2019-02-08。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_021_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-02 至 2019-02-08 为窗口，按日对齐累计 中俄东线 与 川气东送 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_022",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-07 至 2019-02-08。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_022_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-07 至 2019-02-08 为窗口，只看 中俄东线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_023",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-03 至 2019-02-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_023_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-04 为窗口，只看 西气东输二线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_024",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-12-05 至 2019-12-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_024_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-05 至 2019-12-07 为窗口，只看 西气东输一线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_025",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-26 至 2019-01-27。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_025_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-26 至 2019-01-27 为窗口，按日对齐累计 冀宁线 与 西气东输二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_026",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-04 至 2019-02-08。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_026_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-04 至 2019-02-08 为窗口，按日对齐累计 西气东输三线 与 西气东输一线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_027",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-12-06 至 2019-12-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_027_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-06 至 2019-12-07 为窗口，只看 冀宁线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_028",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-01-20 至 2019-01-21。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_028_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-20 至 2019-01-21 为窗口，比较 陕京二线 和 中俄东线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 3 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_029",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-04 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_029_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-04 至 2019-12-06 为窗口，只看 “安平站—南京站” 和 “石家庄站—永清站” 这两组并行区段，比较 冀宁线、西气东输二线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_030",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-05 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_030_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-05 至 2019-02-07 为窗口，按日对齐累计 陕京二线 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_031",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-25 至 2019-01-29。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_031_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-25 至 2019-01-29 为窗口，只看 “古浪站—永昌站” 和 “上海站—上海白鹤末站” 这两组并行区段，比较 西气东输三线、川气东送 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_032",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-24 至 2019-01-26。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_032_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-26 为窗口，按日对齐累计 冀宁线 与 西气东输一线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_033",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-03 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_033_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-07 为窗口，只看 “永清站—通州南站” 和 “普光首站—达州站” 这两组并行区段，比较 西气东输二线、川气东送 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_034",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-04 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_034_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-04 至 2019-12-06 为窗口，只看 “甪直站—上海站” 和 “石家庄站—永清站” 这两组并行区段，比较 川气东送、西气东输二线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_035",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-27 至 2019-01-28。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_035_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-27 至 2019-01-28 为窗口，按日对齐累计 川气东送 与 冀宁线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_036",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-02 至 2019-12-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_036_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-02 至 2019-12-04 为窗口，只看 “上海站—上海白鹤末站” 和 “乌苏站—精河站” 这两组并行区段，比较 川气东送、西气东输一线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_037",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-12-01 至 2019-12-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_037_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-01 至 2019-12-07 为窗口，只看 陕京二线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_038",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-15 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_038_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-15 至 2019-01-16 为窗口，按日对齐累计 冀宁线 与 西气东输三线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_039",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-20 至 2019-01-21。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_039_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-20 至 2019-01-21 为窗口，只看 “临潼站—高陵站” 和 “霍尔果斯首站—乌鲁木齐站” 这两组并行区段，比较 西气东输二线、西气东输一线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_040",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-26 至 2019-01-27。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_040_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-26 至 2019-01-27 为窗口，只看 “永清站—通州南站” 和 “乌鲁木齐站—昌吉站” 这两组并行区段，比较 西气东输二线、西气东输一线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_041",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-03 至 2019-02-05。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_041_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-05 为窗口，按日对齐累计 陕京二线 与 西气东输三线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_042",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-03 至 2019-02-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_042_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-04 为窗口，只看 西气东输三线，按窗口内绝对流量降序列出前 3 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_043",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-14 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_043_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-14 至 2019-01-16 为窗口，按日对齐累计 西气东输二线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_044",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-01-25 至 2019-01-27。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_044_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-25 至 2019-01-27 为窗口，只看 西气东输三线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_045",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-05 至 2019-02-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_045_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-05 至 2019-02-06 为窗口，只看 “如皋站—海安站” 和 “南通站—如皋站” 这两组并行区段，比较 冀宁线、中俄东线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_046",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-12-01 至 2019-12-03。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_046_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-01 至 2019-12-03 为窗口，按日对齐累计 冀宁线 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_047",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-02-02 至 2019-02-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_047_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-02 至 2019-02-06 为窗口，只看 “乌鲁木齐站—昌吉站” 和 “哈尔滨站—长春站” 这两组并行区段，比较 西气东输二线、中俄东线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_048",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-04 至 2019-12-05。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_048_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-04 至 2019-12-05 为窗口，只看 “宝坻站—永清站” 和 “华阴站—潼关站” 这两组并行区段，比较 中俄东线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_049",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-02-03 至 2019-02-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_049_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-04 为窗口，比较 西气东输三线 和 冀宁线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 5 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_050",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-12-03 至 2019-12-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_050_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-03 至 2019-12-07 为窗口，按日对齐累计 西气东输一线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_051",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-24 至 2019-01-25。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_051_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-25 为窗口，按日对齐累计 中俄东线 与 西气东输二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_052",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-12-05 至 2019-12-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_052_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-05 至 2019-12-06 为窗口，只看 西气东输一线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_053",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-02-03 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_053_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-07 为窗口，比较 中俄东线 和 西气东输二线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 3 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_054",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-14 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_054_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-14 至 2019-01-16 为窗口，只看 “靖边站—石家庄站” 和 “上海站—上海白鹤末站” 这两组并行区段，比较 西气东输二线、川气东送 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_055",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-02 至 2019-02-03。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_055_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-02 至 2019-02-03 为窗口，按日对齐累计 冀宁线 与 西气东输三线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_056",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-01-26 至 2019-01-27。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_056_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-26 至 2019-01-27 为窗口，比较 西气东输一线 和 冀宁线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 5 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_057",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-02-05 至 2019-02-06。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_057_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-05 至 2019-02-06 为窗口，比较 陕京二线 和 中俄东线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 5 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_058",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-15 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_058_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-15 至 2019-01-16 为窗口，只看 “中卫站—古浪站” 和 “临潼站—高陵站” 这两组并行区段，比较 西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_059",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-02-03 至 2019-02-04。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_059_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-03 至 2019-02-04 为窗口，比较 陕京二线 和 西气东输一线；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 3 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_060",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-24 至 2019-01-26。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_060_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-24 至 2019-01-26 为窗口，按日对齐累计 西气东输二线 与 陕京二线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_061",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 D；窗口 2019-01-27 至 2019-01-28。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_061_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-27 至 2019-01-28 为窗口，比较 冀宁线 和 川气东送；把 abs_flow==0 的日子记为 zero_day，告诉我 zero_ratio 分别多少，并指出 zero_day 最多的 3 段。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像计划性停输，还是路由中断。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_062",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-12-01 至 2019-12-03。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_062_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-01 至 2019-12-03 为窗口，只看 “中卫站—古浪站” 和 “古浪站—永昌站” 这两组并行区段，比较 西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_063",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-15 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_063_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-15 至 2019-01-16 为窗口，只看 “精河站—中卫站” 和 “霍尔果斯首站—乌鲁木齐站” 这两组并行区段，比较 西气东输三线、西气东输一线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_064",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-15 至 2019-01-16。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_064_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-15 至 2019-01-16 为窗口，只看 “乌苏站—精河站” 和 “哈尔滨站—长春站” 这两组并行区段，比较 西气东输三线、中俄东线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_065",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-25 至 2019-01-29。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_065_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-25 至 2019-01-29 为窗口，只看 “石家庄站—永清站” 和 “南京站—南通站” 这两组并行区段，比较 陕京二线、冀宁线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_066",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-12-01 至 2019-12-03。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_066_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-12-01 至 2019-12-03 为窗口，按日对齐累计 西气东输三线 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_067",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 A；窗口 2019-01-19 至 2019-01-21。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_067_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-19 至 2019-01-21 为窗口，只看 “石家庄站—永清站” 和 “精河站—中卫站” 这两组并行区段，比较 西气东输二线、西气东输三线 的累计绝对流量，告诉我哪条线更高、差值大概多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_068",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 C；窗口 2019-02-06 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_068_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-06 至 2019-02-07 为窗口，只看 冀宁线，按窗口内绝对流量降序列出前 5 段，给我起点站名、终点站名和累计绝对流量。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像骨干承载，还是存在负荷集中。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_069",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-02-06 至 2019-02-07。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_069_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-02-06 至 2019-02-07 为窗口，按日对齐累计 西气东输一线 与 冀宁线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_multifile_070",
+    "scenario_type": "openclaw",
+    "scenario_class_label": "class_11_multi_file_aggregation",
+    "scenario_description": "窗口聚合场景（pipeline 数据）。形状 B；窗口 2019-01-26 至 2019-01-28。",
+    "sessions": [
+      {
+        "session_id": "scenario_multifile_070_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "请以 2019-01-26 至 2019-01-28 为窗口，按日对齐累计 川气东送 与 中俄东线 的绝对流量，告诉我哪条线更高，差值有多少。"
+          },
+          {
+            "turn_id": 2,
+            "user_input": "只用一句话判断这更像明显分担，还是接近等负荷。"
+          }
+        ]
+      }
+    ]
+  }
+]

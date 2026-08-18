@@ -358,6 +358,8 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             for r in records
             if r.get("scenario_type") == "pipeformer" and int(r.get("turn_id") or 1) == 1
         ]
+    elif getattr(args, "all_scenarios", False):
+        sources = [dict(r) for r in records]
     else:
         sources = select_python_scenarios(records)
     if args.limit:
@@ -541,6 +543,11 @@ def main() -> int:
         "--pipeformer",
         action="store_true",
         help="select scenario_type=pipeformer records instead of python (run_command) scenarios",
+    )
+    parser.add_argument(
+        "--all-scenarios",
+        action="store_true",
+        help="select all scenarios (openclaw + pipeformer) instead of filtering",
     )
     parser.add_argument("--device")
     parser.add_argument("--quant-bits", type=int)
