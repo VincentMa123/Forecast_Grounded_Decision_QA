@@ -356,7 +356,13 @@ def composite_reward(stats: Mapping[str, Any], report_fields: Mapping[str, Any])
 
 def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     records = read_jsonl(Path(args.source))
-    if getattr(args, "pipeformer", False):
+    if getattr(args, "all_scenarios", False):
+        sources = [
+            dict(r)
+            for r in records
+            if r.get("tool_calls") or r.get("tool_outputs")
+        ]
+    elif getattr(args, "pipeformer", False):
         sources = [
             dict(r)
             for r in records
@@ -564,6 +570,11 @@ def main() -> int:
     parser.add_argument(
         "--model-type",
         help="explicit ms-swift model_type when auto-matching is ambiguous (e.g., qwen3_5 for Qwen3.8-27B)",
+    )
+    parser.add_argument(
+        "--all-scenarios",
+        action="store_true",
+        help="evaluate every scenario family (openclaw + topology + pipeformer turn-1), not only python scenarios",
     )
     parser.add_argument("--repo-root", default=".")
     args = parser.parse_args()
