@@ -37,6 +37,7 @@ from tqdm.auto import tqdm
 
 
 RUN_TOOL = "run_command"
+TOPOLOGY_TOOL = "analyze_pipeline_topology"
 # Policy-ladder rejects priced identically to sandbox_violation; keep in one
 # shared lane or each dodge reopens with its own price discovery.
 _PRECONDITION_REJECTS = (
@@ -64,13 +65,16 @@ _ABORT_STATUSES = frozenset(
 
 def select_python_scenarios(
     records: Sequence[Mapping[str, Any]],
+    *,
+    include_topology: bool = False,
 ) -> list[dict[str, Any]]:
-    """Keep records whose teacher trace executes a python script."""
+    """Keep records whose teacher trace executes a python script (or topology tool)."""
+    wanted = {RUN_TOOL, TOPOLOGY_TOOL} if include_topology else {RUN_TOOL}
     return [
         dict(record)
         for record in records
-        if RUN_TOOL
-        in {
+        if wanted
+        & {
             str(item.get("name"))
             for item in record.get("tool_calls") or []
             if isinstance(item, Mapping)
@@ -342,7 +346,7 @@ def composite_reward(stats: Mapping[str, Any], report_fields: Mapping[str, Any])
     # ladder — the bare attempt and the metric-padded dodge must BOTH lose to
     # stop-and-declare (AGENTS rule 3).
     reward -= 0.10 * float(
-        any(stats["error_counts"].get(code) for code in _PRECONDITION_REJECTS)
+        any(stats.get("error_counts", {}).get(code) for code in _PRECONDITION_REJECTS)
     )
     # A recovery bonus (+0.05 for pass-with-any-failure) enabled the "1 junk
     # fail then pass outscores clean" exploit; ranking is already safe via the
@@ -359,7 +363,9 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             if r.get("scenario_type") == "pipeformer" and int(r.get("turn_id") or 1) == 1
         ]
     else:
-        sources = select_python_scenarios(records)
+        sources = select_python_scenarios(
+            records, include_topology=bool(getattr(args, "include_topology", False))
+        )
     if args.limit:
         sources = sources[: args.limit]
     if not sources:
@@ -544,6 +550,11 @@ def main() -> int:
         "--pipeformer",
         action="store_true",
         help="select scenario_type=pipeformer records instead of python (run_command) scenarios",
+    )
+    parser.add_argument(
+        "--include-topology",
+        action="store_true",
+        help="also include records whose teacher trace uses analyze_pipeline_topology",
     )
     parser.add_argument("--device")
     parser.add_argument("--quant-bits", type=int)
