@@ -234,6 +234,7 @@ class SwiftGenerator:
         quant_bits: int | None = None,
         no_quantization: bool = False,
         enable_thinking: bool = False,
+        model_type: str | None = None,
     ) -> "SwiftGenerator":
         if device:
             os.environ["CUDA_VISIBLE_DEVICES"] = device
@@ -247,6 +248,11 @@ class SwiftGenerator:
                 "MS-SWIFT is required for non-dry-run evaluation; PEFT is required "
                 "when --adapters is used"
             ) from exc
+
+        if model_type:
+            model_load_kwargs_extra = {"model_type": model_type}
+        else:
+            model_load_kwargs_extra = {}
 
         model_load_spec = resolve_model_load_kwargs(
             Path(adapters) if adapters else None,
@@ -263,6 +269,7 @@ class SwiftGenerator:
         else:
             print("[evaluate_autonomous] base-model loading: default (unquantized)")
 
+        model_load_kwargs.update(model_load_kwargs_extra)
         model_obj, processor = get_model_processor(model, **model_load_kwargs)
         if adapters:
             model_obj = PeftModel.from_pretrained(model_obj, adapters)

@@ -526,6 +526,7 @@ def _build_runner(args: argparse.Namespace, schemas: Sequence[Mapping[str, Any]]
         quant_bits=getattr(args, "quant_bits", None),
         no_quantization=bool(getattr(args, "no_quantization", False)),
         enable_thinking=bool(getattr(args, "enable_thinking", False)),
+        model_type=getattr(args, "model_type", None),
     )
     dispatcher = build_openclaw_dispatcher(list(schemas), Path(args.repo_root))
     runner = RolloutRunner(generator, dispatcher, policy=ScenarioPolicy())
@@ -560,6 +561,10 @@ def main() -> int:
     parser.add_argument("--quant-bits", type=int)
     parser.add_argument("--no-quantization", action="store_true")
     parser.add_argument("--enable-thinking", action="store_true")
+    parser.add_argument(
+        "--model-type",
+        help="explicit ms-swift model_type when auto-matching is ambiguous (e.g., qwen3_5 for Qwen3.8-27B)",
+    )
     parser.add_argument("--repo-root", default=".")
     args = parser.parse_args()
 

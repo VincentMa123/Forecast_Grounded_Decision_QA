@@ -477,10 +477,15 @@ def _validate_messages(
                 f"{example_id}: unregistered tool schema {unknown}"
             )
 
+    # Recovery records are student-failure-shaped rows: they deliberately include
+    # the failed tool_response so the model learns the post-error transition.
+    # Allowed ONLY under the explicit opt-in; ordinary teacher traces never qualify.
+    allow_failures = record.get("quality_flag") == "recovery"
     call_count = _validate_tool_messages(
         messages,
         example_id=example_id,
         registered_tool_names=registered_tool_names,
+        allow_failed_responses=allow_failures,
     )
     if projection == "trace_level" and messages[-1].get("role") != "assistant":
         raise DatasetValidationError(
@@ -560,6 +565,7 @@ def _validate_tool_messages(
     *,
     example_id: str,
     registered_tool_names: set[str],
+    allow_failed_responses: bool = False,
 ) -> int:
     call_count = 0
     parsed_calls: list[dict[str, Any]] = []
@@ -607,9 +613,10 @@ def _validate_tool_messages(
             response["content"], f"{example_id}: tool_response"
         )
         if not isinstance(payload, dict) or payload.get("success") is not True:
-            raise DatasetValidationError(
-                f"{example_id}: tool_response must be successful"
-            )
+            if not allow_failed_responses:
+                raise DatasetValidationError(
+                    f"{example_id}: tool_response must be successful"
+                )
         index += 2
     _validate_python_tool_sequence(parsed_calls, example_id)
     return call_count
