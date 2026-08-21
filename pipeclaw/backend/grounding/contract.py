@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import json
 import re
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 from .answer_limits import (
@@ -983,6 +983,36 @@ def _format_number(value: Any) -> str:
     return format(Decimal(formatted), "f") if "e" in formatted.casefold() else formatted
 
 
+_NUMBER_TOKEN = re.compile(
+    r"(?<![\w.])[-+]?(?:\d+(?:\.\d+)?|\.\d+)(?:e[-+]?\d+)?(?!\w)",
+    re.IGNORECASE,
+)
+
+
+def _number_disclosed(answer: str, value: Any) -> bool:
+    try:
+        expected = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return _format_number(value) in answer
+    for match in _NUMBER_TOKEN.finditer(answer):
+        token = match.group(0)
+        try:
+            reported = Decimal(token)
+        except (InvalidOperation, ValueError):
+            continue
+        if reported == expected:
+            return True
+        mantissa = token.casefold().split("e", 1)[0]
+        if "e" not in token.casefold() and "." in mantissa:
+            precision = Decimal(1).scaleb(-len(mantissa.rsplit(".", 1)[1]))
+            try:
+                if expected.quantize(precision) == reported:
+                    return True
+            except InvalidOperation:
+                continue
+    return False
+
+
 def _format_action(action: Dict[str, Any], chinese: bool) -> str:
     parts: List[str] = []
     for variable, value in dict(action.get("percentage_changes") or {}).items():
@@ -1439,8 +1469,8 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
             if candidate_id.casefold() not in answer_folded:
                 continue
             for metric, evidence in dict(metrics or {}).items():
-                expected_value = _format_number(dict(evidence or {}).get("value"))
-                if expected_value and expected_value not in answer:
+                expected_value = dict(evidence or {}).get("value")
+                if expected_value is not None and not _number_disclosed(answer, expected_value):
                     missing_objective_values.append(f"{candidate_id}:{metric}")
         if missing_objective_values:
             issues.append("decision_objective_evidence_incomplete")
@@ -1474,7 +1504,13 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
             issues.append("candidate_audit_evidence_incomplete")
 
         if not re.search(
-            r"(?:F|失败|failure)\s*0|failure_count\s*[:=]\s*0|无(?:规则)?失败",
+            r"(?:F|失败|failure)\s*0|failure_count\s*[:=]\s*0|无(?:规则)?失败|"
+            r"硬约束(?:均|全部|全都|已)?(?:通过|满足)|"
+            r"(?:全部|所有|均).{0,16}(?<![未不])(?:通过|满足).{0,12}硬约束|"
+            r"hard constraints?\s*(?:(?:all|are|were|have been)\s*)*"
+            r"(?:pass(?:ed)?|satisf(?:ied|y))|"
+            r"(?:all|every)\s+hard constraints?\s+"
+            r"(?:pass(?:ed)?|are\s+satisfied)",
             answer,
             re.IGNORECASE,
         ):

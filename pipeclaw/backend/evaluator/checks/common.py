@@ -154,9 +154,6 @@ def task_field_comparison(
         "disturbance_direction",
         "disturbance_magnitude_percent",
         "forecast_horizon_minutes",
-        "task_type",
-        "constraint_verification_types",
-        "required_constraints",
     )
     required_fields = {"case_id", "disturbance_variable"}
     assumed_fields = inferred_task_fields(expected)

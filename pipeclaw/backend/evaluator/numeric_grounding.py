@@ -91,7 +91,7 @@ def grounded_numeric_claim_values(
             or _number_is_deterministically_derived(value, supported)
         )
         or any(
-            _numbers_match(value, raw_value)
+            numeric_values_match(value, raw_value)
             and _number_is_supported(minutes, supported_times)
             for raw_value, minutes in claimed_times
         )
@@ -242,12 +242,12 @@ def derived_numeric_values(value: Any) -> List[float]:
     return collect(value, [])
 
 
-def _numbers_match(value: float, candidate: float) -> bool:
+def numeric_values_match(value: float, candidate: float) -> bool:
     return abs(value - candidate) <= max(0.01, abs(candidate) * 0.005)
 
 
 def _number_is_supported(value: float, supported: List[float]) -> bool:
-    return any(_numbers_match(value, candidate) for candidate in supported)
+    return any(numeric_values_match(value, candidate) for candidate in supported)
 
 
 def _number_is_deterministically_derived(value: float, supported: List[float]) -> bool:

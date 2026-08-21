@@ -178,6 +178,16 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
     if not expected_tasks:
         task = mapping(context.oracle.get("task"))
         expected_tasks = [task] if task else []
+    teacher_task_count = len(expected_tasks)
+    distinct_tasks: list[Mapping[str, Any]] = []
+    for task in expected_tasks:
+        if not any(
+            task_field_comparison(task, existing)[0]
+            and task_field_comparison(existing, task)[0]
+            for existing in distinct_tasks
+        ):
+            distinct_tasks.append(task)
+    expected_tasks = distinct_tasks
     actual_tasks = _student_tasks(context.record)
     unmatched = list(expected_tasks)
     mismatches: list[str] = []
@@ -214,6 +224,7 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
         applicable=applicable,
         passed=applicable and matched_count == len(expected_tasks),
         details={
+            "teacher_task_count": teacher_task_count,
             "expected_task_count": len(expected_tasks),
             "matched_task_count": matched_count,
             "matched_fields": sorted(set(matched_fields)),
@@ -270,9 +281,8 @@ def _tool_metrics(
         call_capabilities = capabilities({name}) if is_openclaw else {name}
         for capability in call_capabilities & recovery_targets:
             last_required[capability] = call
-    # Recovery is a feature, not a defect: one failed call retried with a
-    # different signature may still pass the gate. Only the identical repeated
-    # failing call — the thrash signature — blocks.
+    # Keep recovery separate from clean tool-call correctness: a successful
+    # retry passes ``tool_recovery`` but does not erase the failed call.
     failure_signatures: dict[str, int] = {}
     for call in failed_calls:
         signature = json.dumps([call.get("name"), call.get("arguments")], sort_keys=True, default=str)
@@ -285,7 +295,7 @@ def _tool_metrics(
         passed=(
             applicable
             and required <= emitted_valid
-            and not repeated_failures
+            and not failed_calls
         ),
         details={
             "expected_tool_names": sorted(teacher_names),

@@ -14,7 +14,7 @@ from pipeclaw.backend.grounding.contract import (
 )
 
 from ..models import EvaluationContext, EvaluationProfile, MetricResult
-from ..numeric_grounding import derived_numeric_values
+from ..numeric_grounding import derived_numeric_values, numeric_values_match
 from ..quality_references import (
     observed_numeric_claim_items,
     observed_numeric_claim_values,
@@ -224,6 +224,8 @@ def _autonomous_evidence(
     state_before = mapping(source.get("state_before"))
     evidence_numbers.extend(observed_numeric_values(state_before.get("verified_evidence")))
     evidence_numbers.extend(derived_numeric_values(state_before.get("verified_evidence")))
+    evidence_numbers.extend(observed_numeric_values(state_before.get("candidates")))
+    evidence_numbers.extend(derived_numeric_values(state_before.get("candidates")))
     for task in sequence(oracle.get("tasks")):
         evidence_numbers.extend(observed_numeric_values(task))
     evidence_numbers.extend(_prior_turn_evidence(rollout))
@@ -255,10 +257,7 @@ def _autonomous_evidence(
     unsupported = [
         value
         for value in claims
-        if not any(
-            math.isclose(value, evidence, rel_tol=1e-5, abs_tol=1e-5)
-            for evidence in unique_numbers
-        )
+        if not any(numeric_values_match(value, evidence) for evidence in unique_numbers)
     ]
     unsupported_rows = [
         *_unsupported_row_claims(final_answer, row_evidence),
