@@ -120,6 +120,8 @@ class LLMProvider:
 
             if self.settings.reasoning_effort:
                 options["reasoning_effort"] = self.settings.reasoning_effort
+            if self.settings.max_tokens is not None:
+                options["max_tokens"] = self.settings.max_tokens
 
             return options
 

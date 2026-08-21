@@ -104,6 +104,37 @@ Run the same command with `--dry-run` and without `--adapters` to inspect the
 prompt/tool inputs first. Results are written to `rollouts.jsonl` and
 `summary.json`, both stamped `"schema_version": "pipeclaw_evaluation_v2"`.
 
+### Production-agent pass@k
+
+`pass_at_k.py` has two execution modes. `raw-student` remains the default and
+loads a checkpoint directly. `production-agent` calls the already deployed
+OpenAI-compatible student through the same `AgentOrchestrator` used by the app,
+including verified state, recent turns, production tool guards, loop closure,
+and answer finalization. It defaults to the production limit of 30 turns and
+writes complete traces to `trajectories.jsonl` beside compact `episodes.jsonl`.
+
+```bash
+export OPENAI_API_BASE=http://127.0.0.1:8000/v1
+export OPENAI_API_KEY="$STUDENT_API_KEY"
+export OPENAI_MODEL=pipeclaw-student
+
+python -m pipeclaw.task2_student.scripts.pass_at_k \
+  --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_valid.jsonl \
+  --tool-schema-source pipeclaw/task2_student/data/trace_level/valid.jsonl \
+  --execution-mode production-agent \
+  --all-scenarios \
+  --episodes 1 --temps 0.0 --max-new-tokens 2048 \
+  --output-dir pipeclaw/task2_student/outputs/evaluation/production_agent
+```
+
+Do not point GRPO at an ordinary `swift deploy` app endpoint. GRPO needs the
+current trainable policy's token log-probabilities and synchronized weights.
+For a remote inference process, use MS-SWIFT's `swift rollout` plus
+`vllm_mode: server`; its API key may secure the rollout server, but weight
+synchronization—not the key—is what makes that server valid for training. The
+PipeClaw multi-turn scheduler remains responsible for production tool execution
+and deterministic reward inside GRPO.
+
 Under schema v2, every applicable deliverable metric carries weight `1.0` and
 `overall_score` is the percentage of that weight which passed; inapplicable
 metrics are reported explicitly rather than scored as failures, and diagnostics

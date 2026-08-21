@@ -90,6 +90,9 @@ class TraceWriter:
         }
         if extra:
             record.update(extra)
+        record["sequence"] = len(payload.get("tool_calls") or []) + len(
+            payload.get("audit_tool_calls") or []
+        ) + 1
         payload.setdefault("tool_calls", []).append(record)
         self.save_trace(session_id, payload, updated_at=resolved_timestamp)
         return payload
@@ -101,20 +104,25 @@ class TraceWriter:
         args: Dict[str, Any],
         result: Any,
         *,
+        tool_call_id: Optional[str] = None,
         timestamp: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Retain failed/internal calls for audit without exporting them to SFT."""
         payload = self.load_trace(session_id)
         resolved_timestamp = _resolve_timestamp(timestamp)
-        payload.setdefault("audit_tool_calls", []).append(
-            {
-                "tool_name": tool_name,
-                "args": args,
-                "result": result,
-                "timestamp": resolved_timestamp,
-                "teacher_trace_eligible": False,
-            }
-        )
+        record = {
+            "tool_name": tool_name,
+            "args": args,
+            "result": result,
+            "timestamp": resolved_timestamp,
+            "teacher_trace_eligible": False,
+            "sequence": len(payload.get("tool_calls") or []) + len(
+                payload.get("audit_tool_calls") or []
+            ) + 1,
+        }
+        if tool_call_id:
+            record["tool_call_id"] = tool_call_id
+        payload.setdefault("audit_tool_calls", []).append(record)
         self.save_trace(
             session_id,
             payload,

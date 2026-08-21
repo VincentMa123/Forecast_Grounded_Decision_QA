@@ -119,6 +119,22 @@ def _finite_number(value: Any) -> float | None:
     return numeric if math.isfinite(numeric) else None
 
 
+def case_identity_matches(
+    expected: Mapping[str, Any], actual: Mapping[str, Any]
+) -> bool:
+    """Treat the resolved operating condition as the canonical case identity."""
+
+    expected_condition = _finite_number(
+        expected.get("current_operating_condition_number")
+    )
+    actual_condition = _finite_number(
+        actual.get("current_operating_condition_number")
+    )
+    if expected_condition is not None and actual_condition is not None:
+        return math.isclose(expected_condition, actual_condition, abs_tol=0.0)
+    return normalize(expected.get("case_id")) == normalize(actual.get("case_id"))
+
+
 def task_field_comparison(
     expected: Mapping[str, Any],
     actual: Mapping[str, Any],
@@ -155,7 +171,9 @@ def task_field_comparison(
             continue
         left = normalize(expected[field])
         right = normalize(actual[field])
-        if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        if field == "case_id":
+            equal = case_identity_matches(expected, actual)
+        elif isinstance(left, (int, float)) and isinstance(right, (int, float)):
             equal = math.isclose(
                 float(left),
                 float(right),

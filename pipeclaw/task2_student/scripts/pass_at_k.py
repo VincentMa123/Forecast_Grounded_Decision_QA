@@ -404,12 +404,15 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     runner = _build_runner(args, all_schemas)
     rows: list[dict[str, Any]] = []
     rollouts_path = output_dir / "episodes.jsonl"
+    trajectories_path = output_dir / "trajectories.jsonl"
     progress = tqdm(
         total=len(sources) * len(args.temps) * args.episodes,
         desc="pass_at_k",
         unit="episode",
     )
-    with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
+    with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout, atomic_jsonl_writer(
+        trajectories_path, default=str
+    ) as write_trajectory:
         for source in sources:
             case_schemas = _schemas_for(source, schemas_by_key) or builder.build(
                 source,
@@ -417,7 +420,8 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             ).tools
             frozen_prompt = (
                 _frozen_prompt(frozen_prompts, source)
-                if args.system_prompt_mode == "training"
+                if args.execution_mode == "raw-student"
+                and args.system_prompt_mode == "training"
                 else None
             )
             for temp in args.temps:
@@ -444,6 +448,17 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                         ),
                     )
                     rollout = result.to_dict()
+                    write_trajectory(
+                        {
+                            "scenario_id": source.get("scenario_id") or "",
+                            "sample_id": source.get("sample_id")
+                            or source.get("example_id"),
+                            "temperature": temp,
+                            "episode": k,
+                            "execution_mode": args.execution_mode,
+                            "rollout": rollout,
+                        }
+                    )
                     stats = episode_stats(rollout)
                     report_fields = evaluate(
                         rollout,
@@ -456,6 +471,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                         or source.get("example_id"),
                         "temperature": temp,
                         "episode": k,
+                        "execution_mode": args.execution_mode,
                         **stats,
                         "overall_score": report_fields.get("overall_score"),
                         "hard_gate_passed": report_fields.get("hard_gate_passed"),
@@ -514,6 +530,13 @@ def _union_schemas(
 
 
 def _build_runner(args: argparse.Namespace, schemas: Sequence[Mapping[str, Any]]):
+    if getattr(args, "execution_mode", "raw-student") == "production-agent":
+        from pipeclaw.task2_student.rollout.production_agent import (
+            ProductionAgentRunner,
+        )
+
+        return ProductionAgentRunner()
+
     from pipeclaw.task2_student.rollout.runner import RolloutRunner
     from pipeclaw.task2_student.rollout.scenarios import (
         ScenarioPolicy,
@@ -539,7 +562,7 @@ def _build_runner(args: argparse.Namespace, schemas: Sequence[Mapping[str, Any]]
     return runner
 
 
-def main() -> int:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", required=True, help="teacher_trace_*.jsonl")
     parser.add_argument("--tool-schema-source", help="trace_level/*.jsonl for schemas")
@@ -548,9 +571,22 @@ def main() -> int:
     parser.add_argument("--output-dir", default="pipeclaw/task2_student/outputs/evaluation/pass_at_k")
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--temps", type=float, nargs="+", default=[0.7, 1.0])
-    parser.add_argument("--max-turns", type=int, default=8)
+    parser.add_argument(
+        "--max-turns",
+        type=int,
+        help="default: 8 for raw-student, 30 for production-agent",
+    )
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--limit", type=int)
+    parser.add_argument(
+        "--execution-mode",
+        choices=["raw-student", "production-agent"],
+        default="raw-student",
+        help=(
+            "raw-student loads the model directly; production-agent uses the "
+            "deployed OpenAI-compatible model through AgentOrchestrator"
+        ),
+    )
     parser.add_argument("--system-prompt-mode", choices=["training", "production"], default="training")
     parser.add_argument("--emit-grpo-prompts", help="write the GRPO prompt dataset and exit")
     parser.add_argument(
@@ -577,14 +613,29 @@ def main() -> int:
         help="evaluate every scenario family (openclaw + topology + pipeformer turn-1), not only python scenarios",
     )
     parser.add_argument("--repo-root", default=".")
-    args = parser.parse_args()
+    return parser
 
-    if not args.emit_grpo_prompts and not args.adapters and not args.model:
+
+def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> None:
+    if args.max_turns is None:
+        args.max_turns = 30 if args.execution_mode == "production-agent" else 8
+    if (
+        args.execution_mode == "raw-student"
+        and not args.emit_grpo_prompts
+        and not args.adapters
+        and not args.model
+    ):
         parser.error("--adapters or --model is required unless --emit-grpo-prompts")
     if not args.tool_schema_source:
         # emit-mode needs it too: frozen prompts keyed from the same source;
         # without it the emit dies at the first record in one cold raise.
         parser.error("--tool-schema-source is required")
+
+
+def main() -> int:
+    parser = build_parser()
+    args = parser.parse_args()
+    validate_args(parser, args)
     summary = run_episodes(args)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0

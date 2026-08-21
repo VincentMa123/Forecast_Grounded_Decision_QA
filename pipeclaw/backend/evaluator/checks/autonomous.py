@@ -21,6 +21,7 @@ from .assumptions import assumption_consistency, inferred_task_fields, predictio
 from .common import (
     CANONICAL_METRIC_NAMES,
     PIPEFORMER_TOOL,
+    case_identity_matches,
     checkpoint_inference_used,
     disturbance_was_applied,
     horizon_is_consistent,
@@ -68,6 +69,8 @@ def _successful_forecast_pairs(
 def _same_forecast_action(
     expected_call: Mapping[str, Any],
     actual_call: Mapping[str, Any],
+    *,
+    ignored_fields: frozenset[str] = frozenset(),
 ) -> bool:
     """Match legacy partial teacher calls without equating different actions."""
     expected = mapping(expected_call.get("arguments"))
@@ -80,11 +83,16 @@ def _same_forecast_action(
         "disturbance_setpoint",
         "forecast_horizon_minutes",
     )
-    if not expected or any(
-        key in expected and actual.get(key) != expected[key]
-        for key in scalar_keys
-    ):
+    if not expected:
         return False
+    for key in scalar_keys:
+        if key not in expected or key in ignored_fields:
+            continue
+        if key == "case_id":
+            if not case_identity_matches(expected, actual):
+                return False
+        elif actual.get(key) != expected[key]:
+            return False
     if "boundary_conditions" not in expected:
         return True
     expected_boundary = mapping(expected.get("boundary_conditions"))
@@ -120,13 +128,33 @@ def _matching_reference_output(
         **actual_call,
         "arguments": _resolved_forecast_arguments(context.record, actual_call),
     }
-    return next(
-        (
-            output
-            for call, output in _successful_forecast_pairs(context.reference or {})
-            if _same_forecast_action(call, resolved_call)
-        ),
-        None,
+    reference = context.reference or {}
+    for call, output in _successful_forecast_pairs(reference):
+        expected_arguments = _resolved_forecast_arguments(reference, call)
+        expected_call = {**call, "arguments": expected_arguments}
+        if _same_forecast_action(expected_call, resolved_call):
+            return output
+    return None
+
+
+def _matches_reference_contract(
+    context: EvaluationContext, actual_call: Mapping[str, Any]
+) -> bool:
+    """Accept alternatives only for fields the teacher marked provisional."""
+
+    resolved_call = {
+        **actual_call,
+        "arguments": _resolved_forecast_arguments(context.record, actual_call),
+    }
+    reference = context.reference or {}
+    return any(
+        _same_forecast_action(
+            {**call, "arguments": expected_arguments},
+            resolved_call,
+            ignored_fields=inferred_task_fields(expected_arguments),
+        )
+        for call, _output_value in _successful_forecast_pairs(reference)
+        for expected_arguments in [_resolved_forecast_arguments(reference, call)]
     )
 
 
@@ -655,12 +683,14 @@ def _label_metric(
     output_key: str,
 ) -> MetricResult:
     pairs = _successful_forecast_pairs(context.record)
-    matched = [
-        (reference, output)
-        for call, output in pairs
-        for reference in [_matching_reference_output(context, call)]
-        if reference is not None
-    ]
+    matched: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
+    student_evidence: list[Mapping[str, Any]] = []
+    for call, output in pairs:
+        reference = _matching_reference_output(context, call)
+        if reference is not None:
+            matched.append((reference, output))
+        elif _matches_reference_contract(context, call):
+            student_evidence.append(output)
 
     def value(output: Mapping[str, Any]) -> Any:
         verification = verification_view(output)
@@ -676,16 +706,20 @@ def _label_metric(
     ]
     expected = [item[0] for item in comparisons]
     actual = [item[1] for item in comparisons]
-    applicable = bool(comparisons)
+    own_values = [value(output) for output in student_evidence]
+    applicable = bool(comparisons or own_values)
     return metric(
         context,
         name,
         applicable=applicable,
-        passed=applicable and actual == expected,
+        passed=applicable
+        and actual == expected
+        and all(item is not None for item in own_values),
         details={
             "expected": expected[0] if len(expected) == 1 else expected,
             "actual": actual[0] if len(actual) == 1 else actual,
             "matched_reference_forecast_count": len(matched),
+            "student_evidence_forecast_count": len(student_evidence),
         },
     )
 

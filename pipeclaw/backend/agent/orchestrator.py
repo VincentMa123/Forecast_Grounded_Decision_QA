@@ -234,15 +234,31 @@ class AgentOrchestrator:
         enable_skills: Optional[bool] = None,
         request_timeout_seconds: Optional[float] = None,
         workspace_root_base: Optional[Path] = None,
+        max_steps: Optional[int] = None,
+        temperature: Optional[float] = None,
+        max_tokens: Optional[int] = None,
     ):
         self.data_loader = data_loader
         self.agent_id = agent_id or "default"
         self.session_id = session_id
         provider_settings = LLMProviderSettings.from_env()
-        self.max_steps = int(os.getenv("MAX_AGENT_STEPS", "30"))
+        self.max_steps = int(
+            os.getenv("MAX_AGENT_STEPS", "30") if max_steps is None else max_steps
+        )
+        if self.max_steps <= 0:
+            raise ValueError("max_steps must be greater than zero")
         raw_timeout = request_timeout_seconds
         if raw_timeout not in (None, "", 0, "0"):
             provider_settings = replace(provider_settings, timeout_seconds=float(raw_timeout))
+        if temperature is not None:
+            provider_settings = replace(provider_settings, temperature=float(temperature))
+        if max_tokens is not None:
+            resolved_max_tokens = int(max_tokens)
+            if resolved_max_tokens <= 0:
+                raise ValueError("max_tokens must be greater than zero")
+            provider_settings = replace(
+                provider_settings, max_tokens=resolved_max_tokens
+            )
         self.llm_provider = LLMProvider(provider_settings)
         self.api_key = provider_settings.api_key
         self.api_base = provider_settings.base_url
@@ -832,6 +848,7 @@ class AgentOrchestrator:
                             call.name,
                             args,
                             result,
+                            tool_call_id=call.call_id,
                             timestamp=event_time,
                         )
                         logger.info(
