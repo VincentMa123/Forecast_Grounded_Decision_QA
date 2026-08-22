@@ -40,8 +40,7 @@ only and records the exact MS-SWIFT-rendered length distribution used for
 sequence-length and hardware selection. Its sibling per-record JSONL remains
 local because it is a generated audit artifact.
 
-The checked-in 2026-07-30 profile is stale. Its historical distribution (4,199
-records; median 2,840, p95 9,675, p99 12,029, maximum 13,792) is not current
-evidence. Refresh the profile with the designated tokenizer before using any
-context-length or hardware claim; do not assume that all records fit without
-truncation.
+The checked-in 2026-08-22 profile matches the current manifest and covers 5,166
+train/validation records. The trace-level maximum is 18,127 tokens, the
+constraint-multitask maximum is 17,622, and the answer-only maximum is 2,532.
+A context limit of 18,432 therefore preserves every current trace-level record.

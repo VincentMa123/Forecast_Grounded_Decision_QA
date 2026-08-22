@@ -284,7 +284,7 @@ class TeacherTraceProjector:
             selected = sorted(
                 [
                     *unique_registry_searches,
-                    *successful_decision_policies[-1:],
+                    *(successful_decision_policies[-1:] if multiple_pipeformer else []),
                     *successful_pipeformer,
                 ],
                 key=lambda pair: pair[0],
@@ -363,18 +363,8 @@ class TeacherTraceProjector:
         successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
         forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
     ) -> set[str]:
-        """Select every registry search a retained forecast still depends on.
-
-        Two independent rules contribute, and both are needed: one keeps the
-        searches the runtime precondition *requires* to authorize the call, the
-        other keeps the searches that *explain where the forecast's observation
-        targets came from*.  They are kept as separate methods because they
-        answer different questions and fail differently — see each docstring.
-        """
+        """Select only registry searches required to authorize retained forecasts."""
         return cls._registry_calls_required_for_forecasts(
-            successful,
-            forecasts,
-        ) | cls._registry_calls_grounding_forecast_targets(
             successful,
             forecasts,
         )
@@ -403,81 +393,17 @@ class TeacherTraceProjector:
                 dict(forecast_call.get("arguments") or {}),
                 preceding,
             )
-            required.update(
+            disturbance_call_ids = [
                 str(value)
                 for value in authorization.get("disturbance_search_call_ids") or []
                 if str(value)
-            )
+            ]
+            if disturbance_call_ids:
+                required.add(disturbance_call_ids[-1])
             for call_ids in (authorization.get("candidate_search_call_ids") or {}).values():
-                required.update(str(value) for value in call_ids if str(value))
-        return required
-
-    @staticmethod
-    def _registry_calls_grounding_forecast_targets(
-        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
-        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
-    ) -> set[str]:
-        """Keep the searches that discover a forecast's observation targets.
-
-        The registry precondition only authorizes the disturbance and the
-        boundary-condition action variables, so
-        :meth:`_registry_calls_required_for_forecasts` drops every
-        ``role="output"`` discovery page.  That deletes the teacher's
-        demonstration of how ``attention_targets`` and
-        ``output_state_variables`` are derived and leaves the retained
-        trajectory naming canonical observation IDs with no visible lookup.
-
-        A search grounds a target when it returned that canonical ID, or when
-        the query asked for it by name.  The query check is what preserves the
-        semantic group targets (``pressure``, ``linepack``, ``compressor_load``)
-        that are legal attention targets but are never returned as variable IDs.
-        Searches that match no retained target stay dropped.
-        """
-        targets: set[str] = set()
-        for _, forecast_call, _ in forecasts:
-            arguments = dict(forecast_call.get("arguments") or {})
-            for field in ("attention_targets", "output_state_variables"):
-                targets.update(
-                    str(value).strip()
-                    for value in arguments.get(field) or []
-                    if isinstance(value, str) and str(value).strip()
-                )
-        if not targets:
-            return set()
-        folded_targets = {value.casefold() for value in targets}
-
-        last_forecast_index = max(index for index, _, _ in forecasts)
-        required: set[str] = set()
-        for index, call, output_record in successful:
-            if index >= last_forecast_index:
-                continue
-            if call.get("name") != "search_pipeformer_registry":
-                continue
-            output = (output_record or {}).get("output")
-            if not isinstance(output, dict) or output.get("success") is False:
-                continue
-            returned = {
-                str(entry.get("variable")).strip()
-                for entry in output.get("variables") or []
-                if isinstance(entry, dict) and entry.get("variable")
-            }
-            if returned & targets:
-                required.add(str(call.get("tool_call_id") or ""))
-                continue
-            arguments = dict(call.get("arguments") or {})
-            requested = {
-                term.casefold()
-                for term in str(arguments.get("query") or "").split()
-                if term.strip()
-            }
-            requested.update(
-                str(value).strip().casefold()
-                for value in arguments.get("attention_targets") or []
-                if isinstance(value, str) and str(value).strip()
-            )
-            if requested & folded_targets:
-                required.add(str(call.get("tool_call_id") or ""))
-        required.discard("")
+                matching = [str(value) for value in call_ids if str(value)]
+                if matching:
+                    required.add(matching[-1])
         return required
 
     @staticmethod

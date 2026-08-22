@@ -70,7 +70,7 @@ CONVERTER_VERSION = "1.1.0"
 SPLITS = ("train", "valid", "test")
 PROJECTIONS = ("answer_only", "trace_level", "constraint_multitask")
 CORRECTION_SPLITS = ("train", "valid")
-EXPECTED_SOURCE_COUNTS = {"train": 1041, "valid": 143, "test": 135}
+EXPECTED_SOURCE_COUNTS = {"train": 1073, "valid": 147, "test": 139}
 DEFAULT_SOURCE_ROOT = (
     REPO_ROOT / "pipeclaw" / "backend" / "generated_teacher_traces" / "splits"
 )

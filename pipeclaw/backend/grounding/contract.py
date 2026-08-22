@@ -1504,7 +1504,7 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
             issues.append("candidate_audit_evidence_incomplete")
 
         if not re.search(
-            r"(?:F|失败|failure)\s*0|failure_count\s*[:=]\s*0|无(?:规则)?失败|"
+            r"(?:F|失败|failure)\s*[:=]?\s*0|failure_count\s*[:=]\s*0|无(?:规则)?失败|"
             r"硬约束(?:均|全部|全都|已)?(?:通过|满足)|"
             r"(?:全部|所有|均).{0,16}(?<![未不])(?:通过|满足).{0,12}硬约束|"
             r"hard constraints?\s*(?:(?:all|are|were|have been)\s*)*"
@@ -1674,8 +1674,8 @@ def _objective_token(
     if variable:
         detail += f"({variable})"
     if unit:
-        detail += unit
-    return f"{label}{detail}" if chinese else f"{label}={detail}"
+        detail += f" {unit}"
+    return f"{label}={detail}"
 
 
 def _audit_category_summary(

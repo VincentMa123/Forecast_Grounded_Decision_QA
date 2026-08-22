@@ -1,0 +1,722 @@
+[
+  {
+    "scenario_id": "scenario_pipeformer_prediction_021",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "节流瓶颈与通道受限",
+    "scenario_description": "mock_test第021个算例的扩展预测题，围绕 B_001:FR 的变化，关注入口阀收紧后的短时瓶颈。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_021_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行预报任务：mock_test 第021个算例；唯一扰动是 B_001:FR（球阀通流比例）下调 14%；其余边界保持基线。请先预测未来 60 分钟（1 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_022",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "紧平衡与低压消耗",
+    "scenario_description": "mock_test第022个算例的扩展预测题，围绕 E_018:SNQ 的变化，关注新增需求对末端压力和管存的联合影响。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_022_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班审查：mock_test 第022个算例；唯一扰动是 E_018:SNQ（用户侧需求流量设定）上调 16%；其余边界保持基线。请先预测未来 180 分钟（3 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_023",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "压缩机工况边界",
+    "scenario_description": "mock_test第023个算例的扩展预测题，围绕 C_014:SP_out 的变化，关注出口设定回撤后的负荷和保压余度。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_023_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "工况核验：mock_test 第023个算例；唯一扰动是 C_014:SP_out（压缩机出口设定压力）下调 5%；其余边界保持基线。请先预测未来 90 分钟（1.5 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_024",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "富余抬升与高压能耗",
+    "scenario_description": "mock_test第024个算例的扩展预测题，围绕 T_002:SNQ 的变化，关注气源增供后的高压与能耗权衡。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_024_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "边界扰动测试：mock_test 第024个算例；唯一扰动是 T_002:SNQ（气源流量设定）上调 9%；其余边界保持基线。请先预测未来 240 分钟（4 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_025",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "重分配与稳态重构",
+    "scenario_description": "mock_test第025个算例的扩展预测题，围绕 R_008:SPD 的变化，关注调压设定抬升后的路径重构。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_025_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "安全审计请求：mock_test 第025个算例；唯一扰动是 R_008:SPD（调节阀下游设定压力）上调 6%；其余边界保持基线。请先预测未来 120 分钟（2 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_026",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "富余抬升与高压能耗",
+    "scenario_description": "mock_test第026个算例的扩展预测题，围绕 E_101:SNQ 的变化，关注需求回落后的富余压力积累。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_026_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "预测工单：mock_test 第026个算例；唯一扰动是 E_101:SNQ（用户侧需求流量设定）下调 11%；其余边界保持基线。请先预测未来 360 分钟（6 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_027",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "节流瓶颈与通道受限",
+    "scenario_description": "mock_test第027个算例的扩展预测题，围绕 B_015:FR 的变化，关注阀门收紧后的局部瓶颈。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_027_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "控制室问题：mock_test 第027个算例；唯一扰动是 B_015:FR（球阀通流比例）下调 22%；其余边界保持基线。请先预测未来 180 分钟（3 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_028",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "压缩机工况边界",
+    "scenario_description": "mock_test第028个算例的扩展预测题，围绕 C_021:SP_out 的变化，关注小幅抬压对机组负荷的短时影响。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_028_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "异常复核：mock_test 第028个算例；唯一扰动是 C_021:SP_out（压缩机出口设定压力）上调 4%；其余边界保持基线。请先预测未来 60 分钟（1 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_029",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "紧平衡与低压消耗",
+    "scenario_description": "mock_test第029个算例的扩展预测题，围绕 T_005:SNQ 的变化，关注源侧回撤后的低压和管存消耗。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_029_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "状态评估：mock_test 第029个算例；唯一扰动是 T_005:SNQ（气源流量设定）下调 13%；其余边界保持基线。请先预测未来 240 分钟（4 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_030",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "紧平衡与低压消耗",
+    "scenario_description": "mock_test第030个算例的扩展预测题，围绕 E_001:SNQ 的变化，关注需求骤增后的供需紧平衡。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_030_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "证据核验任务：mock_test 第030个算例；唯一扰动是 E_001:SNQ（用户侧需求流量设定）上调 20%；其余边界保持基线。请先预测未来 120 分钟（2 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_031",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "重分配与稳态重构",
+    "scenario_description": "mock_test第031个算例的扩展预测题，围绕 R_006:ST 的变化，关注调节通道恢复后的稳态重构。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_031_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行预报任务：mock_test 第031个算例；唯一扰动是 R_006:ST（调节阀启停状态）从关闭切换为启动；其余边界保持基线。请先预测未来 90 分钟（1.5 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_032",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "节流瓶颈与通道受限",
+    "scenario_description": "mock_test第032个算例的扩展预测题，围绕 B_273:FR 的变化，关注卡涩通道收紧后的网络受限。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_032_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班审查：mock_test 第032个算例；唯一扰动是 B_273:FR（球阀通流比例）下调 17%；其余边界保持基线。请先预测未来 360 分钟（6 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_033",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "压缩机工况边界",
+    "scenario_description": "mock_test第033个算例的扩展预测题，围绕 C_023:SP_out 的变化，关注出口压力下降后的关键节点余度。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_033_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "工况核验：mock_test 第033个算例；唯一扰动是 C_023:SP_out（压缩机出口设定压力）下调 8%；其余边界保持基线。请先预测未来 180 分钟（3 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_034",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "重分配与稳态重构",
+    "scenario_description": "mock_test第034个算例的扩展预测题，围绕 T_007:SNQ 的变化，关注持续增供下的路径与流量重分配。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_034_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "边界扰动测试：mock_test 第034个算例；唯一扰动是 T_007:SNQ（气源流量设定）上调 12%；其余边界保持基线。请先预测未来 120 分钟（2 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_035",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "富余抬升与高压能耗",
+    "scenario_description": "mock_test第035个算例的扩展预测题，围绕 E_082:SNQ 的变化，关注大用户减量后的系统富余。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_035_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "安全审计请求：mock_test 第035个算例；唯一扰动是 E_082:SNQ（用户侧需求流量设定）下调 15%；其余边界保持基线。请先预测未来 240 分钟（4 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_036",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "节流瓶颈与通道受限",
+    "scenario_description": "mock_test第036个算例的扩展预测题，围绕 R_010:SPD 的变化，关注调压回撤后的下游受限风险。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_036_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "预测工单：mock_test 第036个算例；唯一扰动是 R_010:SPD（调节阀下游设定压力）下调 7%；其余边界保持基线。请先预测未来 60 分钟（1 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_037",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "压缩机工况边界",
+    "scenario_description": "mock_test第037个算例的扩展预测题，围绕 C_017:ST 的变化，关注机组退出后的替代通道和负荷迁移。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_037_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "控制室问题：mock_test 第037个算例；唯一扰动是 C_017:ST（压缩机启停状态）从运行切换为停机；其余边界保持基线。请先预测未来 360 分钟（6 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_038",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "重分配与稳态重构",
+    "scenario_description": "mock_test第038个算例的扩展预测题，围绕 B_329:FR 的变化，关注旁路放大后的短时流量迁移。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_038_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "异常复核：mock_test 第038个算例；唯一扰动是 B_329:FR（球阀通流比例）上调 9%；其余边界保持基线。请先预测未来 90 分钟（1.5 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_039",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "紧平衡与低压消耗",
+    "scenario_description": "mock_test第039个算例的扩展预测题，围绕 T_005:SP 的变化，关注源侧压力回撤后的低压先兆。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_039_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "状态评估：mock_test 第039个算例；唯一扰动是 T_005:SP（气源压力设定）下调 6%；其余边界保持基线。请先预测未来 180 分钟（3 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_prediction_040",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "富余抬升与高压能耗",
+    "scenario_description": "mock_test第040个算例的扩展预测题，围绕 E_119:SNQ 的变化，关注末端需求下降后的高压冗余。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_prediction_040_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "证据核验任务：mock_test 第040个算例；唯一扰动是 E_119:SNQ（用户侧需求流量设定）下调 18%；其余边界保持基线。请先预测未来 240 分钟（4 小时），随后独立校核压力、流量、管存、压缩机负荷和能耗。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_021",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "低负荷优化与越限消除",
+    "scenario_description": "mock_test第001个算例的扩展调度题，围绕 E_045:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_021_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "调度决策任务：在 mock_test 第001个算例中，将 E_045:SNQ（用户侧需求流量设定）下调 8%，其它边界先保持基线，评估窗口为 120 分钟（2 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：降低多余能耗，同时避免局部高压；现场硬约束：压缩机不得停机。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_022",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "管存与系统余度保持",
+    "scenario_description": "mock_test第002个算例的扩展调度题，围绕 T_003:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_022_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行处置工单：在 mock_test 第002个算例中，将 T_003:SNQ（气源流量设定）上调 10%，其它边界先保持基线，评估窗口为 180 分钟（3 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：恢复管存余度并限制增量能耗；现场硬约束：主气源单次调整不得超过 12%。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_023",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "末端保压与关键供气",
+    "scenario_description": "mock_test第003个算例的扩展调度题，围绕 B_302:FR 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_023_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "闭环控制审查：在 mock_test 第003个算例中，将 B_302:FR（球阀通流比例）上调 16%，其它边界先保持基线，评估窗口为 240 分钟（4 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：保障关键下游节点压力；现场硬约束：最多改变两个边界控制量。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_024",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "约束减违与安全回边界",
+    "scenario_description": "mock_test第004个算例的扩展调度题，围绕 C_016:SP_out 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_024_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班调度请求：在 mock_test 第004个算例中，将 C_016:SP_out（压缩机出口设定压力）上调 5%，其它边界先保持基线，评估窗口为 360 分钟（6 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：先消除压力违约，再比较功耗；现场硬约束：不得降低关键末端供气。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_025",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "末端保压与关键供气",
+    "scenario_description": "mock_test第005个算例的扩展调度题，围绕 E_066:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_025_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "候选动作评估：在 mock_test 第005个算例中，将 E_066:SNQ（用户侧需求流量设定）上调 14%，其它边界先保持基线，评估窗口为 120 分钟（2 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：需求增长时优先保住末端压力；现场硬约束：阀门动作幅度应尽量小。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_026",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "波动抑制与单点失稳防控",
+    "scenario_description": "mock_test第006个算例的扩展调度题，围绕 R_001:SPD 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_026_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "安全回边界任务：在 mock_test 第006个算例中，将 R_001:SPD（调节阀下游设定压力）下调 6%，其它边界先保持基线，评估窗口为 90 分钟（1.5 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：抑制下游压力波动；现场硬约束：不要改变压缩机启停状态。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_027",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "约束减违与安全回边界",
+    "scenario_description": "mock_test第007个算例的扩展调度题，围绕 B_286:FR 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_027_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "控制室处置：在 mock_test 第007个算例中，将 B_286:FR（球阀通流比例）下调 20%，其它边界先保持基线，评估窗口为 180 分钟（3 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：降低流量和压力约束违反率；现场硬约束：不允许大幅增供。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_028",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "末端保压与关键供气",
+    "scenario_description": "mock_test第008个算例的扩展调度题，围绕 C_019:SP_out 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_028_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "应急调度复核：在 mock_test 第008个算例中，将 C_019:SP_out（压缩机出口设定压力）下调 7%，其它边界先保持基线，评估窗口为 240 分钟（4 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：保持末端压力并控制机组负荷；现场硬约束：候选动作必须可回退。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_029",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "管存与系统余度保持",
+    "scenario_description": "mock_test第009个算例的扩展调度题，围绕 E_097:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_029_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行优化请求：在 mock_test 第009个算例中，将 E_097:SNQ（用户侧需求流量设定）上调 17%，其它边界先保持基线，评估窗口为 360 分钟（6 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：减缓管存下降并维持供需平衡；现场硬约束：额外能耗只能作为次要代价。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_030",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "约束减违与安全回边界",
+    "scenario_description": "mock_test第010个算例的扩展调度题，围绕 T_004:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_030_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "动作排序任务：在 mock_test 第010个算例中，将 T_004:SNQ（气源流量设定）下调 12%，其它边界先保持基线，评估窗口为 120 分钟（2 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：优先减少低压和供气不足；现场硬约束：不得关闭现有通道。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_031",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "低负荷优化与越限消除",
+    "scenario_description": "mock_test第011个算例的扩展调度题，围绕 B_120:FR 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_031_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "调度决策任务：在 mock_test 第011个算例中，将 B_120:FR（球阀通流比例）上调 15%，其它边界先保持基线，评估窗口为 60 分钟（1 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：消除高流速并避免过压；现场硬约束：只允许一次阀门调整。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_032",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "低负荷优化与越限消除",
+    "scenario_description": "mock_test第012个算例的扩展调度题，围绕 E_112:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_032_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行处置工单：在 mock_test 第012个算例中，将 E_112:SNQ（用户侧需求流量设定）下调 10%，其它边界先保持基线，评估窗口为 180 分钟（3 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：低负荷下减少不必要功耗；现场硬约束：安全余度不得变差。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_033",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "约束减违与安全回边界",
+    "scenario_description": "mock_test第013个算例的扩展调度题，围绕 C_022:SP_out 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_033_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "闭环控制审查：在 mock_test 第013个算例中，将 C_022:SP_out（压缩机出口设定压力）上调 6%，其它边界先保持基线，评估窗口为 240 分钟（4 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：把压力与机组负荷拉回安全区；现场硬约束：不得牺牲管存恢复。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_034",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "波动抑制与单点失稳防控",
+    "scenario_description": "mock_test第014个算例的扩展调度题，围绕 R_004:SPD 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_034_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "值班调度请求：在 mock_test 第014个算例中，将 R_004:SPD（调节阀下游设定压力）上调 9%，其它边界先保持基线，评估窗口为 90 分钟（1.5 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：稳定下游压力并控制调节幅度；现场硬约束：优先使用单变量动作。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_035",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "管存与系统余度保持",
+    "scenario_description": "mock_test第015个算例的扩展调度题，围绕 B_341:FR 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_035_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "候选动作评估：在 mock_test 第015个算例中，将 B_341:FR（球阀通流比例）下调 18%，其它边界先保持基线，评估窗口为 360 分钟（6 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：保持网络余度并控制瓶颈；现场硬约束：不增加压缩机启停次数。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_036",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "波动抑制与单点失稳防控",
+    "scenario_description": "mock_test第016个算例的扩展调度题，围绕 E_120:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_036_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "安全回边界任务：在 mock_test 第016个算例中，将 E_120:SNQ（用户侧需求流量设定）上调 13%，其它边界先保持基线，评估窗口为 120 分钟（2 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：抑制需求冲击引起的末端压力波动；现场硬约束：主气源调整必须小于需求扰动。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_037",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "波动抑制与单点失稳防控",
+    "scenario_description": "mock_test第017个算例的扩展调度题，围绕 C_008:ST 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_037_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "控制室处置：在 mock_test 第017个算例中，将 C_008:ST（压缩机启停状态）从运行切换为停机，其它边界先保持基线，评估窗口为 240 分钟（4 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：机组退出后避免单点失稳；现场硬约束：不得重新启动该机组。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_038",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "管存与系统余度保持",
+    "scenario_description": "mock_test第018个算例的扩展调度题，围绕 T_006:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_038_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "应急调度复核：在 mock_test 第018个算例中，将 T_006:SNQ（气源流量设定）下调 11%，其它边界先保持基线，评估窗口为 180 分钟（3 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：在供给回撤下守住系统余度；现场硬约束：最多采用一个增供动作。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_039",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "低负荷优化与越限消除",
+    "scenario_description": "mock_test第019个算例的扩展调度题，围绕 B_198:FR 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_039_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "运行优化请求：在 mock_test 第019个算例中，将 B_198:FR（球阀通流比例）上调 12%，其它边界先保持基线，评估窗口为 60 分钟（1 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：短时倒换中消除局部越限；现场硬约束：不要改变气源压力设定。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "scenario_id": "scenario_pipeformer_dispatch_040",
+    "scenario_type": "pipeformer",
+    "scenario_class_label": "末端保压与关键供气",
+    "scenario_description": "mock_test第020个算例的扩展调度题，围绕 E_109:SNQ 受扰后的闭环候选排序。",
+    "sessions": [
+      {
+        "session_id": "scenario_pipeformer_dispatch_040_session_001",
+        "offset_hours": 0,
+        "dialogue": [
+          {
+            "turn_id": 1,
+            "user_input": "动作排序任务：在 mock_test 第020个算例中，将 E_109:SNQ（用户侧需求流量设定）上调 19%，其它边界先保持基线，评估窗口为 360 分钟（6 小时）。请提出并比较 3 个不同且可行的边界控制方案。优化目标：长时增需下维持末端保压；现场硬约束：压缩机负荷不得进入告警区。任何候选不得出现工程约束失败，并按“告警数最少 → 风险等级最低 → 相对基线能耗变化最小”的顺序排序。最终给出候选排序、selected_candidate_id、首选与未选理由、风险与人工干预标签，并引用 2 个决定排序的证据变量。"
+          }
+        ]
+      }
+    ]
+  }
+]

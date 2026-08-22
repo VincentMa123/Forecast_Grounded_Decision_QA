@@ -97,6 +97,7 @@ def validate_source_records(
             sample_id,
             tool_schemas=tool_schemas,
         )
+        _validate_v8_dispatch_lifecycle(record, sample_id)
 
 
 def validate_projection_records(
@@ -409,6 +410,90 @@ def _validate_source_tool_pairs(
             raise DatasetValidationError(
                 f"{sample_id}: tool output {call_id} must be successful"
             )
+
+
+def _validate_v8_dispatch_lifecycle(record: dict[str, Any], sample_id: str) -> None:
+    is_v8 = (
+        record.get("dataset_source") == "Pipeline_Full_Life_Cycle_Test_Dataset-v8"
+        or sample_id.startswith("Pipeline_Full_Life_Cycle_Test_Dataset-v8:")
+    )
+    if (
+        not is_v8
+        or not str(record.get("scenario_id") or "").startswith(
+            "scenario_pipeformer_dispatch_"
+        )
+    ):
+        return
+
+    calls = record.get("tool_calls") or []
+    names = [call.get("name") for call in calls]
+    registry_count = next(
+        (index for index, name in enumerate(names) if name != "search_pipeformer_registry"),
+        len(names),
+    )
+    expected_names = ["search_pipeformer_registry"] * registry_count + [
+        "run_pipeformer_forecast",
+        "run_pipeformer_forecast",
+        "run_pipeformer_forecast",
+        "set_decision_policy",
+    ]
+    candidate_ids = [
+        call.get("arguments", {}).get("candidate_id")
+        for call in calls
+        if call.get("name") == "run_pipeformer_forecast"
+    ]
+    forecast_arguments = [
+        dict(call.get("arguments") or {})
+        for call in calls
+        if call.get("name") == "run_pipeformer_forecast"
+    ]
+    context_keys = (
+        "case_id",
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+        "forecast_horizon_minutes",
+    )
+    contexts = {
+        tuple(arguments.get(key) for key in context_keys)
+        for arguments in forecast_arguments
+    }
+    actions = {
+        json.dumps(
+            {
+                key: dict(
+                    (arguments.get("boundary_conditions") or {}).get(key) or {}
+                )
+                for key in ("setpoints", "percentage_changes")
+            },
+            sort_keys=True,
+        )
+        for arguments in forecast_arguments
+    }
+    registry_arguments = [dict(call.get("arguments") or {}) for call in calls[:2]]
+    disturbance_variable = (
+        forecast_arguments[0].get("disturbance_variable")
+        if forecast_arguments
+        else None
+    )
+    answer = str(record.get("final_answer") or "")
+    if (
+        registry_count != 2
+        or names != expected_names
+        or candidate_ids != ["candidate_1", "candidate_2", "candidate_3"]
+        or registry_arguments[0].get("query") != disturbance_variable
+        or registry_arguments[1].get("query") != ""
+        or registry_arguments[1].get("role") != "input"
+        or registry_arguments[1].get("controllable") is not True
+        or len(contexts) != 1
+        or len(actions) != 3
+        or "selected_candidate_id" not in answer
+        or any(candidate_id not in answer for candidate_id in candidate_ids)
+    ):
+        raise DatasetValidationError(
+            f"{sample_id}: v8 dispatch lifecycle must be two registry lookups, "
+            "candidate_1/2/3 forecasts, one decision policy, and a ranked answer"
+        )
 
 
 def _validate_messages(

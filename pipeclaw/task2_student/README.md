@@ -12,7 +12,7 @@ The source splits are read-only:
 - `pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_valid.jsonl`
 - `pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl`
 
-The frozen source counts are 923 / 127 / 117. Derived records must preserve
+The frozen source counts are 1073 / 147 / 139. Derived records must preserve
 sample IDs and split assignments. The test split is reserved for final
 evaluation.
 
@@ -155,7 +155,7 @@ environment:
 conda run -n pipeclaw python -m pipeclaw.task2_student.scripts.prepare_dataset
 ```
 
-It reads the three authoritative splits, requires the frozen 923 / 127 / 117
+It reads the three authoritative splits, requires the frozen 1073 / 147 / 139
 counts, loads all eight schemas from PipeClaw's actual tool registry, and
 writes:
 
@@ -264,12 +264,11 @@ data/token_profiles/qwen35_08b_token_profile.json
 data/token_profiles/qwen35_08b_token_records.jsonl
 ```
 
-The checked-in profile is stale. Task 11 could not regenerate it because the
-designated environments do not contain MS-SWIFT or a cached Qwen3.5 tokenizer;
-the current dataset manifest and profile provenance do not match. Do not use
-the checked-in profile's token lengths, coverage, or hardware guidance as
-current figures. Regenerate into a scratch directory and review the provenance
-before replacing either released profile artifact.
+The checked-in profile was regenerated on 2026-08-22 with MS-SWIFT 4.4.2 and
+the Qwen3.5 training template. It covers 5,166 train/validation rows and matches
+the current dataset manifest. The trace-level maximum is 18,127 tokens (p95
+10,523; p99 12,890); the constraint-multitask maximum is 17,622 and the
+answer-only maximum is 2,532. Use 18,432 for lossless trace-level training.
 
 No `max_length` or truncation strategy is passed while profiling. Any later
 training limit must fit a complete record or have a reviewed, explicit
@@ -315,9 +314,8 @@ limitation, not a YAML-versus-flags problem: the same value fails when passed
 directly on the command line.
 
 The smoke configurations retain their reviewed `max_length=2048` and
-fail-closed `delete` strategy. Because the checked-in profile is stale, validate
-the selected records against a fresh profile before treating that limit as
-current.
+fail-closed `delete` strategy. The selected 32 training rows have a maximum of
+1,949 tokens and the selected 8 validation rows have a maximum of 1,931.
 
 Run steps 1 through 10 from the repository root:
 
@@ -344,10 +342,10 @@ user to run on the CUDA environment.
 ## Remote server run (Qwen3.5-9B)
 
 Two configurations cover the rented Linux server. Both use the full trace-level
-projection with `max_length=16384`, 4-bit NF4 QLoRA with LoRA rank 32 / alpha
+projection with `max_length=18432`, 4-bit NF4 QLoRA with LoRA rank 32 / alpha
 64, `flash_attn`, gradient checkpointing, and DeepSpeed ZeRO-2 across four
-ranks (effective batch size 32). The checked-in token profile is stale; verify
-current tokenizer coverage before describing this limit as lossless.
+ranks (effective batch size 32). The current exact trace-level maximum is
+18,127 tokens, so this limit is lossless.
 
 ```bash
 # 1. Build the environment, then add the compiled kernels (needs nvcc)
