@@ -445,7 +445,7 @@ def _build_teacher_record(
         hard_issues=quality_issues,
         trace_status=trace.get("status"),
     )
-    # The quality_* fields are aliases of the canonical schema-v2 report; the
+    # The quality_* fields are aliases of the canonical schema-v3 report; the
     # generator never computes a second score of its own.
     apply_quality_aliases(
         record,

@@ -36,6 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--tool-schema-source",
         help="Projection JSONL containing OpenAI tool schemas",
     )
+    parser.add_argument(
+        "--execution-mode",
+        choices=("raw-student", "production-agent"),
+        default="raw-student",
+        help="Use the direct student loop or the same AgentOrchestrator as the app",
+    )
     parser.add_argument("--adapters", help="Optional LoRA adapter directory")
     parser.add_argument(
         "--model",
@@ -60,7 +66,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument("--limit", type=int, help="Limit the number of cases")
-    parser.add_argument("--max-turns", type=int, default=8)
+    parser.add_argument("--max-turns", type=int)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
     parser.add_argument(
@@ -107,6 +113,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+    if args.max_turns is None:
+        args.max_turns = 30 if args.execution_mode == "production-agent" else 8
     summary = evaluate_dataset(args)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     return 0

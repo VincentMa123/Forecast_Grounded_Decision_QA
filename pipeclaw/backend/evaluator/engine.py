@@ -23,7 +23,7 @@ def build_report(
     diagnostics: Mapping[str, Any] | None = None,
     minimum_score: float | None = None,
 ) -> EvaluationReport:
-    """Build one schema-v2 report using the canonical score formula."""
+    """Build one schema-v3 report using the canonical score formula."""
 
     profile = EvaluationProfile(profile)
     metric_values = list(metrics)

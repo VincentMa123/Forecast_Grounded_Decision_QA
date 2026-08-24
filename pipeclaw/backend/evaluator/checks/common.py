@@ -153,18 +153,27 @@ def task_field_comparison(
         "disturbance_variable",
         "disturbance_direction",
         "disturbance_magnitude_percent",
+        "disturbance_setpoint",
         "forecast_horizon_minutes",
     )
-    required_fields = {"case_id", "disturbance_variable"}
-    assumed_fields = inferred_task_fields(expected)
+    assumed_fields = set(inferred_task_fields(expected))
+    if str(expected.get("disturbance_variable") or "").endswith(":ST"):
+        assumed_fields.update(
+            {"disturbance_direction", "disturbance_magnitude_percent"}
+        )
     mismatches: list[str] = []
     matched_fields: list[str] = []
     for field in fields:
         if field not in expected or field in assumed_fields:
             continue
         if field not in actual:
-            if field in required_fields:
-                mismatches.append(field)
+            if (
+                field in {"case_id", "current_operating_condition_number"}
+                and case_identity_matches(expected, actual)
+            ):
+                matched_fields.append(field)
+                continue
+            mismatches.append(field)
             continue
         left = normalize(expected[field])
         right = normalize(actual[field])

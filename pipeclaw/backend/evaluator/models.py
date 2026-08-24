@@ -9,7 +9,7 @@ from types import MappingProxyType
 from typing import Any
 
 
-EVALUATION_SCHEMA_VERSION = "pipeclaw_evaluation_v2"
+EVALUATION_SCHEMA_VERSION = "pipeclaw_evaluation_v3"
 
 
 class EvaluationInputError(ValueError):
@@ -106,6 +106,7 @@ class EvaluationReport:
         if (
             self.profile is EvaluationProfile.AUTONOMOUS_ROLLOUT
             and evidence is not None
+            and "hallucination" not in self.metrics
         ):
             hallucination = evidence.to_dict()
             hallucination["included_in_score"] = False

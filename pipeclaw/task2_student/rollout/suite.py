@@ -1,4 +1,4 @@
-"""Dataset-level rollout orchestration and schema-v2 scoring.
+"""Dataset-level rollout orchestration and schema-v3 scoring.
 
 This module is the single place where rollout *execution* meets rollout
 *evaluation*: it runs each case through :class:`RolloutRunner` and then scores
@@ -12,6 +12,7 @@ from __future__ import annotations
 import gc
 import json
 from pathlib import Path
+from time import perf_counter
 from typing import Any, Mapping, Sequence
 
 from pipeclaw.backend.evaluator import (
@@ -48,7 +49,7 @@ except ImportError:  # pragma: no cover - MS-SWIFT normally installs tqdm
         return iterable if iterable is not None else []
 
 
-# The canonical schema-v2 fields copied from the report onto every rollout
+# The canonical schema-v3 fields copied from the report onto every rollout
 # record.  ``schema_version`` is renamed so the rollout keeps one unambiguous
 # evaluation-schema field alongside its trajectory fields.
 _REPORT_ROOT_FIELDS = (
@@ -245,7 +246,7 @@ def schemas_by_scenario_family(
 
 
 def attach_report(rollout: dict[str, Any], report: EvaluationReport) -> dict[str, Any]:
-    """Copy the canonical schema-v2 root fields onto one rollout record.
+    """Copy the canonical schema-v3 root fields onto one rollout record.
 
     The report is flattened rather than nested so a rollout carries exactly one
     score, one metric mapping, and one set of diagnostics.
@@ -291,7 +292,7 @@ def _summary(
     mode: str,
     record_count: int,
 ) -> dict[str, Any]:
-    """Build one schema-v2 summary, including for dry runs with no reports."""
+    """Build one schema-v3 summary, including for dry runs with no reports."""
 
     summary = summarize(reports)
     summary["mode"] = mode
@@ -362,6 +363,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
 
     rollouts_path = output_dir / "rollouts.jsonl"
     reports: list[EvaluationReport | None] = []
+    latencies: list[float] = []
     record_count = 0
     mode = "dry_run" if dry_run else "autonomous"
     with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
@@ -387,7 +389,11 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                         getattr(args, "save_raw_tool_outputs", False)
                     ),
                 )
+                started = perf_counter()
                 rollout = runner(case).run(case, config).to_dict()
+                latency = perf_counter() - started
+                rollout["latency_seconds"] = round(latency, 6)
+                latencies.append(latency)
                 report = evaluate(
                     rollout,
                     profile=EvaluationProfile.AUTONOMOUS_ROLLOUT,
@@ -410,6 +416,15 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
         record_count=record_count,
     )
     summary["by_scenario_type"] = _by_scenario_type(cases, reports, mode=mode)
+    summary["execution_mode"] = getattr(args, "execution_mode", "raw-student")
+    summary["runtime"] = {
+        "count": len(latencies),
+        "average_latency_seconds": (
+            round(sum(latencies) / len(latencies), 6) if latencies else None
+        ),
+        "minimum_latency_seconds": round(min(latencies), 6) if latencies else None,
+        "maximum_latency_seconds": round(max(latencies), 6) if latencies else None,
+    }
     atomic_write_text(
         output_dir / "summary.json",
         json.dumps(summary, ensure_ascii=False, indent=2, default=str),
@@ -423,6 +438,12 @@ def _build_runner(args: Any, cases: Sequence[tuple[Mapping[str, Any], PromptCase
     MS-SWIFT, PEFT, and torch are imported here rather than at module import so
     the dry-run path and the test suite never touch model weights or CUDA.
     """
+
+    if getattr(args, "execution_mode", "raw-student") == "production-agent":
+        from .production_agent import ProductionAgentRunner
+
+        runner = ProductionAgentRunner()
+        return lambda _case: runner
 
     adapters = getattr(args, "adapters", None)
     model = getattr(args, "model", None)

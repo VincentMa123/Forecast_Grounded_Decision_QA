@@ -84,7 +84,25 @@ def summarize(
     }
     pass_count = sum(bool(report.get("passed")) for report in payloads)
     record_count = len(payloads)
-    evidence_summary = metrics.get("evidence_consistency", {})
+    hallucination_summary = diagnostics.get("hallucination", {})
+    tool_successes = 0
+    tool_calls = 0
+    duplicate_successes = 0
+    for report in payloads:
+        report_metrics = report.get("metrics")
+        tool_metric = (
+            report_metrics.get("tool_call")
+            if isinstance(report_metrics, Mapping)
+            else None
+        )
+        details = tool_metric.get("details") if isinstance(tool_metric, Mapping) else None
+        if not isinstance(details, Mapping):
+            continue
+        tool_successes += int(details.get("successful_call_count") or 0)
+        tool_calls += int(details.get("total_call_count") or 0)
+        duplicate_successes += int(
+            details.get("duplicate_successful_call_count") or 0
+        )
     portability = {
         key: sum(
             int(
@@ -117,7 +135,13 @@ def summarize(
         },
         "metrics": metrics,
         "diagnostics": diagnostics,
-        "hallucination_rate": evidence_summary.get("failure_rate"),
+        "hallucination_rate": hallucination_summary.get("failure_rate"),
+        "tool_call_execution": {
+            "successful_calls": tool_successes,
+            "total_calls": tool_calls,
+            "success_rate": tool_successes / tool_calls if tool_calls else None,
+            "duplicate_successful_calls": duplicate_successes,
+        },
         "portability": portability,
         "by_scenario_type": {},
     }

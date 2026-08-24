@@ -91,6 +91,7 @@ AUTONOMOUS_CRITICAL_METRICS = frozenset(
         "artifact_evidence",
         "question_anchor",
         "claim_alignment",
+        "answer_claim_support",
     }
 )
 AUTONOMOUS_DIAGNOSTIC_METRICS = frozenset(
@@ -100,9 +101,6 @@ AUTONOMOUS_DIAGNOSTIC_METRICS = frozenset(
         "raw_capture_metadata",
         "model_loading_metadata",
         "hallucination",
-        # Observed but unscored until a real student rollout supplies the
-        # distribution needed to set a defensible pass threshold.
-        "answer_claim_support",
     }
 )
 

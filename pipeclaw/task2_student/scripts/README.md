@@ -83,6 +83,12 @@ Omit `--scenario-type` to evaluate both families in one run. The combined
 `summary.json` also contains `by_scenario_type` entries, each with its own
 record count and denominator-aware metric rates.
 
+Use `--execution-mode production-agent` to evaluate through the same
+`AgentOrchestrator` as the app. It reads the deployed model settings from the
+backend environment, needs no `--model` or `--adapters`, and defaults to 30
+turns. `summary.json` records the execution mode, wall-clock latency, strict
+record-level tool correctness, and actual successful/total tool-call counts.
+
 During a tool turn the loop appends MS-SWIFT's native `tool_call` and
 `tool_response` roles, matching the trace-level training projection; OpenAI-style
 SDK responses are normalized at the parser boundary. Qwen3.5's
@@ -90,7 +96,7 @@ SDK responses are normalized at the parser boundary. Qwen3.5's
 alongside a duplicate native call, the typed text representation is preferred.
 
 The evaluator writes `rollouts.jsonl` and `summary.json`, both stamped
-`"schema_version": "pipeclaw_evaluation_v2"`. A rollout can end as
+`"schema_version": "pipeclaw_evaluation_v3"`. A rollout can end as
 `completed`, `empty_response`, or `max_turns_exceeded`; malformed tool JSON and
 tool failures remain in the record instead of aborting the suite. Tool calls are
 schema-checked and only read-only/topology/registry/forecast operations are
@@ -101,7 +107,7 @@ workspace: `read_file`, `write_file`, and `edit_file` are workspace-bounded,
 logical `pipeline_data/...` reads remain read-only, and `run_command` is limited
 to a Python script located inside that workspace with a 1--60 second timeout.
 
-### Schema-v2 score and critical gate
+### Schema-v3 score and critical gate
 
 Each record in `rollouts.jsonl` carries an `overall_score`, a `passed` flag, and
 a `metrics` mapping in which every entry reports `applicable`, `passed`,
@@ -148,15 +154,12 @@ pipeline deliverable and `openclaw` for the PipeClaw agent cases. Each metric in
 `artifact_evidence` metric, which checks that files named in the current
 request were actually read or used as evidence rather than merely mentioned.
 
-### Hallucination rate is derived, not measured separately
+### Hallucination rate
 
-`summary["hallucination_rate"]` is exactly `evidence_consistency.failure_rate`,
-and each autonomous record's `hallucination` entry is a copy of its
-`evidence_consistency` result tagged `derived_from: "evidence_consistency"` and
-`included_in_score: false`. The grounding checker runs once per record; there is
-no second pass, so the two figures cannot drift apart. Report
-`hallucination_rate` (or equivalently the `evidence_consistency` failure rate)
-as the requested hallucination rate.
+`summary["hallucination_rate"]` combines unsupported numeric, row, identifier,
+entity/count, and requested-resource claims. It is not a copy of
+`evidence_consistency`: incomplete but non-fabricated answers can fail grounding
+without increasing hallucination. The diagnostic remains outside the score.
 
 PipeFormer records that carry a non-empty `disturbance_assumption` marker are
 scored assumption-aware. When the request does not state the disturbance

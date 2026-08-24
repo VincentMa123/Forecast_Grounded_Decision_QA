@@ -109,15 +109,19 @@ def _resolved_forecast_arguments(
     call: Mapping[str, Any],
 ) -> dict[str, Any]:
     call_id = str(call.get("tool_call_id") or "")
-    parsed_task = next(
+    resolved_output = next(
         (
-            mapping(output.get("parsed_task"))
+            output
             for paired_call, output in _successful_forecast_pairs(record)
             if str(paired_call.get("tool_call_id") or "") == call_id
         ),
         {},
     )
-    return {**parsed_task, **mapping(call.get("arguments"))}
+    return {
+        **prediction_view(resolved_output),
+        **mapping(resolved_output.get("parsed_task")),
+        **mapping(call.get("arguments")),
+    }
 
 
 def _matching_reference_output(
@@ -140,7 +144,7 @@ def _matching_reference_output(
 def _matches_reference_contract(
     context: EvaluationContext, actual_call: Mapping[str, Any]
 ) -> bool:
-    """Accept alternatives only for fields the teacher marked provisional."""
+    """Accept a different action only when its underlying task still matches."""
 
     resolved_call = {
         **actual_call,
@@ -148,11 +152,7 @@ def _matches_reference_contract(
     }
     reference = context.reference or {}
     return any(
-        _same_forecast_action(
-            {**call, "arguments": expected_arguments},
-            resolved_call,
-            ignored_fields=inferred_task_fields(expected_arguments),
-        )
+        task_field_comparison(expected_arguments, resolved_call["arguments"])[0]
         for call, _output_value in _successful_forecast_pairs(reference)
         for expected_arguments in [_resolved_forecast_arguments(reference, call)]
     )
@@ -288,6 +288,17 @@ def _tool_metrics(
         signature = json.dumps([call.get("name"), call.get("arguments")], sort_keys=True, default=str)
         failure_signatures[signature] = failure_signatures.get(signature, 0) + 1
     repeated_failures = [s for s, count in failure_signatures.items() if count > 1]
+    success_signatures: dict[str, int] = {}
+    for call in valid_calls:
+        signature = json.dumps(
+            [call.get("name"), call.get("arguments")],
+            sort_keys=True,
+            default=str,
+        )
+        success_signatures[signature] = success_signatures.get(signature, 0) + 1
+    duplicate_successes = sum(
+        count - 1 for count in success_signatures.values() if count > 1
+    )
     tool_result = metric(
         context,
         "tool_call",
@@ -296,6 +307,7 @@ def _tool_metrics(
             applicable
             and required <= emitted_valid
             and not failed_calls
+            and not duplicate_successes
         ),
         details={
             "expected_tool_names": sorted(teacher_names),
@@ -303,6 +315,10 @@ def _tool_metrics(
             "emitted_tool_names": [str(call.get("name")) for call in calls if call.get("name")],
             "failed_call_count": len(failed_calls),
             "repeated_failure_signatures": len(repeated_failures),
+            "successful_call_count": len(valid_calls),
+            "total_call_count": len(calls),
+            "call_success_rate": len(valid_calls) / len(calls) if calls else None,
+            "duplicate_successful_call_count": duplicate_successes,
         },
     )
     recovered = bool(failed_calls) and recovery_targets <= set(last_required) and all(
@@ -670,6 +686,9 @@ def _claim_support_metric(context: EvaluationContext) -> MetricResult:
             value = source.get(key)
             if value:
                 haystack.append(_json_text(value))
+    reference_answer = (context.reference or {}).get("final_answer")
+    if reference_answer:
+        haystack.append(str(reference_answer))
     haystack.append(_json_text(context.oracle))
     corpus = "\n".join(haystack)
     unsupported = sorted(claim for claim in claims if claim not in corpus)
@@ -717,6 +736,15 @@ def _label_metric(
     expected = [item[0] for item in comparisons]
     actual = [item[1] for item in comparisons]
     own_values = [value(output) for output in student_evidence]
+    state_candidates = [
+        item
+        for item in sequence(
+            mapping((context.reference or {}).get("state_before")).get("candidates")
+        )
+        if isinstance(item, Mapping)
+    ]
+    state_values = [value(item) for item in state_candidates]
+    own_values.extend(state_values)
     applicable = bool(comparisons or own_values)
     return metric(
         context,
@@ -730,30 +758,67 @@ def _label_metric(
             "actual": actual[0] if len(actual) == 1 else actual,
             "matched_reference_forecast_count": len(matched),
             "student_evidence_forecast_count": len(student_evidence),
+            "state_candidate_count": len(state_candidates),
         },
     )
 
 
-# The shortest genuine ``final_answer`` in the frozen 1,140-record release is 10
-# characters, so a floor below that rejects degenerate stubs without failing any
-# real record.  This is a non-degeneracy floor, not a semantic judgement: for the
-# tool-less OpenClaw records ``answer_completeness`` is the only always-scored
-# deliverable, and accepting ``"x"`` let an empty rollout score as a pass.
+# Length rejects degenerate stubs; reference-token overlap also keeps tool-less
+# follow-up answers relevant without requiring exact teacher wording.
 _MIN_SUBSTANTIVE_ANSWER_CHARS = 8
+
+_ANSWER_WORD = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}|[\u4e00-\u9fff]{2,}")
+_ANSWER_STOPWORDS = frozenset({
+    "the", "and", "that", "this", "with", "from", "answer", "result",
+    "现在", "记得", "回答", "结果", "可以", "需要", "这个", "那个",
+})
+
+
+def _answer_tokens(text: str) -> set[str]:
+    tokens: set[str] = set()
+    for value in _ANSWER_WORD.findall(text):
+        value = value.casefold()
+        if value in _ANSWER_STOPWORDS:
+            continue
+        if re.fullmatch(r"[\u4e00-\u9fff]+", value):
+            tokens.update(
+                value[index:index + 2]
+                for index in range(len(value) - 1)
+                if value[index:index + 2] not in _ANSWER_STOPWORDS
+            )
+        else:
+            tokens.add(value)
+    return tokens
 
 
 def _answer_metric(context: EvaluationContext) -> MetricResult:
     answer = str(context.record.get("final_answer") or "")
     stripped = answer.strip()
-    applicable = bool(str((context.reference or {}).get("final_answer") or "").strip()) or bool(stripped)
+    reference_answer = str((context.reference or {}).get("final_answer") or "").strip()
+    applicable = bool(reference_answer or stripped)
+    reference_tokens = _answer_tokens(reference_answer)
+    answer_tokens = _answer_tokens(stripped)
+    matched_tokens = sorted(reference_tokens & answer_tokens)
+    requires_relevance = (
+        not bool(context.oracle.get("has_tool_target")) and bool(reference_tokens)
+    )
+    trace_completed = context.record.get("trace_status") == "completed"
     return metric(
         context,
         "answer_completeness",
         applicable=applicable,
-        passed=applicable and len(stripped) >= _MIN_SUBSTANTIVE_ANSWER_CHARS,
+        passed=(
+            applicable
+            and trace_completed
+            and len(stripped) >= _MIN_SUBSTANTIVE_ANSWER_CHARS
+            and (not requires_relevance or bool(matched_tokens))
+        ),
         details={
             "answer_length": len(answer),
             "minimum_length": _MIN_SUBSTANTIVE_ANSWER_CHARS,
+            "trace_completed": trace_completed,
+            "relevance_required": requires_relevance,
+            "matched_reference_tokens": matched_tokens[:20],
         },
     )
 
@@ -769,7 +834,46 @@ def _json_metric(context: EvaluationContext) -> MetricResult:
         passed=applicable and not errors and all(
             call.get("schema_valid") is not False for call in calls
         ),
-        details={"error_count": len(errors)},
+        details={"error_count": len(errors), "scope": "tool_call_json_and_schema"},
+    )
+
+
+def _hallucination_metric(
+    context: EvaluationContext,
+    components: list[MetricResult],
+) -> MetricResult:
+    evidence, *other_components = components
+    evidence_claims = any(
+        evidence.details.get(key)
+        for key in (
+            "claimed_numeric_values",
+            "unsupported_row_claims",
+            "candidate_contract_issues",
+        )
+    )
+    applicable = [item for item in other_components if item.applicable]
+    applicable_names = [item.name for item in applicable]
+    failed = [item.name for item in applicable if not item.passed]
+    if evidence.applicable:
+        applicable_names.insert(0, evidence.name)
+        if evidence_claims and any(
+            evidence.details.get(key)
+            for key in (
+                "unsupported_numeric_values",
+                "unsupported_row_claims",
+                "candidate_contract_issues",
+            )
+        ):
+            failed.insert(0, evidence.name)
+    return metric(
+        context,
+        "hallucination",
+        applicable=bool(applicable_names),
+        passed=bool(applicable_names) and not failed,
+        details={
+            "applicable_components": applicable_names,
+            "failed_components": failed,
+        },
     )
 
 
@@ -847,6 +951,9 @@ def evaluate_autonomous_checks(
 
     tool_call, tool_recovery = _tool_metrics(context)
     claim_support = _claim_support_metric(context)
+    evidence = evidence_consistency(context)
+    claim_alignment = _claim_alignment_metric(context)
+    question_anchor = _question_anchor_metric(context)
     metrics = [
         _task_parsing(context),
         _assumption_metric(context),
@@ -861,7 +968,7 @@ def evaluate_autonomous_checks(
                 ("dispatch", "dispatch_recommendation"),
             )
         ),
-        evidence_consistency(context),
+        evidence,
         _answer_metric(context),
         _json_metric(context),
         _artifact_metric(context),
@@ -872,6 +979,12 @@ def evaluate_autonomous_checks(
     ordered = [by_name[name] for name in CANONICAL_METRIC_NAMES]
     ordered.append(tool_recovery)
     ordered.append(claim_support)
-    ordered.append(_claim_alignment_metric(context))
-    ordered.append(_question_anchor_metric(context))
+    ordered.append(claim_alignment)
+    ordered.append(question_anchor)
+    ordered.append(
+        _hallucination_metric(
+            context,
+            [evidence, claim_support, claim_alignment, question_anchor],
+        )
+    )
     return ordered, {"portability": _portability_diagnostics(context.record)}

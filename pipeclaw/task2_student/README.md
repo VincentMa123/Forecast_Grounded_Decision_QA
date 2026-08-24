@@ -102,7 +102,10 @@ restrict file operations and Python scripts to the evaluation workspace.
 
 Run the same command with `--dry-run` and without `--adapters` to inspect the
 prompt/tool inputs first. Results are written to `rollouts.jsonl` and
-`summary.json`, both stamped `"schema_version": "pipeclaw_evaluation_v2"`.
+`summary.json`, both stamped `"schema_version": "pipeclaw_evaluation_v3"`.
+Add `--execution-mode production-agent` to run through the deployed backend
+model and the same `AgentOrchestrator` used by the app; this mode defaults to
+30 turns and reports wall-clock latency.
 
 ### Production-agent pass@k
 
@@ -135,14 +138,14 @@ synchronization—not the key—is what makes that server valid for training. Th
 PipeClaw multi-turn scheduler remains responsible for production tool execution
 and deterministic reward inside GRPO.
 
-Under schema v2, every applicable deliverable metric carries weight `1.0` and
+Under schema v3, every applicable deliverable metric carries weight `1.0` and
 `overall_score` is the percentage of that weight which passed; inapplicable
 metrics are reported explicitly rather than scored as failures, and diagnostics
 (`tool_recovery`, `portability`, capture and model-loading metadata,
 `hallucination`) stay out of the denominator. A record's `passed` flag is a
 critical gate, not a threshold: one failing critical metric or hard grounding
-issue fails it regardless of score. `summary["hallucination_rate"]` is derived
-from `evidence_consistency.failure_rate` rather than measured separately. See
+issue fails it regardless of score. `summary["hallucination_rate"]` combines
+unsupported numeric, row, identifier, entity/count, and resource claims. See
 `scripts/README.md` for the safety allowlist, failure-state details, and the
 full metric list.
 

@@ -41,9 +41,9 @@ record already exists.
 - `answer_quality.py` — validates unsupported answer claims while a trace is
   being generated, i.e. before there is a record to score.
 
-## Schema v2 scoring and the critical gate
+## Schema v3 scoring and the critical gate
 
-`EVALUATION_SCHEMA_VERSION` is `pipeclaw_evaluation_v2`. Every report carries
+`EVALUATION_SCHEMA_VERSION` is `pipeclaw_evaluation_v3`. Every report carries
 it, and there is exactly one score formula in the repository:
 
 ```python
@@ -79,20 +79,18 @@ Three consequences are worth stating explicitly:
   `1.0`, and there is no minimum-score threshold: a student rollout is judged
   on whether it got the critical work right, not on clearing a curve.
 
-## Derived hallucination rate
+## Hallucination rate
 
-Hallucination is **not** a separately computed check. `EvaluationReport.to_dict()`
-copies the `evidence_consistency` result into a `hallucination` entry marked
-`derived_from: "evidence_consistency"` and `included_in_score: false`, and only
-for the autonomous profile. At dataset level, `summary["hallucination_rate"]`
-is exactly `evidence_consistency.failure_rate`. The grounding checker runs
-once per record; the second name is a compatibility view of the first result,
-so the two can never disagree.
+The autonomous `hallucination` diagnostic combines unsupported numbers and row
+claims, unsupported identifiers, entity/count mismatches, and requested-resource
+substitution. It remains outside the score denominator. A merely short or
+vacuous answer can fail completeness or evidence consistency without being
+misreported as a hallucination.
 
 ## Teacher compatibility surface
 
 `scorer.py` keeps the released teacher-side API callable, but everything it
-returns is copied from a schema-v2 `EvaluationReport` rather than recomputed:
+returns is copied from a schema-v3 `EvaluationReport` rather than recomputed:
 
 - `apply_quality_aliases()` writes the `quality_*` fields listed below from one
   report. **The `quality_*` names are deprecated.** New code should read
