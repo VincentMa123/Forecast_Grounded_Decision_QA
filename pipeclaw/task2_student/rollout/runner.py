@@ -74,11 +74,11 @@ _EXECUTION_ERROR_CODES = {
 _PORTABILITY_RECORD_KEYS = ("cwd_rebased", "portable_path_normalization")
 
 
-def _schema_valid(result: Mapping[str, Any]) -> bool:
+def schema_valid(result: Mapping[str, Any]) -> bool:
     return result.get("error_code") not in _SCHEMA_ERROR_CODES
 
 
-def _execution_success(result: Mapping[str, Any]) -> bool:
+def execution_success(result: Mapping[str, Any]) -> bool:
     return (
         result.get("success", True) is not False
         and not result.get("error")
@@ -196,8 +196,8 @@ class RolloutRunner:
                 "tool_call_id": call.call_id,
                 "name": call.name,
                 "arguments": dict(self.policy.recorded_arguments(normalized, case)),
-                "schema_valid": _schema_valid(tool_result),
-                "execution_success": _execution_success(tool_result),
+                "schema_valid": schema_valid(tool_result),
+                "execution_success": execution_success(tool_result),
             }
             call_record.update(
                 {

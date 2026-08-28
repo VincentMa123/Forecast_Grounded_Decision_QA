@@ -1,20 +1,6 @@
-"""pass@k rollout harness for the python-writing (write_file+run_command) scenarios.
-
-GRPO Phase 0: measures whether the current checkpoint's failures (syntax slips,
-wrong paths, thrash) are a *capability* problem or a *reliability* problem by
-sampling K episodes per python scenario at several temperatures and scoring each
-episode with the deterministic backend evaluator.
-
-Zero-model-weight mode: --emit-grpo-prompts only renders the prompt dataset used
-by the GRPO stage and never loads a checkpoint.
-
-Run from the repository root in the task2-ms-swift conda env.
-"""
-
 from __future__ import annotations
 
 import argparse
-import gc
 import json
 import statistics
 import sys
@@ -31,7 +17,12 @@ from pipeclaw.task2_student.rollout.scenarios import (
     evaluation_workspace_key,
     workspace_for,
 )
-from pipeclaw.task2_student.rollout.suite import read_jsonl, tool_schema_index
+from pipeclaw.task2_student.rollout.suite import (
+    read_jsonl,
+    release_cuda_cache,
+    sample_keys,
+    tool_schema_index,
+)
 
 from tqdm.auto import tqdm
 
@@ -101,9 +92,9 @@ def training_system_prompt(record: Mapping[str, Any]) -> str:
     use frozen_system_prompt() with the released trace_level data when the
     model must see the exact SFT prompt distribution.
     """
-    from pipeclaw.task2_student.scripts.prepare_dataset import _trace_system_content
+    from pipeclaw.task2_student.scripts.prepare_dataset import trace_system_content
 
-    return _trace_system_content(dict(record))
+    return trace_system_content(dict(record))
 
 
 def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
@@ -176,11 +167,7 @@ def _schemas_for(
     schemas_by_key: Mapping[str, Any],
 ) -> list[dict[str, Any]] | None:
     """Match a record's schemas via its identifiers; None when the index misses."""
-    for key in (
-        str(record.get("sample_id") or ""),
-        str(record.get("example_id") or ""),
-        str(record.get("source_id") or ""),
-    ):
+    for key in sample_keys(record):
         matched = schemas_by_key.get(key)
         if matched:
             return list(matched)
@@ -314,7 +301,7 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "mean_reward": statistics.fmean([float(r.get("reward", 0.0)) for r in rows])
         if rows
         else 0.0,
-        "zero_reward_prompt_share": zero_variance_share,
+        "zero_variance_share": zero_variance_share,
         "syntax_error_share": rate(
             [r["error_counts"]["python_syntax_error"] > 0 for r in rows]
         ),
@@ -492,14 +479,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                         refresh=False,
                     )
                     progress.update()
-                    gc.collect()
-                    try:
-                        import torch
-
-                        if torch.cuda.is_available():
-                            torch.cuda.empty_cache()
-                    except ImportError:
-                        pass
+                    release_cuda_cache()
     progress.close()
     summary = _aggregate(rows)
     atomic_write_text(
@@ -610,7 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--all-scenarios",
         action="store_true",
-        help="evaluate every scenario family (openclaw + topology + pipeformer turn-1), not only python scenarios",
+        help="evaluate every record with tool activity (including OpenClaw, topology, and PipeFormer traces), not only Python/run_command scenarios",
     )
     parser.add_argument("--repo-root", default=".")
     return parser

@@ -4,10 +4,6 @@ import json
 from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Optional
 
-from pipeclaw.backend.evaluator.numeric_grounding import (
-    grounded_numeric_claim_values,
-    numeric_claims_are_grounded,
-)
 from pipeclaw.backend.evaluator.quality_references import (
     numeric_claim_values,
     sft_file_references,
@@ -43,6 +39,10 @@ SFT_OMITTED_TOOL_KEYS = {
     "timestamp",
     "workspace",
 }
+def _evidence_blob(output: Optional[Dict[str, Any]]) -> str:
+    return json.dumps((output or {}).get("output") or {}, ensure_ascii=False).casefold()
+
+
 def parse_tool_output(tool_call: Dict[str, Any]) -> Any:
     if "result" in tool_call:
         return tool_call["result"]
@@ -55,28 +55,50 @@ def parse_tool_output(tool_call: Dict[str, Any]) -> Any:
         return raw
 
 
-def sanitize_tool_output(value: Any) -> Any:
-    return deepcopy(value)
+def _select_fields(value: Mapping[str, Any], keys: tuple[str, ...]) -> Dict[str, Any]:
+    return {key: value[key] for key in keys if key in value}
+
+
+def _compact_watch_variables(
+    evidence: Mapping[str, Any],
+    *,
+    include_auxiliary_variables: bool = True,
+) -> Dict[str, Any]:
+    keys = ("top_watch_variables", "key_observation_variables")
+    item_keys = (
+        "variable",
+        "role",
+        "metric",
+        "value",
+        "status",
+        "mean_prediction",
+        "mean_abs_delta_vs_observed",
+    )
+    return {
+        key: [
+            _select_fields(item, item_keys)
+            for item in list(evidence.get(key) or [])[:3]
+        ]
+        for key in keys
+        if include_auxiliary_variables and evidence.get(key)
+    }
 
 
 def tool_call_id(tool_call: Dict[str, Any], index: int) -> str:
     return str(tool_call.get("tool_call_id") or f"tool_{index:03d}")
 
 
-def _legacy_task_view(
+def _legacy_projection(
     forecast: ForecastResult,
     arguments: Mapping[str, Any],
 ) -> Dict[str, Any]:
-    """Expose canonical task facts, with a fallback for pre-contract records."""
-    task = dict(forecast.parsed_task)
-    if task:
-        return task
+    """Map the public contract to legacy record field names without reshaping it."""
     prediction = forecast.prediction
     resolution = forecast.task_resolution
-    task = {
-        **{
-            key: prediction.get(key)
-            for key in (
+    parsed_task = forecast.parsed_task or {
+        **_select_fields(
+            prediction,
+            (
                 "case_id",
                 "current_operating_condition_number",
                 "disturbance_variable",
@@ -85,17 +107,17 @@ def _legacy_task_view(
                 "disturbance_assumption",
                 "disturbance_source",
                 "forecast_horizon_minutes",
-            )
-        },
-        **{
-            key: arguments.get(key)
-            for key in (
+            ),
+        ),
+        **_select_fields(
+            arguments,
+            (
                 "attention_targets",
                 "output_state_variables",
                 "constraint_verification_types",
                 "boundary_conditions",
-            )
-        },
+            ),
+        ),
         **{
             key: resolution.get(key, 0 if key.endswith("_count") else [])
             for key in (
@@ -112,16 +134,9 @@ def _legacy_task_view(
             prediction.get("forecast_window") or {}
         ).get("time_step_minutes"),
     }
-    return {key: item for key, item in task.items() if item is not None}
-
-
-def _legacy_projection(
-    forecast: ForecastResult,
-    arguments: Mapping[str, Any],
-) -> Dict[str, Any]:
-    """Map the public contract to legacy record field names without reshaping it."""
+    parsed_task = {key: item for key, item in parsed_task.items() if item is not None}
     return {
-        "parsed_task": _legacy_task_view(forecast, arguments),
+        "parsed_task": parsed_task,
         "prediction_summary": dict(forecast.prediction),
         "constraint_check": dict(forecast.verification),
         "evidence": dict(forecast.evidence),
@@ -160,14 +175,19 @@ def export_trace_tools(
             candidate_role = arguments.get("candidate_role") or raw_output.get("candidate_role")
             forecast = ForecastResult.from_payload(raw_output)
             output = forecast.model_dump()
-            projection = _legacy_projection(forecast, arguments)
-            pipeformer_results.append({"tool_call_id": call_id, "output": output, "projection": projection})
+            pipeformer_results.append(
+                {
+                    "tool_call_id": call_id,
+                    "output": output,
+                    "projection": _legacy_projection(forecast, arguments),
+                }
+            )
             if candidate_id:
                 output["candidate_id"] = candidate_id
             if candidate_role:
                 output["candidate_role"] = candidate_role
         else:
-            output = sanitize_tool_output(raw_output)
+            output = deepcopy(raw_output)
         outputs.append(
             {
                 "tool_call_id": call_id,
@@ -251,7 +271,7 @@ class TeacherTraceProjector:
             if action_forecasts:
                 successful_pipeformer = action_forecasts
             multiple_pipeformer = len(successful_pipeformer) > 1
-            required_registry_call_ids = self._registry_calls_to_retain(
+            required_registry_call_ids = self._registry_calls_required_for_forecasts(
                 successful,
                 successful_pipeformer,
             )
@@ -357,18 +377,6 @@ class TeacherTraceProjector:
             )
         return compact_calls, compact_outputs
 
-    @classmethod
-    def _registry_calls_to_retain(
-        cls,
-        successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
-        forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
-    ) -> set[str]:
-        """Select only registry searches required to authorize retained forecasts."""
-        return cls._registry_calls_required_for_forecasts(
-            successful,
-            forecasts,
-        )
-
     @staticmethod
     def _registry_calls_required_for_forecasts(
         successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
@@ -430,13 +438,8 @@ class TeacherTraceProjector:
         while available and len(selected) < SFT_MAX_GENERIC_TOOL_PAIRS:
             ranked = []
             for pair in available:
-                blob = json.dumps((pair[2] or {}).get("output") or {}, ensure_ascii=False).casefold()
-                normalized = blob.replace(",", "")
-                covered = {
-                    value for value in remaining
-                    if value.casefold().replace(",", "") in normalized
-                }
-                ranked.append((len(covered), self._evidence_score(pair[2], answer), -pair[0], pair, covered))
+                covered_count, covered = self._evidence_coverage(pair[2], remaining)
+                ranked.append((covered_count, self._evidence_score(pair[2], answer), -pair[0], pair, covered))
             _, _, _, best, covered = max(ranked, key=lambda item: item[:3])
             selected.append(best)
             remaining.difference_update(covered)
@@ -636,25 +639,7 @@ class TeacherTraceProjector:
                 "candidate_forecasts",
             }
         }
-        for key in ("top_watch_variables", "key_observation_variables"):
-            if not evidence.get(key):
-                continue
-            compact[key] = [
-                {
-                    item_key: item[item_key]
-                    for item_key in (
-                        "variable",
-                        "role",
-                        "metric",
-                        "value",
-                        "status",
-                        "mean_prediction",
-                        "mean_abs_delta_vs_observed",
-                    )
-                    if item_key in item
-                }
-                for item in list(evidence.get(key) or [])[:3]
-            ]
+        compact.update(_compact_watch_variables(evidence))
         return self.compact_sft_output(compact)
 
     def serialize_sft_decision_summary(self, value: Any) -> Dict[str, Any]:
@@ -668,11 +653,7 @@ class TeacherTraceProjector:
                     raw_policy.get("hard_constraints") or []
                 ),
                 "objectives": [
-                    {
-                        key: objective[key]
-                        for key in ("metric", "direction", "tolerance")
-                        if key in objective
-                    }
+                    _select_fields(objective, ("metric", "direction", "tolerance"))
                     for objective in raw_policy.get("objectives") or []
                     if isinstance(objective, dict)
                 ],
@@ -684,30 +665,45 @@ class TeacherTraceProjector:
             }
         else:
             compact_policy = {}
-        compact_summary = {
-            key: summary[key]
-            for key in (
+        compact_summary = _select_fields(
+            summary,
+            (
                 "status",
                 "selected_candidate_id",
                 "ranked_candidate_ids",
                 "ranked_candidate_groups",
                 "eliminated_candidates",
                 "missing_metrics",
-            )
-            if key in summary
-        }
+            ),
+        )
         if compact_policy:
             compact_summary["ranking_policy"] = compact_policy
         return compact_summary
 
     @staticmethod
     def _evidence_score(output: Optional[Dict[str, Any]], answer: str) -> int:
-        blob = json.dumps((output or {}).get("output") or {}, ensure_ascii=False).casefold()
-        references = TeacherTraceProjector._reference_tokens(answer)
-        score = sum(3 for value in references if value.casefold() in blob)
+        blob = _evidence_blob(output)
+        score = sum(
+            3
+            for value in TeacherTraceProjector._reference_tokens(answer)
+            if value.casefold() in blob
+        )
         if '"stdout"' in blob or '"content"' in blob:
             score += 1
         return score
+
+    @staticmethod
+    def _evidence_coverage(
+        output: Optional[Dict[str, Any]],
+        remaining: set[str],
+    ) -> tuple[int, set[str]]:
+        normalized = _evidence_blob(output).replace(",", "")
+        covered = {
+            value
+            for value in remaining
+            if value.casefold().replace(",", "") in normalized
+        }
+        return len(covered), covered
 
     def _select_forecast_evidence_for_sft(
         self,
@@ -717,9 +713,10 @@ class TeacherTraceProjector:
         include_auxiliary_variables: bool,
         max_variables: int,
     ) -> Dict[str, Any]:
-        prediction = dict(output.get("prediction") or {})
-        verification = dict(output.get("verification") or {})
-        evidence = dict(output.get("evidence") or {})
+        compact = ForecastResult.from_payload(output).model_dump()
+        prediction = compact["prediction"]
+        verification = compact["verification"]
+        evidence = compact["evidence"]
         referenced = list(dict.fromkeys(variable_references(answer)))
         if include_auxiliary_variables:
             for key in ("top_watch_variables", "key_observation_variables"):
@@ -732,7 +729,7 @@ class TeacherTraceProjector:
                 referenced.extend(str(value) for value in finding.get("affected_variables") or [])
         referenced = list(dict.fromkeys(referenced))[:max_variables]
         summary = dict(prediction.get("output_forecast_summary") or {})
-        metric_keys = {
+        metric_keys = (
             "mean_prediction",
             "minimum_prediction",
             "maximum_prediction",
@@ -742,40 +739,16 @@ class TeacherTraceProjector:
             "max_step_decline",
             "max_decline_from_start",
             "recovery_from_minimum",
-        }
-        compact_summary = {
-            variable: {
-                key: value
-                for key, value in dict(summary.get(variable) or {}).items()
-                if key in metric_keys
-            }
+        )
+        prediction["output_forecast_summary"] = {
+            variable: _select_fields(dict(summary[variable] or {}), metric_keys)
             for variable in referenced
             if variable in summary
         }
-        prediction_keys = (
-            "forecast_mode",
-            "case_id",
-            "current_operating_condition_number",
-            "forecast_horizon_minutes",
-            "actual_forecast_horizon_minutes",
-            "actual_forecast_steps",
-            "disturbance_variable",
-            "disturbance_direction",
-            "disturbance_magnitude_percent",
-            "disturbance_assumption",
-            "disturbance_source",
-            "forecast_window",
-            "counterfactual_comparison",
-            "total_output_variable_count",
-        )
-        compact_prediction = {
-            key: prediction[key] for key in prediction_keys if key in prediction
-        }
-        if not include_auxiliary_variables and "counterfactual_comparison" in compact_prediction:
-            comparison = dict(compact_prediction["counterfactual_comparison"] or {})
-            compact_prediction["counterfactual_comparison"] = {
-                key: comparison[key]
-                for key in (
+        if not include_auxiliary_variables and "counterfactual_comparison" in prediction:
+            prediction["counterfactual_comparison"] = _select_fields(
+                dict(prediction["counterfactual_comparison"] or {}),
+                (
                     "mode",
                     "compared_step_count",
                     "compared_output_variable_count",
@@ -783,49 +756,21 @@ class TeacherTraceProjector:
                     "baseline_reference",
                     "disturbance_variable",
                     "applied_disturbance",
-                )
-                if key in comparison
-            }
-        compact_prediction["output_forecast_summary"] = compact_summary
-        verification_keys = (
-            "requested_categories",
-            "category_status",
-            "safety_energy_comparison",
-            "rule_status",
-            "overall_status",
-            "verification_complete",
-            "not_evaluated_rules",
-            "risk_level",
-            "risk_escalations",
-            "failure_count",
-            "warning_count",
-            "failed_rule_ids",
-            "warning_rule_ids",
-            "triggered_flags",
-            "human_intervention_label",
-            "dispatch_recommendation",
-            "priority_findings",
-        )
-        compact_verification = {
-            key: verification[key]
-            for key in verification_keys
-            if key in verification and key not in {"rule_status", "risk_escalations", "priority_findings"}
-        }
+                ),
+            )
         if "comparable_metrics" in verification:
             metrics = dict(verification.get("comparable_metrics") or {})
-            compact_verification["comparable_metrics"] = {
-                key: metrics[key]
-                for key in COMPACT_COMPARABLE_METRIC_KEYS
-                if key in metrics
-            }
+            verification["comparable_metrics"] = _select_fields(
+                metrics, COMPACT_COMPARABLE_METRIC_KEYS
+            )
             if "energy_evaluation_status" in metrics:
-                compact_verification["comparable_metrics"]["evaluation_status"] = metrics[
+                verification["comparable_metrics"]["evaluation_status"] = metrics[
                     "energy_evaluation_status"
                 ]
-        compact_verification["priority_findings"] = [
-            {
-                key: finding[key]
-                for key in (
+        verification["priority_findings"] = [
+            _select_fields(
+                finding,
+                (
                     "name",
                     "category",
                     "status",
@@ -833,72 +778,45 @@ class TeacherTraceProjector:
                     "flag",
                     "priority",
                     "affected_variables",
-                )
-                if key in finding
-            }
+                ),
+            )
             for finding in (verification.get("priority_findings") or [])[:5]
         ]
-        compact_evidence = {
-            key: [
-                {
-                    item_key: item[item_key]
-                    for item_key in (
-                        "variable",
-                        "role",
-                        "metric",
-                        "value",
-                        "status",
-                        "mean_prediction",
-                        "mean_abs_delta_vs_observed",
-                    )
-                    if item_key in item
-                }
-                for item in list(evidence.get(key) or [])[:3]
-            ]
-            for key in ("top_watch_variables", "key_observation_variables")
-            if include_auxiliary_variables and evidence.get(key)
-        }
+        compact["evidence"] = _compact_watch_variables(
+            evidence,
+            include_auxiliary_variables=include_auxiliary_variables,
+        )
         if evidence.get("boundary_application_evidence"):
-            compact_evidence["boundary_application_evidence"] = [
-                {
-                    key: item[key]
-                    for key in (
+            compact["evidence"]["boundary_application_evidence"] = [
+                _select_fields(
+                    item,
+                    (
                         "variable",
                         "mode",
                         "requested_value",
                         "input_values_applied",
                         "verified",
-                    )
-                    if key in item
-                }
+                    ),
+                )
                 for item in evidence.get("boundary_application_evidence") or []
             ]
-        task_resolution = dict(output.get("task_resolution") or {})
-        compact_resolution = {
-            key: task_resolution[key]
-            for key in (
+        compact["task_resolution"] = _select_fields(
+            compact["task_resolution"],
+            (
                 "resolved_attention_variable_count",
                 "resolved_output_variable_count",
                 "unresolved_attention_targets",
                 "unresolved_output_state_variables",
                 "applied_boundary_conditions",
-            )
-            if key in task_resolution
-        }
-        provenance = dict(output.get("provenance") or {})
-        compact_provenance = {
-            key: provenance[key]
-            for key in ("checkpoint_id", "forecast_mode", "device")
-            if key in provenance
-        }
-        return {
-            "success": output.get("success") is True,
-            "task_resolution": compact_resolution,
-            "prediction": compact_prediction,
-            "verification": compact_verification,
-            "evidence": compact_evidence,
-            "provenance": compact_provenance,
-        }
+            ),
+        )
+        compact["provenance"] = _select_fields(
+            compact["provenance"], ("checkpoint_id", "forecast_mode", "device")
+        )
+        compact.pop("risk_level", None)
+        compact.pop("manual_intervention_label", None)
+        compact.pop("dispatch_recommendation", None)
+        return compact
 
 DEFAULT_PROJECTOR = TeacherTraceProjector()
 
@@ -907,5 +825,4 @@ __all__ = [
     "TeacherTraceProjector",
     "export_trace_tools",
     "final_answer",
-    "sanitize_tool_output",
 ]

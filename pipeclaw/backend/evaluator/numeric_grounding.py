@@ -18,6 +18,7 @@ from .quality_references import (
     CASE_IDENTIFIER_NUMBER,
     numeric_claim_values,
     time_values_in_minutes,
+    walk_numeric_values,
 )
 from .quality_context import trusted_conversation_context
 
@@ -57,10 +58,9 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
                 per_line_counts[pipeline] = per_line_counts.get(pipeline, 0) + 1
         except csv.Error:
             continue
-        meta: List[tuple] = sorted([(line, total, count) for line, (total, count) in zip(per_line_sums.keys(), zip(per_line_sums.values(), per_line_counts.values()))])
-        for line, total, count in meta:
+        for line, total in sorted(per_line_sums.items()):
             totals.append(round(total, 6))
-            totals.append(float(count))
+            totals.append(float(per_line_counts[line]))
     return totals
 
 
@@ -283,16 +283,11 @@ def _number_is_deterministically_derived(value: float, supported: List[float]) -
 
 
 def _numbers_in_value(value: Any) -> List[float]:
-    if isinstance(value, bool) or value is None:
-        return []
-    if isinstance(value, (int, float)):
-        return [float(value)]
-    if isinstance(value, str):
-        values = numeric_claim_values(value)
-        values.extend(float(match.group(1)) for match in CASE_IDENTIFIER_NUMBER.finditer(value))
+    def leaf(text: str) -> List[float]:
+        values = numeric_claim_values(text)
+        values.extend(
+            float(match.group(1)) for match in CASE_IDENTIFIER_NUMBER.finditer(text)
+        )
         return values
-    if isinstance(value, dict):
-        return [number for item in value.values() for number in _numbers_in_value(item)]
-    if isinstance(value, list):
-        return [number for item in value for number in _numbers_in_value(item)]
-    return []
+
+    return walk_numeric_values(value, leaf)

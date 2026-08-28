@@ -5,12 +5,23 @@ import hashlib
 import json
 import logging
 import os
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_MAPPING_CSV = (
+    BACKEND_ROOT.parents[1]
+    / "pipeFormer"
+    / "data"
+    / "mock_lifecycle"
+    / "static"
+    / "mock_lifecycle"
+    / "index_variable_mapping.csv"
+)
+DEFAULT_SPLIT_SEED = "pipeclaw-lifecycle-v1"
 
 from pipeclaw.backend.grounding.decision_trace_state import (
     VerifiedDecisionState,
@@ -39,18 +50,14 @@ from pipeclaw.backend.grounding.evidence.tool import (
 )
 from pipeclaw.backend.grounding.evidence.topology import topology_summary_from_tool_outputs
 from pipeclaw.backend.evaluator.scorer import NativeTraceEvaluator, apply_quality_aliases
-from pipeclaw.backend.pipeline.io_utils import write_json
 from pipeclaw.backend.pipeline.scenario_preflight import validate_scenario_sources
 from pipeclaw.backend.pipeline.teacher_trace_store import (
     TeacherTraceStore,
 )
-from pipeclaw.backend.task1.trace_history import (
-    build_history_turn as _build_history_turn,
-)
+from pipeclaw.backend.task1.trace_history import build_history_turn
 from pipeclaw.backend.task1.trace_projection import (
     export_trace_tools,
     final_answer,
-    sanitize_tool_output,
 )
 from pipeclaw.backend.task1.trace_export import write_split_records
 from pipeclaw.backend.task1.trace_sources import (
@@ -63,21 +70,12 @@ from pipeclaw.backend.task1.trace_sources import (
 
 logger = logging.getLogger("teacher_trace")
 
-# Legacy imports remain valid while in-tree consumers use the focused support
-# modules directly.
-build_history_turn = _build_history_turn
 
-
-def backend_root() -> Path:
-    """Locate ``pipeclaw/backend``, which is this module's *parent* package.
-
-    This file lives in ``pipeclaw/backend/task1/``, so ``__file__.parent`` is
-    ``task1`` rather than the backend root.  Every data default below
-    (``pipeclaw_data``, ``generated_teacher_traces``, ``.env``, ``.openclaw``)
-    resolves against the backend directory, so returning ``task1`` silently
-    pointed all of them at directories that do not exist.
-    """
-    return BACKEND_ROOT
+def _ensure_applied_disturbance_disclosure(
+    answer: str, question: str, contract: Dict[str, Any]
+) -> str:
+    del question
+    return finalize_applied_disturbance_disclosure(answer, contract)
 
 
 def configure_logging(level_name: str) -> None:
@@ -108,7 +106,7 @@ def agent_turn_message(
     question: str,
     history: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    del history  # Prior verified state is injected by the runtime state manager.
+    del history
     description = str(scenario.get("scenario_description") or "").strip()
     parts = []
     if description:
@@ -121,25 +119,16 @@ def agent_turn_message(
 
 
 def load_backend_env() -> None:
-    env_path = backend_root() / ".env"
+    env_path = BACKEND_ROOT / ".env"
     if not env_path.exists():
         return
-    try:
-        from dotenv import load_dotenv
-    except ModuleNotFoundError:
-        for line in env_path.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            key = key.removeprefix("export ").strip()
-            os.environ.setdefault(key, value.strip().strip("'\""))
-    else:
-        load_dotenv(env_path, override=False)
+    from dotenv import load_dotenv
+
+    load_dotenv(env_path, override=False)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    root = backend_root()
+    root = BACKEND_ROOT
     parser = argparse.ArgumentParser(description="Run PipeClaw and export teacher_trace records.")
     parser.add_argument(
         "--scenario-file",
@@ -175,20 +164,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=root / "generated_teacher_traces" / "splits",
         help="Directory for scenario-isolated train/valid/test turn JSONL files.",
     )
-    parser.add_argument(
-        "--mapping-csv",
-        type=Path,
-        default=root.parents[1] / "pipeFormer" / "data" / "mock_lifecycle" / "static" / "mock_lifecycle" / "index_variable_mapping.csv",
-        help="Active PipeFormer mapping used for scenario-variable preflight.",
-    )
-    parser.add_argument(
-        "--preflight-output",
-        type=Path,
-        default=None,
-        help="Optional JSON path for preflight diagnostics; validation always runs.",
-    )
     parser.add_argument("--preflight-only", action="store_true")
-    parser.add_argument("--split-seed", default="pipeclaw-lifecycle-v1")
     parser.add_argument(
         "--force",
         action="store_true",
@@ -211,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
 DEFAULT_NATIVE_EVALUATOR = NativeTraceEvaluator()
 
 
-def _build_teacher_record(
+def build_teacher_record(
     scenario: Dict[str, Any],
     question: str,
     trace: Dict[str, Any],
@@ -292,30 +268,24 @@ def _build_teacher_record(
                 **dict(item["projection"].get(field) or {}),
             }
 
-        parsed_task = {
-            "candidate_forecasts": [
-                candidate_projection(item, "parsed_task")
-                for item in pipeformer_results
-            ]
+        projected_fields = {
+            field: {
+                "candidate_forecasts": [
+                    candidate_projection(item, field)
+                    for item in pipeformer_results
+                ]
+            }
+            for field in (
+                "parsed_task",
+                "prediction_summary",
+                "constraint_check",
+                "evidence",
+            )
         }
-        prediction_summary = {
-            "candidate_forecasts": [
-                candidate_projection(item, "prediction_summary")
-                for item in pipeformer_results
-            ]
-        }
-        constraint_check = {
-            "candidate_forecasts": [
-                candidate_projection(item, "constraint_check")
-                for item in pipeformer_results
-            ]
-        }
-        evidence = {
-            "candidate_forecasts": [
-                candidate_projection(item, "evidence")
-                for item in pipeformer_results
-            ]
-        }
+        parsed_task = projected_fields["parsed_task"]
+        prediction_summary = projected_fields["prediction_summary"]
+        constraint_check = projected_fields["constraint_check"]
+        evidence = projected_fields["evidence"]
         risk_level = grounding_contract.get("worst_case_risk_level")
         manual_intervention_label = grounding_contract.get(
             "worst_case_intervention_label"
@@ -342,25 +312,9 @@ def _build_teacher_record(
         evidence["topology_summary"] = topology_summary
     decision_summary = dict(grounding_contract.get("decision_summary") or {})
     fallback_applied = False
-    answer_quality_flag, quality_issues = evaluate_answer_quality(
-        answer=answer,
-        question=question,
-        pipeformer=pipeformer,
-        trace_status=trace.get("status"),
-        pipeformer_call_count=pipeformer_call_count,
-        pipeformer_outputs=pipeformer_outputs,
-        conversation_context=conversation_context,
-        tool_outputs=grounded_tool_outputs,
-        record_evidence=evidence,
-        grounding_contract=grounding_contract,
-    )
-    if (
-        grounding_contract.get("answer_mode") == "dispatch_comparison"
-        and quality_issues
-    ):
-        fallback_answer = grounded_fallback_answer(question, grounding_contract)
-        fallback_flag, fallback_issues = evaluate_answer_quality(
-            answer=fallback_answer,
+    def score_answer(answer_text: str) -> tuple[Any, list[Any]]:
+        return evaluate_answer_quality(
+            answer=answer_text,
             question=question,
             pipeformer=pipeformer,
             trace_status=trace.get("status"),
@@ -371,6 +325,14 @@ def _build_teacher_record(
             record_evidence=evidence,
             grounding_contract=grounding_contract,
         )
+
+    answer_quality_flag, quality_issues = score_answer(answer)
+    if (
+        grounding_contract.get("answer_mode") == "dispatch_comparison"
+        and quality_issues
+    ):
+        fallback_answer = grounded_fallback_answer(question, grounding_contract)
+        fallback_flag, fallback_issues = score_answer(fallback_answer)
         if len(fallback_issues) < len(quality_issues):
             answer = fallback_answer
             answer_quality_flag = fallback_flag
@@ -401,18 +363,18 @@ def _build_teacher_record(
         "scenario_type": scenario.get("scenario_type"),
         "split": split,
         "answer_mode": grounding_contract.get("answer_mode"),
-        "grounding_contract": sanitize_tool_output(grounding_contract),
-        "decision_summary": sanitize_tool_output(decision_summary),
-        "conversation_context": sanitize_tool_output(conversation_context or []),
-        "state_before": sanitize_tool_output(state_before),
-        "recent_turns": sanitize_tool_output(recent_turns),
+        "grounding_contract": deepcopy(grounding_contract),
+        "decision_summary": deepcopy(decision_summary),
+        "conversation_context": deepcopy(conversation_context or []),
+        "state_before": deepcopy(state_before),
+        "recent_turns": deepcopy(recent_turns),
         "user_input": question,
-        "parsed_task": sanitize_tool_output(parsed_task),
+        "parsed_task": deepcopy(parsed_task),
         "tool_calls": tool_calls,
         "tool_outputs": tool_outputs,
-        "prediction_summary": sanitize_tool_output(prediction_summary),
-        "constraint_check": sanitize_tool_output(constraint_check),
-        "evidence": sanitize_tool_output(evidence),
+        "prediction_summary": deepcopy(prediction_summary),
+        "constraint_check": deepcopy(constraint_check),
+        "evidence": deepcopy(evidence),
         "risk_level": risk_level,
         "manual_intervention_label": manual_intervention_label,
         "dispatch_recommendation": dispatch_recommendation,
@@ -422,7 +384,7 @@ def _build_teacher_record(
         "quality_issues": quality_issues,
     }
     if grounding_contract.get("decision_policy"):
-        record["decision_policy"] = sanitize_tool_output(
+        record["decision_policy"] = deepcopy(
             grounding_contract["decision_policy"]
         )
     if disclosure_repair_applied:
@@ -492,8 +454,9 @@ def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, 
             key=lambda value: hashlib.sha256(f"{seed}:{scenario_type}:{value}".encode("utf-8")).hexdigest(),
         )
         count = len(ordered)
-        valid_count = max(1, round(count * 0.1)) if count >= 3 else 0
-        test_count = max(1, round(count * 0.1)) if count >= 3 else 0
+        holdout_count = max(1, round(count * 0.1)) if count >= 3 else 0
+        valid_count = holdout_count
+        test_count = holdout_count
         train_end = count - valid_count - test_count
         for index, scenario_id in enumerate(ordered):
             result[scenario_id] = "train" if index < train_end else "valid" if index < train_end + valid_count else "test"
@@ -528,7 +491,7 @@ def run_backend_session(
         agent_id=args.agent_id,
         session_id=runtime_session_id,
         enable_skills=False,
-        workspace_root_base=backend_root() / ".openclaw" / "tt_runs" / run_namespace,
+        workspace_root_base=BACKEND_ROOT / ".openclaw" / "tt_runs" / run_namespace,
     )
     orchestrator.verified_state_manager.commit(
         runtime_session_id,
@@ -584,7 +547,7 @@ def run_backend_session(
                 AgentChatRequest(
                     agent_id=args.agent_id,
                     session_id=runtime_session_id,
-                    message=agent_turn_message(scenario, question, history),
+                    message=agent_turn_message(scenario, question),
                 ),
                 answer_validator=validate_answer,
             )
@@ -594,7 +557,7 @@ def run_backend_session(
             trace = _turn_trace(full_trace, message_count, tool_count)
             message_count = len(full_trace.get("messages") or [])
             tool_count = len(full_trace.get("tool_calls") or [])
-            record = _build_teacher_record(
+            record = build_teacher_record(
                 scenario,
                 question,
                 trace,
@@ -604,7 +567,7 @@ def run_backend_session(
                 split=split,
             )
             records.append(record)
-            history.append(_build_history_turn(record))
+            history.append(build_history_turn(record))
             logger.info("Turn finished: scenario=%s session=%s turn=%d quality=%s", scenario_id, source_session_id, turn_id, record["quality_flag"])
             if trace.get("status") != "completed":
                 errors.append(
@@ -669,6 +632,7 @@ class _GenerationExecution:
     records: List[Dict[str, Any]]
     session_records: List[Dict[str, Any]]
     skipped_scenarios: int
+    failed_session_count: int
 
 
 @dataclass(frozen=True)
@@ -809,11 +773,11 @@ class TeacherTraceGenerator:
         )
         preflight = validate_scenario_sources(
             preflight_sources or list(scope.selected_sources),
-            self.args.mapping_csv,
+            DEFAULT_MAPPING_CSV,
         )
         selected_preflight = validate_scenario_sources(
             list(scope.selected_sources),
-            self.args.mapping_csv,
+            DEFAULT_MAPPING_CSV,
         )
         preflight["selected_data_files"] = {
             "required_data_file_count": selected_preflight["required_data_file_count"],
@@ -833,8 +797,6 @@ class TeacherTraceGenerator:
         preflight["replacement_mode"] = scope.replacement_mode
         preflight["existing_record_count"] = len(existing_records)
         preflight["unavailable_existing_scenarios"] = missing_preflight_pairs
-        if self.args.preflight_output is not None:
-            write_json(self.args.preflight_output, preflight, force=True)
         return preflight, selected_preflight
 
     @staticmethod
@@ -878,7 +840,7 @@ class TeacherTraceGenerator:
         run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         records: List[Dict[str, Any]] = []
         session_records: List[Dict[str, Any]] = []
-        split_map = scenario_split_map(list(scope.all_scenarios), self.args.split_seed)
+        split_map = scenario_split_map(list(scope.all_scenarios), DEFAULT_SPLIT_SEED)
         existing_sample_ids = {
             str(record.get("sample_id"))
             for record in existing_records
@@ -923,7 +885,12 @@ class TeacherTraceGenerator:
                 )
                 records.extend(turn_records)
                 session_records.append(session_record)
-        return _GenerationExecution(records, session_records, skipped_scenarios)
+        failed_session_count = sum(
+            not bool(item.get("complete")) for item in session_records
+        )
+        return _GenerationExecution(
+            records, session_records, skipped_scenarios, failed_session_count
+        )
 
     def _merge_records(
         self,
@@ -932,9 +899,7 @@ class TeacherTraceGenerator:
         existing_session_records: List[Dict[str, Any]],
         execution: _GenerationExecution,
     ) -> _MergedGeneration:
-        failed_sessions = sum(
-            not bool(item.get("complete")) for item in execution.session_records
-        )
+        failed_sessions = execution.failed_session_count
         if scope.replacement_mode:
             if failed_sessions:
                 raise RuntimeError(
@@ -1021,9 +986,7 @@ class TeacherTraceGenerator:
             merged.records,
             force=True,
         )
-        failed_sessions = sum(
-            not bool(item.get("complete")) for item in execution.session_records
-        )
+        failed_sessions = execution.failed_session_count
         total_failed_sessions = sum(
             not bool(item.get("complete")) for item in merged.session_records
         )

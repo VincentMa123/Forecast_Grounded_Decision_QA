@@ -12,8 +12,6 @@ from pipeclaw.backend.grounding.evidence.tool import (
     classify_tool_evidence,
     requested_artifacts,
 )
-from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
-
 from pipeclaw.backend.evaluator.numeric_grounding import (
     numeric_claims_are_grounded,
     numeric_grounding_evidence,
@@ -22,44 +20,31 @@ from pipeclaw.backend.evaluator.quality_references import numeric_claim_values
 
 from ..models import EvaluationContext, MetricResult
 from .common import (
-    CANONICAL_METRIC_NAMES,
     PIPEFORMER_TOOL,
+    calls,
     checkpoint_inference_used,
     disturbance_was_applied,
+    forecast_registry_order,
     horizon_is_consistent,
     mapping,
     metric,
+    ordered_canonical_metrics,
+    output_wrappers,
     requested_constraints_executed,
     sequence,
+    task_views,
     verification_is_complete,
 )
 from .evidence import evidence_consistency
 
 
 REQUIRED_RECORD_FIELDS = (
-    "sample_id",
-    "scenario_id",
-    "scenario_type",
-    "user_input",
-    "parsed_task",
-    "tool_calls",
-    "tool_outputs",
-    "prediction_summary",
-    "constraint_check",
-    "evidence",
-    "risk_level",
-    "manual_intervention_label",
-    "dispatch_recommendation",
-    "final_answer",
-    "quality_flag",
+    "sample_id", "scenario_id", "scenario_type", "user_input", "parsed_task",
+    "tool_calls", "tool_outputs", "prediction_summary", "constraint_check",
+    "evidence", "risk_level", "manual_intervention_label", "dispatch_recommendation",
+    "final_answer", "quality_flag",
 )
-
-TEACHER_TRACE_REQUIRED_FIELDS = (
-    "sample_id", "scenario_id", "scenario_type", "state_before", "recent_turns",
-    "user_input", "parsed_task", "tool_calls", "tool_outputs", "prediction_summary",
-    "constraint_check", "evidence", "risk_level", "manual_intervention_label",
-    "dispatch_recommendation", "final_answer", "quality_flag",
-)
+TEACHER_TRACE_REQUIRED_FIELDS = (*REQUIRED_RECORD_FIELDS[:3], "state_before", "recent_turns", *REQUIRED_RECORD_FIELDS[3:])
 TEACHER_TRACE_EXPECTED_TYPES = {
     "sample_id": str, "scenario_id": str, "scenario_type": str, "state_before": dict,
     "recent_turns": list, "user_input": str, "parsed_task": dict, "tool_calls": list,
@@ -83,34 +68,18 @@ RAISE_COMPRESSOR_LOAD = re.compile(
 )
 
 
-def _calls(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_calls")) if isinstance(item, Mapping)]
-
-
-def _output_wrappers(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_outputs")) if isinstance(item, Mapping)]
-
-
-def _task_views(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    parsed = mapping(record.get("parsed_task"))
-    candidates = sequence(parsed.get("candidate_forecasts"))
-    if candidates:
-        return [item for item in candidates if isinstance(item, Mapping)]
-    return [parsed] if parsed else []
-
-
 def _pipeformer_outputs(
     record: Mapping[str, Any],
     referenced_call_ids: Sequence[str],
 ) -> list[Mapping[str, Any]]:
     forecast_call_ids = {
         str(call.get("tool_call_id") or "")
-        for call in _calls(record)
+        for call in calls(record)
         if call.get("name") == PIPEFORMER_TOOL
     }
     wrappers = [
         item
-        for item in _output_wrappers(record)
+        for item in output_wrappers(record)
         if item.get("name") == PIPEFORMER_TOOL
         or str(item.get("tool_call_id") or "") in forecast_call_ids
     ]
@@ -149,32 +118,12 @@ def _task_is_complete(task: Mapping[str, Any]) -> bool:
 
 
 def _registry_ordering(record: Mapping[str, Any]) -> tuple[bool, list[str]]:
-    calls = _calls(record)
+    tool_calls = calls(record)
     outputs_by_id = {
         str(item.get("tool_call_id") or ""): item.get("output")
-        for item in _output_wrappers(record)
+        for item in output_wrappers(record)
     }
-    forecast_indices = [
-        index for index, call in enumerate(calls) if call.get("name") == PIPEFORMER_TOOL
-    ]
-    unauthorized: list[str] = []
-    for index in forecast_indices:
-        completed = [
-            {
-                "tool_call_id": str(call.get("tool_call_id") or ""),
-                "name": call.get("name"),
-                "arguments": dict(mapping(call.get("arguments"))),
-                "output": outputs_by_id.get(str(call.get("tool_call_id") or "")),
-            }
-            for call in calls[:index]
-        ]
-        result = authorize_forecast_registry(
-            dict(mapping(calls[index].get("arguments"))),
-            completed,
-        )
-        if not result["authorized"]:
-            unauthorized.append(str(calls[index].get("tool_call_id") or ""))
-    return bool(forecast_indices) and not unauthorized, unauthorized
+    return forecast_registry_order(tool_calls, outputs_by_id)
 
 
 def _record_contract(
@@ -275,7 +224,7 @@ def _pipeformer_checks(
     maximum_chars: int,
 ) -> list[MetricResult]:
     record = context.record
-    tasks = _task_views(record)
+    tasks = task_views(record)
     referenced_ids = [
         str(task.get("tool_call_id")) for task in tasks if task.get("tool_call_id")
     ]
@@ -353,14 +302,7 @@ def _pipeformer_checks(
             maximum_chars=maximum_chars,
         ),
     ]
-    present = {item.name for item in metrics}
-    metrics.extend(
-        metric(context, name, applicable=False)
-        for name in CANONICAL_METRIC_NAMES
-        if name not in present
-    )
-    by_name = {item.name: item for item in metrics}
-    return [by_name[name] for name in CANONICAL_METRIC_NAMES]
+    return ordered_canonical_metrics(context, metrics)
 
 
 def _generic_checks(
@@ -371,8 +313,8 @@ def _generic_checks(
 ) -> list[MetricResult]:
     record = context.record
     outputs = attach_tool_arguments(
-        [dict(item) for item in _output_wrappers(record)],
-        [dict(item) for item in _calls(record)],
+        [dict(item) for item in output_wrappers(record)],
+        [dict(item) for item in calls(record)],
     )
     requested = requested_artifacts(str(record.get("user_input") or ""))
     assessments = [classify_tool_evidence(item, requested=requested) for item in outputs]
@@ -423,19 +365,11 @@ def _generic_checks(
             maximum_chars=maximum_chars,
         ),
     ]
-    present = {item.name for item in metrics}
-    metrics.extend(
-        metric(
-            context,
-            name,
-            applicable=False,
-            teacher_variant="generic",
-        )
-        for name in CANONICAL_METRIC_NAMES
-        if name not in present
+    return ordered_canonical_metrics(
+        context,
+        metrics,
+        teacher_variant="generic",
     )
-    by_name = {item.name: item for item in metrics}
-    return [by_name[name] for name in CANONICAL_METRIC_NAMES]
 
 
 def evaluate_teacher_checks(
@@ -454,7 +388,7 @@ def evaluate_teacher_checks(
     else:
         issues = tuple(context.hard_issues)
     has_pipeformer = any(
-        call.get("name") == PIPEFORMER_TOOL for call in _calls(context.record)
+        call.get("name") == PIPEFORMER_TOOL for call in calls(context.record)
     )
     if has_pipeformer:
         metrics = _pipeformer_checks(

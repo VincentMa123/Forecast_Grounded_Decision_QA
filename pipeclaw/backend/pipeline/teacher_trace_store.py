@@ -195,7 +195,7 @@ class TeacherTraceStore:
             if prior != split:
                 raise ValueError(
                     f"Scenario {scenario_id!r} appears in both {prior!r} and {split!r}; "
-                    "use the same --split-seed or regenerate with --force."
+                    "regenerate with --force."
                 )
 
     @staticmethod

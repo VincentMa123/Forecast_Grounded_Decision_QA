@@ -129,9 +129,9 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
     answer = context.answer
     question = context.question
     pipeformer = context.pipeformer
-    conversation_context = list(context.conversation_context)
-    tool_outputs = list(context.tool_outputs)
-    record_evidence = dict(context.record_evidence)
+    conversation_context = context.conversation_context
+    tool_outputs = context.tool_outputs
+    record_evidence = context.record_evidence
     grounding_evidence = context.grounding_evidence
     issues: List[str] = []
     if not answer.strip():
@@ -260,7 +260,7 @@ def evaluate_answer_quality(
     grounding_contract: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, List[str]]:
     outputs = tool_outputs or []
-    context = build_quality_context(
+    issues = answer_quality_issues(
         answer=answer,
         question=question,
         pipeformer=pipeformer,
@@ -268,7 +268,6 @@ def evaluate_answer_quality(
         tool_outputs=outputs,
         record_evidence=record_evidence,
     )
-    issues = _answer_quality_issues(context)
     contract = (
         dict(grounding_contract)
         if grounding_contract is not None
@@ -568,4 +567,3 @@ def _has_unsupported_evidence_description(
             ):
                 return True
     return False
-

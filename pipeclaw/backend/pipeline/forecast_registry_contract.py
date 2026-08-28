@@ -1,4 +1,3 @@
-"""Pure preconditions for registry-grounded PipeFormer forecast calls."""
 from __future__ import annotations
 
 from collections.abc import Mapping

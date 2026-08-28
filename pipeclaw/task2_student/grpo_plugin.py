@@ -1,24 +1,3 @@
-"""GRPO external plugin: pipeclaw python-scenario scheduler + rule reward.
-
-Registered via ms-swift ``--external_plugins``:
-- ``multi_turns['python_scenario_scheduler']``: drives one agent episode per
-  request (read_file/write_file/edit_file/run_command through the real
-  tools in the backend workspace runner). Each request gets its own
-  workspace and its own dispatcher: a GRPO group runs generations
-  concurrently, so no completed-tool history is ever shared or reset
-  mid-episode, and ``set_decision_policy`` quoting is checked against the
-  request's own user message.
-- ``orms['python_episode_reward']``: deterministic reward = backend evaluator
-  overall_score/hard gate + execution stats (compile, exit code, thrash,
-  malformed JSON). Mirrors scripts/pass_at_k.composite_reward so the Phase-0
-  gate measures exactly what the RL stage optimizes.
-
-preflight (run BEFORE the first real run; upstream refs here are ms-swift 'main',
-this env pins ms-swift==4.4.2):
-  python -c "from swift.rewards import ORM, orms; from swift.rollout.multi_turn import MultiTurnScheduler, multi_turns; print('ok')"
-  swift rlhf <config> --rlhf_type grpo --max_steps 1   # fails fast if names differ
-"""
-
 from __future__ import annotations
 
 import re
@@ -34,7 +13,8 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 from pipeclaw.task2_student.path_contract import canonicalize_recorded_tool_arguments
-from pipeclaw.task2_student.rollout.runner import _execution_success, _schema_valid
+from pipeclaw.task2_student.rollout.models import RolloutResult
+from pipeclaw.task2_student.rollout.runner import execution_success, schema_valid
 from pipeclaw.task2_student.rollout.scenarios import (ScenarioPolicy, build_dispatcher)
 from pipeclaw.task2_student.rollout.tools import append_tool_exchange, parse_tool_calls
 from pipeclaw.task2_student.scripts.pass_at_k import composite_reward, episode_stats
@@ -131,7 +111,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
     ) -> Dict[str, Any]:
         state = self._state(infer_request)
         text, calls, errors = parse_tool_calls(getattr(response_choice, "message", response_choice))
-        del errors  # json_errors are extended once per response in on_turn_end
+        state["_last_parse"] = (id(response_choice), text, calls, errors)
         # ms-swift already appended this response as a raw assistant message;
         # replace it with its parsed text so history matches the offline runner.
         if infer_request.messages and infer_request.messages[-1].get("role") == "assistant":
@@ -167,8 +147,8 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                     "arguments": canonicalize_recorded_tool_arguments(
                         call.name, normalized.arguments
                     ),
-                    "execution_success": _execution_success(tool_result),
-                    "schema_valid": _schema_valid(tool_result),
+                    "execution_success": execution_success(tool_result),
+                    "schema_valid": schema_valid(tool_result),
                 }
             )
             state["tool_outputs"].append(
@@ -189,7 +169,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         state = self._state(infer_request)
         if super().check_finished(infer_request, response_choice, current_turn):
             state["trace_status"] = "max_turns_exceeded"
-        elif state["_last_parse"][1]:
+        elif state["_last_parse"][2]:
             return False
         self._cleanup_workspace(state)
         # swift snapshots rollout_infos before the finished branch runs; the
@@ -202,12 +182,16 @@ class PythonScenarioScheduler(MultiTurnScheduler):
     ) -> Dict[str, Any]:
         data = getattr(infer_request, "data_dict", {}) or {}
         state = self._state(infer_request)
-        # Single parse point per response: swift calls this BEFORE check_finished,
-        # so the snapshot the ORM reads must already carry the terminal fields.
-        text, calls, errors = parse_tool_calls(
-            getattr(response_choice, "message", None) or response_choice
-        )
-        state["_last_parse"] = (text, calls, errors)
+        # Single parse point per response: reuse step()'s parse, re-parsing only
+        # when swift skipped step() (the capped turn).
+        last = state.get("_last_parse")
+        if last is not None and last[0] == id(response_choice):
+            text, calls, errors = last[1:]
+        else:
+            text, calls, errors = parse_tool_calls(
+                getattr(response_choice, "message", None) or response_choice
+            )
+        state["_last_parse"] = (id(response_choice), text, calls, errors)
         # dispatch the capped turn's calls BEFORE building the snapshot: swift
         # skips step() on the capped turn, but the frame merges AFTER this hook.
         capped = (
@@ -279,18 +263,16 @@ class PythonEpisodeReward(ORM):
 def _score_episode(info: Mapping[str, Any], reference: Any, completion: str) -> float:
     from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
 
-    rollout = {
-        "sample_id": info.get("sample_id") or "",
-        "scenario_id": info.get("scenario_id") or "",
-        "scenario_type": info.get("scenario_type") or "openclaw",
-        "tool_calls": list(info.get("tool_calls") or []),
-        "tool_outputs": list(info.get("tool_outputs") or []),
-        "final_answer": str(info.get("final_answer") or ""),
-        "trace_status": info.get("trace_status") or "",
-        "json_errors": list(info.get("json_errors") or []),
-        "messages": [],
-        "turns": 0,
-    }
+    rollout = RolloutResult(
+        sample_id=info.get("sample_id") or "",
+        scenario_id=info.get("scenario_id") or "",
+        scenario_type=info.get("scenario_type") or "openclaw",
+        tool_calls=list(info.get("tool_calls") or []),
+        tool_outputs=list(info.get("tool_outputs") or []),
+        final_answer=str(info.get("final_answer") or ""),
+        trace_status=info.get("trace_status") or "",
+        json_errors=list(info.get("json_errors") or []),
+    ).to_dict()
     report = evaluate(
         rollout, profile=EvaluationProfile.AUTONOMOUS_ROLLOUT, reference=reference
     )

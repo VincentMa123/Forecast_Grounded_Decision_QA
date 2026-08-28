@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
 from .schemas import ForecastRow
-from .variable_registry import VariableRegistry, load_variable_registry, normalize_task_variables
+from .variable_registry import VariableRegistry, normalize_task_variables
 
 
 logger = logging.getLogger(__name__)
@@ -798,18 +798,9 @@ class PipeFormerInferenceEngine:
 
     def __init__(
         self,
-        environment_or_config: ResolvedPipeFormerEnvironment | PipeFormerInferenceConfig,
+        environment: ResolvedPipeFormerEnvironment,
     ) -> None:
-        self.config = (
-            environment_or_config
-            if isinstance(environment_or_config, PipeFormerInferenceConfig)
-            else None
-        )
-        self.environment = (
-            resolve_pipeformer_environment(environment_or_config)
-            if isinstance(environment_or_config, PipeFormerInferenceConfig)
-            else environment_or_config
-        )
+        self.environment = environment
 
     def forecast(self, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
         return _run_checkpoint_inference(parsed_task=parsed_task, environment=self.environment)
@@ -827,14 +818,16 @@ def run_checkpoint_inference(
 ) -> Dict[str, Any]:
     """Compatibility wrapper for the configured inference engine."""
     return PipeFormerInferenceEngine(
-        PipeFormerInferenceConfig(
-            checkpoint_dir=checkpoint_dir,
-            pipeformer_root=pipeformer_root,
-            data_dir=data_dir,
-            static_dir=static_dir,
-            mapping_path=mapping_path,
-            device=device,
-            disturbance_timing_mode=disturbance_timing_mode,
+        resolve_pipeformer_environment(
+            PipeFormerInferenceConfig(
+                checkpoint_dir=checkpoint_dir,
+                pipeformer_root=pipeformer_root,
+                data_dir=data_dir,
+                static_dir=static_dir,
+                mapping_path=mapping_path,
+                device=device,
+                disturbance_timing_mode=disturbance_timing_mode,
+            )
         )
     ).forecast(parsed_task)
 

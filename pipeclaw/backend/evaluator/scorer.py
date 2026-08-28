@@ -34,16 +34,9 @@ _GENERIC_LEGACY_NAMES = {
     "record_contract": "compact_record_contract",
 }
 _BOOLEAN_ALIASES = {
-    "parsed_task_correct": "task_parsing",
-    "forecast_tool_succeeded": "tool_call",
-    "checkpoint_inference_used": "checkpoint_inference",
-    "disturbance_applied_correctly": "disturbance_application",
-    "forecast_horizon_consistent": "forecast_horizon",
-    "requested_constraints_executed": "constraint_execution",
-    "verification_complete": "verification_completeness",
-    "registry_search_precedes_forecast": "registry_ordering",
-    "answer_grounded": "evidence_consistency",
-    "compact_record_contract": "record_contract",
+    legacy: canonical
+    for canonical, legacy in _PIPEFORMER_LEGACY_NAMES.items()
+    if legacy != canonical
 }
 
 

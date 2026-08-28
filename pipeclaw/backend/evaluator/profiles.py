@@ -19,7 +19,6 @@ class MetricPolicy:
 
 @dataclass(frozen=True)
 class ProfilePolicy:
-    profile: EvaluationProfile
     minimum_score: float | None
     metrics: Mapping[str, MetricPolicy]
     critical_metrics: frozenset[str] = frozenset()
@@ -118,19 +117,16 @@ def _metric_map(
 
 
 _TEACHER_PIPEFORMER_POLICY = ProfilePolicy(
-    profile=EvaluationProfile.TEACHER_TRACE,
     minimum_score=DEFAULT_TEACHER_MINIMUM_SCORE,
     metrics=_metric_map(_TEACHER_PIPEFORMER_WEIGHTS, _TEACHER_PIPEFORMER_CRITICAL),
     critical_metrics=_TEACHER_PIPEFORMER_CRITICAL,
 )
 _TEACHER_GENERIC_POLICY = ProfilePolicy(
-    profile=EvaluationProfile.TEACHER_TRACE,
     minimum_score=DEFAULT_TEACHER_MINIMUM_SCORE,
     metrics=_metric_map(_TEACHER_GENERIC_WEIGHTS, _TEACHER_GENERIC_CRITICAL),
     critical_metrics=_TEACHER_GENERIC_CRITICAL,
 )
 _AUTONOMOUS_POLICY = ProfilePolicy(
-    profile=EvaluationProfile.AUTONOMOUS_ROLLOUT,
     minimum_score=None,
     metrics=MappingProxyType({}),
     critical_metrics=AUTONOMOUS_CRITICAL_METRICS,

@@ -62,31 +62,22 @@ class Task1StatisticsWorkbook:
                 for cell in source_sheet[source_sheet.max_row][1:]:
                     cell.number_format = "0.0%"
 
-        Task1StatisticsWorkbook._distribution_sheet(
-            scenario_sheet,
-            facts["distribution_tables"]["scenario_type_distribution"],
-            "scenario_type",
-        )
-        Task1StatisticsWorkbook._distribution_sheet(
-            task_sheet,
-            facts["distribution_tables"]["task_type_distribution"],
-            "pipeformer_task_type",
-        )
-        Task1StatisticsWorkbook._distribution_sheet(
-            constraint_sheet,
-            facts["distribution_tables"]["constraint_type_distribution"],
-            "constraint_type",
-        )
-        Task1StatisticsWorkbook._distribution_sheet(
-            risk_sheet,
-            facts["distribution_tables"]["risk_level_distribution"],
-            "risk_level",
-        )
-        Task1StatisticsWorkbook._distribution_sheet(
-            intervention_sheet,
-            facts["distribution_tables"]["human_intervention_distribution"],
-            "intervention_label",
-        )
+        for sheet, distribution, label in (
+            (scenario_sheet, "scenario_type_distribution", "scenario_type"),
+            (task_sheet, "task_type_distribution", "pipeformer_task_type"),
+            (constraint_sheet, "constraint_type_distribution", "constraint_type"),
+            (risk_sheet, "risk_level_distribution", "risk_level"),
+            (
+                intervention_sheet,
+                "human_intervention_distribution",
+                "intervention_label",
+            ),
+        ):
+            Task1StatisticsWorkbook._distribution_sheet(
+                sheet,
+                facts["distribution_tables"][distribution],
+                label,
+            )
 
         outcome_sheet.append([
             "constraint_category", "requested", "evaluated", "pass", "warning", "fail",
@@ -126,7 +117,6 @@ class Task1StatisticsWorkbook:
         for row in facts["evidence_rows"]:
             evidence_sheet.append(row)
 
-        check_names = ("schema", "numerical_consistency", "rule_consistency", "dispatch_consistency")
         quality_sheet.append([
             "quality_dimension", "pass", "fail_or_needs_review", "not_applicable",
             "applicable_count", "applicable_pass_rate",
@@ -170,9 +160,14 @@ class Task1StatisticsWorkbook:
             chart.set_categories(Reference(source_sheet, min_col=2, max_col=source_sheet.max_column, min_row=1))
             style_chart(chart, ("4472C4",))
             source_sheet.add_chart(chart, "F2")
-        Task1StatisticsWorkbook._add_bar_chart(scenario_sheet, BarChart, Reference, "Scenario-Type Distribution", 2, "F2")
-        Task1StatisticsWorkbook._add_bar_chart(task_sheet, BarChart, Reference, "PipeFormer Task-Type Distribution", 2, "F2")
-        Task1StatisticsWorkbook._add_bar_chart(constraint_sheet, BarChart, Reference, "Constraint-Type Distribution", 2, "F2")
+        for sheet, title in (
+            (scenario_sheet, "Scenario-Type Distribution"),
+            (task_sheet, "PipeFormer Task-Type Distribution"),
+            (constraint_sheet, "Constraint-Type Distribution"),
+        ):
+            Task1StatisticsWorkbook._add_bar_chart(
+                sheet, BarChart, Reference, title, 2, "F2"
+            )
         if risk_sheet.max_row > 1:
             chart = PieChart()
             chart.title = "Risk-Level Distribution"

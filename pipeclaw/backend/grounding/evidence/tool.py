@@ -50,6 +50,14 @@ class ToolEvidenceAssessment:
         return self.state is ToolEvidenceState.CONTENT_EVIDENCE
 
 
+def tool_result_failed(output: Any) -> bool:
+    return bool(
+        output.get("success") is False
+        or output.get("error")
+        or output.get("exit_code") not in (None, 0)
+    )
+
+
 def requested_artifacts(text: str) -> Tuple[str, ...]:
     return tuple(dict.fromkeys(value.casefold() for value in DATA_FILE_REFERENCE.findall(text)))
 
@@ -133,11 +141,7 @@ def classify_tool_evidence(
             return ToolEvidenceAssessment(ToolEvidenceState.CONTENT_EVIDENCE, "nonempty_tool_result")
         return ToolEvidenceAssessment(ToolEvidenceState.NO_EVIDENCE, "empty_tool_result")
 
-    if (
-        output.get("success") is False
-        or bool(output.get("error"))
-        or output.get("exit_code") not in (None, 0)
-    ):
+    if tool_result_failed(output):
         return ToolEvidenceAssessment(ToolEvidenceState.EXECUTION_FAILED, "tool_execution_failed")
 
     text = "\n".join(
@@ -209,15 +213,8 @@ def requested_data_retrieved(
     requested = set(requested_artifacts(question))
     if not requested:
         return True
-    context = list(conversation_context)
-    verified_artifacts = {
-        str(artifact).casefold()
-        for item in context
-        if item.get("grounding_verified") is True
-        or item.get("tool_evidence_verified") is True
-        for artifact in item.get("evidence_artifacts") or []
-    }
-    for item in context:
+    verified_artifacts = set()
+    for item in conversation_context:
         if not (
             item.get("grounding_verified") is True
             or item.get("tool_evidence_verified") is True
@@ -226,9 +223,12 @@ def requested_data_retrieved(
         summary = dict(item.get("verified_evidence_summary") or {})
         csv_evidence = dict(summary.get("csv_evidence") or {})
         verified_artifacts.update(
-            str(source_file).casefold()
-            for source_file in csv_evidence.get("source_files") or []
-            if source_file
+            str(artifact).casefold()
+            for artifact in [
+                *(item.get("evidence_artifacts") or []),
+                *(csv_evidence.get("source_files") or []),
+            ]
+            if artifact
         )
     unresolved = requested - verified_artifacts
     if not unresolved:

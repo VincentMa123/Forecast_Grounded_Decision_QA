@@ -99,7 +99,7 @@ def expected_applied_disturbance(
         magnitude = prediction.get("disturbance_magnitude_percent")
     try:
         expected = abs(float(magnitude)) * (1.0 if direction == "up" else -1.0)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     if not math.isfinite(expected) or not variable or direction not in {"up", "down"}:
         return None

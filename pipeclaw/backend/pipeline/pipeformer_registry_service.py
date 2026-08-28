@@ -72,7 +72,6 @@ class PipeFormerRegistrySearchService:
             limit = max(1, min(int(filters.pop("limit", 12)), 50))
             variables = registry.search(
                 **filters,
-                limit=max(1, len(registry.by_name)),
             )
             distances = self._topology_distances(attention_targets)
             if attention_targets:

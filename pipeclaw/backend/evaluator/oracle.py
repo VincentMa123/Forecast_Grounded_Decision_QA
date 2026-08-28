@@ -4,18 +4,8 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .checks.common import mapping, normalize, sequence, verification_view
+from .checks.common import mapping, normalize, sequence, task_views, verification_view
 from .models import EvaluationInputError
-
-
-def _task_views(source: Mapping[str, Any]) -> list[dict[str, Any]]:
-    parsed = source.get("parsed_task")
-    candidates = source.get("candidate_forecasts")
-    if not candidates and isinstance(parsed, Mapping):
-        candidates = parsed.get("candidate_forecasts")
-    if sequence(candidates):
-        return [dict(item) for item in sequence(candidates) if isinstance(item, Mapping)]
-    return [dict(parsed)] if isinstance(parsed, Mapping) and parsed else []
 
 
 def _merge_task_fields(
@@ -176,7 +166,7 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(reference, Mapping):
         raise EvaluationInputError("Teacher reference must be a mapping.")
     source = dict(reference)
-    tasks = _task_views(source)
+    tasks = task_views(source)
     outputs = _output_views(source)
     first_output = outputs[0] if outputs else {}
     verification = verification_view(first_output)

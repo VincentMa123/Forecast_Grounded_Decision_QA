@@ -1,25 +1,7 @@
-"""Run prompt-only autonomous rollouts and score them against teacher oracles.
-
-Examples::
-
-    python -m pipeclaw.task2_student.scripts.evaluate_autonomous \
-        --source pipeclaw/task2_student/data/trace_level/test.jsonl \
-        --adapters pipeclaw/task2_student/outputs/qwen35-9b \
-        --output-dir pipeclaw/task2_student/outputs/evaluation/autonomous
-
-Use ``--dry-run`` to inspect the exact PromptBuilder messages and tool schemas
-without loading a model or executing tools.
-
-This module owns argument parsing only.  Rollout execution lives in
-``pipeclaw.task2_student.rollout`` and scoring lives in
-``pipeclaw.backend.evaluator``.
-"""
-
 from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from typing import Sequence
 
 from pipeclaw.task2_student.rollout.suite import evaluate_dataset

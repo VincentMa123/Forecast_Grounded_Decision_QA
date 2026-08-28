@@ -9,7 +9,12 @@ from typing import Any
 
 from ..models import EvaluationContext, MetricResult
 from ..profiles import get_profile_policy
-from .assumptions import inferred_task_fields, prediction_view
+from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
+from .assumptions import (
+    expected_applied_disturbance,
+    inferred_task_fields,
+    prediction_view,
+)
 
 
 PIPEFORMER_TOOL = "run_pipeformer_forecast"
@@ -45,6 +50,42 @@ def mapping(value: Any) -> Mapping[str, Any]:
     return value if isinstance(value, Mapping) else {}
 
 
+def calls(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [item for item in sequence(record.get("tool_calls")) if isinstance(item, Mapping)]
+
+
+def output_wrappers(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    return [item for item in sequence(record.get("tool_outputs")) if isinstance(item, Mapping)]
+
+
+def task_views(record: Mapping[str, Any]) -> list[dict[str, Any]]:
+    parsed = mapping(record.get("parsed_task"))
+    candidates = sequence(record.get("candidate_forecasts")) or sequence(
+        parsed.get("candidate_forecasts")
+    )
+    if candidates:
+        return [dict(item) for item in candidates if isinstance(item, Mapping)]
+    return [dict(parsed)] if parsed else []
+
+
+def ordered_canonical_metrics(
+    context: EvaluationContext,
+    metrics: Sequence[MetricResult],
+    *,
+    teacher_variant: str = "pipeformer",
+    extra: Sequence[MetricResult] = (),
+) -> list[MetricResult]:
+    present = {item.name for item in metrics}
+    metrics = list(metrics)
+    metrics.extend(
+        metric(context, name, applicable=False, teacher_variant=teacher_variant)
+        for name in CANONICAL_METRIC_NAMES
+        if name not in present
+    )
+    by_name = {item.name: item for item in metrics}
+    return [by_name[name] for name in CANONICAL_METRIC_NAMES] + list(extra)
+
+
 def metric(
     context: EvaluationContext,
     name: str,
@@ -72,6 +113,33 @@ def metric(
 def verification_view(output: Mapping[str, Any]) -> Mapping[str, Any]:
     value = output.get("verification") or output.get("constraint_check")
     return value if isinstance(value, Mapping) else {}
+
+
+def forecast_registry_order(
+    calls: Sequence[Mapping[str, Any]],
+    outputs_by_id: Mapping[str, Any],
+) -> tuple[bool, list[str]]:
+    forecast_indices = [
+        index for index, call in enumerate(calls) if call.get("name") == PIPEFORMER_TOOL
+    ]
+    unauthorized: list[str] = []
+    for index in forecast_indices:
+        completed = [
+            {
+                "tool_call_id": str(call.get("tool_call_id") or ""),
+                "name": call.get("name"),
+                "arguments": dict(mapping(call.get("arguments"))),
+                "output": outputs_by_id.get(str(call.get("tool_call_id") or "")),
+            }
+            for call in calls[:index]
+        ]
+        result = authorize_forecast_registry(
+            dict(mapping(calls[index].get("arguments"))),
+            completed,
+        )
+        if not result["authorized"]:
+            unauthorized.append(str(calls[index].get("tool_call_id") or ""))
+    return bool(forecast_indices) and not unauthorized, unauthorized
 
 
 def normalize(value: Any) -> Any:
@@ -252,8 +320,11 @@ def disturbance_was_applied(
                 # did not apply the disturbance the caller asked for.
                 return False
     elif variable in percentages:
+        expected = expected_applied_disturbance(task, prediction, variable)
+        if expected is None:
+            return False
         expected_mode = "percent_change"
-        expected_value = percentages[variable]
+        expected_value = expected["value"]
         if magnitude is not None:
             magnitude_value = _finite_number(magnitude)
             if magnitude_value is None:
@@ -262,14 +333,14 @@ def disturbance_was_applied(
             if direction not in {"up", "down"} or not numbers_match(
                 expected_value,
                 signed,
-            ):
+                ):
                 return False
     elif magnitude is not None and direction in {"up", "down"}:
-        expected_mode = "percent_change"
-        magnitude_value = _finite_number(magnitude)
-        if magnitude_value is None:
+        expected = expected_applied_disturbance(task, prediction, variable)
+        if expected is None:
             return False
-        expected_value = abs(magnitude_value) * (1.0 if direction == "up" else -1.0)
+        expected_mode = "percent_change"
+        expected_value = expected["value"]
     else:
         return False
     applied = sequence(

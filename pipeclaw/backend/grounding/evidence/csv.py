@@ -19,7 +19,6 @@ from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
 
 
 MAX_EVIDENCE_ROWS = 12
-MAX_COMPUTED_RESULTS = 1
 MAX_EVIDENCE_FIELDS = 10
 MAX_VALUE_CHARS = 160
 MAX_COMPUTED_OUTPUT_CHARS = 8_000
@@ -590,10 +589,7 @@ def _structured_computation_results(
     A structured command result is therefore preferred when at least one of its
     scalar values is repeated in the answer.
     """
-    results = []
     for item in reversed(list(outputs)):
-        if len(results) >= MAX_COMPUTED_RESULTS:
-            break
         if str(item.get("name") or "").casefold() != "run_command" or tool_output_failed(item):
             continue
         output = item.get("output") or {}
@@ -614,11 +610,11 @@ def _structured_computation_results(
             compact_value = stdout[:MAX_COMPUTED_OUTPUT_CHARS]
         if not supports_answer:
             continue
-        results.append({
+        return [{
             "tool_call_id": item.get("tool_call_id"),
             "value": compact_value,
-        })
-    return list(reversed(results))
+        }]
+    return []
 
 
 def _plain_computation_supports_answer(

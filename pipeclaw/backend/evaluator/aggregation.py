@@ -143,5 +143,4 @@ def summarize(
             "duplicate_successful_calls": duplicate_successes,
         },
         "portability": portability,
-        "by_scenario_type": {},
     }

@@ -9,6 +9,7 @@ from .common import (
     longest_episode_minutes,
     run_specs,
     status_from_threshold,
+    supply_demand_gaps,
     threshold_limits_for_variable,
     threshold_episodes,
     total_episode_minutes,
@@ -155,28 +156,11 @@ def _supply_demand_balance_check(
     supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
     demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
     variables = supply_variables + demand_variables
-    usable_supply_variables = [
-        name for name in supply_variables if summaries.get(name, {}).get("predicted_values")
-    ]
-    usable_demand_variables = [
-        name for name in demand_variables if summaries.get(name, {}).get("predicted_values")
-    ]
-    series_lengths = [
-        len(summaries[name]["predicted_values"])
-        for name in usable_supply_variables + usable_demand_variables
-    ]
-    step_count = min(series_lengths, default=0) if usable_supply_variables and usable_demand_variables else 0
-    gaps = []
-    for index in range(step_count):
-        supply = sum(
-            summaries[name]["predicted_values"][index] for name in usable_supply_variables
-        ) / len(usable_supply_variables)
-        demand = sum(
-            summaries[name]["predicted_values"][index] for name in usable_demand_variables
-        ) / len(usable_demand_variables)
-        gaps.append(supply - demand)
-
-    usable_variables = usable_supply_variables + usable_demand_variables
+    usable_variables, gaps = supply_demand_gaps(
+        summaries,
+        supply_variables,
+        demand_variables,
+    )
     labels = summaries.get(usable_variables[0], {}).get("prediction_labels", []) if usable_variables else []
     widening_change_indices = [
         index

@@ -1,26 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 import json
 import re
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Optional
 
 from .answer_limits import (
-    CHINESE_SINGLE_FORECAST_MAX_CHARS,
     ENGLISH_COMPARISON_MAX_CHARS,
     ENGLISH_MAX_WORDS,
-    GENERIC_MAX_CHARS,
     chinese_comparison_max_chars,
 )
 from .decision_policy import (
     RISK_RANK,
     collect_objective_evidence,
     decision_policy_source_has_priority_signal,
+    llm_policy_excerpts,
+    nested_value,
+    number_value,
     normalize_decision_policy,
     rank_candidate_groups,
 )
-from .decision_trace_state import VerifiedDecisionState
+from .decision_trace_state import (
+    ENGINEERING_METRIC_FIELDS,
+    VerifiedDecisionState,
+    canonical_json,
+    has_boundary_action,
+)
 from .evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
 
 
@@ -32,19 +38,55 @@ INTERVENTION_RANK = {
 }
 
 
-def _forecast_views(output: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
+def forecast_views(output: Dict[str, Any]) -> tuple[Dict[str, Any], Dict[str, Any]]:
     return (
         dict(output.get("prediction") or output.get("prediction_summary") or {}),
         dict(output.get("verification") or output.get("constraint_check") or {}),
     )
+
+
+def is_chinese(text: str) -> bool:
+    return any("\u4e00" <= character <= "\u9fff" for character in text)
+
+
+def successful_pipeformer_results(
+    tool_results: Iterable[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    return [
+        dict(item)
+        for item in tool_results
+        if item.get("name") == "run_pipeformer_forecast"
+        and dict(item.get("output") or {}).get("success") is True
+    ]
+
+
+def latest_decision_policy(
+    results: Iterable[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    for item in reversed(list(results)):
+        output = dict(item.get("output") or {})
+        if (
+            item.get("name") == "set_decision_policy"
+            and output.get("success") is True
+            and isinstance(output.get("decision_policy"), dict)
+        ):
+            return dict(output["decision_policy"])
+    return None
+
+
+def _candidate_role(item: Dict[str, Any]) -> str:
+    output = dict(item.get("output") or {})
+    arguments = dict(item.get("arguments") or {})
+    return str(
+        output.get("candidate_role") or arguments.get("candidate_role") or ""
+    ).casefold()
+
+
 @dataclass(frozen=True)
 class CandidateResult:
     candidate_id: str
     tool_call_id: str
     action: Dict[str, Any]
-    prediction_summary: Dict[str, Any]
-    constraint_check: Dict[str, Any]
-    evidence: Dict[str, Any]
     failure_count: int
     warning_count: int
     risk_level: str
@@ -63,28 +105,9 @@ class CandidateResult:
     category_status: Dict[str, Any]
 
     def compact(self) -> Dict[str, Any]:
-        return {
-            "candidate_id": self.candidate_id,
-            "tool_call_id": self.tool_call_id,
-            "action": self.action,
-            "failure_count": self.failure_count,
-            "warning_count": self.warning_count,
-            "risk_level": self.risk_level,
-            "manual_intervention_label": self.manual_intervention_label,
-            "dispatch_recommendation": self.dispatch_recommendation,
-            "failed_rule_ids": self.failed_rule_ids,
-            "warning_rule_ids": self.warning_rule_ids,
-            "energy_consumption": self.energy_consumption,
-            "nonzero_impacted_variable_count": self.nonzero_impacted_variable_count,
-            "pressure_metrics": self.pressure_metrics,
-            "linepack_metrics": self.linepack_metrics,
-            "flow_metrics": self.flow_metrics,
-            "compressor_metrics": self.compressor_metrics,
-            "energy_metrics": self.energy_metrics,
-            "baseline_reference": self.baseline_reference,
-            "category_status": self.category_status,
-            "elimination_reasons": self.failed_rule_ids,
-        }
+        compact = {item.name: getattr(self, item.name) for item in fields(self)}
+        compact["elimination_reasons"] = self.failed_rule_ids
+        return compact
 
     @classmethod
     def from_compact(cls, value: Dict[str, Any]) -> "CandidateResult":
@@ -93,9 +116,6 @@ class CandidateResult:
             candidate_id=str(item.get("candidate_id") or ""),
             tool_call_id=str(item.get("tool_call_id") or ""),
             action=dict(item.get("action") or {}),
-            prediction_summary={},
-            constraint_check={},
-            evidence={},
             failure_count=int(item.get("failure_count") or 0),
             warning_count=int(item.get("warning_count") or 0),
             risk_level=str(item.get("risk_level") or "low"),
@@ -151,7 +171,7 @@ class GroundingContractBuilder:
         prior_applied_disturbances: Optional[Iterable[Dict[str, Any]]] = None,
     ) -> Dict[str, Any]:
         results = [dict(item) for item in tool_results]
-        current_policy = self._decision_policy_from_results(results)
+        current_policy = latest_decision_policy(results)
         uses_prior_policy = (
             decision_policy is None
             and current_policy is None
@@ -171,11 +191,7 @@ class GroundingContractBuilder:
             if uses_prior_policy
             else question
         )
-        pipeformer = [
-            item for item in results
-            if item.get("name") == "run_pipeformer_forecast"
-            and dict(item.get("output") or {}).get("success") is True
-        ]
+        pipeformer = successful_pipeformer_results(results)
         prior_candidates = [
             dict(item)
             for item in prior_candidate_results or []
@@ -209,26 +225,18 @@ class GroundingContractBuilder:
         prior_candidate_results: List[Dict[str, Any]],
         prior_applied_disturbances: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
-        baselines = self._deduplicate_candidate_results([
-            item
-            for item in results
-            if str(
-                dict(item.get("output") or {}).get("candidate_role")
-                or dict(item.get("arguments") or {}).get("candidate_role")
-                or ""
-            ).casefold()
-            == "baseline"
-        ])
+        baselines = self._deduplicate_candidate_results(
+            [
+                item
+                for item in results
+                if _candidate_role(item) == "baseline"
+            ]
+        )
         candidates = self._deduplicate_candidate_results(
             [
                 item
                 for item in results
-                if str(
-                    dict(item.get("output") or {}).get("candidate_role")
-                    or dict(item.get("arguments") or {}).get("candidate_role")
-                    or ""
-                ).casefold()
-                != "baseline"
+                if _candidate_role(item) != "baseline"
             ]
         )
 
@@ -245,7 +253,7 @@ class GroundingContractBuilder:
                 continue
             if (
                 current_action_candidates
-                and not self._candidate_has_boundary_action(candidate)
+                and not has_boundary_action({"action": candidate.action})
             ):
                 continue
             if key not in parsed_by_id:
@@ -305,13 +313,7 @@ class GroundingContractBuilder:
             mode = str(disturbance.get("mode") or "")
             if not variable or not mode:
                 continue
-            key = json.dumps(
-                disturbance,
-                ensure_ascii=False,
-                sort_keys=True,
-                separators=(",", ":"),
-                default=str,
-            )
+            key = canonical_json(disturbance)
             if key in applied_seen:
                 continue
             applied_seen.add(key)
@@ -319,20 +321,6 @@ class GroundingContractBuilder:
         if applied_disturbances:
             contract["applied_disturbances"] = applied_disturbances
         return contract
-
-    @staticmethod
-    def _decision_policy_from_results(
-        results: List[Dict[str, Any]],
-    ) -> Optional[Dict[str, Any]]:
-        for item in reversed(results):
-            output = dict(item.get("output") or {})
-            if (
-                item.get("name") == "set_decision_policy"
-                and output.get("success") is True
-                and isinstance(output.get("decision_policy"), dict)
-            ):
-                return dict(output["decision_policy"])
-        return None
 
     @staticmethod
     def _deduplicate_candidate_results(
@@ -376,13 +364,7 @@ class GroundingContractBuilder:
                 if action.get(key)
             }
             key = (
-                "action:"
-                + json.dumps(
-                    payload,
-                    ensure_ascii=False,
-                    sort_keys=True,
-                    separators=(",", ":"),
-                )
+                "action:" + canonical_json(payload)
                 if payload
                 else "candidate:" + candidate.candidate_id.casefold()
             )
@@ -397,7 +379,7 @@ class GroundingContractBuilder:
         for item in results:
             output = dict(item.get("output") or {})
             arguments = dict(item.get("arguments") or {})
-            prediction, _ = _forecast_views(output)
+            prediction, _ = forecast_views(output)
             parsed_task = dict(output.get("parsed_task") or {})
             sources = [parsed_task, prediction, output]
             for source in sources:
@@ -456,7 +438,7 @@ class GroundingContractBuilder:
                 continue
             output = dict(item.get("output") or {})
             arguments = dict(item.get("arguments") or {})
-            prediction, _ = _forecast_views(output)
+            prediction, _ = forecast_views(output)
             variable = str(
                 arguments.get("disturbance_variable")
                 or prediction.get("disturbance_variable")
@@ -536,12 +518,17 @@ class GroundingContractBuilder:
 
     def _candidate(self, index: int, item: Dict[str, Any]) -> CandidateResult:
         output = dict(item.get("output") or {})
-        prediction, verification = _forecast_views(output)
-        evidence = dict(output.get("evidence") or {})
+        prediction, verification = forecast_views(output)
         arguments = dict(item.get("arguments") or {})
         metrics = dict(verification.get("comparable_metrics") or {})
         engineering = dict(verification.get("engineering_evidence") or {})
         comparison = dict(prediction.get("counterfactual_comparison") or {})
+        category_metrics = {
+            category: self._compact_category_metrics(
+                engineering.get(category), fields
+            )
+            for category, fields in ENGINEERING_METRIC_FIELDS.items()
+        }
         return CandidateResult(
             candidate_id=str(
                 arguments.get("candidate_id")
@@ -550,9 +537,6 @@ class GroundingContractBuilder:
             ),
             tool_call_id=str(item.get("tool_call_id") or ""),
             action=self._candidate_action(arguments),
-            prediction_summary=prediction,
-            constraint_check=verification,
-            evidence=evidence,
             failure_count=self._integer(verification.get("failure_count")),
             warning_count=self._integer(verification.get("warning_count")),
             risk_level=str(
@@ -571,62 +555,22 @@ class GroundingContractBuilder:
             failed_rule_ids=[str(value) for value in verification.get("failed_rule_ids") or []],
             warning_rule_ids=[str(value) for value in verification.get("warning_rule_ids") or []],
             energy_consumption=(
-                self._number(metrics.get("energy_consumption_delta"))
+                number_value(metrics.get("energy_consumption_delta"))
                 if metrics.get("energy_consumption_delta") is not None
-                else self._number(metrics.get("energy_consumption"))
+                else number_value(metrics.get("energy_consumption"))
             ),
             nonzero_impacted_variable_count=(
                 self._integer(comparison.get("nonzero_impacted_variable_count"))
                 if comparison.get("nonzero_impacted_variable_count") is not None
                 else None
             ),
-            pressure_metrics=self._compact_category_metrics(
-                engineering.get("pressure"),
-                (
-                    "minimum_pressure",
-                    "maximum_pressure",
-                    "minimum_lower_bound_margin",
-                    "minimum_upper_bound_margin",
-                    "minimum_operating_window_margin",
-                    "violation_node_count",
-                    "warning_node_count",
-                    "maximum_continuous_pressure_violation_minutes",
-                ),
-            ),
-            linepack_metrics=self._compact_category_metrics(
-                engineering.get("linepack"),
-                (
-                    "minimum_linepack",
-                    "maximum_decline_from_start",
-                    "maximum_continuous_decline_minutes",
-                    "minimum_peak_shaving_reserve",
-                    "insufficient_recovery_count",
-                    "linepack_warning_status",
-                ),
-            ),
-            flow_metrics=self._compact_category_metrics(
-                engineering.get("flow"),
-                (
-                    "maximum_segment_flow_change",
-                    "maximum_boundary_flow_change_rate",
-                    "flow_capacity_excursion_count",
-                    "supply_demand_balance_status",
-                    "supply_demand_balance",
-                ),
-            ),
-            compressor_metrics=self._compact_category_metrics(
-                engineering.get("compressor"),
-                (
-                    "operating_envelope_status",
-                    "maximum_load",
-                    "maximum_compression_ratio",
-                    "maximum_rotational_speed",
-                    "maximum_power_change",
-                ),
-            ),
+            **{
+                f"{category}_metrics": category_metrics[category]
+                for category in ENGINEERING_METRIC_FIELDS
+            },
             energy_metrics={
-                "total": self._number(metrics.get("energy_consumption")),
-                "delta_vs_baseline": self._number(metrics.get("energy_consumption_delta")),
+                "total": number_value(metrics.get("energy_consumption")),
+                "delta_vs_baseline": number_value(metrics.get("energy_consumption_delta")),
                 "unit": metrics.get("energy_unit"),
                 "variable_count": self._integer(metrics.get("energy_variable_count")),
                 "evaluation_status": metrics.get("energy_evaluation_status"),
@@ -652,16 +596,18 @@ class GroundingContractBuilder:
         return {
             "pressure_preservation": self._leaders(
                 candidates,
-                lambda item: self._nested_number(
-                    item.pressure_metrics, "minimum_operating_window_margin", "value"
+                lambda item: number_value(
+                    nested_value(
+                        item.pressure_metrics,
+                        ("minimum_operating_window_margin", "value"),
+                    )
                 ),
                 prefer="maximum",
             ),
-            "slowest_linepack_decline": self._leaders(
-                self._linepack_best_candidates(candidates),
-                lambda item: 0.0,
-                prefer="minimum",
-            ),
+            "slowest_linepack_decline": [
+                item.candidate_id
+                for item in self._linepack_best_candidates(candidates)
+            ],
             "lowest_energy_consumption": self._leaders(
                 candidates,
                 lambda item: item.energy_consumption,
@@ -676,15 +622,16 @@ class GroundingContractBuilder:
             (
                 item,
                 (
-                    self._nested_number(
-                        item.linepack_metrics,
-                        "maximum_decline_from_start",
-                        "value",
+                    number_value(
+                        nested_value(
+                            item.linepack_metrics,
+                            ("maximum_decline_from_start", "value"),
+                        )
                     ),
-                    self._number(
+                    number_value(
                         item.linepack_metrics.get("maximum_continuous_decline_minutes")
                     ),
-                    self._number(
+                    number_value(
                         item.linepack_metrics.get("insufficient_recovery_count")
                     ),
                 ),
@@ -717,15 +664,6 @@ class GroundingContractBuilder:
         return [item.candidate_id for item, value in values if value == target]
 
     @staticmethod
-    def _nested_number(value: Dict[str, Any], *path: str) -> Optional[float]:
-        current: Any = value
-        for key in path:
-            if not isinstance(current, dict):
-                return None
-            current = current.get(key)
-        return GroundingContractBuilder._number(current)
-
-    @staticmethod
     def _candidate_action(arguments: Dict[str, Any]) -> Dict[str, Any]:
         boundary = dict(arguments.get("boundary_conditions") or {})
         if boundary.get("setpoints") or boundary.get("percentage_changes"):
@@ -754,14 +692,6 @@ class GroundingContractBuilder:
             signed = abs(signed)
         return {"percentage_changes": {str(variable): signed}}
 
-    @staticmethod
-    def _candidate_has_boundary_action(candidate: CandidateResult) -> bool:
-        action = dict(candidate.action or {})
-        return bool(
-            dict(action.get("percentage_changes") or {})
-            or dict(action.get("setpoints") or {})
-        )
-
     def _decision(
         self,
         candidates: List[CandidateResult],
@@ -783,13 +713,8 @@ class GroundingContractBuilder:
             legacy_excerpt = " ".join(
                 str(policy.get("source_excerpt") or "").split()
             ).casefold()
-            for objective in objectives:
+            for objective, excerpt in zip(objectives, llm_policy_excerpts(policy)):
                 item = dict(objective or {})
-                excerpt = " ".join(
-                    str(item.get("source_excerpt") or "").split()
-                ).casefold()
-                if not excerpt and len(objectives) == 1:
-                    excerpt = legacy_excerpt
                 if len(excerpt) < 4 or excerpt not in normalized_question:
                     if len(objectives) == 1 and legacy_excerpt:
                         policy_errors.append(
@@ -923,14 +848,6 @@ class GroundingContractBuilder:
         except (TypeError, ValueError):
             return 0
 
-    @staticmethod
-    def _number(value: Any) -> Optional[float]:
-        try:
-            return float(value) if value is not None else None
-        except (TypeError, ValueError):
-            return None
-
-
 def _policy_unavailable_at_generation(record: Dict[str, Any]) -> bool:
     """Preserve a deliberately unsupported saved policy decision."""
 
@@ -972,7 +889,7 @@ def record_grounding_contract(
     )
 
 
-def _format_number(value: Any) -> str:
+def format_number(value: Any) -> str:
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -993,7 +910,7 @@ def _number_disclosed(answer: str, value: Any) -> bool:
     try:
         expected = Decimal(str(value))
     except (InvalidOperation, ValueError):
-        return _format_number(value) in answer
+        return format_number(value) in answer
     for match in _NUMBER_TOKEN.finditer(answer):
         token = match.group(0)
         try:
@@ -1023,12 +940,12 @@ def _format_action(action: Dict[str, Any], chinese: bool) -> str:
             continue
         if chinese:
             direction = "\u4e0a\u8c03" if number >= 0 else "\u4e0b\u8c03"
-            parts.append(f"{variable} {direction} {_format_number(abs(number))}%")
+            parts.append(f"{variable} {direction} {format_number(abs(number))}%")
         else:
             direction = "increase" if number >= 0 else "decrease"
-            parts.append(f"{direction} {variable} by {_format_number(abs(number))}%")
+            parts.append(f"{direction} {variable} by {format_number(abs(number))}%")
     for variable, value in dict(action.get("setpoints") or {}).items():
-        parts.append(f"{variable}={_format_number(value)}")
+        parts.append(f"{variable}={format_number(value)}")
     if parts:
         return ", ".join(parts)
     return "\u672a\u8bb0\u5f55" if chinese else "not recorded"
@@ -1039,14 +956,15 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
     action = _format_action(dict(candidate.get("action") or {}), chinese)
     failed_rules = ", ".join(candidate.get("failed_rule_ids") or []) or "none"
     warning_rules = ", ".join(candidate.get("warning_rule_ids") or []) or "none"
-    pressure = GroundingContractBuilder._nested_number(
-        dict(candidate.get("pressure_metrics") or {}),
-        "minimum_operating_window_margin",
-        "value",
+    pressure = number_value(
+        nested_value(
+            dict(candidate.get("pressure_metrics") or {}),
+            ("minimum_operating_window_margin", "value"),
+        )
     )
     linepack = dict(candidate.get("linepack_metrics") or {})
-    decline = GroundingContractBuilder._nested_number(
-        linepack, "maximum_decline_from_start", "value"
+    decline = number_value(
+        nested_value(linepack, ("maximum_decline_from_start", "value"))
     )
     duration = linepack.get("maximum_continuous_decline_minutes")
     recovery = linepack.get("insufficient_recovery_count")
@@ -1054,30 +972,30 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
     metrics = []
     if pressure is not None:
         metrics.append(
-            f"\u538b\u88d5{_format_number(pressure)}"
+            f"\u538b\u88d5{format_number(pressure)}"
             if chinese
-            else f"pressure margin {_format_number(pressure)}"
+            else f"pressure margin {format_number(pressure)}"
         )
     if decline is not None:
         linepack_text = (
-            f"\u7ba1\u5b58\u964d{_format_number(decline)}"
+            f"\u7ba1\u5b58\u964d{format_number(decline)}"
             if chinese
-            else f"linepack decline {_format_number(decline)}"
+            else f"linepack decline {format_number(decline)}"
         )
         if duration is not None:
-            linepack_text += f"/{_format_number(duration)}min"
+            linepack_text += f"/{format_number(duration)}min"
         if recovery is not None:
             linepack_text += (
-                f"/\u6062\u590d\u4e0d\u8db3{_format_number(recovery)}"
+                f"/\u6062\u590d\u4e0d\u8db3{format_number(recovery)}"
                 if chinese
-                else f"/insufficient recovery {_format_number(recovery)}"
+                else f"/insufficient recovery {format_number(recovery)}"
             )
         metrics.append(linepack_text)
     if energy is not None:
         metrics.append(
-            f"\u80fd\u8017\u0394{_format_number(energy)}"
+            f"\u80fd\u8017\u0394{format_number(energy)}"
             if chinese
-            else f"energy delta {_format_number(energy)}"
+            else f"energy delta {format_number(energy)}"
         )
     metric_text = ("\uff1b" if chinese else "; ").join(metrics)
     metric_text = metric_text or ("\u65e0\u53ef\u6bd4\u6307\u6807" if chinese else "no comparable metrics")
@@ -1190,7 +1108,7 @@ def _canonical_sequence_value(values: Any, fallback: Any) -> str:
     return json.dumps(rendered, ensure_ascii=False, separators=(",", ":"))
 
 
-def _canonical_applied_disturbance_lines(
+def canonical_applied_disturbance_lines(
     contract: Dict[str, Any],
 ) -> List[str]:
     lines: List[str] = []
@@ -1291,7 +1209,7 @@ def _canonical_assumption_source_lines(
     contract: Dict[str, Any],
 ) -> List[str]:
     assignments: Dict[str, str] = {}
-    for line in _canonical_applied_disturbance_lines(contract):
+    for line in canonical_applied_disturbance_lines(contract):
         if not line.startswith(("Applied disturbance:", "Applied setpoint:")):
             continue
         assignment = line.split(":", 1)[1].strip()
@@ -1347,7 +1265,7 @@ def finalize_applied_disturbance_disclosure(
 ) -> str:
     """Serialize the canonical application block without rewriting prose."""
     required = [
-        *_canonical_applied_disturbance_lines(contract),
+        *canonical_applied_disturbance_lines(contract),
         *_canonical_assumption_source_lines(contract),
     ]
     prose = normalize_not_evaluated_wording(
@@ -1365,25 +1283,30 @@ def comparison_requirements_active(
     contract: Dict[str, Any],
 ) -> bool:
     """Escalate comparison validation only for operational turns or claims."""
-    if int(contract.get("current_candidate_forecast_count") or 0) > 0:
-        return True
-    if int(contract.get("current_decision_policy_call_count") or 0) > 0:
-        return True
-    if _SELECTED_CANDIDATE.search(answer):
-        return True
-    if re.search(
-        r"\bcandidate[_-]?\d+\s*(?:>|<|>=|<=)\s*candidate[_-]?\d+\b",
-        answer,
-        re.IGNORECASE,
-    ):
-        return True
     return bool(
-        re.search(
+        int(contract.get("current_candidate_forecast_count") or 0) > 0
+        or int(contract.get("current_decision_policy_call_count") or 0) > 0
+        or _SELECTED_CANDIDATE.search(answer)
+        or re.search(
+            r"\bcandidate[_-]?\d+\s*(?:>|<|>=|<=)\s*candidate[_-]?\d+\b",
+            answer,
+            re.IGNORECASE,
+        )
+        or re.search(
             r"(?:recommend|select|choose|建议|推荐|选择).{0,24}\bcandidate[_-]?\d+\b",
             answer,
             re.IGNORECASE,
         )
     )
+
+
+_AUDIT_CATEGORIES = (
+    ("pressure", "pressure_metrics", "压力", "pressure", r"压力|压裕|pressure"),
+    ("flow", "flow_metrics", "流量", "flow", r"流量|供需|flow|supply.?demand"),
+    ("linepack", "linepack_metrics", "管存", "linepack", r"管存|linepack"),
+    ("compressor", "compressor_metrics", "压缩机", "compressor", r"压缩机|负荷|compressor|load"),
+    ("energy", "energy_metrics", "能耗", "energy", r"能耗|energy"),
+)
 
 
 def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]:
@@ -1392,7 +1315,7 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
     issues: List[str] = []
     if _contains_bare_action_prefix(answer, action_variables):
         issues.append("canonical_action_variable_abbreviated")
-    required_disclosure = _canonical_applied_disturbance_lines(contract)
+    required_disclosure = canonical_applied_disturbance_lines(contract)
     actual_disclosure = _canonical_disclosure_lines_in_answer(answer)
     normalized_answer_lines = [
         line.strip()
@@ -1481,25 +1404,13 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
         present_categories = {
             category
             for candidate in contract.get("candidate_results") or []
-            for category, key in (
-                ("pressure", "pressure_metrics"),
-                ("flow", "flow_metrics"),
-                ("linepack", "linepack_metrics"),
-                ("compressor", "compressor_metrics"),
-                ("energy", "energy_metrics"),
-            )
+            for category, key, *_ in _AUDIT_CATEGORIES
             if dict(candidate.get(key) or {})
         }
-        category_patterns = {
-            "pressure": r"压力|压裕|pressure",
-            "flow": r"流量|供需|flow|supply.?demand",
-            "linepack": r"管存|linepack",
-            "compressor": r"压缩机|负荷|compressor|load",
-            "energy": r"能耗|energy",
-        }
         if any(
-            not re.search(category_patterns[category], answer, re.IGNORECASE)
-            for category in present_categories
+            not re.search(pattern, answer, re.IGNORECASE)
+            for category, _, _, _, pattern in _AUDIT_CATEGORIES
+            if category in present_categories
         ):
             issues.append("candidate_audit_evidence_incomplete")
 
@@ -1534,9 +1445,8 @@ def _finalize_comparison_answer(
     maximum_chars: int = 500,
     maximum_words: Optional[int] = None,
 ) -> str:
-    suffix = "\n".join(_comparison_markers(selected_candidate_id))
     body = "\n".join(str(line).strip() for line in lines if str(line).strip())
-    answer = body + "\n" + suffix
+    answer = body + f"\nselected_candidate_id: {selected_candidate_id or 'none'}"
     over_budget = len(answer) > maximum_chars
     if maximum_words is not None and len(answer.split()) > maximum_words:
         over_budget = True
@@ -1545,12 +1455,6 @@ def _finalize_comparison_answer(
     else:
         contract.pop("answer_render_status", None)
     return answer
-
-
-def _comparison_markers(
-    selected_candidate_id: str,
-) -> List[str]:
-    return [f"selected_candidate_id: {selected_candidate_id or 'none'}"]
 
 
 def _shared_outcome_line(candidate: Dict[str, Any], chinese: bool) -> str:
@@ -1580,17 +1484,8 @@ def _compact_action(action: Dict[str, Any]) -> str:
         except (TypeError, ValueError):
             parts.append(f"{variable}={raw_value}")
     for variable, raw_value in dict(action.get("setpoints") or {}).items():
-        parts.append(f"{variable}={_format_number(raw_value)}")
+        parts.append(f"{variable}={format_number(raw_value)}")
     return ",".join(parts) or "未记录"
-
-
-def _action_variables(action: Dict[str, Any]) -> str:
-    variables = [
-        str(variable)
-        for key in ("percentage_changes", "setpoints")
-        for variable in dict(action.get(key) or {})
-    ]
-    return ",".join(variables) or "未记录"
 
 
 def applied_disturbance_disclosure(
@@ -1599,7 +1494,7 @@ def applied_disturbance_disclosure(
 ) -> str:
     """Return the exact machine-verifiable application evidence block."""
     del question
-    return "\n".join(_canonical_applied_disturbance_lines(contract))
+    return "\n".join(canonical_applied_disturbance_lines(contract))
 
 
 def _compact_assumption_lines(
@@ -1615,18 +1510,18 @@ def _compact_assumption_lines(
         key = (
             variable.casefold(),
             direction.casefold(),
-            _format_number(magnitude),
-            _format_number(setpoint),
+            format_number(magnitude),
+            format_number(setpoint),
         )
         if key in seen:
             continue
         seen.add(key)
         if variable.endswith(":ST") and setpoint is not None:
             if chinese:
-                lines.append(f"LLM暂设：{variable}={_format_number(setpoint)}。")
+                lines.append(f"LLM暂设：{variable}={format_number(setpoint)}。")
             else:
                 lines.append(
-                    f"Provisional LLM assumption: {variable}={_format_number(setpoint)}."
+                    f"Provisional LLM assumption: {variable}={format_number(setpoint)}."
                 )
             continue
         if chinese:
@@ -1634,13 +1529,13 @@ def _compact_assumption_lines(
             if magnitude is None:
                 lines.append(f"LLM临时假设：{variable}{direction_label}。")
             else:
-                lines.append(f"LLM临时假设：{variable}{direction_label}{_format_number(magnitude)}%。")
+                lines.append(f"LLM临时假设：{variable}{direction_label}{format_number(magnitude)}%。")
         else:
             if magnitude is None:
                 lines.append(f"Provisional LLM assumption: {variable} {direction}.")
             else:
                 lines.append(
-                    f"Provisional LLM assumption: {variable} {direction} {_format_number(magnitude)}%."
+                    f"Provisional LLM assumption: {variable} {direction} {format_number(magnitude)}%."
                 )
     return lines
 
@@ -1667,7 +1562,7 @@ def _objective_token(
     chinese: bool,
 ) -> str:
     label = _objective_label(objective, chinese)
-    value = _format_number(evidence.get("value"))
+    value = format_number(evidence.get("value"))
     variable = str(evidence.get("variable") or "")
     unit = str(evidence.get("unit") or "")
     detail = value
@@ -1682,16 +1577,9 @@ def _audit_category_summary(
     candidates: List[Dict[str, Any]],
     chinese: bool,
 ) -> str:
-    category_definitions = (
-        ("pressure", "pressure_metrics", "压力", "pressure"),
-        ("flow", "flow_metrics", "流量", "flow"),
-        ("linepack", "linepack_metrics", "管存", "linepack"),
-        ("compressor", "compressor_metrics", "压缩机", "compressor"),
-        ("energy", "energy_metrics", "能耗", "energy"),
-    )
     present = [
         (category, zh, en)
-        for category, key, zh, en in category_definitions
+        for category, key, zh, en, _ in _AUDIT_CATEGORIES
         if any(dict(candidate.get(key) or {}) for candidate in candidates)
     ]
     labels = [zh if chinese else en for _, zh, en in present]
@@ -1717,7 +1605,7 @@ def _selected_comparison_answer(
     candidates: List[Dict[str, Any]],
     decision: Dict[str, Any],
 ) -> str:
-    chinese = any("\u4e00" <= character <= "\u9fff" for character in question)
+    chinese = is_chinese(question)
     ranking = [str(value) for value in decision.get("ranked_candidate_ids") or []]
     by_id = {str(item.get("candidate_id") or ""): item for item in candidates}
     ranked = [by_id[candidate_id] for candidate_id in ranking if candidate_id in by_id]
@@ -1824,34 +1712,31 @@ def _selected_comparison_answer(
         rejection_line = "; ".join(rejection_parts) + "."
 
     lines = [
-        *_canonical_applied_disturbance_lines(contract),
+        *canonical_applied_disturbance_lines(contract),
         *_compact_assumption_lines(contract, chinese),
         policy_line,
         *candidate_lines,
         _audit_category_summary(ranked, chinese),
         ranking_line,
         rejection_line,
-        *_comparison_markers(selected_id),
     ]
-    answer = "\n".join(lines)
-    over_budget = len(answer) > (
-        chinese_comparison_max_chars(len(ranked))
-        if chinese
-        else ENGLISH_COMPARISON_MAX_CHARS
+    return _finalize_comparison_answer(
+        lines,
+        selected_id,
+        contract,
+        maximum_chars=(
+            chinese_comparison_max_chars(len(ranked))
+            if chinese
+            else ENGLISH_COMPARISON_MAX_CHARS
+        ),
+        maximum_words=None if chinese else ENGLISH_MAX_WORDS,
     )
-    if not chinese and len(answer.split()) > ENGLISH_MAX_WORDS:
-        over_budget = True
-    if over_budget:
-        contract["answer_render_status"] = "answer_budget_insufficient"
-    else:
-        contract.pop("answer_render_status", None)
-    return answer
 
 def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
     """Render a compact, instruction-complete answer from deterministic facts."""
     decision = dict(contract.get("decision_summary") or {})
     candidates = list(contract.get("candidate_results") or [])
-    chinese = any("\u4e00" <= character <= "\u9fff" for character in question)
+    chinese = is_chinese(question)
     ranking = [str(value) for value in decision.get("ranked_candidate_ids") or []]
     if ranking:
         positions = {candidate_id: index for index, candidate_id in enumerate(ranking)}
@@ -1860,36 +1745,35 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
                 str(item.get("candidate_id") or ""), len(positions)
             )
         )
+    if decision.get("status") == "selected":
+        return _selected_comparison_answer(question, contract, candidates, decision)
+
     assumption_lines = [
-        *_canonical_applied_disturbance_lines(contract),
+        *canonical_applied_disturbance_lines(contract),
         *_compact_assumption_lines(contract, chinese),
     ]
     shared_outcome = not ranking and len(candidates) > 1 and len({
         _outcome_key(candidate) for candidate in candidates
     }) == 1
+    lines = [
+        *assumption_lines,
+        (
+            "\u5019\u9009\u52a8\u4f5c\uff1a" if chinese else "Candidate actions:"
+        ) if shared_outcome else (
+            "\u5019\u9009\u52a8\u4f5c\u6bd4\u8f83\uff1a" if chinese else "Candidate comparison:"
+        ),
+    ]
     if shared_outcome:
-        lines = [
-            *assumption_lines,
-            "\u5019\u9009\u52a8\u4f5c\uff1a" if chinese else "Candidate actions:",
-            *[
-                f"- {candidate.get('candidate_id')}: "
-                f"{_format_action(dict(candidate.get('action') or {}), chinese)}"
-                for candidate in candidates
-            ],
-            _shared_outcome_line(candidates[0], chinese),
-        ]
+        lines.extend(
+            f"- {candidate.get('candidate_id')}: "
+            f"{_format_action(dict(candidate.get('action') or {}), chinese)}"
+            for candidate in candidates
+        )
+        lines.append(_shared_outcome_line(candidates[0], chinese))
     else:
-        lines = [
-            *assumption_lines,
-            "\u5019\u9009\u52a8\u4f5c\u6bd4\u8f83\uff1a" if chinese else "Candidate comparison:",
-            *[_candidate_line(candidate, chinese) for candidate in candidates],
-        ]
-    selected_id = str(decision.get("selected_candidate_id") or "")
+        lines.extend(_candidate_line(candidate, chinese) for candidate in candidates)
     eliminated = list(decision.get("eliminated_candidates") or [])
     missing = [str(value) for value in decision.get("missing_metrics") or []]
-
-    if decision.get("status") == "selected":
-        return _selected_comparison_answer(question, contract, candidates, decision)
 
     all_eliminated = bool(candidates) and len(eliminated) == len(candidates)
     failed_rules = sorted({

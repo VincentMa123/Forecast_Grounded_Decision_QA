@@ -11,7 +11,7 @@ from typing import Any
 from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
 
 from .models import PromptCase, RolloutConfig, RolloutResult
-from .runner import _execution_success, _schema_valid
+from .runner import execution_success, schema_valid
 
 
 _SAFE_ID = re.compile(r"[^A-Za-z0-9_.-]+")
@@ -66,7 +66,12 @@ def _ordered_attempts(trace: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 
 def _trace_rollout(
-    case: PromptCase, trace: Mapping[str, Any], answer: str
+    case: PromptCase,
+    trace: Mapping[str, Any],
+    answer: str,
+    *,
+    capture_raw_responses: bool = False,
+    capture_raw_tool_outputs: bool = False,
 ) -> RolloutResult:
     attempts = _ordered_attempts(trace)
     calls: list[dict[str, Any]] = []
@@ -80,8 +85,8 @@ def _trace_rollout(
                 "tool_call_id": call_id,
                 "name": name,
                 "arguments": dict(attempt.get("args") or {}),
-                "execution_success": _execution_success(result),
-                "schema_valid": _schema_valid(result),
+                "execution_success": execution_success(result),
+                "schema_valid": schema_valid(result),
             }
         )
         outputs.append({"tool_call_id": call_id, "name": name, "output": result})
@@ -106,12 +111,18 @@ def _trace_rollout(
             str(trace.get("status") or ""), str(trace.get("status") or "")
         ),
         turns=turns,
-        raw_responses=[
-            dict(item)
-            for item in trace.get("llm_calls") or []
-            if isinstance(item, Mapping)
-        ],
-        raw_tool_outputs=[dict(item) for item in attempts],
+        raw_responses=(
+            [
+                dict(item)
+                for item in trace.get("llm_calls") or []
+                if isinstance(item, Mapping)
+            ]
+            if capture_raw_responses
+            else None
+        ),
+        raw_tool_outputs=(
+            [dict(item) for item in attempts] if capture_raw_tool_outputs else None
+        ),
     )
 
 
@@ -151,4 +162,10 @@ class ProductionAgentRunner:
             )
         )
         trace = orchestrator.trace_writer.load_trace(session_id)
-        return _trace_rollout(case, trace, response.return_message)
+        return _trace_rollout(
+            case,
+            trace,
+            response.return_message,
+            capture_raw_responses=config.capture_raw_responses,
+            capture_raw_tool_outputs=config.capture_raw_tool_outputs,
+        )

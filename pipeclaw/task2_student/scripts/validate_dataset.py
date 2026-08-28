@@ -1,10 +1,9 @@
-"""Fail-closed validation for Task 2 MS-SWIFT datasets."""
-
 from __future__ import annotations
 
 import argparse
 import ast
 import json
+from functools import partial
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
@@ -14,8 +13,8 @@ from pipeclaw.backend.grounding.evidence.tool import (
 )
 from pipeclaw.task2_student.path_contract import is_host_absolute_path, redact_host_paths
 from pipeclaw.task2_student.release_artifacts import (
-    JsonlArtifactError,
-    read_jsonl as _read_jsonl_artifact,
+    read_jsonl_domain,
+    required_text,
     sha256_bytes as _sha256_bytes,
     sha256_file as _sha256_file,
 )
@@ -54,13 +53,13 @@ class DatasetValidationError(ValueError):
     """Raised when a source or derived dataset violates a safety invariant."""
 
 
+_required_text = partial(required_text, error_factory=DatasetValidationError)
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read a UTF-8 JSONL file and reject blank, invalid, or non-object rows."""
 
-    try:
-        return _read_jsonl_artifact(path)
-    except JsonlArtifactError as exc:
-        raise DatasetValidationError(str(exc)) from exc
+    return read_jsonl_domain(path, error_factory=DatasetValidationError)
 
 
 def validate_source_records(
@@ -766,13 +765,6 @@ def _parse_json(value: str, location: str) -> Any:
         return json.loads(value)
     except json.JSONDecodeError as exc:
         raise DatasetValidationError(f"{location}: invalid JSON") from exc
-
-
-def _required_text(record: dict[str, Any], field: str, location: str) -> str:
-    value = record.get(field)
-    if not isinstance(value, str) or not value.strip():
-        raise DatasetValidationError(f"{location}: {field} must be nonempty text")
-    return value
 
 
 def _validate_derived_identities(

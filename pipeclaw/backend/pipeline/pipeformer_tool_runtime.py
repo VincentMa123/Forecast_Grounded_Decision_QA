@@ -16,9 +16,14 @@ from .condition_parser import (
     parse_condition,
     targets_for_checks,
 )
+from .constraints.common import variables_matching
 from .engineering_constraints import run_engineering_constraint_checks
 from .evidence_extractor import summarize_variables, top_variables
-from .forecast_result import ForecastResult
+from .forecast_result import (
+    ForecastResult,
+    compact_forecast_window,
+    source_name,
+)
 from .pipeformer_inference import (
     PipeFormerInferenceConfig,
     PipeFormerInferenceEngine,
@@ -138,34 +143,23 @@ def _integrated_energy_metrics(
     }
 
 
-def _compact_source_name(path_value: Optional[str]) -> Optional[str]:
-    if not path_value:
-        return None
-    return Path(str(path_value)).name
-
-
-def _strip_row_suffix(label: str) -> str:
-    return label.removesuffix("_real") if label.endswith("_real") else label.removesuffix("_predict")
-
-
 def _forecast_window_summary(forecast_context: Dict[str, Any]) -> Dict[str, Any]:
     real_rows = forecast_context.get("real_rows") or []
     predict_rows = forecast_context.get("predict_rows") or []
     labels = list(forecast_context.get("forecast_time_labels") or [])
     if not labels:
         labels = [
-            _strip_row_suffix(str(getattr(row, "label", row)))
+            str(getattr(row, "label", row)).removesuffix("_real").removesuffix("_predict")
             for row in predict_rows or real_rows
         ]
-
-    window = {
-        "start_time": labels[0] if labels else None,
-        "end_time": labels[-1] if labels else None,
-        "time_step_minutes": forecast_context.get("time_step_minutes"),
-        "real_row_count": len(real_rows),
-        "predict_row_count": len(predict_rows),
-    }
-    return {key: value for key, value in window.items() if value is not None}
+    return compact_forecast_window(
+        {
+            "forecast_time_labels": labels,
+            "time_step_minutes": forecast_context.get("time_step_minutes"),
+            "real_rows": real_rows,
+            "predict_rows": predict_rows,
+        }
+    )
 
 
 def _clean_checks(requested_categories: Optional[List[str]]) -> List[str]:
@@ -199,11 +193,14 @@ def _resolve_requested_variables(
             matches = [target]
         elif target in REGISTRY_GROUP_RULES:
             rule = REGISTRY_GROUP_RULES[target]
-            matches = [
-                name
-                for name in variable_names
-                if _registry_group_match(registry.get(name, {}), rule)
-            ]
+            matches = variables_matching(
+                variable_names,
+                registry=registry,
+                physical_quantities=tuple(rule.get("physical_quantities") or ()),
+                equipment_types=tuple(rule.get("equipment_types") or ()),
+                roles=tuple(rule.get("roles") or ()),
+                controllable=rule.get("controllable"),
+            )
         else:
             matches = [
                 name
@@ -319,23 +316,6 @@ def _resolve_task_vocabulary(
         "unresolved_output_state_variables": unresolved_outputs,
         "invalid_normalized_variables": invalid_normalized_variables,
     }
-
-
-def _registry_group_match(metadata: Dict[str, Any], rule: Dict[str, Any]) -> bool:
-    if not metadata:
-        return False
-    for key in ("physical_quantities", "equipment_types", "roles"):
-        allowed = rule.get(key)
-        metadata_key = {
-            "physical_quantities": "physical_quantity",
-            "equipment_types": "equipment_type",
-            "roles": "role",
-        }[key]
-        if allowed and metadata.get(metadata_key) not in allowed:
-            return False
-    if "controllable" in rule and bool(metadata.get("controllable")) != bool(rule["controllable"]):
-        return False
-    return True
 
 
 def _counterfactual_comparison(
@@ -685,12 +665,6 @@ def build_pipeformer_task(
     return parsed
 
 
-def _public_forecast_result(result: Dict[str, Any]) -> Dict[str, Any]:
-    if result.get("success") is not True:
-        return result
-    return ForecastResult.from_payload(result).model_dump()
-
-
 class PipeFormerForecastService:
     """Coordinate task parsing, checkpoint inference, constraints, and evidence."""
 
@@ -706,13 +680,54 @@ class PipeFormerForecastService:
         )
 
     def analyze(self, **request: Any) -> Dict[str, Any]:
-        return _public_forecast_result(
-            _analyze_pipeformer_forecast(
-                backend_root=self.backend_root,
-                baseline_cache=self.baseline_cache,
-                **request,
-            )
+        result = _analyze_pipeformer_forecast(
+            backend_root=self.backend_root,
+            baseline_cache=self.baseline_cache,
+            **request,
         )
+        return (
+            ForecastResult.from_payload(result).model_dump()
+            if result.get("success") is True
+            else result
+        )
+
+
+def run_pipeformer_forecast_analysis(
+    *,
+    question: str,
+    backend_root: Path,
+    candidate_id: Optional[str] = None,
+    candidate_role: str = "candidate",
+    case_id: Optional[str] = None,
+    forecast_horizon_minutes: Optional[int] = None,
+    current_operating_condition_number: Optional[int] = None,
+    boundary_conditions: Optional[Dict[str, Any]] = None,
+    disturbance_variable: Optional[str] = None,
+    disturbance_setpoint: Optional[int] = None,
+    disturbance_direction: Optional[str] = None,
+    disturbance_magnitude_percent: Optional[float] = None,
+    disturbance_assumption: Optional[str] = None,
+    disturbance_source: Optional[str] = None,
+    attention_targets: Optional[List[str]] = None,
+    output_state_variables: Optional[List[str]] = None,
+    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
+    constraint_verification_types: Optional[List[str]] = None,
+    include_baseline_comparison: Optional[bool] = None,
+    baseline_cache: Optional[BaselineForecastCache] = None,
+    pipeformer_root: Optional[str] = None,
+    checkpoint_dir: Optional[str] = None,
+    data_dir: Optional[str] = None,
+    static_dir: Optional[str] = None,
+    mapping_csv: Optional[str] = None,
+    device: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Compatibility entry point; new callers should use PipeFormerForecastService."""
+    request = locals().copy()
+    service = PipeFormerForecastService(
+        request.pop("backend_root"),
+        baseline_cache=request.pop("baseline_cache"),
+    )
+    return service.analyze(**request)
 
 
 def _analyze_pipeformer_forecast(
@@ -983,13 +998,12 @@ def _analyze_pipeformer_forecast(
         if key in forecast_context:
             forecast_metadata[key] = forecast_context[key]
 
-    compact_source_keys = {
-        "checkpoint_dir": "checkpoint_id",
-        "data_case_dir": "data_case_id",
-    }
-    for source_key, metadata_key in compact_source_keys.items():
+    for source_key, metadata_key in (
+        ("checkpoint_dir", "checkpoint_id"),
+        ("data_case_dir", "data_case_id"),
+    ):
         if source_key in forecast_context:
-            forecast_metadata[metadata_key] = _compact_source_name(forecast_context[source_key])
+            forecast_metadata[metadata_key] = source_name(forecast_context[source_key])
 
     parsed_task.pop("_variable_registry", None)
     parsed_task.pop("_boundary_application_evidence", None)
@@ -1011,52 +1025,12 @@ def _analyze_pipeformer_forecast(
         "manual_intervention_label": verification["human_intervention_label"],
         "dispatch_recommendation": verification.get("dispatch_recommendation"),
         "quality_flag": (
-            "needs_review"
-            if unresolved_attention
-            or unresolved_outputs
-            or not verification.get("verification_complete", True)
-            else "pass"
+            "pass"
+            if verification.get("verification_complete", True)
+            else "needs_review"
         ),
         "forecast_metadata": forecast_metadata,
     }
     if counterfactual_comparison is not None:
         result["counterfactual_comparison"] = counterfactual_comparison
     return result
-
-
-def run_pipeformer_forecast_analysis(
-    *,
-    question: str,
-    backend_root: Path,
-    candidate_id: Optional[str] = None,
-    candidate_role: str = "candidate",
-    case_id: Optional[str] = None,
-    forecast_horizon_minutes: Optional[int] = None,
-    current_operating_condition_number: Optional[int] = None,
-    boundary_conditions: Optional[Dict[str, Any]] = None,
-    disturbance_variable: Optional[str] = None,
-    disturbance_setpoint: Optional[int] = None,
-    disturbance_direction: Optional[str] = None,
-    disturbance_magnitude_percent: Optional[float] = None,
-    disturbance_assumption: Optional[str] = None,
-    disturbance_source: Optional[str] = None,
-    attention_targets: Optional[List[str]] = None,
-    output_state_variables: Optional[List[str]] = None,
-    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
-    constraint_verification_types: Optional[List[str]] = None,
-    include_baseline_comparison: Optional[bool] = None,
-    baseline_cache: Optional[BaselineForecastCache] = None,
-    pipeformer_root: Optional[str] = None,
-    checkpoint_dir: Optional[str] = None,
-    data_dir: Optional[str] = None,
-    static_dir: Optional[str] = None,
-    mapping_csv: Optional[str] = None,
-    device: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Compatibility entry point; new callers should use PipeFormerForecastService."""
-    request = locals().copy()
-    service = PipeFormerForecastService(
-        request.pop("backend_root"),
-        baseline_cache=request.pop("baseline_cache"),
-    )
-    return service.analyze(**request)

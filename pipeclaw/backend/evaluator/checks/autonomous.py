@@ -13,20 +13,21 @@ from pipeclaw.backend.grounding.evidence.tool import (
     classify_tool_evidence,
     requested_artifacts,
 )
-from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
-
 from ..models import EvaluationContext, MetricResult
 from ..quality_references import VARIABLE_REFERENCE
 from .assumptions import assumption_consistency, inferred_task_fields, prediction_view
 from .common import (
-    CANONICAL_METRIC_NAMES,
     PIPEFORMER_TOOL,
+    calls,
     case_identity_matches,
     checkpoint_inference_used,
     disturbance_was_applied,
+    forecast_registry_order,
     horizon_is_consistent,
     mapping,
     metric,
+    ordered_canonical_metrics,
+    output_wrappers,
     requested_constraints_executed,
     sequence,
     task_field_comparison,
@@ -34,14 +35,6 @@ from .common import (
     verification_view,
 )
 from .evidence import evidence_consistency
-
-
-def _calls(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_calls")) if isinstance(item, Mapping)]
-
-
-def _output_wrappers(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_outputs")) if isinstance(item, Mapping)]
 
 
 def _output(wrapper: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -54,10 +47,10 @@ def _successful_forecast_pairs(
 ) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
     calls_by_id = {
         str(call.get("tool_call_id") or ""): call
-        for call in _calls(record)
+        for call in calls(record)
     }
     pairs: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
-    for wrapper in _output_wrappers(record):
+    for wrapper in output_wrappers(record):
         value = _output(wrapper)
         call = calls_by_id.get(str(wrapper.get("tool_call_id") or ""), {})
         is_forecast = wrapper.get("name") == PIPEFORMER_TOOL or call.get("name") == PIPEFORMER_TOOL
@@ -161,7 +154,7 @@ def _matches_reference_contract(
 def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     tasks = [
         _resolved_forecast_arguments(record, call)
-        for call in _calls(record)
+        for call in calls(record)
         if call.get("name") == PIPEFORMER_TOOL
         and isinstance(call.get("arguments"), Mapping)
     ]
@@ -171,10 +164,18 @@ def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
     return [prediction_view(pairs[0][1])] if pairs else []
 
 
-def _task_parsing(context: EvaluationContext) -> MetricResult:
-    expected_tasks = [
+def _oracle_tasks(context: EvaluationContext) -> list[Mapping[str, Any]]:
+    return [
         item for item in sequence(context.oracle.get("tasks")) if isinstance(item, Mapping)
     ]
+
+
+def _assumed_task_fields(tasks: list[Mapping[str, Any]]) -> list[str]:
+    return sorted({field for task in tasks for field in inferred_task_fields(task)})
+
+
+def _task_parsing(context: EvaluationContext) -> MetricResult:
+    expected_tasks = _oracle_tasks(context)
     if not expected_tasks:
         task = mapping(context.oracle.get("task"))
         expected_tasks = [task] if task else []
@@ -210,13 +211,7 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
             unmatched.pop(matched_index)
         elif unmatched:
             mismatches.extend(task_field_comparison(unmatched[0], actual)[1])
-    assumed_fields = sorted(
-        {
-            field
-            for task in expected_tasks
-            for field in inferred_task_fields(task)
-        }
-    )
+    assumed_fields = _assumed_task_fields(expected_tasks)
     applicable = bool(expected_tasks)
     return metric(
         context,
@@ -237,7 +232,7 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
 def _tool_metrics(
     context: EvaluationContext,
 ) -> tuple[MetricResult, MetricResult]:
-    calls = _calls(context.record)
+    tool_calls = calls(context.record)
     teacher_names = {str(item) for item in sequence(context.oracle.get("teacher_tool_names"))}
     is_openclaw = str((context.reference or {}).get("scenario_type") or "").casefold() in {
         "openclaw",
@@ -264,19 +259,19 @@ def _tool_metrics(
         } or set(teacher_names)
     valid_calls = [
         call
-        for call in calls
+        for call in tool_calls
         if call.get("schema_valid") is not False
         and call.get("execution_success") is not False
     ]
-    failed_calls = [call for call in calls if call not in valid_calls]
+    failed_calls = [call for call in tool_calls if call not in valid_calls]
     emitted_names = {str(call.get("name")) for call in valid_calls if call.get("name")}
     emitted_valid = capabilities(emitted_names) if is_openclaw else emitted_names
-    applicable = bool(required or calls)
+    applicable = bool(required or tool_calls)
     failed_names = {str(call.get("name")) for call in failed_calls if call.get("name")}
     failed_capabilities = capabilities(failed_names) if is_openclaw else failed_names
     recovery_targets = required | failed_capabilities
     last_required: dict[str, Mapping[str, Any]] = {}
-    for call in calls:
+    for call in tool_calls:
         name = str(call.get("name") or "")
         call_capabilities = capabilities({name}) if is_openclaw else {name}
         for capability in call_capabilities & recovery_targets:
@@ -312,12 +307,14 @@ def _tool_metrics(
         details={
             "expected_tool_names": sorted(teacher_names),
             "required_tool_names": sorted(required),
-            "emitted_tool_names": [str(call.get("name")) for call in calls if call.get("name")],
+            "emitted_tool_names": [str(call.get("name")) for call in tool_calls if call.get("name")],
             "failed_call_count": len(failed_calls),
             "repeated_failure_signatures": len(repeated_failures),
             "successful_call_count": len(valid_calls),
-            "total_call_count": len(calls),
-            "call_success_rate": len(valid_calls) / len(calls) if calls else None,
+            "total_call_count": len(tool_calls),
+            "call_success_rate": (
+                len(valid_calls) / len(tool_calls) if tool_calls else None
+            ),
             "duplicate_successful_call_count": duplicate_successes,
         },
     )
@@ -345,12 +342,8 @@ def _tool_metrics(
 
 
 def _assumption_metric(context: EvaluationContext) -> MetricResult:
-    expected_tasks = [
-        item for item in sequence(context.oracle.get("tasks")) if isinstance(item, Mapping)
-    ]
-    assumed = sorted(
-        {field for task in expected_tasks for field in inferred_task_fields(task)}
-    )
+    expected_tasks = _oracle_tasks(context)
+    assumed = _assumed_task_fields(expected_tasks)
     pairs = _successful_forecast_pairs(context.record)
     actual_task = mapping(pairs[0][0].get("arguments")) if pairs else {}
     output = pairs[0][1] if pairs else {}
@@ -430,32 +423,15 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
 
 
 def _registry_metric(context: EvaluationContext) -> MetricResult:
-    calls = _calls(context.record)
+    tool_calls = calls(context.record)
     outputs_by_id = {
         str(item.get("tool_call_id") or ""): _output(item)
-        for item in _output_wrappers(context.record)
+        for item in output_wrappers(context.record)
     }
-    forecast_indices = [
-        index for index, call in enumerate(calls) if call.get("name") == PIPEFORMER_TOOL
-    ]
-    unauthorized: list[str] = []
-    for index in forecast_indices:
-        completed = [
-            {
-                "tool_call_id": str(call.get("tool_call_id") or ""),
-                "name": call.get("name"),
-                "arguments": dict(mapping(call.get("arguments"))),
-                "output": outputs_by_id.get(str(call.get("tool_call_id") or "")),
-            }
-            for call in calls[:index]
-        ]
-        authorization = authorize_forecast_registry(
-            dict(mapping(calls[index].get("arguments"))),
-            completed,
-        )
-        if not authorization["authorized"]:
-            unauthorized.append(str(calls[index].get("tool_call_id") or ""))
-    applicable = bool(forecast_indices)
+    _, unauthorized = forecast_registry_order(tool_calls, outputs_by_id)
+    applicable = bool(
+        any(call.get("name") == PIPEFORMER_TOOL for call in tool_calls)
+    )
     return metric(
         context,
         "registry_ordering",
@@ -498,10 +474,10 @@ def _missing_resource_anchors(record: Mapping[str, Any]) -> list[str]:
     # drops the structured details (e.g. compacted projections).
     calls_by_id = {
         str(call.get("tool_call_id") or ""): mapping(call.get("arguments"))
-        for call in _calls(record)
+        for call in calls(record)
     }
     anchors: list[str] = []
-    for item in _output_wrappers(record):
+    for item in output_wrappers(record):
         if not (output := item.get("output")) or not isinstance(output, Mapping) or output.get("success", True) is not False:
             continue
         error_code = str(output.get("error_code") or "")
@@ -824,15 +800,15 @@ def _answer_metric(context: EvaluationContext) -> MetricResult:
 
 
 def _json_metric(context: EvaluationContext) -> MetricResult:
-    calls = _calls(context.record)
+    tool_calls = calls(context.record)
     errors = sequence(context.record.get("json_errors"))
-    applicable = bool(calls or errors)
+    applicable = bool(tool_calls or errors)
     return metric(
         context,
         "json_validity",
         applicable=applicable,
         passed=applicable and not errors and all(
-            call.get("schema_valid") is not False for call in calls
+            call.get("schema_valid") is not False for call in tool_calls
         ),
         details={"error_count": len(errors), "scope": "tool_call_json_and_schema"},
     )
@@ -887,8 +863,8 @@ def _artifact_metric(context: EvaluationContext) -> MetricResult:
             details={"requested_artifacts": []},
         )
     enriched = attach_tool_arguments(
-        [dict(item) for item in _output_wrappers(context.record)],
-        [dict(item) for item in _calls(context.record)],
+        [dict(item) for item in output_wrappers(context.record)],
+        [dict(item) for item in calls(context.record)],
     )
     assessments = [
         classify_tool_evidence(item, requested=requested) for item in enriched
@@ -930,8 +906,8 @@ def _record_contract(context: EvaluationContext) -> MetricResult:
 
 
 def _portability_diagnostics(record: Mapping[str, Any]) -> dict[str, int]:
-    calls = _calls(record)
-    rebased = [call for call in calls if call.get("cwd_rebased")]
+    tool_calls = calls(record)
+    rebased = [call for call in tool_calls if call.get("cwd_rebased")]
     failures = sum(call.get("execution_success") is False for call in rebased)
     return {
         "cwd_rebased_calls": len(rebased),
@@ -939,7 +915,7 @@ def _portability_diagnostics(record: Mapping[str, Any]) -> dict[str, int]:
         "rebased_execution_successes": len(rebased) - failures,
         "rebased_execution_failures": failures,
         "portable_path_normalization_calls": sum(
-            bool(call.get("portable_path_normalization")) for call in calls
+            bool(call.get("portable_path_normalization")) for call in tool_calls
         ),
     }
 
@@ -975,16 +951,18 @@ def evaluate_autonomous_checks(
         _record_contract(context),
         tool_recovery,
     ]
-    by_name = {item.name: item for item in metrics}
-    ordered = [by_name[name] for name in CANONICAL_METRIC_NAMES]
-    ordered.append(tool_recovery)
-    ordered.append(claim_support)
-    ordered.append(claim_alignment)
-    ordered.append(question_anchor)
-    ordered.append(
-        _hallucination_metric(
-            context,
-            [evidence, claim_support, claim_alignment, question_anchor],
-        )
+    ordered = ordered_canonical_metrics(
+        context,
+        metrics,
+        extra=(
+            tool_recovery,
+            claim_support,
+            claim_alignment,
+            question_anchor,
+            _hallucination_metric(
+                context,
+                [evidence, claim_support, claim_alignment, question_anchor],
+            ),
+        ),
     )
     return ordered, {"portability": _portability_diagnostics(context.record)}

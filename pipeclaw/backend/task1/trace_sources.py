@@ -32,9 +32,10 @@ def load_scenario_sources(paths: Sequence[Path]) -> List[Dict[str, Any]]:
         scenarios = json.loads(resolved.read_text(encoding="utf-8-sig"))
         if not isinstance(scenarios, list):
             raise TypeError(f"Scenario file must contain a JSON list: {resolved}")
-        for scenario in scenarios:
-            scenario["dataset_source"] = source_name
-            scenario["source_file"] = resolved.name
+        scenarios = [
+            {**scenario, "dataset_source": source_name, "source_file": resolved.name}
+            for scenario in scenarios
+        ]
         sources.append(
             {
                 "dataset_source": source_name,

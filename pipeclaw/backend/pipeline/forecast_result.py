@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Dict, List, Literal, Optional
 
@@ -36,7 +36,7 @@ COMPACT_OUTPUT_SUMMARY_KEYS = (
 )
 
 
-def _without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
+def without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
     return {key: item for key, item in value.items() if item is not None}
 
 
@@ -94,7 +94,7 @@ def compact_parsed_task(output: Mapping[str, Any]) -> Dict[str, Any]:
         variable_key="resolved_output_variables",
     )
     compact["boundary_conditions"] = compact_boundary
-    return _without_none_values(compact)
+    return without_none_values(compact)
 
 
 def _relevant_forecast_variables(
@@ -128,7 +128,7 @@ def _relevant_forecast_variables(
     return relevant
 
 
-def _compact_forecast_window(metadata: Mapping[str, Any]) -> Dict[str, Any]:
+def compact_forecast_window(metadata: Mapping[str, Any]) -> Dict[str, Any]:
     stored = metadata.get("forecast_window")
     if isinstance(stored, Mapping):
         return dict(stored)
@@ -151,10 +151,10 @@ def _compact_forecast_window(metadata: Mapping[str, Any]) -> Dict[str, Any]:
         "real_row_count": len(real_rows) if isinstance(real_rows, list) else 0,
         "predict_row_count": len(predict_rows) if isinstance(predict_rows, list) else 0,
     }
-    return _without_none_values(window)
+    return without_none_values(window)
 
 
-def _source_name(value: Any) -> Optional[str]:
+def source_name(value: Any) -> Optional[str]:
     return Path(str(value)).name if value else None
 
 
@@ -163,6 +163,16 @@ def _compact_output_summary(summary: Mapping[str, Any]) -> Dict[str, Any]:
         key: summary[key]
         for key in COMPACT_OUTPUT_SUMMARY_KEYS
         if summary.get(key) is not None
+    }
+
+
+def compact_output_summaries(
+    summaries: Mapping[str, Any], variables: Iterable[str]
+) -> Dict[str, Any]:
+    return {
+        variable: _compact_output_summary(dict(summaries[variable] or {}))
+        for variable in variables
+        if variable in summaries
     }
 
 
@@ -183,13 +193,11 @@ def _compact_prediction(output: Mapping[str, Any]) -> Dict[str, Any]:
     )
     compact = {key: prediction.get(key) for key in keys}
     summaries = dict(prediction.get("output_forecast_summary") or {})
-    compact["output_forecast_summary"] = {
-        variable: _compact_output_summary(dict(summaries[variable] or {}))
-        for variable in _relevant_forecast_variables(output)
-        if variable in summaries
-    }
+    compact["output_forecast_summary"] = compact_output_summaries(
+        summaries, _relevant_forecast_variables(output)
+    )
     compact["total_output_variable_count"] = len(summaries)
-    forecast_window = _compact_forecast_window(metadata)
+    forecast_window = compact_forecast_window(metadata)
     compact.update(
         {
             "forecast_window": forecast_window or None,
@@ -199,7 +207,7 @@ def _compact_prediction(output: Mapping[str, Any]) -> Dict[str, Any]:
             ),
         }
     )
-    return _without_none_values(compact)
+    return without_none_values(compact)
 
 
 def _compact_finding(finding: Mapping[str, Any]) -> Dict[str, Any]:
@@ -230,7 +238,7 @@ def _compact_finding(finding: Mapping[str, Any]) -> Dict[str, Any]:
     compact["evaluated_values"] = values[:3]
     if finding.get("operating_envelope_status"):
         compact["operating_envelope_status"] = finding["operating_envelope_status"]
-    return _without_none_values(compact)
+    return without_none_values(compact)
 
 
 def _compact_verification(output: Mapping[str, Any]) -> Dict[str, Any]:
@@ -275,7 +283,7 @@ def _compact_verification(output: Mapping[str, Any]) -> Dict[str, Any]:
             compact["comparable_metrics"]["energy_evaluation_status"] = (
                 comparable_metrics["energy_evaluation_status"]
             )
-    return _without_none_values(compact)
+    return without_none_values(compact)
 
 
 def _compact_execution(output: Mapping[str, Any]) -> Dict[str, Any]:
@@ -303,9 +311,9 @@ def _compact_execution(output: Mapping[str, Any]) -> Dict[str, Any]:
     }
     provenance = {
         "checkpoint_id": metadata.get("checkpoint_id")
-        or _source_name(metadata.get("checkpoint_dir")),
+        or source_name(metadata.get("checkpoint_dir")),
         "data_case_id": metadata.get("data_case_id")
-        or _source_name(metadata.get("data_case_dir")),
+        or source_name(metadata.get("data_case_dir")),
         "device": metadata.get("device"),
         "model_input_projection_type": metadata.get("model_input_projection_type"),
         "data_provenance": metadata.get("data_provenance"),
@@ -313,14 +321,14 @@ def _compact_execution(output: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "success": True,
         "parsed_task": parsed_task,
-        "task_resolution": _without_none_values(task_resolution),
+        "task_resolution": without_none_values(task_resolution),
         "prediction": _compact_prediction(output),
         "verification": _compact_verification(output),
         "evidence": dict(output.get("evidence") or {}),
         "risk_level": output.get("risk_level"),
         "manual_intervention_label": output.get("manual_intervention_label"),
         "dispatch_recommendation": output.get("dispatch_recommendation"),
-        "provenance": _without_none_values(provenance),
+        "provenance": without_none_values(provenance),
     }
 
 
@@ -328,7 +336,7 @@ class ForecastResult(BaseModel):
     """The released compact forecast-result mapping with a typed boundary."""
 
     success: Literal[True]
-    parsed_task: Dict[str, Any] = Field(default_factory=dict)
+    parsed_task: Dict[str, Any] = Field(default_factory=dict, exclude=True)
     task_resolution: Dict[str, Any]
     prediction: Dict[str, Any]
     verification: Dict[str, Any]
@@ -369,5 +377,6 @@ __all__ = [
     "COMPACT_COMPARABLE_METRIC_KEYS",
     "COMPACT_OUTPUT_SUMMARY_KEYS",
     "ForecastResult",
+    "compact_forecast_window",
     "compact_parsed_task",
 ]

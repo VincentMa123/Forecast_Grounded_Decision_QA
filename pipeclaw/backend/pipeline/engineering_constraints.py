@@ -18,7 +18,8 @@ from .constraints.flow import run_flow_checks
 from .constraints.human_intervention import intervention_label_from_checks, run_human_intervention_checks
 from .constraints.linepack import run_linepack_checks
 from .constraints.pressure import run_pressure_checks
-from .rule_library import load_pipeline_constraints, load_rule_document
+from .constraints.common import PIPELINE_CONSTRAINTS, DISPATCH_RULES
+from .forecast_result import without_none_values
 
 
 CategoryRunner = Callable[[Dict[str, Dict[str, Any]], Dict[str, Any]], List[Dict[str, Any]]]
@@ -32,10 +33,6 @@ CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "abnormality_warning": run_abnormality_warning_checks,
     "dispatch_priority": run_dispatch_priority_checks,
 }
-PIPELINE_CONSTRAINTS = load_pipeline_constraints()
-DISPATCH_RULES = load_rule_document("dispatch_priority")
-
-
 def run_engineering_constraint_checks(
     summaries: Dict[str, Dict[str, Any]],
     parsed_task: Optional[Dict[str, Any]] = None,
@@ -186,7 +183,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
     ]
 
     return {
-        "pressure": _without_none_values(
+        "pressure": without_none_values(
             {
                 "minimum_pressure": pressure.get("minimum_pressure"),
                 "maximum_pressure": pressure.get("maximum_pressure"),
@@ -216,7 +213,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 ),
             }
         ),
-        "flow": _without_none_values(
+        "flow": without_none_values(
             {
                 "maximum_segment_flow_change": _maximum_mapping_value(
                     flow.get("flow_change_magnitude", {})
@@ -232,7 +229,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "supply_demand_balance": (balance.get("evaluated_values") or [None])[0],
             }
         ),
-        "linepack": _without_none_values(
+        "linepack": without_none_values(
             {
                 "minimum_linepack": linepack.get("minimum_linepack"),
                 "maximum_linepack_change_rate": _maximum_mapping_value(
@@ -256,7 +253,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "linepack_warning_status": linepack.get("linepack_warning_status"),
             }
         ),
-        "compressor": _without_none_values(
+        "compressor": without_none_values(
             {
                 "operating_envelope_status": compressor.get("operating_envelope_status"),
                 "maximum_load": _maximum_evaluated_value(compressor),
@@ -282,10 +279,6 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
             ),
         },
     }
-
-
-def _without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
-    return {key: item for key, item in value.items() if item is not None}
 
 
 def _minimum_pressure_margin(

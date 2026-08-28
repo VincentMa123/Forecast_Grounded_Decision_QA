@@ -1,11 +1,9 @@
-"""Deterministic Task 1 to MS-SWIFT dataset projections."""
-
 from __future__ import annotations
 
 import argparse
 import json
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -16,9 +14,7 @@ from pipeclaw.task2_student.path_contract import (
     redact_host_paths,
 )
 from pipeclaw.task2_student.release_artifacts import (
-    JsonlArtifactError,
     atomic_write_text as _atomic_write_text,
-    read_jsonl as _read_jsonl_artifact,
     sha256_bytes as _sha256_bytes,
     sha256_file as _sha256_file,
     stable_json,
@@ -27,6 +23,7 @@ from pipeclaw.task2_student.release_artifacts import (
 from pipeclaw.task2_student.scripts.validate_dataset import (
     DatasetValidationError,
     projection_writes_python,
+    read_jsonl,
     validate_projection_records,
     validate_source_records,
 )
@@ -78,15 +75,6 @@ DEFAULT_OUTPUT_ROOT = REPO_ROOT / "pipeclaw" / "task2_student" / "data"
 DEFAULT_MANIFEST_PATH = (
     DEFAULT_OUTPUT_ROOT / "manifests" / "task2_dataset_manifest.json"
 )
-
-
-def read_jsonl(path: Path) -> list[dict[str, Any]]:
-    """Read source JSONL through the shared artifact boundary as a domain error."""
-
-    try:
-        return _read_jsonl_artifact(path)
-    except JsonlArtifactError as exc:
-        raise DatasetValidationError(str(exc)) from exc
 
 
 def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
@@ -141,7 +129,7 @@ def project_trace_level(
     record["messages"] = [
         {
             "role": "system",
-            "content": _trace_system_content(source),
+            "content": trace_system_content(source),
         },
         {"role": "user", "content": source["user_input"]},
         *_paired_tool_messages(source, registered_names),
@@ -539,7 +527,7 @@ def _system_content(source: dict[str, Any], prompt: str) -> str:
     )
 
 
-def _trace_system_content(source: dict[str, Any]) -> str:
+def trace_system_content(source: dict[str, Any]) -> str:
     training_context = (
         "## Training Example Context\n"
         "The following verified state and bounded dialogue are input data, "

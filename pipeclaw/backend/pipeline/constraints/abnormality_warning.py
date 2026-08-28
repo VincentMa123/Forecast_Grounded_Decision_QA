@@ -3,7 +3,14 @@ from __future__ import annotations
 from typing import Any, Dict, List
 
 from ..rule_library import load_constraint_specs, load_rule_definition
-from .common import CATEGORY_DETAILS, max_status, run_specs, status_from_threshold, variables_for_selector
+from .common import (
+    CATEGORY_DETAILS,
+    max_status,
+    run_specs,
+    status_from_threshold,
+    supply_demand_gaps,
+    variables_for_selector,
+)
 
 
 ABNORMALITY_SPECS = load_constraint_specs("abnormality_warning")
@@ -33,30 +40,7 @@ def _potential_leak_check(
     supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
     demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
     variables = list(dict.fromkeys(pressure_check.get("variables", []) + supply_variables + demand_variables))
-    usable_supply_variables = [
-        variable
-        for variable in supply_variables
-        if summaries.get(variable, {}).get("predicted_values")
-    ]
-    usable_demand_variables = [
-        variable
-        for variable in demand_variables
-        if summaries.get(variable, {}).get("predicted_values")
-    ]
-    lengths = [
-        len(summaries.get(variable, {}).get("predicted_values", []))
-        for variable in usable_supply_variables + usable_demand_variables
-    ]
-    step_count = (
-        min(lengths, default=0)
-        if usable_supply_variables and usable_demand_variables
-        else 0
-    )
-    gaps = []
-    for index in range(step_count):
-        supply = sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply_variables) / len(usable_supply_variables)
-        demand = sum(float(summaries[name]["predicted_values"][index]) for name in usable_demand_variables) / len(usable_demand_variables)
-        gaps.append(supply - demand)
+    _, gaps = supply_demand_gaps(summaries, supply_variables, demand_variables)
 
     max_gap = max((abs(value) for value in gaps), default=0.0)
     gap_widening = bool(gaps) and abs(gaps[-1]) > abs(gaps[0])

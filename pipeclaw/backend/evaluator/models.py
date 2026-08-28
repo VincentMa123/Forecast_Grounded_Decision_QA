@@ -102,16 +102,6 @@ class EvaluationReport:
             str(name): metric.to_dict()
             for name, metric in self.metrics.items()
         }
-        evidence = self.metrics.get("evidence_consistency")
-        if (
-            self.profile is EvaluationProfile.AUTONOMOUS_ROLLOUT
-            and evidence is not None
-            and "hallucination" not in self.metrics
-        ):
-            hallucination = evidence.to_dict()
-            hallucination["included_in_score"] = False
-            hallucination["derived_from"] = "evidence_consistency"
-            metrics["hallucination"] = hallucination
         return {
             "schema_version": str(self.schema_version),
             "profile": self.profile.value,

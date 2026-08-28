@@ -14,15 +14,14 @@ from pipeclaw.backend.grounding.evidence.tool import (
     classify_tool_evidence,
     requested_artifacts,
 )
-from pipeclaw.backend.pipeline.forecast_result import compact_parsed_task
+from pipeclaw.backend.pipeline.forecast_result import (
+    compact_parsed_task,
+    without_none_values,
+)
 
 
 OMITTED_CALL_ARGUMENT_KEYS = frozenset({"cwd"})
 MAX_HISTORY_SUMMARY_CHARS = 1_900
-
-
-def _without_none_values(value: Dict[str, Any]) -> Dict[str, Any]:
-    return {key: item for key, item in value.items() if item is not None}
 
 
 def _host_absolute_path(value: Any) -> bool:
@@ -34,7 +33,6 @@ def _host_absolute_path(value: Any) -> bool:
         Path(normalized).is_absolute()
         or PureWindowsPath(raw).is_absolute()
         or ntpath.splitdrive(raw)[0]
-        or normalized.startswith("//")
     )
 
 
@@ -98,7 +96,7 @@ def _comparison_state(state: VerifiedDecisionState) -> Dict[str, Any]:
     """Persist the state-owned candidate facts without a second projection."""
     if not state.candidates:
         return {}
-    return _without_none_values(
+    return without_none_values(
         {
             "scope": deepcopy(state.scope),
             "candidate_results": deepcopy(state.candidates),
@@ -110,7 +108,7 @@ def _comparison_state(state: VerifiedDecisionState) -> Dict[str, Any]:
 
 def _policy_memory_summary(value: Any) -> Dict[str, Any]:
     policy = dict(value or {})
-    return _without_none_values(
+    return without_none_values(
         {
             "source": policy.get("source"),
             "hard_constraints": list(policy.get("hard_constraints") or [])[:2],
@@ -145,7 +143,7 @@ def _comparison_memory_summary(value: Mapping[str, Any]) -> Dict[str, Any]:
         for candidate in value.get("candidate_results") or []
         if isinstance(candidate, Mapping)
     ]
-    return _without_none_values(
+    return without_none_values(
         {
             "candidate_results": candidates[:3],
             "decision_policy": _policy_memory_summary(value.get("decision_policy")),
@@ -194,7 +192,7 @@ def _compact_csv_result(value: Any) -> Any:
 
 def _minimal_csv_evidence(value: Any) -> Dict[str, Any]:
     source = dict(value or {})
-    return _without_none_values(
+    return without_none_values(
         {
             "source_file_count": source.get("source_file_count"),
             "source_files": list(source.get("source_files") or [])[:2],
@@ -239,7 +237,7 @@ def _compact_csv_evidence(value: Any) -> Dict[str, Any]:
         )
     if rows:
         compact["answer_rows"] = rows
-    return _without_none_values(compact)
+    return without_none_values(compact)
 
 
 def _bounded_verified_evidence_summary(
@@ -415,7 +413,7 @@ def build_history_turn(
     verified_evidence_summary = _bounded_verified_evidence_summary(
         verified_evidence_summary
     )
-    return _without_none_values(
+    return without_none_values(
         {
             "session_id": record.get("session_id"),
             "turn_id": record.get("turn_id"),

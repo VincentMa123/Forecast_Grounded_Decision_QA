@@ -7,6 +7,9 @@ from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
+from .decision_policy import llm_policy_excerpts
+from .evidence.tool import tool_result_failed
+
 
 VERIFIED_DECISION_STATE_SCHEMA_VERSION = "verified_decision_state_v1"
 DEFAULT_STATE_MAX_CHARS = 16_000
@@ -29,7 +32,7 @@ def _explicit_scope_value(
     return current.get(key) if value is None else value
 
 
-def _canonical_json(value: Any) -> str:
+def canonical_json(value: Any) -> str:
     return json.dumps(
         value,
         ensure_ascii=False,
@@ -61,10 +64,10 @@ def _action_fingerprint(
             ),
         },
     }
-    return hashlib.sha256(_canonical_json(payload).encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()[:20]
 
 
-def _has_boundary_action(candidate: Dict[str, Any]) -> bool:
+def has_boundary_action(candidate: Dict[str, Any]) -> bool:
     action = dict(candidate.get("action") or {})
     return bool(
         dict(action.get("percentage_changes") or {})
@@ -77,13 +80,13 @@ def _requested_action_fingerprint(
     scope: Dict[str, Any],
 ) -> Optional[str]:
     candidate = {"action": dict(arguments.get("boundary_conditions") or {})}
-    return _action_fingerprint(candidate, scope) if _has_boundary_action(candidate) else None
+    return _action_fingerprint(candidate, scope) if has_boundary_action(candidate) else None
 
 
 def _failed_forecast_arguments(turn: Dict[str, Any]) -> Dict[str, Any]:
     request = turn.get("failed_forecast_request")
     return (
-        deepcopy(dict(request.get("arguments") or {}))
+        dict(request.get("arguments") or {})
         if isinstance(request, dict)
         else {}
     )
@@ -130,7 +133,6 @@ def _normalized_disturbance(value: Any) -> Dict[str, Any]:
                 result["requested_value"] = rendered
     return result
 
-
 def _scope_from_pipeformer(
     pipeformer: Dict[str, Any],
     current: Dict[str, Any],
@@ -167,7 +169,7 @@ def _scope_from_pipeformer(
 
 
 def _scope_fingerprint(scope: Dict[str, Any]) -> str:
-    return hashlib.sha256(_canonical_json(scope).encode("utf-8")).hexdigest()[:20]
+    return hashlib.sha256(canonical_json(scope).encode("utf-8")).hexdigest()[:20]
 
 
 def _candidate_audit_status(candidate: Dict[str, Any]) -> str:
@@ -176,13 +178,7 @@ def _candidate_audit_status(candidate: Dict[str, Any]) -> str:
         warning_count = int(candidate.get("warning_count") or 0)
     except (TypeError, ValueError):
         return "unknown"
-    return (
-        "failed"
-        if failure_count > 0
-        else "warning"
-        if warning_count > 0
-        else "passed"
-    )
+    return "failed" if failure_count else "warning" if warning_count else "passed"
 
 
 def _merge_candidate_results(
@@ -197,10 +193,10 @@ def _merge_candidate_results(
     incoming_candidates = [
         deepcopy(dict(item)) for item in incoming if isinstance(item, dict)
     ]
-    if any(_has_boundary_action(item) for item in incoming_candidates):
-        candidates = [item for item in candidates if _has_boundary_action(item)]
+    if any(has_boundary_action(item) for item in incoming_candidates):
+        candidates = [item for item in candidates if has_boundary_action(item)]
         incoming_candidates = [
-            item for item in incoming_candidates if _has_boundary_action(item)
+            item for item in incoming_candidates if has_boundary_action(item)
         ]
 
     positions = {
@@ -255,14 +251,12 @@ def _scope_from_single_forecast_snapshot(
     current: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Recover the canonical scope when history stores only a state snapshot."""
-    stored = dict(snapshot.get("scope") or {})
-    if not stored:
-        return deepcopy(current)
+    stored = snapshot.get("scope")
     return {
         key: deepcopy(value)
-        for key, value in stored.items()
+        for key, value in dict(stored).items()
         if value not in (None, "", [], {})
-    }
+    } if stored else deepcopy(current)
 
 
 def _accepted_llm_policy(
@@ -281,16 +275,11 @@ def _accepted_llm_policy(
     question = " ".join(str(source_question).split()).casefold()
     if not question:
         return None
-    objectives = [dict(item or {}) for item in policy.get("objectives") or []]
-    legacy_excerpt = " ".join(str(policy.get("source_excerpt") or "").split()).casefold()
-    for objective in objectives:
-        excerpt = " ".join(
-            str(objective.get("source_excerpt") or "").split()
-        ).casefold()
-        if not excerpt and len(objectives) == 1:
-            excerpt = legacy_excerpt
-        if len(excerpt) < 4 or excerpt not in question:
-            return None
+    if any(
+        len(excerpt) < 4 or excerpt not in question
+        for excerpt in llm_policy_excerpts(policy)
+    ):
+        return None
     result = deepcopy(policy)
     ranking = decision.get("ordered_viable_candidate_ids") or decision.get("ranking")
     if ranking:
@@ -399,32 +388,27 @@ def _merge_registry_state_items(existing: Iterable[Dict[str, Any]], incoming: It
 
 
 def _merge_applied_disturbances(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return _merge_replaced_items(existing, incoming, lambda item: _canonical_json([str(item.get("variable") or "").casefold(), str(item.get("mode") or "").casefold(), item.get("requested_value")]))
+    return _merge_replaced_items(existing, incoming, lambda item: canonical_json([str(item.get("variable") or "").casefold(), str(item.get("mode") or "").casefold(), item.get("requested_value")]))
 
 
 def _ordered_unique(existing: Iterable[Any], incoming: Iterable[Any]) -> List[Any]:
     merged = []
     seen = set()
     for item in [*existing, *incoming]:
-        key = _canonical_json(item)
+        key = canonical_json(item)
         if key not in seen:
             seen.add(key)
             merged.append(deepcopy(item))
     return merged
 
 
-def _successful_tool_result(item: Dict[str, Any]) -> bool:
+def _verified_state_tool_result(item: Dict[str, Any]) -> bool:
     output = item.get("output")
-    return (
+    if not (
         isinstance(output, dict)
         and output.get("success") is True
-        and not output.get("error")
-        and output.get("exit_code") in (None, 0)
-    )
-
-
-def _verified_state_tool_result(item: Dict[str, Any]) -> bool:
-    if not _successful_tool_result(item):
+        and not tool_result_failed(output)
+    ):
         return False
     if item.get("name") != "run_pipeformer_forecast":
         return True
@@ -488,7 +472,7 @@ def _forecast_scope(
     }
 
 
-_SINGLE_FORECAST_ENGINEERING_FIELDS = {
+ENGINEERING_METRIC_FIELDS = {
     "pressure": (
         "maximum_pressure",
         "minimum_pressure",
@@ -591,46 +575,22 @@ def _compact_single_forecast_snapshot(
             ),
             "baseline_reference": comparable.get("baseline_reference"),
         },
-        "top_watch_variables": [
-            {
-                key: deepcopy(item[key])
-                for key in (
-                    "variable",
-                    "role",
-                    "metric",
-                    "value",
-                    "status",
-                    "mean_prediction",
-                    "mean_abs_delta_vs_observed",
-                )
-                if item.get(key) is not None
-            }
-            for item in list(evidence.get("top_watch_variables") or [])[:3]
-            if isinstance(item, dict)
-        ],
-        "key_observation_variables": [
-            {
-                key: deepcopy(item[key])
-                for key in (
-                    "variable",
-                    "role",
-                    "metric",
-                    "value",
-                    "status",
-                    "mean_prediction",
-                    "mean_abs_delta_vs_observed",
-                )
-                if item.get(key) is not None
-            }
-            for item in list(evidence.get("key_observation_variables") or [])[:2]
-            if isinstance(item, dict)
-        ],
-        "provenance": {
-            "source_turn_id": source_turn_id,
-            "source_tool_call_id": str(call.get("tool_call_id") or ""),
-        },
     }
-    for category, fields in _SINGLE_FORECAST_ENGINEERING_FIELDS.items():
+    watch_fields = (
+        "variable", "role", "metric", "value", "status",
+        "mean_prediction", "mean_abs_delta_vs_observed",
+    )
+    for key, limit in (("top_watch_variables", 3), ("key_observation_variables", 2)):
+        snapshot[key] = [
+            {name: deepcopy(item[name]) for name in watch_fields if item.get(name) is not None}
+            for item in list(evidence.get(key) or [])[:limit]
+            if isinstance(item, dict)
+        ]
+    snapshot["provenance"] = {
+        "source_turn_id": source_turn_id,
+        "source_tool_call_id": str(call.get("tool_call_id") or ""),
+    }
+    for category, fields in ENGINEERING_METRIC_FIELDS.items():
         category_evidence = dict(engineering.get(category) or {})
         compact_category = {
             field: deepcopy(category_evidence[field])
@@ -639,7 +599,7 @@ def _compact_single_forecast_snapshot(
         }
         if compact_category:
             snapshot[category] = compact_category
-    if len(_canonical_json(snapshot)) <= MAX_SINGLE_FORECAST_HISTORY_CHARS:
+    if len(canonical_json(snapshot)) <= MAX_SINGLE_FORECAST_HISTORY_CHARS:
         return snapshot
     # Preserve the facts used to compare an earlier single forecast while
     # staying below PromptBuilder's per-entry memory budget.
@@ -684,7 +644,7 @@ def bounded_recent_turns(
             if turn.get(key) not in (None, "")
         }
         projected.append(item)
-    while projected and len(_canonical_json(projected)) > max_chars:
+    while projected and len(canonical_json(projected)) > max_chars:
         if len(projected) > 1:
             projected.pop(0)
             continue
@@ -696,7 +656,7 @@ def bounded_recent_turns(
         if not text_keys:
             raise ValueError("Recent-turn metadata exceeds the configured budget.")
         key = text_keys[0]
-        overflow = len(_canonical_json(projected)) - max_chars
+        overflow = len(canonical_json(projected)) - max_chars
         keep = max(0, len(only[key]) - overflow - 1)
         only[key] = only[key][:keep]
         if keep == 0:
@@ -708,8 +668,6 @@ def serialize_verified_decision_state(
     state: "VerifiedDecisionState | Dict[str, Any]",
     *,
     max_chars: int = DEFAULT_STATE_MAX_CHARS,
-    token_counter: Optional[Callable[[str], int]] = None,
-    max_tokens: Optional[int] = None,
 ) -> Dict[str, Any]:
     """Serialize one state snapshot and fail closed instead of dropping evidence."""
     payload = (
@@ -717,25 +675,13 @@ def serialize_verified_decision_state(
         if isinstance(state, VerifiedDecisionState)
         else VerifiedDecisionState.from_dict(dict(state)).to_dict()
     )
-    rendered = _canonical_json(payload)
+    rendered = canonical_json(payload)
     if len(rendered) > max_chars:
         raise ValueError(
             "Verified decision state exceeds the configured state budget "
             f"({len(rendered)} > {max_chars}); required IDs, metrics, and "
             "provenance were not dropped."
         )
-    if max_tokens is not None:
-        if token_counter is None:
-            raise ValueError(
-                "A caller-supplied offline token_counter is required when "
-                "max_tokens is configured."
-            )
-        token_count = int(token_counter(rendered))
-        if token_count > max_tokens:
-            raise ValueError(
-                "Verified decision state exceeds the configured token budget "
-                f"({token_count} > {max_tokens})."
-            )
     return payload
 
 
@@ -914,7 +860,6 @@ class _VerifiedStateDelta:
     requested_action_fingerprint: Optional[str] = None
     registry_variables: Tuple[Dict[str, Any], ...] = ()
     candidate_results: Tuple[Dict[str, Any], ...] = ()
-    candidate_results_present: bool = False
     preserve_prior_tool_call_id: bool = False
     decision_policy: Optional[Dict[str, Any]] = None
     decision_policy_source_question: Optional[str] = None
@@ -931,26 +876,27 @@ def _delta_from_verified_tool_results(
     session_id: str, turn_id: int, question: str,
     tool_results: Iterable[Dict[str, Any]], current: "VerifiedDecisionState",
 ) -> _VerifiedStateDelta:
-    from .contract import GroundingContractBuilder
+    from .contract import GroundingContractBuilder, latest_decision_policy
 
     observed = [deepcopy(dict(item)) for item in tool_results if isinstance(item, dict)]
     forecasts = [item for item in observed if item.get("name") == "run_pipeformer_forecast"]
-    scope = _forecast_scope(dict(forecasts[-1].get("arguments") or {}), [], current.scope) if forecasts else {}
-    requested_action_fingerprint = (
-        _requested_action_fingerprint(
-            dict(forecasts[-1].get("arguments") or {}), scope
-        )
-        if forecasts
-        else None
-    )
     successful = [item for item in observed if _verified_state_tool_result(item)]
     if not successful:
+        scope = _forecast_scope(dict(forecasts[-1].get("arguments") or {}), [], current.scope) if forecasts else {}
         return _VerifiedStateDelta(
             scope=scope,
-            requested_action_fingerprint=requested_action_fingerprint,
+            requested_action_fingerprint=(
+                _requested_action_fingerprint(
+                    dict(forecasts[-1].get("arguments") or {}), scope
+                )
+                if forecasts
+                else None
+            ),
         )
 
     current_forecasts = [item for item in successful if item.get("name") == "run_pipeformer_forecast"]
+    scope: Dict[str, Any] = {}
+    requested_action_fingerprint = None
     contract = GroundingContractBuilder().build(
         question, successful, require_decision_policy=True,
         prior_candidate_results=current.candidates, prior_decision_policy=current.decision_policy,
@@ -968,10 +914,10 @@ def _delta_from_verified_tool_results(
         )
 
     registry = [
-        _compact_registry_state_item(dict(variable), provenance={
-            "tool_call_id": call.get("tool_call_id"), "query": dict(call.get("arguments") or {}).get("query"),
-            "role": dict(call.get("arguments") or {}).get("role"),
-            "controllable": dict(call.get("arguments") or {}).get("controllable")})
+        _compact_registry_state_item(
+            dict(variable),
+            provenance={"tool_call_id": call.get("tool_call_id")},
+        )
         for call in successful if call.get("name") == "search_pipeformer_registry"
         for variable in dict(call.get("output") or {}).get("variables") or []
         if isinstance(variable, dict) and variable.get("variable")
@@ -995,12 +941,9 @@ def _delta_from_verified_tool_results(
                     candidate[key] = arguments[key]
             if applied: candidate["disturbance"] = deepcopy(applied[-1])
 
-    policy = dict(contract.get("decision_policy") or {})
-    for call in reversed(successful):
-        output_policy = dict(call.get("output") or {}).get("decision_policy")
-        if call.get("name") == "set_decision_policy" and isinstance(output_policy, dict):
-            policy = output_policy
-            break
+    policy = latest_decision_policy(successful) or dict(
+        contract.get("decision_policy") or {}
+    )
     accepted_policy = _accepted_llm_policy(
         policy,
         dict(contract.get("decision_summary") or {}),
@@ -1038,7 +981,6 @@ def _delta_from_verified_tool_results(
         requested_action_fingerprint=requested_action_fingerprint,
         registry_variables=tuple(registry),
         candidate_results=tuple(candidates),
-        candidate_results_present=bool(contract.get("candidate_results")),
         decision_policy=accepted_policy,
         decision_policy_source_question=question if accepted_policy and question else None,
         applied_disturbances=applied,
@@ -1118,7 +1060,6 @@ def _delta_from_history_turn(
             for candidate in pipeformer.get("candidate_results") or []
             if isinstance(candidate, dict) and candidate.get("candidate_id")
         ),
-        candidate_results_present=bool(pipeformer.get("candidate_results")),
         preserve_prior_tool_call_id=True,
         decision_policy=accepted_policy,
         decision_policy_source_question=(
@@ -1181,7 +1122,7 @@ def _apply_verified_state_delta(
     result.registry_variables = _merge_registry_state_items(
         result.registry_variables, delta.registry_variables
     )
-    if delta.candidate_results_present:
+    if delta.candidate_results:
         result.candidates, policy_reset = _merge_candidate_results(
             result.candidates,
             delta.candidate_results,
@@ -1219,5 +1160,4 @@ def _apply_verified_state_delta(
     return result
 
 
-# Backward-compatible name used by existing evaluator/generator imports.
 DecisionTraceState = VerifiedDecisionState

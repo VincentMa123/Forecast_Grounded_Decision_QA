@@ -1,5 +1,3 @@
-"""Exact, fail-closed token profiling for Task 2 MS-SWIFT datasets."""
-
 from __future__ import annotations
 
 import argparse
@@ -9,14 +7,15 @@ import math
 import tempfile
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol
 
 from pipeclaw.task2_student.release_artifacts import (
-    JsonlArtifactError,
-    atomic_write_text,
-    read_jsonl as _read_jsonl_artifact,
+    atomic_write_text as _atomic_write_text,
+    read_jsonl_domain,
+    required_text,
     sha256_bytes,
     sha256_file as _sha256_file,
     stable_json as _stable_json,
@@ -66,11 +65,11 @@ class TokenProfileError(ValueError):
     """Raised when a token profile cannot be produced safely."""
 
 
+_required_text = partial(required_text, error_factory=TokenProfileError)
+
+
 def _read_jsonl(path: Path) -> list[dict[str, Any]]:
-    try:
-        return _read_jsonl_artifact(path)
-    except JsonlArtifactError as exc:
-        raise TokenProfileError(str(exc)) from exc
+    return read_jsonl_domain(path, error_factory=TokenProfileError)
 
 
 @dataclass(frozen=True)
@@ -493,8 +492,8 @@ def write_profile_reports(
         raise TokenProfileError("summary and records destinations must differ")
     summary_text = _stable_json(report) + "\n"
     records_text = _records_text(rows)
-    atomic_write_text(summary_path, summary_text)
-    atomic_write_text(records_path, records_text)
+    _atomic_write_text(summary_path, summary_text)
+    _atomic_write_text(records_path, records_text)
 
 
 def _commit_profile_reports(
@@ -508,11 +507,11 @@ def _commit_profile_reports(
 
     summary_path = summary_path.resolve()
     records_path = records_path.resolve()
-    atomic_write_text(
+    _atomic_write_text(
         records_path,
         staged_records_path.read_text(encoding="utf-8"),
     )
-    atomic_write_text(
+    _atomic_write_text(
         summary_path,
         staged_summary_path.read_text(encoding="utf-8"),
     )
@@ -852,13 +851,6 @@ def _flat_vector(value: Any, location: str) -> list[Any]:
 
 def _records_text(rows: Sequence[dict[str, Any]]) -> str:
     return "".join(_stable_json(row) + "\n" for row in rows)
-
-
-def _required_text(record: dict[str, Any], field: str, location: str) -> str:
-    value = record.get(field)
-    if not isinstance(value, str) or not value.strip():
-        raise TokenProfileError(f"{location}: {field} must be nonempty text")
-    return value
 
 
 def main(

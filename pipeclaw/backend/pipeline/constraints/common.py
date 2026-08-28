@@ -48,6 +48,7 @@ def variables_matching(
     physical_quantities: Tuple[str, ...] = (),
     equipment_types: Tuple[str, ...] = (),
     roles: Tuple[str, ...] = (),
+    controllable: Optional[bool] = None,
 ) -> List[str]:
     if not registry:
         raise ValueError("Variable registry metadata is required for constraint selection.")
@@ -59,6 +60,8 @@ def variables_matching(
         if equipment_types and metadata.get("equipment_type") not in equipment_types:
             continue
         if roles and metadata.get("role") not in roles:
+            continue
+        if controllable is not None and bool(metadata.get("controllable")) != controllable:
             continue
         result.append(name)
     return result
@@ -302,6 +305,8 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
         (str(variable), float(value))
         for variable, value in dict(boundary.get("percentage_changes") or {}).items()
     ]
+
+
     if parsed_task.get("disturbance_source") != "external_condition":
         disturbance_variable = parsed_task.get("disturbance_variable")
         disturbance_percent = parsed_task.get("disturbance_magnitude_percent")
@@ -393,6 +398,27 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
     else:
         check["message"] = "Boundary-control adjustment magnitude requires review."
     return check
+
+
+def supply_demand_gaps(
+    summaries: Dict[str, Dict[str, Any]],
+    supply_variables: List[str],
+    demand_variables: List[str],
+) -> tuple[List[str], List[float]]:
+    usable_supply = [
+        name for name in supply_variables if summaries.get(name, {}).get("predicted_values")
+    ]
+    usable_demand = [
+        name for name in demand_variables if summaries.get(name, {}).get("predicted_values")
+    ]
+    lengths = [len(summaries[name]["predicted_values"]) for name in usable_supply + usable_demand]
+    step_count = min(lengths, default=0) if usable_supply and usable_demand else 0
+    gaps = [
+        sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply) / len(usable_supply)
+        - sum(float(summaries[name]["predicted_values"][index]) for name in usable_demand) / len(usable_demand)
+        for index in range(step_count)
+    ]
+    return usable_supply + usable_demand, gaps
 
 
 def evaluate_spec(

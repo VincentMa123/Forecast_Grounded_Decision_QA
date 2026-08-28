@@ -22,10 +22,9 @@ from pipeclaw.backend.evaluator import (
     summarize,
 )
 from pipeclaw.task2_student.release_artifacts import (
-    JsonlArtifactError,
     atomic_jsonl_writer,
     atomic_write_text,
-    read_jsonl as _read_jsonl_artifact,
+    read_jsonl_domain,
 )
 
 from .models import PromptCase, RolloutConfig
@@ -66,12 +65,7 @@ _REPORT_ROOT_FIELDS = (
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read one JSON object per line, reporting the offending line on failure."""
 
-    try:
-        return _read_jsonl_artifact(path, skip_blank_lines=True)
-    except JsonlArtifactError as exc:
-        if exc.message == "JSONL row must be an object":
-            raise ValueError(f"expected object at {exc.path}:{exc.line_number}") from exc
-        raise ValueError(f"invalid JSONL at {exc.path}:{exc.line_number}: {exc.message}") from exc
+    return read_jsonl_domain(path, skip_blank_lines=True)
 
 
 
@@ -276,12 +270,14 @@ def _set_postfix(progress: Any, **fields: Any) -> None:
         progress.set_postfix(refresh=False, **fields)
 
 
-def _release_cuda_cache() -> None:
+def release_cuda_cache() -> None:
     """Release unreachable per-case tensors and unused CUDA allocator blocks."""
 
-    import torch
-
     gc.collect()
+    try:
+        import torch
+    except ImportError:
+        return
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
 
@@ -408,7 +404,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                     scenario=case.scenario_type,
                     status=rollout.get("trace_status", "unknown"),
                 )
-                _release_cuda_cache()
+                release_cuda_cache()
 
     summary = _summary(
         [report for report in reports if report is not None],

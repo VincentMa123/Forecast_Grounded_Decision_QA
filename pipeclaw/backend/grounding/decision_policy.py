@@ -16,85 +16,20 @@ class MetricDefinition:
 
 
 METRIC_CATALOG: Dict[str, MetricDefinition] = {
-    "warning.count": MetricDefinition(
-        "warning.count",
-        ("warning_count",),
-        "minimize",
-        "告警数",
-        "warnings",
-    ),
-    "risk.rank": MetricDefinition(
-        "risk.rank",
-        ("risk_rank",),
-        "minimize",
-        "风险等级",
-        "risk rank",
-    ),
-    "compressor.maximum_load": MetricDefinition(
-        "compressor.maximum_load",
-        ("compressor_metrics", "maximum_load", "value"),
-        "minimize",
-        "压缩机最大负荷",
-        "maximum compressor load",
-    ),
-    "pressure.minimum_operating_window_margin": MetricDefinition(
-        "pressure.minimum_operating_window_margin",
-        ("pressure_metrics", "minimum_operating_window_margin", "value"),
-        "maximize",
-        "最小压力窗裕度",
-        "minimum pressure-window margin",
-    ),
-    "flow.max_abs_supply_demand_gap": MetricDefinition(
-        "flow.max_abs_supply_demand_gap",
-        ("flow_metrics", "supply_demand_balance", "value"),
-        "minimize",
-        "最大供需差",
-        "maximum absolute supply-demand gap",
-    ),
-    "flow.maximum_segment_flow_change": MetricDefinition(
-        "flow.maximum_segment_flow_change",
-        ("flow_metrics", "maximum_segment_flow_change", "value"),
-        "minimize",
-        "最大管段流量变化",
-        "maximum segment-flow change",
-    ),
-    "linepack.maximum_decline_from_start": MetricDefinition(
-        "linepack.maximum_decline_from_start",
-        ("linepack_metrics", "maximum_decline_from_start", "value"),
-        "minimize",
-        "最大管存下降",
-        "maximum linepack decline",
-    ),
-    "linepack.maximum_continuous_decline_minutes": MetricDefinition(
-        "linepack.maximum_continuous_decline_minutes",
-        ("linepack_metrics", "maximum_continuous_decline_minutes"),
-        "minimize",
-        "管存最长连续下降分钟",
-        "maximum continuous linepack-decline minutes",
-    ),
-    "linepack.insufficient_recovery_count": MetricDefinition(
-        "linepack.insufficient_recovery_count",
-        ("linepack_metrics", "insufficient_recovery_count"),
-        "minimize",
-        "管存恢复不足次数",
-        "insufficient linepack-recovery count",
-    ),
-    "energy.delta_vs_baseline": MetricDefinition(
-        "energy.delta_vs_baseline",
-        ("energy_metrics", "delta_vs_baseline"),
-        "minimize",
-        "相对基线能耗变化",
-        "energy delta versus baseline",
-        ("energy_metrics", "unit"),
-    ),
-    "energy.total": MetricDefinition(
-        "energy.total",
-        ("energy_metrics", "total"),
-        "minimize",
-        "总能耗",
-        "total energy",
-        ("energy_metrics", "unit"),
-    ),
+    metric: MetricDefinition(metric, path, direction, label_zh, label_en, unit_path)
+    for metric, path, direction, label_zh, label_en, unit_path in (
+        ("warning.count", ("warning_count",), "minimize", "告警数", "warnings", ()),
+        ("risk.rank", ("risk_rank",), "minimize", "风险等级", "risk rank", ()),
+        ("compressor.maximum_load", ("compressor_metrics", "maximum_load", "value"), "minimize", "压缩机最大负荷", "maximum compressor load", ()),
+        ("pressure.minimum_operating_window_margin", ("pressure_metrics", "minimum_operating_window_margin", "value"), "maximize", "最小压力窗裕度", "minimum pressure-window margin", ()),
+        ("flow.max_abs_supply_demand_gap", ("flow_metrics", "supply_demand_balance", "value"), "minimize", "最大供需差", "maximum absolute supply-demand gap", ()),
+        ("flow.maximum_segment_flow_change", ("flow_metrics", "maximum_segment_flow_change", "value"), "minimize", "最大管段流量变化", "maximum segment-flow change", ()),
+        ("linepack.maximum_decline_from_start", ("linepack_metrics", "maximum_decline_from_start", "value"), "minimize", "最大管存下降", "maximum linepack decline", ()),
+        ("linepack.maximum_continuous_decline_minutes", ("linepack_metrics", "maximum_continuous_decline_minutes"), "minimize", "管存最长连续下降分钟", "maximum continuous linepack-decline minutes", ()),
+        ("linepack.insufficient_recovery_count", ("linepack_metrics", "insufficient_recovery_count"), "minimize", "管存恢复不足次数", "insufficient linepack-recovery count", ()),
+        ("energy.delta_vs_baseline", ("energy_metrics", "delta_vs_baseline"), "minimize", "相对基线能耗变化", "energy delta versus baseline", ("energy_metrics", "unit")),
+        ("energy.total", ("energy_metrics", "total"), "minimize", "总能耗", "total energy", ("energy_metrics", "unit")),
+    )
 }
 
 DEFAULT_DECISION_POLICY: Dict[str, Any] = {
@@ -122,7 +57,7 @@ _DECISION_PRIORITY_SIGNAL = re.compile(
 )
 
 
-def _nested(value: Mapping[str, Any], path: Sequence[str]) -> Any:
+def nested_value(value: Mapping[str, Any], path: Sequence[str]) -> Any:
     current: Any = value
     for key in path:
         if not isinstance(current, Mapping):
@@ -131,11 +66,26 @@ def _nested(value: Mapping[str, Any], path: Sequence[str]) -> Any:
     return current
 
 
-def _number(value: Any) -> Optional[float]:
+def number_value(value: Any) -> Optional[float]:
     try:
         return float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+
+
+def llm_policy_excerpts(policy: Mapping[str, Any]) -> List[str]:
+    """Return the normalized source excerpts that must appear in the user question."""
+    objectives = [dict(item or {}) for item in policy.get("objectives") or []]
+    legacy_excerpt = " ".join(str(policy.get("source_excerpt") or "").split()).casefold()
+    excerpts = []
+    for objective in objectives:
+        excerpt = " ".join(
+            str(objective.get("source_excerpt") or "").split()
+        ).casefold()
+        if not excerpt and len(objectives) == 1:
+            excerpt = legacy_excerpt
+        excerpts.append(excerpt)
+    return excerpts
 
 
 def normalize_decision_policy(
@@ -182,7 +132,7 @@ def normalize_decision_policy(
                 f"invalid_metric_direction:{metric}:{direction}:expected_{definition.direction}"
             )
             continue
-        tolerance = _number(item.get("tolerance"))
+        tolerance = number_value(item.get("tolerance"))
         if tolerance is None:
             tolerance = 0.0
         if tolerance < 0:
@@ -276,13 +226,13 @@ def metric_evidence(
     if metric == "risk.rank":
         raw_value = RISK_RANK.get(str(candidate.get("risk_level") or "").casefold())
     else:
-        raw_value = _nested(candidate, definition.path)
-    value = _number(raw_value)
+        raw_value = nested_value(candidate, definition.path)
+    value = number_value(raw_value)
     if value is None:
         return None
 
     result: Dict[str, Any] = {"value": value}
-    metric_container = _nested(candidate, definition.path[:-1])
+    metric_container = nested_value(candidate, definition.path[:-1])
     if isinstance(metric_container, Mapping):
         if metric_container.get("variable"):
             result["variable"] = str(metric_container["variable"])
@@ -290,7 +240,7 @@ def metric_evidence(
             result["source_metric"] = str(metric_container["metric"])
         if metric_container.get("status"):
             result["status"] = str(metric_container["status"])
-    unit = _nested(candidate, definition.unit_path) if definition.unit_path else None
+    unit = nested_value(candidate, definition.unit_path) if definition.unit_path else None
     if unit:
         result["unit"] = str(unit)
     return result

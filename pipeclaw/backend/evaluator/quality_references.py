@@ -223,18 +223,28 @@ def observed_numeric_claim_values(text: str) -> list[float]:
     return [value for value, _, _ in observed_numeric_claim_items(text)]
 
 
-def observed_numeric_values(value: Any) -> list[float]:
-    """Walk structured or serialized evidence without inventing conversions."""
+def walk_numeric_values(value: Any, leaf) -> list[float]:
+    """Walk structured or serialized evidence, applying a leaf parser to strings."""
 
     if isinstance(value, str):
-        return observed_numeric_claim_values(value)
+        return leaf(value)
     if isinstance(value, Mapping):
-        return [number for item in value.values() for number in observed_numeric_values(item)]
+        return [
+            number
+            for item in value.values()
+            for number in walk_numeric_values(item, leaf)
+        ]
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
-        return [number for item in value for number in observed_numeric_values(item)]
+        return [number for item in value for number in walk_numeric_values(item, leaf)]
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return [float(value)]
     return []
+
+
+def observed_numeric_values(value: Any) -> list[float]:
+    """Walk structured or serialized evidence without inventing conversions."""
+
+    return walk_numeric_values(value, observed_numeric_claim_values)
 
 
 def _is_compact_date(raw: str) -> bool:

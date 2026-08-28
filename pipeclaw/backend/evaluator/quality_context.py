@@ -13,7 +13,6 @@ class QualityContext:
     pipeformer: Optional[Dict[str, Any]]
     conversation_context: tuple[Dict[str, Any], ...]
     tool_outputs: tuple[Dict[str, Any], ...]
-    trusted_tool_outputs: tuple[Dict[str, Any], ...]
     record_evidence: Dict[str, Any]
     grounding_evidence: Dict[str, Any]
 
@@ -42,7 +41,6 @@ def build_quality_context(
         pipeformer=normalized_pipeformer,
         conversation_context=tuple(trusted_context),
         tool_outputs=normalized_outputs,
-        trusted_tool_outputs=trusted_tool_outputs,
         record_evidence=normalized_record_evidence,
         grounding_evidence={
             "pipeformer": normalized_pipeformer or {},

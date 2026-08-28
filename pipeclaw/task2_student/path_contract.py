@@ -1,5 +1,3 @@
-"""Platform-neutral path predicates shared by dataset and rollout code."""
-
 from __future__ import annotations
 
 import ntpath
@@ -24,12 +22,6 @@ def is_host_absolute_path(value: Any) -> bool:
     )
 
 
-def normalize_relative_path(value: str) -> str:
-    """Normalize a model-facing relative path to POSIX separators."""
-
-    return str(value).replace("\\", "/")
-
-
 def canonicalize_recorded_tool_arguments(
     tool_name: str,
     arguments: Mapping[str, Any],
@@ -49,7 +41,7 @@ def canonicalize_recorded_tool_arguments(
     if cwd is None or cwd == "<host-path>" or is_host_absolute_path(cwd):
         canonical.pop("cwd", None)
     elif isinstance(cwd, str):
-        canonical["cwd"] = normalize_relative_path(cwd)
+        canonical["cwd"] = str(cwd).replace("\\", "/")
 
     command = canonical.get("cmd")
     if isinstance(command, list):
@@ -57,7 +49,7 @@ def canonicalize_recorded_tool_arguments(
             (
                 "<host-path>"
                 if isinstance(item, str) and is_host_absolute_path(item)
-                else normalize_relative_path(item)
+                else str(item).replace("\\", "/")
                 if isinstance(item, str) and not item.startswith("-")
                 else item
             )

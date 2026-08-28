@@ -114,11 +114,9 @@ class VariableRegistry:
         equipment_types: Iterable[str] = (),
         physical_quantities: Iterable[str] = (),
         offset: int = 0,
-        limit: int = 12,
+        limit: int | None = None,
     ) -> List[Dict[str, Any]]:
         """Return a deterministic compact registry projection for tool use."""
-        page_offset = max(0, int(offset))
-        page_limit = max(1, int(limit))
         query_terms = [term for term in str(query).casefold().split() if term]
         equipment_id_filter = {str(value).casefold() for value in equipment_ids}
         equipment_type_filter = {str(value).casefold() for value in equipment_types}
@@ -157,7 +155,8 @@ class VariableRegistry:
             exact_score = 0 if canonical_id_in_query else 1
             ranked.append((exact_score, str(item.get("variable")), item))
         ranked.sort(key=lambda value: (value[0], value[1]))
-        page = ranked[page_offset : page_offset + page_limit]
+        start = max(0, int(offset))
+        page = ranked[start:] if limit is None else ranked[start : start + max(1, int(limit))]
         return [_compact_registry_entry(item) for _, _, item in page]
 
 
@@ -256,14 +255,6 @@ def validate_variable_registry(
     except ValueError as exc:
         return _invalid_registry_report(path, f"Could not read registry JSON: {exc}")
     return registry.validate(required_variables)
-
-
-def load_variable_registry(
-    path: Path,
-    required_variables: Iterable[str],
-) -> Dict[str, Any]:
-    path = Path(path)
-    return VariableRegistry.read(path).require(required_variables)
 
 
 def _registry_report(
