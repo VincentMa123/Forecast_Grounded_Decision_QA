@@ -1,12 +1,3 @@
-"""Dataset-level rollout orchestration and schema-v3 scoring.
-
-This module is the single place where rollout *execution* meets rollout
-*evaluation*: it runs each case through :class:`RolloutRunner` and then scores
-the resulting trajectory with ``pipeclaw.backend.evaluator``.  ``models``,
-``prompting``, ``runner``, and ``tools`` stay free of evaluator imports so the
-execution core remains testable without teacher oracles or score weights.
-"""
-
 from __future__ import annotations
 
 import gc
@@ -43,6 +34,7 @@ from .tools import ToolDispatcher
 try:
     from tqdm.auto import tqdm
 except ImportError:  # pragma: no cover - MS-SWIFT normally installs tqdm
+
     def tqdm(iterable=None, *args, **kwargs):
         del args, kwargs
         return iterable if iterable is not None else []
@@ -66,7 +58,6 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read one JSON object per line, reporting the offending line on failure."""
 
     return read_jsonl_domain(path, skip_blank_lines=True)
-
 
 
 def sample_keys(record: Mapping[str, Any]) -> set[str]:
@@ -208,9 +199,7 @@ def build_cases(
         )
         case = builder.build(
             source,
-            workspace_root=workspace_for(
-                output_dir, evaluation_workspace_key(source)
-            ),
+            workspace_root=workspace_for(output_dir, evaluation_workspace_key(source)),
             tool_schemas=schemas,
         )
         cases.append((dict(source), case))
@@ -364,7 +353,9 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     mode = "dry_run" if dry_run else "autonomous"
     with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
         if dry_run:
-            progress = tqdm(cases, total=len(cases), desc="Preparing evaluation", unit="case")
+            progress = tqdm(
+                cases, total=len(cases), desc="Preparing evaluation", unit="case"
+            )
             for _, case in progress:
                 write_rollout(_dry_run_item(case))
                 record_count += 1

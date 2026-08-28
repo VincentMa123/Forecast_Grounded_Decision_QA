@@ -1,5 +1,3 @@
-"""Canonical handling for provisional teacher disturbance assumptions."""
-
 from __future__ import annotations
 
 import math
@@ -40,20 +38,15 @@ def inferred_task_fields(task: Mapping[str, Any]) -> frozenset[str]:
     return frozenset(
         canonical
         for field in fields
-        if (
-            canonical := _ASSUMED_FIELD_ALIASES.get(
-                str(field).strip().casefold()
-            )
-        )
+        if (canonical := _ASSUMED_FIELD_ALIASES.get(str(field).strip().casefold()))
     )
 
 
 def prediction_view(forecast_output: Mapping[str, Any]) -> Mapping[str, Any]:
     """Return either supported compact PipeFormer prediction shape."""
 
-    prediction = (
-        forecast_output.get("prediction")
-        or forecast_output.get("prediction_summary")
+    prediction = forecast_output.get("prediction") or forecast_output.get(
+        "prediction_summary"
     )
     return prediction if isinstance(prediction, Mapping) else forecast_output
 
@@ -167,9 +160,7 @@ def assumption_consistency(
     """Validate assumed values against the student's executed prediction."""
 
     assumed_fields = frozenset(
-        field
-        for task in expected_tasks
-        for field in inferred_task_fields(task)
+        field for task in expected_tasks for field in inferred_task_fields(task)
     )
     if not assumed_fields:
         return True, []
@@ -185,9 +176,10 @@ def assumption_consistency(
         if field == "disturbance_direction":
             if str(actual_value).casefold() not in {"up", "down"}:
                 mismatches.append(field)
-            elif predicted_value is not None and str(predicted_value).casefold() != str(
-                actual_value
-            ).casefold():
+            elif (
+                predicted_value is not None
+                and str(predicted_value).casefold() != str(actual_value).casefold()
+            ):
                 mismatches.append(field)
             continue
         try:

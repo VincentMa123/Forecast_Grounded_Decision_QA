@@ -164,10 +164,7 @@ def _compact_csv_value(value: Any, *, depth: int = 0) -> Any:
             for key, item in list(value.items())[:6]
         }
     if isinstance(value, list):
-        return [
-            _compact_csv_value(item, depth=depth + 1)
-            for item in value[:2]
-        ]
+        return [_compact_csv_value(item, depth=depth + 1) for item in value[:2]]
     return deepcopy(value)
 
 
@@ -211,9 +208,7 @@ def _compact_csv_evidence(value: Any) -> Dict[str, Any]:
         "source_file_count": source.get("source_file_count"),
     }
     if source.get("selection_summary") is not None:
-        compact["selection_summary"] = _compact_csv_value(
-            source["selection_summary"]
-        )
+        compact["selection_summary"] = _compact_csv_value(source["selection_summary"])
     if source.get("source_files"):
         compact["source_files"] = list(source["source_files"])[:3]
     for key, limit in (("computed_results", 1), ("derived_results", 2)):
@@ -230,8 +225,7 @@ def _compact_csv_evidence(value: Any) -> Dict[str, Any]:
             {
                 "source_file": item.get("source_file"),
                 "values": {
-                    key: _compact_csv_value(values[key])
-                    for key in list(values)[:6]
+                    key: _compact_csv_value(values[key]) for key in list(values)[:6]
                 },
             }
         )
@@ -244,7 +238,10 @@ def _bounded_verified_evidence_summary(
     value: Dict[str, Any],
 ) -> Dict[str, Any]:
     """Keep one history-memory entry eligible for PromptBuilder rendering."""
-    if len(json.dumps(value, ensure_ascii=False, default=str)) <= MAX_HISTORY_SUMMARY_CHARS:
+    if (
+        len(json.dumps(value, ensure_ascii=False, default=str))
+        <= MAX_HISTORY_SUMMARY_CHARS
+    ):
         return value
     primary = (
         "pipeformer"
@@ -333,11 +330,13 @@ def build_history_turn(
     ]
     verified_forecast_outputs = bool(forecast_outputs) and all(
         output.get("success") is True
-        and dict(output.get("verification") or output.get("constraint_check") or {}).get(
-            "verification_complete"
-        )
+        and dict(
+            output.get("verification") or output.get("constraint_check") or {}
+        ).get("verification_complete")
         is True
-        and bool(dict(output.get("evidence") or {}).get("boundary_application_evidence"))
+        and bool(
+            dict(output.get("evidence") or {}).get("boundary_application_evidence")
+        )
         and all(
             isinstance(application, dict) and application.get("verified") is True
             for application in dict(output.get("evidence") or {}).get(
@@ -350,16 +349,14 @@ def build_history_turn(
     failed_forecast_request = (
         next(
             (
-                {
-                    "arguments": compact_tool_call_arguments(item.get("arguments") or {})
-                }
+                {"arguments": compact_tool_call_arguments(item.get("arguments") or {})}
                 for item in reversed(outputs)
-                if str(item.get("name") or "").casefold()
-                == "run_pipeformer_forecast"
+                if str(item.get("name") or "").casefold() == "run_pipeformer_forecast"
             ),
             None,
         )
-        if forecast_outputs and all(output.get("success") is not True for output in forecast_outputs)
+        if forecast_outputs
+        and all(output.get("success") is not True for output in forecast_outputs)
         else None
     )
     comparison_state: Dict[str, Any] = {}
@@ -422,8 +419,7 @@ def build_history_turn(
             "quality_flag": record.get("quality_flag"),
             "verified_state_eligible": bool(verified_evidence_summary),
             "grounding_verified": (
-                record.get("quality_flag") == "pass"
-                and bool(verified_evidence_summary)
+                record.get("quality_flag") == "pass" and bool(verified_evidence_summary)
             ),
             "tool_evidence_verified": bool(verified_evidence_summary),
             "evidence_artifacts": list(summary.evidence_artifacts),

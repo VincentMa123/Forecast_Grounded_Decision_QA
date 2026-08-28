@@ -33,15 +33,33 @@ from .pipeformer_inference import (
 
 REGISTRY_GROUP_RULES = {
     "nodes": {"equipment_types": {"node"}, "roles": {"output"}},
-    "segments": {"equipment_types": {"pipeline_segment", "ball_valve"}, "roles": {"output"}},
+    "segments": {
+        "equipment_types": {"pipeline_segment", "ball_valve"},
+        "roles": {"output"},
+    },
     "linepack": {"physical_quantities": {"linepack"}, "roles": {"output"}},
-    "compressors": {"equipment_types": {"compressor", "compressor_power"}, "roles": {"output"}},
+    "compressors": {
+        "equipment_types": {"compressor", "compressor_power"},
+        "roles": {"output"},
+    },
     "pressure": {"physical_quantities": {"pressure"}, "roles": {"output"}},
     "flow": {"physical_quantities": {"flow"}, "roles": {"output"}},
-    "compressor_load": {"physical_quantities": {"compressor_load"}, "roles": {"output"}},
-    "compressor": {"equipment_types": {"compressor", "compressor_power"}, "roles": {"output"}},
-    "compression_ratio": {"physical_quantities": {"compression_ratio"}, "roles": {"output"}},
-    "compressor_speed": {"physical_quantities": {"rotational_speed"}, "roles": {"output"}},
+    "compressor_load": {
+        "physical_quantities": {"compressor_load"},
+        "roles": {"output"},
+    },
+    "compressor": {
+        "equipment_types": {"compressor", "compressor_power"},
+        "roles": {"output"},
+    },
+    "compression_ratio": {
+        "physical_quantities": {"compression_ratio"},
+        "roles": {"output"},
+    },
+    "compressor_speed": {
+        "physical_quantities": {"rotational_speed"},
+        "roles": {"output"},
+    },
     "compressor_power": {"physical_quantities": {"power"}, "roles": {"output"}},
     "power": {"physical_quantities": {"power"}, "roles": {"output"}},
     "energy": {"physical_quantities": {"power"}, "roles": {"output"}},
@@ -52,7 +70,10 @@ REGISTRY_GROUP_RULES = {
     "pressure_regulators": {"equipment_types": {"pressure_regulator"}},
     "boundary_controls": {"roles": {"input"}, "controllable": True},
     "valve_opening": {"physical_quantities": {"valve_opening"}, "roles": {"output"}},
-    "regulator_range": {"physical_quantities": {"regulator_range"}, "roles": {"output"}},
+    "regulator_range": {
+        "physical_quantities": {"regulator_range"},
+        "roles": {"output"},
+    },
     "boundary_control_adjustment": {"roles": {"input"}, "controllable": True},
     "dispatch_priority_audit": {"roles": {"output"}},
 }
@@ -99,11 +120,15 @@ def _integrated_energy_metrics(
         if item.get("role") == "output" and item.get("physical_quantity") == "power"
     ]
     units = {str(item.get("unit") or "") for item in power_entries}
-    energy_unit = {
-        "p.u.": "p.u.-hour",
-        "MW": "MWh",
-        "kW": "kWh",
-    }.get(next(iter(units), "")) if len(units) == 1 else None
+    energy_unit = (
+        {
+            "p.u.": "p.u.-hour",
+            "MW": "MWh",
+            "kW": "kWh",
+        }.get(next(iter(units), ""))
+        if len(units) == 1
+        else None
+    )
     usable = [
         str(item["variable"])
         for item in power_entries
@@ -119,19 +144,28 @@ def _integrated_energy_metrics(
         }
 
     factor = float(time_step_minutes) / 60.0
-    total = sum(
-        sum(float(value) for value in summaries[variable]["predicted_values"])
-        for variable in usable
-    ) * factor
+    total = (
+        sum(
+            sum(float(value) for value in summaries[variable]["predicted_values"])
+            for variable in usable
+        )
+        * factor
+    )
     baseline_total = None
     if baseline_summaries is not None and all(
         (baseline_summaries.get(variable) or {}).get("predicted_values")
         for variable in usable
     ):
-        baseline_total = sum(
-            sum(float(value) for value in baseline_summaries[variable]["predicted_values"])
-            for variable in usable
-        ) * factor
+        baseline_total = (
+            sum(
+                sum(
+                    float(value)
+                    for value in baseline_summaries[variable]["predicted_values"]
+                )
+                for variable in usable
+            )
+            * factor
+        )
     return {
         "energy_consumption": round(total, 6),
         "energy_consumption_delta": (
@@ -149,7 +183,9 @@ def _forecast_window_summary(forecast_context: Dict[str, Any]) -> Dict[str, Any]
     labels = list(forecast_context.get("forecast_time_labels") or [])
     if not labels:
         labels = [
-            str(getattr(row, "label", row)).removesuffix("_real").removesuffix("_predict")
+            str(getattr(row, "label", row))
+            .removesuffix("_real")
+            .removesuffix("_predict")
             for row in predict_rows or real_rows
         ]
     return compact_forecast_window(
@@ -178,7 +214,9 @@ def _resolve_requested_variables(
     registry_entries: List[Dict[str, Any]],
 ) -> tuple[List[str], List[str]]:
     if not registry_entries:
-        raise ValueError("Variable registry metadata is required to resolve PipeFormer targets.")
+        raise ValueError(
+            "Variable registry metadata is required to resolve PipeFormer targets."
+        )
     registry = {
         str(item.get("variable")): item
         for item in registry_entries
@@ -241,7 +279,9 @@ def _normalize_vocabulary_provenance(
             raise ValueError(
                 "Vocabulary normalization must use normalization_source='registry_search'."
             )
-        missing = [value for value in canonical_variables if value not in available_targets]
+        missing = [
+            value for value in canonical_variables if value not in available_targets
+        ]
         if missing:
             raise ValueError(
                 "Registry-normalized variables must also appear in attention_targets or "
@@ -325,8 +365,16 @@ def _counterfactual_comparison(
 ) -> Dict[str, Any]:
     comparisons = []
     for variable in output_variables:
-        baseline = [float(row.values[variable]) for row in baseline_rows if variable in row.values]
-        disturbed = [float(row.values[variable]) for row in disturbed_rows if variable in row.values]
+        baseline = [
+            float(row.values[variable])
+            for row in baseline_rows
+            if variable in row.values
+        ]
+        disturbed = [
+            float(row.values[variable])
+            for row in disturbed_rows
+            if variable in row.values
+        ]
         compared_steps = min(len(baseline), len(disturbed))
         if not compared_steps:
             continue
@@ -340,7 +388,11 @@ def _counterfactual_comparison(
                 "final_delta": round(deltas[-1], 6),
                 "max_abs_delta": round(abs(deltas[peak_index]), 6),
                 "max_abs_delta_step_index": peak_index,
-                "direction": "increase" if mean_delta > 0 else "decrease" if mean_delta < 0 else "unchanged",
+                "direction": "increase"
+                if mean_delta > 0
+                else "decrease"
+                if mean_delta < 0
+                else "unchanged",
             }
         )
     comparisons.sort(key=lambda item: item["max_abs_delta"], reverse=True)
@@ -393,19 +445,33 @@ def _normalize_pipeformer_task(parsed: Dict[str, Any]) -> Dict[str, Any]:
     parsed["constraint_verification_types"] = checks
 
     parsed.setdefault("case_id", None)
-    parsed.setdefault("current_operating_condition_number", _condition_number_from_case_id(parsed.get("case_id")))
+    parsed.setdefault(
+        "current_operating_condition_number",
+        _condition_number_from_case_id(parsed.get("case_id")),
+    )
     parsed.setdefault("forecast_horizon_minutes", None)
     _validate_forecast_horizon(parsed.get("forecast_horizon_minutes"))
     parsed.setdefault("disturbance_direction", "unknown")
     parsed.setdefault("disturbance_magnitude_percent", None)
-    parsed.setdefault("attention_targets", targets_for_checks(checks, CATEGORY_ATTENTION_TARGETS))
-    parsed.setdefault("output_state_variables", targets_for_checks(checks, CATEGORY_OUTPUT_STATE_VARIABLES))
+    parsed.setdefault(
+        "attention_targets", targets_for_checks(checks, CATEGORY_ATTENTION_TARGETS)
+    )
+    parsed.setdefault(
+        "output_state_variables",
+        targets_for_checks(checks, CATEGORY_OUTPUT_STATE_VARIABLES),
+    )
 
     boundary_conditions = dict(parsed.get("boundary_conditions") or {})
     boundary_conditions.setdefault("keep_other_boundary_controls", True)
-    boundary_conditions.setdefault("disturbance_variable", parsed.get("disturbance_variable"))
-    boundary_conditions.setdefault("disturbance_direction", parsed.get("disturbance_direction"))
-    boundary_conditions.setdefault("disturbance_magnitude_percent", parsed.get("disturbance_magnitude_percent"))
+    boundary_conditions.setdefault(
+        "disturbance_variable", parsed.get("disturbance_variable")
+    )
+    boundary_conditions.setdefault(
+        "disturbance_direction", parsed.get("disturbance_direction")
+    )
+    boundary_conditions.setdefault(
+        "disturbance_magnitude_percent", parsed.get("disturbance_magnitude_percent")
+    )
     parsed["boundary_conditions"] = boundary_conditions
 
     parsed.setdefault("task_type", "prediction_and_verification")
@@ -544,7 +610,9 @@ def build_pipeformer_task(
     if case_id is not None:
         parsed["case_id"] = case_id
     if current_operating_condition_number is not None:
-        parsed["current_operating_condition_number"] = int(current_operating_condition_number)
+        parsed["current_operating_condition_number"] = int(
+            current_operating_condition_number
+        )
     if boundary_conditions is not None:
         parsed["boundary_conditions"] = _merge_boundary_conditions(
             dict(parsed.get("boundary_conditions") or {}),
@@ -569,10 +637,7 @@ def build_pipeformer_task(
         parsed_boundary = dict(parsed.get("boundary_conditions") or {})
         setpoints = dict(parsed_boundary.get("setpoints") or {})
         existing_setpoint = setpoints.get(resolved_disturbance_variable)
-        if (
-            existing_setpoint is not None
-            and float(existing_setpoint) != setpoint_value
-        ):
+        if existing_setpoint is not None and float(existing_setpoint) != setpoint_value:
             raise ValueError(
                 f"disturbance_setpoint={int(setpoint_value)} conflicts with "
                 f"boundary_conditions.setpoints[{resolved_disturbance_variable!r}]="
@@ -606,7 +671,9 @@ def build_pipeformer_task(
     if output_state_variables is not None:
         parsed["output_state_variables"] = list(output_state_variables)
     if constraint_verification_types is not None:
-        parsed["constraint_verification_types"] = _clean_checks(constraint_verification_types)
+        parsed["constraint_verification_types"] = _clean_checks(
+            constraint_verification_types
+        )
 
     parsed_boundary = dict(parsed.get("boundary_conditions") or {})
     parsed_boundary["disturbance_variable"] = parsed.get("disturbance_variable")
@@ -618,18 +685,18 @@ def build_pipeformer_task(
 
     source = str(disturbance_source or "").strip().casefold()
     if source and source not in {"external_condition", "operator_action"}:
-        raise ValueError("disturbance_source must be 'external_condition' or 'operator_action'.")
+        raise ValueError(
+            "disturbance_source must be 'external_condition' or 'operator_action'."
+        )
     candidate_boundary = dict(parsed.get("boundary_conditions") or {})
     has_candidate_action = bool(
-        candidate_boundary.get("percentage_changes") or candidate_boundary.get("setpoints")
+        candidate_boundary.get("percentage_changes")
+        or candidate_boundary.get("setpoints")
     )
-    parsed["disturbance_source"] = (
-        source
-        or (
-            "external_condition"
-            if disturbance_assumption or (candidate_id and has_candidate_action)
-            else "operator_action"
-        )
+    parsed["disturbance_source"] = source or (
+        "external_condition"
+        if disturbance_assumption or (candidate_id and has_candidate_action)
+        else "operator_action"
     )
 
     if assumed_fields and parsed["disturbance_source"] != "operator_action":
@@ -657,9 +724,15 @@ def build_pipeformer_task(
         + list(parsed.get("output_state_variables") or []),
     )
     if not parsed.get("disturbance_variable"):
-        raise ValueError(f"PipeFormer forecast requires disturbance_variable. Parse error: {parse_error or 'not parsed'}")
-    if parsed.get("disturbance_magnitude_percent") is not None and parsed.get("disturbance_direction") not in {"up", "down"}:
-        raise ValueError("PipeFormer forecast requires disturbance_direction to be 'up' or 'down' when disturbance_magnitude_percent is set.")
+        raise ValueError(
+            f"PipeFormer forecast requires disturbance_variable. Parse error: {parse_error or 'not parsed'}"
+        )
+    if parsed.get("disturbance_magnitude_percent") is not None and parsed.get(
+        "disturbance_direction"
+    ) not in {"up", "down"}:
+        raise ValueError(
+            "PipeFormer forecast requires disturbance_direction to be 'up' or 'down' when disturbance_magnitude_percent is set."
+        )
     _validate_disturbance_boundary_consistency(parsed)
     _validate_binary_state_controls(parsed)
     return parsed
@@ -792,14 +865,20 @@ def _analyze_pipeformer_forecast(
     )
     parsed_boundary = dict(parsed_task.get("boundary_conditions") or {})
     disturbance_magnitude = parsed_task.get("disturbance_magnitude_percent")
-    has_disturbance = disturbance_magnitude is not None and float(disturbance_magnitude) != 0.0
+    has_disturbance = (
+        disturbance_magnitude is not None and float(disturbance_magnitude) != 0.0
+    )
     has_percentage_change = any(
         float(value) != 0.0
         for value in dict(parsed_boundary.get("percentage_changes") or {}).values()
     )
     has_setpoint = bool(parsed_boundary.get("setpoints"))
-    if candidate_role == "baseline" and (has_disturbance or has_percentage_change or has_setpoint):
-        logger.warning("Adjusted forecast cannot be a baseline; normalizing candidate_role to candidate.")
+    if candidate_role == "baseline" and (
+        has_disturbance or has_percentage_change or has_setpoint
+    ):
+        logger.warning(
+            "Adjusted forecast cannot be a baseline; normalizing candidate_role to candidate."
+        )
         candidate_role = "candidate"
     logger.info("PipeFormer parsed task: %s", parsed_task)
     environment = resolve_pipeformer_environment(inference_config)
@@ -839,18 +918,30 @@ def _analyze_pipeformer_forecast(
             ),
         }
     forecast_context = inference_engine.forecast(parsed_task)
-    logger.info("PipeFormer forecast context ready: mode=%s", forecast_context.get("mode"))
-    parsed_task["forecast_time_step_minutes"] = forecast_context.get("time_step_minutes")
+    logger.info(
+        "PipeFormer forecast context ready: mode=%s", forecast_context.get("mode")
+    )
+    parsed_task["forecast_time_step_minutes"] = forecast_context.get(
+        "time_step_minutes"
+    )
     parsed_task["_variable_registry"] = registry_entries
     parsed_task["_boundary_application_evidence"] = list(
         forecast_context.get("boundary_application_evidence") or []
     )
-    variable_summaries = summarize_variables(forecast_context["real_rows"], forecast_context["predict_rows"])
-    logger.info("PipeFormer variable summaries built: variables=%d", len(variable_summaries))
+    variable_summaries = summarize_variables(
+        forecast_context["real_rows"], forecast_context["predict_rows"]
+    )
+    logger.info(
+        "PipeFormer variable summaries built: variables=%d", len(variable_summaries)
+    )
     resolved_attention = task_resolution["resolved_attention_variables"]
     resolved_outputs = task_resolution["resolved_output_variables"]
     automatic_baseline = bool(candidate_id) and candidate_role == "candidate"
-    baseline_enabled = automatic_baseline if include_baseline_comparison is None else bool(include_baseline_comparison)
+    baseline_enabled = (
+        automatic_baseline
+        if include_baseline_comparison is None
+        else bool(include_baseline_comparison)
+    )
     baseline_summaries = None
     baseline_reference = None
     counterfactual_comparison = None
@@ -867,9 +958,12 @@ def _analyze_pipeformer_forecast(
             baseline_key,
             lambda: inference_engine.forecast(baseline_task),
         )
-        baseline_reference = "baseline_" + hashlib.sha256(
-            "|".join(str(value) for value in baseline_key).encode("utf-8")
-        ).hexdigest()[:12]
+        baseline_reference = (
+            "baseline_"
+            + hashlib.sha256(
+                "|".join(str(value) for value in baseline_key).encode("utf-8")
+            ).hexdigest()[:12]
+        )
         baseline_summaries = summarize_variables(
             baseline_context["real_rows"], baseline_context["predict_rows"]
         )
@@ -884,7 +978,9 @@ def _analyze_pipeformer_forecast(
             comparison_variables,
         )
         counterfactual_comparison["baseline_reference"] = baseline_reference
-        counterfactual_comparison["disturbance_variable"] = parsed_task.get("disturbance_variable")
+        counterfactual_comparison["disturbance_variable"] = parsed_task.get(
+            "disturbance_variable"
+        )
         counterfactual_comparison["applied_disturbance"] = next(
             (
                 item
@@ -905,10 +1001,15 @@ def _analyze_pipeformer_forecast(
     )
     comparable_metrics["baseline_reference"] = baseline_reference
     verification["comparable_metrics"] = comparable_metrics
-    logger.info("PipeFormer constraint checks finished: overall_status=%s", verification.get("overall_status"))
+    logger.info(
+        "PipeFormer constraint checks finished: overall_status=%s",
+        verification.get("overall_status"),
+    )
     priority_evidence_variables = []
     for finding in verification.get("priority_findings", []):
-        for value in list(finding.get("offending_values") or []) + list(finding.get("evaluated_values") or []):
+        for value in list(finding.get("offending_values") or []) + list(
+            finding.get("evaluated_values") or []
+        ):
             variable = value.get("variable")
             if variable and variable not in priority_evidence_variables:
                 priority_evidence_variables.append(variable)
@@ -951,7 +1052,9 @@ def _analyze_pipeformer_forecast(
     prediction_summary = {
         "forecast_mode": forecast_context["mode"],
         "case_id": parsed_task.get("case_id"),
-        "current_operating_condition_number": parsed_task.get("current_operating_condition_number"),
+        "current_operating_condition_number": parsed_task.get(
+            "current_operating_condition_number"
+        ),
         "forecast_horizon_minutes": parsed_task.get("forecast_horizon_minutes"),
         "disturbance_variable": parsed_task["disturbance_variable"],
         "disturbance_direction": parsed_task["disturbance_direction"],
@@ -972,7 +1075,9 @@ def _analyze_pipeformer_forecast(
         prediction_summary["counterfactual_comparison"] = counterfactual_comparison
     forecast_metadata = {
         "mode": forecast_context["mode"],
-        "disturbance_variable_mapping": forecast_context["disturbance_variable_mapping"],
+        "disturbance_variable_mapping": forecast_context[
+            "disturbance_variable_mapping"
+        ],
         "forecast_window": _forecast_window_summary(forecast_context),
         "baseline_comparison_included": counterfactual_comparison is not None,
         "baseline_reference": baseline_reference,
@@ -1019,7 +1124,8 @@ def _analyze_pipeformer_forecast(
             "key_observation_variables": observation_variables,
             "boundary_application_evidence": forecast_context.get(
                 "boundary_application_evidence"
-            ) or [],
+            )
+            or [],
         },
         "risk_level": verification["risk_level"],
         "manual_intervention_label": verification["human_intervention_label"],

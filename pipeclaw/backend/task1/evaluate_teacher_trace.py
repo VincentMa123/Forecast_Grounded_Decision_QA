@@ -51,7 +51,9 @@ DEFAULT_SUMMARY = DEFAULT_DELIVERABLE_DIR / "quality_evaluation_summary.json"
 DEFAULT_SCHEMA = DEFAULT_DELIVERABLE_DIR / "teacher_trace_schema.json"
 DEFAULT_REPORT = DEFAULT_DELIVERABLE_DIR / "teacher_trace_quality_report.xlsx"
 DEFAULT_STATISTICS = DEFAULT_DELIVERABLE_DIR / "teacher_trace_statistics.xlsx"
-DEFAULT_REVIEWER_ANNOTATIONS = DEFAULT_DELIVERABLE_DIR / "manual_quality_decisions.jsonl"
+DEFAULT_REVIEWER_ANNOTATIONS = (
+    DEFAULT_DELIVERABLE_DIR / "manual_quality_decisions.jsonl"
+)
 DEFAULT_COMPACT_SPLITS = GENERATED_ROOT / "splits"
 CONSTRAINT_LIBRARY = BACKEND_ROOT / "pipeline" / "constraint_library"
 REQUIRED_RULE_FILES = (
@@ -98,7 +100,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON, JSONL, or text file of repaired sample IDs to reset to pending review.",
     )
     parser.add_argument("--deliverable-dir", type=Path, default=DEFAULT_DELIVERABLE_DIR)
-    parser.add_argument("--compact-split-dir", type=Path, default=DEFAULT_COMPACT_SPLITS)
+    parser.add_argument(
+        "--compact-split-dir", type=Path, default=DEFAULT_COMPACT_SPLITS
+    )
     parser.add_argument("--manual-sample-rate", type=float, default=0.25)
     parser.add_argument("--manual-sample-seed", default="task1-quality-v1")
     parser.add_argument(
@@ -150,7 +154,9 @@ class TeacherTraceEvaluationRunner:
 
     def run(self) -> Dict[str, object]:
         self._validate_options()
-        annotation_export, reviewer_annotations, reset_review_sample_ids = self._load_review_inputs()
+        annotation_export, reviewer_annotations, reset_review_sample_ids = (
+            self._load_review_inputs()
+        )
         records, native_results = self._load_filter_and_normalize_records()
         if self.args.repair_grounded_records:
             assert self.args.repair_output is not None
@@ -176,7 +182,9 @@ class TeacherTraceEvaluationRunner:
 
     def _validate_options(self) -> None:
         if self.args.repair_grounded_records and self.args.repair_output is None:
-            raise ValueError("--repair-output is required with --repair-grounded-records.")
+            raise ValueError(
+                "--repair-output is required with --repair-grounded-records."
+            )
 
     def _load_review_inputs(self) -> tuple[object, list[object], set[str]]:
         args = self.args
@@ -212,8 +220,7 @@ class TeacherTraceEvaluationRunner:
         native_results: dict[str, dict[str, object]],
     ) -> _ReportInputs:
         native_reports = [
-            native_results[str(record.get("sample_id") or "")]
-            for record in records
+            native_results[str(record.get("sample_id") or "")] for record in records
         ]
         facts = build_teacher_report_facts(
             records,
@@ -246,7 +253,8 @@ class TeacherTraceEvaluationRunner:
                 [
                     {**record, "quality_flag": "pass"}
                     for record in records
-                    if str(record.get("sample_id") or "") in report_inputs.quality_sample_ids
+                    if str(record.get("sample_id") or "")
+                    in report_inputs.quality_sample_ids
                 ],
                 force=True,
             )
@@ -264,8 +272,7 @@ class TeacherTraceEvaluationRunner:
             else self.auditor.manual_sample(records, report_inputs.evaluations)
         )
         rule_files = {
-            name: (CONSTRAINT_LIBRARY / name).is_file()
-            for name in REQUIRED_RULE_FILES
+            name: (CONSTRAINT_LIBRARY / name).is_file() for name in REQUIRED_RULE_FILES
         }
         artifacts = {
             "teacher_trace_schema": display_path(args.schema_json),
@@ -337,7 +344,9 @@ class TeacherTraceEvaluationRunner:
                     None if args.repair_grounded_records else args.manual_sample_rate
                 ),
                 "sample_count": len(report_artifacts.manual_records),
-                "actual_sample_rate": round(len(report_artifacts.manual_records) / len(records), 6),
+                "actual_sample_rate": round(
+                    len(report_artifacts.manual_records) / len(records), 6
+                ),
                 "status": "pending_human_signoff",
             },
             "rule_library_complete": all(
@@ -380,7 +389,9 @@ class TeacherTraceEvaluationRunner:
             self._refresh_csv_grounding(record)
             if self.args.repair_grounded_records:
                 record = repair_grounded_record(record)
-            native = self.evaluator.evaluate(record, trace_status=record.get("trace_status"))
+            native = self.evaluator.evaluate(
+                record, trace_status=record.get("trace_status")
+            )
             record_id = str(record.get("sample_id") or "")
             native_results[record_id] = native
             if self.args.repair_grounded_records:
@@ -389,8 +400,7 @@ class TeacherTraceEvaluationRunner:
                 apply_quality_aliases(record, native)
             evidence_summary = summarize_record_tool_evidence(record)
             grounding_verified = (
-                native.get("quality_flag") == "pass"
-                and evidence_summary.evidence_found
+                native.get("quality_flag") == "pass" and evidence_summary.evidence_found
             )
             history_projection = build_history_turn(
                 record,
@@ -416,7 +426,9 @@ class TeacherTraceEvaluationRunner:
                 else {}
             )
             if verified_evidence_summary:
-                provenance_entry["verified_evidence_summary"] = verified_evidence_summary
+                provenance_entry["verified_evidence_summary"] = (
+                    verified_evidence_summary
+                )
             provenance[current_key] = provenance_entry
             resolved_records.append(record)
         return resolved_records, native_results
@@ -435,18 +447,13 @@ class TeacherTraceEvaluationRunner:
         record["evidence"] = evidence
 
         issues = list(record.get("quality_issues") or [])
-        if (
-            "unsupported_numerical_claim" in issues
-            and numeric_claims_are_grounded(
-                str(record.get("final_answer") or ""),
-                str(record.get("user_input") or ""),
-                numeric_grounding_evidence(record),
-            )
+        if "unsupported_numerical_claim" in issues and numeric_claims_are_grounded(
+            str(record.get("final_answer") or ""),
+            str(record.get("user_input") or ""),
+            numeric_grounding_evidence(record),
         ):
             record["quality_issues"] = [
-                issue
-                for issue in issues
-                if issue != "unsupported_numerical_claim"
+                issue for issue in issues if issue != "unsupported_numerical_claim"
             ]
 
     @staticmethod
@@ -463,6 +470,7 @@ class TeacherTraceEvaluationRunner:
                 else 0
             )
         return counts
+
 
 def main() -> int:
     args = build_parser().parse_args()

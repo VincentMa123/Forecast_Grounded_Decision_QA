@@ -1,4 +1,3 @@
-"""Provider-specific chat client configuration for the agent orchestrator."""
 from __future__ import annotations
 
 import os

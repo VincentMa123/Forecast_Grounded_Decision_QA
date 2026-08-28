@@ -9,7 +9,9 @@ from .variable_registry import registry_path_for_mapping, validate_variable_regi
 
 
 VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
-DATA_FILE_RE = re.compile(r"\b(?P<filename>\d{8}_(?P<kind>node|pipeline|consumer)\.csv)\b", re.IGNORECASE)
+DATA_FILE_RE = re.compile(
+    r"\b(?P<filename>\d{8}_(?P<kind>node|pipeline|consumer)\.csv)\b", re.IGNORECASE
+)
 TOPOLOGY_FOLLOWUP_RE = re.compile(
     r"相邻站点|相邻供气点|上游|下游|可达|最短路径|共享网关|反向追"
     r"|\b(?:adjacent|upstream|downstream|reachable|shortest path|shared gateway)\b",
@@ -37,7 +39,13 @@ def scenario_texts(scenario: Dict[str, Any]) -> Iterable[str]:
 
 
 def scenario_variables(scenario: Dict[str, Any]) -> List[str]:
-    return sorted({match.group(0) for text in scenario_texts(scenario) for match in VARIABLE_RE.finditer(text)})
+    return sorted(
+        {
+            match.group(0)
+            for text in scenario_texts(scenario)
+            for match in VARIABLE_RE.finditer(text)
+        }
+    )
 
 
 def mapping_variables(mapping_csv: Path) -> List[str]:
@@ -45,7 +53,11 @@ def mapping_variables(mapping_csv: Path) -> List[str]:
         reader = csv.DictReader(handle)
         if "variable_name" not in (reader.fieldnames or []):
             raise ValueError(f"Mapping must contain variable_name: {mapping_csv}")
-        return [str(row["variable_name"]).strip() for row in reader if str(row.get("variable_name") or "").strip()]
+        return [
+            str(row["variable_name"]).strip()
+            for row in reader
+            if str(row.get("variable_name") or "").strip()
+        ]
 
 
 def scenario_data_files(scenario: Dict[str, Any]) -> List[str]:
@@ -90,14 +102,18 @@ def scenario_topology_requirements(
     combined = "\n".join(texts)
     if not TOPOLOGY_FOLLOWUP_RE.search(combined):
         return {"required_data_files": [], "targets": [], "missing_target_mappings": []}
-    consumer_files = sorted({
-        match.group("filename")
-        for match in DATA_FILE_RE.finditer(combined)
-        if match.group("kind").casefold() == "consumer"
-    })
+    consumer_files = sorted(
+        {
+            match.group("filename")
+            for match in DATA_FILE_RE.finditer(combined)
+            if match.group("kind").casefold() == "consumer"
+        }
+    )
     supply_points = set()
     for filename in consumer_files:
-        path = Path(pipeline_data_root) / DATA_FILE_SUBDIRECTORIES["consumer"] / filename
+        path = (
+            Path(pipeline_data_root) / DATA_FILE_SUBDIRECTORIES["consumer"] / filename
+        )
         if not path.is_file():
             continue
         with path.open("r", encoding="utf-8-sig", newline="") as handle:
@@ -115,11 +131,13 @@ def scenario_topology_requirements(
         for filename in consumer_files
         if any(target in SAME_DAY_TOPOLOGY_TARGETS for target in targets)
     }
-    required = sorted({
-        f"pipeline_data/{DATA_FILE_SUBDIRECTORIES[kind]}/{day}_{kind}.csv"
-        for day in topology_dates
-        for kind in ("node", "pipeline")
-    })
+    required = sorted(
+        {
+            f"pipeline_data/{DATA_FILE_SUBDIRECTORIES[kind]}/{day}_{kind}.csv"
+            for day in topology_dates
+            for kind in ("node", "pipeline")
+        }
+    )
     return {
         "required_data_files": required,
         "targets": [
@@ -151,13 +169,14 @@ def validate_scenarios(
         unsupported = sorted(set(required) - supported)
         topology = scenario_topology_requirements(scenario, station_mappings, data_root)
         required_data_files = sorted(
-            set(scenario_data_files(scenario))
-            | set(topology["required_data_files"])
+            set(scenario_data_files(scenario)) | set(topology["required_data_files"])
         )
         missing_data_files = sorted(
             logical_path
             for logical_path in required_data_files
-            if not (data_root / Path(logical_path).relative_to("pipeline_data")).is_file()
+            if not (
+                data_root / Path(logical_path).relative_to("pipeline_data")
+            ).is_file()
         )
         all_required.update(required)
         all_unsupported.update(unsupported)
@@ -256,7 +275,9 @@ def validate_scenario_sources(
                 session_id = str(session.get("session_id") or "")
                 session_key = f"{scenario_id}::{session_id}"
                 session_occurrences.setdefault(session_key, []).append(source_name)
-                for fallback_turn, turn in enumerate(session.get("dialogue") or [], start=1):
+                for fallback_turn, turn in enumerate(
+                    session.get("dialogue") or [], start=1
+                ):
                     turn_id = int(turn.get("turn_id") or fallback_turn)
                     sample_key = f"{scenario_id}::{session_id}::turn_{turn_id:03d}"
                     sample_occurrences.setdefault(sample_key, []).append(source_name)
@@ -270,7 +291,12 @@ def validate_scenario_sources(
             {
                 "scenario_id": scenario_id,
                 "dataset_sources": [item["dataset_source"] for item in occurrences],
-                "scenario_types": sorted({str(item.get("scenario_type") or "unknown") for item in occurrences}),
+                "scenario_types": sorted(
+                    {
+                        str(item.get("scenario_type") or "unknown")
+                        for item in occurrences
+                    }
+                ),
                 "records_identical": len(fingerprints) == 1,
             }
         )
@@ -297,8 +323,12 @@ def validate_scenario_sources(
         "variable_registry": registry_report,
         "id_collisions": {
             "scenario_id": scenario_collisions,
-            "session_id_count": sum(len(values) > 1 for values in session_occurrences.values()),
-            "sample_id_count": sum(len(values) > 1 for values in sample_occurrences.values()),
+            "session_id_count": sum(
+                len(values) > 1 for values in session_occurrences.values()
+            ),
+            "sample_id_count": sum(
+                len(values) > 1 for values in sample_occurrences.values()
+            ),
             "namespacing_required": bool(scenario_collisions),
         },
         "sources": source_reports,
@@ -309,5 +339,7 @@ def _content_fingerprint(value: Dict[str, Any]) -> str:
     import hashlib
     import json
 
-    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    payload = json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()

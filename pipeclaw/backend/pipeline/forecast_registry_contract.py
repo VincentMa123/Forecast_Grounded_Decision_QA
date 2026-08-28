@@ -66,8 +66,7 @@ def _normalization_provenance(
         if not isinstance(item, dict):
             continue
         canonical = {
-            _normalized(value)
-            for value in item.get("canonical_variables") or []
+            _normalized(value) for value in item.get("canonical_variables") or []
         }
         requested_term = _normalized(item.get("requested_term"))
         if (
@@ -84,7 +83,9 @@ def _disturbance_search_authorizes(
     forecast_arguments: Dict[str, Any],
     disturbance_variable: str,
 ) -> bool:
-    if not _successful_search(call) or not _returned_entries(call, disturbance_variable):
+    if not _successful_search(call) or not _returned_entries(
+        call, disturbance_variable
+    ):
         return False
     arguments = dict(call.get("arguments") or {})
     if _normalized(arguments.get("query")) == _normalized(disturbance_variable):
@@ -109,8 +110,7 @@ def _candidate_search_authorizes(
     ):
         return False
     return any(
-        _normalized(item.get("role")) == "input"
-        and item.get("controllable") is True
+        _normalized(item.get("role")) == "input" and item.get("controllable") is True
         for item in _returned_entries(call, candidate_variable)
     )
 
@@ -138,9 +138,8 @@ def candidate_action_variables(forecast_arguments: Dict[str, Any]) -> List[str]:
     disturbance_variable = str(
         forecast_arguments.get("disturbance_variable") or ""
     ).strip()
-    if (
-        disturbance_variable.endswith(":ST")
-        and disturbance_variable in _as_mapping(boundary.get("setpoints"))
+    if disturbance_variable.endswith(":ST") and disturbance_variable in _as_mapping(
+        boundary.get("setpoints")
     ):
         variables.discard(disturbance_variable)
     return sorted(variables, key=str.casefold)
@@ -164,11 +163,7 @@ def authorize_forecast_registry(
     candidate_search_call_ids: Dict[str, List[str]] = {}
     issues: List[Dict[str, str]] = []
 
-    if (
-        candidate_id
-        and candidate_role != "baseline"
-        and not candidate_variables
-    ):
+    if candidate_id and candidate_role != "baseline" and not candidate_variables:
         issues.append(
             {
                 "code": "candidate_action_missing",
@@ -249,11 +244,9 @@ def authorize_forecast_registry(
                 }
             )
 
-    if (
-        disturbance_variable
-        and _normalized(disturbance_variable)
-        in {_normalized(value) for value in candidate_variables}
-    ):
+    if disturbance_variable and _normalized(disturbance_variable) in {
+        _normalized(value) for value in candidate_variables
+    }:
         issues.append(
             {
                 "code": "same_variable_disturbance_action",

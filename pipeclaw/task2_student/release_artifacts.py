@@ -45,7 +45,9 @@ def read_jsonl(path: Path, *, skip_blank_lines: bool = False) -> list[dict[str, 
                     f"invalid JSON: {exc.msg}",
                 ) from exc
             if not isinstance(record, Mapping):
-                raise JsonlArtifactError(path, line_number, "JSONL row must be an object")
+                raise JsonlArtifactError(
+                    path, line_number, "JSONL row must be an object"
+                )
             records.append(dict(record))
     return records
 
@@ -130,6 +132,7 @@ def atomic_jsonl_writer(
     """Yield a streaming JSONL writer and commit it atomically on success."""
 
     with _atomic_text_writer(path) as handle:
+
         def write_record(record: Mapping[str, Any]) -> None:
             serialized = (
                 stable_json(record)
@@ -144,4 +147,9 @@ def atomic_jsonl_writer(
 def utc_now() -> str:
     """Return a second-precision UTC timestamp in the release-file format."""
 
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )

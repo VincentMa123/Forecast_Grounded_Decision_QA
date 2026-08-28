@@ -62,7 +62,9 @@ def trusted_conversation_context(
         return [
             dict(item)
             if item.get("grounding_verified") is True
-            else {key: value for key, value in item.items() if key != "assistant_output"}
+            else {
+                key: value for key, value in item.items() if key != "assistant_output"
+            }
             for item in items
         ]
     context = []
@@ -77,9 +79,11 @@ def trusted_conversation_context(
             and bool(summary)
         )
         if item.get("tool_evidence_verified") is True or legacy_verified_summary:
-            context.append({
-                "tool_evidence_verified": True,
-                "evidence_artifacts": list(item.get("evidence_artifacts") or []),
-                "verified_evidence_summary": summary,
-            })
+            context.append(
+                {
+                    "tool_evidence_verified": True,
+                    "evidence_artifacts": list(item.get("evidence_artifacts") or []),
+                    "verified_evidence_summary": summary,
+                }
+            )
     return context

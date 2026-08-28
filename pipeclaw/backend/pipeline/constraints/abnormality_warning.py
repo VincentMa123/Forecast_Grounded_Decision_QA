@@ -14,7 +14,9 @@ from .common import (
 
 
 ABNORMALITY_SPECS = load_constraint_specs("abnormality_warning")
-POTENTIAL_LEAK_RULE = load_rule_definition("abnormality_warning", "potential_leak_signal")
+POTENTIAL_LEAK_RULE = load_rule_definition(
+    "abnormality_warning", "potential_leak_signal"
+)
 
 
 def run_abnormality_warning_checks(
@@ -39,7 +41,11 @@ def _potential_leak_check(
     demand_selector = POTENTIAL_LEAK_RULE["demand_selector"]
     supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
     demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
-    variables = list(dict.fromkeys(pressure_check.get("variables", []) + supply_variables + demand_variables))
+    variables = list(
+        dict.fromkeys(
+            pressure_check.get("variables", []) + supply_variables + demand_variables
+        )
+    )
     _, gaps = supply_demand_gaps(summaries, supply_variables, demand_variables)
 
     max_gap = max((abs(value) for value in gaps), default=0.0)
@@ -59,7 +65,10 @@ def _potential_leak_check(
     corroborating_status = max_status([flow_status, gap_status])
     if not evaluated:
         status = "not_evaluated"
-    elif pressure_status in {"warning", "fail"} and corroborating_status in {"warning", "fail"}:
+    elif pressure_status in {"warning", "fail"} and corroborating_status in {
+        "warning",
+        "fail",
+    }:
         status = max_status([pressure_status, corroborating_status])
     else:
         status = "pass"

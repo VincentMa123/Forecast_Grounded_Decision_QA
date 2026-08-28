@@ -49,9 +49,7 @@ def load_scenario_sources(paths: Sequence[Path]) -> List[Dict[str, Any]]:
 
 def flatten_source_scenarios(sources: Sequence[Dict[str, Any]]) -> List[Dict[str, Any]]:
     return [
-        scenario
-        for source in sources
-        for scenario in source.get("scenarios") or []
+        scenario for source in sources for scenario in source.get("scenarios") or []
     ]
 
 
@@ -74,7 +72,10 @@ def combined_preflight_sources(
         for scenario in source.get("scenarios") or []
     )
     available_pairs = {
-        (str(source.get("dataset_source") or ""), str(scenario.get("scenario_id") or ""))
+        (
+            str(source.get("dataset_source") or ""),
+            str(scenario.get("scenario_id") or ""),
+        )
         for source in all_sources
         for scenario in source.get("scenarios") or []
     }

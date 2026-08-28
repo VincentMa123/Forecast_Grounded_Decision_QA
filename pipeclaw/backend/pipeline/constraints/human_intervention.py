@@ -10,7 +10,9 @@ INTERVENTION_RULES = load_rule_document("human_intervention")
 SAFETY_CATEGORIES = set(INTERVENTION_RULES["safety_categories"])
 
 
-def intervention_label_from_checks(overall: str, checks: Sequence[Dict[str, Any]]) -> str:
+def intervention_label_from_checks(
+    overall: str, checks: Sequence[Dict[str, Any]]
+) -> str:
     if overall == INTERVENTION_RULES["no_intervention_status"]:
         return "no_intervention"
     if any(
@@ -19,7 +21,10 @@ def intervention_label_from_checks(overall: str, checks: Sequence[Dict[str, Any]
         for check in checks
     ):
         return "immediate_intervention_required"
-    if overall in INTERVENTION_RULES["operator_attention_statuses"] and overall == "fail":
+    if (
+        overall in INTERVENTION_RULES["operator_attention_statuses"]
+        and overall == "fail"
+    ):
         return "operator_attention_required"
     if any(
         check["status"] in INTERVENTION_RULES["operator_attention_statuses"]
@@ -31,7 +36,11 @@ def intervention_label_from_checks(overall: str, checks: Sequence[Dict[str, Any]
 
 
 def run_human_intervention_checks(label: str) -> List[Dict[str, Any]]:
-    status = "pass" if label == "no_intervention" else ("fail" if label == "immediate_intervention_required" else "warning")
+    status = (
+        "pass"
+        if label == "no_intervention"
+        else ("fail" if label == "immediate_intervention_required" else "warning")
+    )
     return [
         {
             "name": "human_intervention_rules",

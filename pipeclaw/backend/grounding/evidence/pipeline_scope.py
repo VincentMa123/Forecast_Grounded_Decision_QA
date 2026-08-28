@@ -13,12 +13,14 @@ def filter_rows_by_named_pipeline(
     """Filter rows when authoritative text explicitly names a pipeline value."""
     materialized = list(rows)
     folded_scope = scope_text.casefold()
-    available = list(dict.fromkeys(
-        value
-        for row in materialized
-        for column in PIPELINE_COLUMNS
-        if (value := str(row.get(column) or "").strip())
-    ))
+    available = list(
+        dict.fromkeys(
+            value
+            for row in materialized
+            for column in PIPELINE_COLUMNS
+            if (value := str(row.get(column) or "").strip())
+        )
+    )
     selected = [value for value in available if value.casefold() in folded_scope]
     if not selected:
         return materialized, []
@@ -26,5 +28,8 @@ def filter_rows_by_named_pipeline(
     return [
         row
         for row in materialized
-        if any(str(row.get(column) or "").strip() in selected_set for column in PIPELINE_COLUMNS)
+        if any(
+            str(row.get(column) or "").strip() in selected_set
+            for column in PIPELINE_COLUMNS
+        )
     ], selected

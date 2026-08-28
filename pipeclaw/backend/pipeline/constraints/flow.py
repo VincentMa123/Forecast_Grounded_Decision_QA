@@ -21,11 +21,17 @@ from .common import (
 FLOW_SPECS = load_constraint_specs("flow")
 BALANCE_RULE = load_rule_definition("flow", "supply_demand_balance")
 FLOW_RAMP_SPEC = next(spec for spec in FLOW_SPECS if spec.name == "flow_ramp_check")
-FLOW_CAPACITY_SPEC = next(spec for spec in FLOW_SPECS if spec.name == "flow_capacity_check")
-BOUNDARY_FLOW_SPEC = next(spec for spec in FLOW_SPECS if spec.name == "boundary_flow_change_rate")
+FLOW_CAPACITY_SPEC = next(
+    spec for spec in FLOW_SPECS if spec.name == "flow_capacity_check"
+)
+BOUNDARY_FLOW_SPEC = next(
+    spec for spec in FLOW_SPECS if spec.name == "boundary_flow_change_rate"
+)
 
 
-def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
+def run_flow_checks(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     checks = run_specs(FLOW_SPECS, summaries, parsed_task)
     segment_variables = sorted(
         set(variables_for_spec(FLOW_RAMP_SPEC, summaries, parsed_task))
@@ -42,9 +48,13 @@ def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str,
         for variable in boundary_variables
     }
     time_step_minutes = float(parsed_task.get("forecast_time_step_minutes") or 1.0)
-    capacity_episodes = _capacity_excursion_episodes(summaries, time_step_minutes, parsed_task)
+    capacity_episodes = _capacity_excursion_episodes(
+        summaries, time_step_minutes, parsed_task
+    )
     ramp_events = _flow_ramp_events(summaries, parsed_task)
-    balance_check = _supply_demand_balance_check(summaries, time_step_minutes, parsed_task)
+    balance_check = _supply_demand_balance_check(
+        summaries, time_step_minutes, parsed_task
+    )
     checks_by_name = {check["name"]: check for check in checks}
     ramp_check = checks_by_name.get(FLOW_RAMP_SPEC.name)
     if ramp_check is not None:
@@ -63,7 +73,9 @@ def run_flow_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str,
     return checks
 
 
-def _abnormal_flow_segments(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[str]:
+def _abnormal_flow_segments(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> List[str]:
     abnormal = set()
     for spec in (FLOW_RAMP_SPEC, FLOW_CAPACITY_SPEC):
         variables = variables_for_spec(spec, summaries, parsed_task)
@@ -71,7 +83,12 @@ def _abnormal_flow_segments(summaries: Dict[str, Dict[str, Any]], parsed_task: D
             value = summaries.get(variable, {}).get(spec.metric)
             if value is None:
                 continue
-            if status_from_threshold(float(value), spec.warning_threshold, spec.fail_threshold) != "pass":
+            if (
+                status_from_threshold(
+                    float(value), spec.warning_threshold, spec.fail_threshold
+                )
+                != "pass"
+            ):
                 abnormal.add(variable)
     return sorted(abnormal)
 
@@ -91,8 +108,10 @@ def _capacity_excursion_episodes(
         labels = summaries.get(variable, {}).get("prediction_labels", [])
         warning = threshold_episodes(
             values,
-            lambda value: abs(value) >= float(warning_threshold)
-            and abs(value) < float(fail_threshold),
+            lambda value: (
+                abs(value) >= float(warning_threshold)
+                and abs(value) < float(fail_threshold)
+            ),
             labels,
             time_step_minutes,
         )
@@ -161,13 +180,19 @@ def _supply_demand_balance_check(
         supply_variables,
         demand_variables,
     )
-    labels = summaries.get(usable_variables[0], {}).get("prediction_labels", []) if usable_variables else []
+    labels = (
+        summaries.get(usable_variables[0], {}).get("prediction_labels", [])
+        if usable_variables
+        else []
+    )
     widening_change_indices = [
         index
         for index in range(1, len(gaps))
         if abs(gaps[index]) > abs(gaps[index - 1])
     ]
-    widening_episodes = contiguous_episodes(widening_change_indices, labels, time_step_minutes)
+    widening_episodes = contiguous_episodes(
+        widening_change_indices, labels, time_step_minutes
+    )
 
     max_gap = max((abs(value) for value in gaps), default=0.0)
     widening = bool(gaps) and abs(gaps[-1]) > abs(gaps[0])
@@ -186,7 +211,9 @@ def _supply_demand_balance_check(
         "final_gap": round(gaps[-1], 6) if gaps else None,
         "gap_is_widening": widening,
         "widening_episodes": widening_episodes,
-        "maximum_continuous_widening_minutes": longest_episode_minutes(widening_episodes),
+        "maximum_continuous_widening_minutes": longest_episode_minutes(
+            widening_episodes
+        ),
         "warning_threshold": warning_threshold,
         "fail_threshold": fail_threshold,
         "status": status,

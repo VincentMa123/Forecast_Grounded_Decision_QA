@@ -59,9 +59,7 @@ def _action_fingerprint(
         "action": {
             "percentage_changes": dict(action.get("percentage_changes") or {}),
             "setpoints": dict(action.get("setpoints") or {}),
-            "keep_other_boundary_controls": action.get(
-                "keep_other_boundary_controls"
-            ),
+            "keep_other_boundary_controls": action.get("keep_other_boundary_controls"),
         },
     }
     return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()[:20]
@@ -80,16 +78,16 @@ def _requested_action_fingerprint(
     scope: Dict[str, Any],
 ) -> Optional[str]:
     candidate = {"action": dict(arguments.get("boundary_conditions") or {})}
-    return _action_fingerprint(candidate, scope) if has_boundary_action(candidate) else None
+    return (
+        _action_fingerprint(candidate, scope)
+        if has_boundary_action(candidate)
+        else None
+    )
 
 
 def _failed_forecast_arguments(turn: Dict[str, Any]) -> Dict[str, Any]:
     request = turn.get("failed_forecast_request")
-    return (
-        dict(request.get("arguments") or {})
-        if isinstance(request, dict)
-        else {}
-    )
+    return dict(request.get("arguments") or {}) if isinstance(request, dict) else {}
 
 
 def _normalized_disturbance(value: Any) -> Dict[str, Any]:
@@ -133,6 +131,7 @@ def _normalized_disturbance(value: Any) -> Dict[str, Any]:
                 result["requested_value"] = rendered
     return result
 
+
 def _scope_from_pipeformer(
     pipeformer: Dict[str, Any],
     current: Dict[str, Any],
@@ -151,8 +150,7 @@ def _scope_from_pipeformer(
     disturbance = _normalized_disturbance(
         disturbances[-1]
         if disturbances
-        else first.get("disturbance")
-        or current.get("disturbance")
+        else first.get("disturbance") or current.get("disturbance")
     )
     scope = {
         "case_id": _explicit_scope_value(first, "case_id", current),
@@ -252,11 +250,15 @@ def _scope_from_single_forecast_snapshot(
 ) -> Dict[str, Any]:
     """Recover the canonical scope when history stores only a state snapshot."""
     stored = snapshot.get("scope")
-    return {
-        key: deepcopy(value)
-        for key, value in dict(stored).items()
-        if value not in (None, "", [], {})
-    } if stored else deepcopy(current)
+    return (
+        {
+            key: deepcopy(value)
+            for key, value in dict(stored).items()
+            if value not in (None, "", [], {})
+        }
+        if stored
+        else deepcopy(current)
+    )
 
 
 def _accepted_llm_policy(
@@ -323,9 +325,7 @@ def _registry_state_projection(
         variable = str(item.get("variable") or "")
         if not variable:
             continue
-        call_id = str(
-            dict(item.get("provenance") or {}).get("tool_call_id") or ""
-        )
+        call_id = str(dict(item.get("provenance") or {}).get("tool_call_id") or "")
         entry: Dict[str, Any] = {"variable": variable}
         if call_id:
             if call_id not in search_positions:
@@ -369,7 +369,11 @@ def _registry_state_items(value: Any) -> List[Dict[str, Any]]:
     return items
 
 
-def _merge_replaced_items(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]], key: Callable[[Dict[str, Any]], str]) -> List[Dict[str, Any]]:
+def _merge_replaced_items(
+    existing: Iterable[Dict[str, Any]],
+    incoming: Iterable[Dict[str, Any]],
+    key: Callable[[Dict[str, Any]], str],
+) -> List[Dict[str, Any]]:
     merged = [deepcopy(dict(item)) for item in existing]
     positions = {key(item): index for index, item in enumerate(merged)}
     for item in incoming:
@@ -383,12 +387,30 @@ def _merge_replaced_items(existing: Iterable[Dict[str, Any]], incoming: Iterable
     return merged
 
 
-def _merge_registry_state_items(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return _merge_replaced_items(existing, (item for item in incoming if item.get("variable")), lambda item: str(item.get("variable") or "").casefold())
+def _merge_registry_state_items(
+    existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    return _merge_replaced_items(
+        existing,
+        (item for item in incoming if item.get("variable")),
+        lambda item: str(item.get("variable") or "").casefold(),
+    )
 
 
-def _merge_applied_disturbances(existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]) -> List[Dict[str, Any]]:
-    return _merge_replaced_items(existing, incoming, lambda item: canonical_json([str(item.get("variable") or "").casefold(), str(item.get("mode") or "").casefold(), item.get("requested_value")]))
+def _merge_applied_disturbances(
+    existing: Iterable[Dict[str, Any]], incoming: Iterable[Dict[str, Any]]
+) -> List[Dict[str, Any]]:
+    return _merge_replaced_items(
+        existing,
+        incoming,
+        lambda item: canonical_json(
+            [
+                str(item.get("variable") or "").casefold(),
+                str(item.get("mode") or "").casefold(),
+                item.get("requested_value"),
+            ]
+        ),
+    )
 
 
 def _ordered_unique(existing: Iterable[Any], incoming: Iterable[Any]) -> List[Any]:
@@ -417,17 +439,13 @@ def _verified_state_tool_result(item: Dict[str, Any]) -> bool:
         output.get("verification") or output.get("constraint_check") or {}
     )
     applications = list(
-        dict(output.get("evidence") or {}).get(
-            "boundary_application_evidence"
-        )
-        or []
+        dict(output.get("evidence") or {}).get("boundary_application_evidence") or []
     )
     return (
         verification.get("verification_complete") is True
         and bool(applications)
         and all(
-            isinstance(application, dict)
-            and application.get("verified") is True
+            isinstance(application, dict) and application.get("verified") is True
             for application in applications
         )
     )
@@ -532,28 +550,20 @@ def _compact_single_forecast_snapshot(
             or "single_forecast"
         ),
         "applied_disturbance": (
-            deepcopy(applied_disturbances[-1])
-            if applied_disturbances
-            else {}
+            deepcopy(applied_disturbances[-1]) if applied_disturbances else {}
         ),
         "audit": {
             "overall_status": verification.get("overall_status"),
             "failure_count": verification.get("failure_count"),
             "warning_count": verification.get("warning_count"),
-            "failed_rule_ids": deepcopy(
-                verification.get("failed_rule_ids") or []
-            ),
-            "warning_rule_ids": deepcopy(
-                verification.get("warning_rule_ids") or []
-            ),
+            "failed_rule_ids": deepcopy(verification.get("failed_rule_ids") or []),
+            "warning_rule_ids": deepcopy(verification.get("warning_rule_ids") or []),
             "category_status": deepcopy(
                 dict(verification.get("category_status") or {})
             ),
         },
         "risk": {
-            "risk_level": (
-                output.get("risk_level") or verification.get("risk_level")
-            ),
+            "risk_level": (output.get("risk_level") or verification.get("risk_level")),
             "manual_intervention_label": (
                 output.get("manual_intervention_label")
                 or verification.get("human_intervention_label")
@@ -565,24 +575,29 @@ def _compact_single_forecast_snapshot(
         },
         "energy": {
             "total": comparable.get("energy_consumption"),
-            "delta_vs_baseline": comparable.get(
-                "energy_consumption_delta"
-            ),
+            "delta_vs_baseline": comparable.get("energy_consumption_delta"),
             "unit": comparable.get("energy_unit"),
             "variable_count": comparable.get("energy_variable_count"),
-            "evaluation_status": comparable.get(
-                "energy_evaluation_status"
-            ),
+            "evaluation_status": comparable.get("energy_evaluation_status"),
             "baseline_reference": comparable.get("baseline_reference"),
         },
     }
     watch_fields = (
-        "variable", "role", "metric", "value", "status",
-        "mean_prediction", "mean_abs_delta_vs_observed",
+        "variable",
+        "role",
+        "metric",
+        "value",
+        "status",
+        "mean_prediction",
+        "mean_abs_delta_vs_observed",
     )
     for key, limit in (("top_watch_variables", 3), ("key_observation_variables", 2)):
         snapshot[key] = [
-            {name: deepcopy(item[name]) for name in watch_fields if item.get(name) is not None}
+            {
+                name: deepcopy(item[name])
+                for name in watch_fields
+                if item.get(name) is not None
+            }
             for item in list(evidence.get(key) or [])[:limit]
             if isinstance(item, dict)
         ]
@@ -650,7 +665,8 @@ def bounded_recent_turns(
             continue
         only = projected[0]
         text_keys = [
-            key for key in ("assistant_output", "user_input")
+            key
+            for key in ("assistant_output", "user_input")
             if isinstance(only.get(key), str) and only[key]
         ]
         if not text_keys:
@@ -742,9 +758,7 @@ class VerifiedDecisionState:
             "schema_version": VERIFIED_DECISION_STATE_SCHEMA_VERSION,
             "scope": deepcopy(self.scope),
             "verified_evidence": deepcopy(self.verified_evidence),
-            "registry_variables": _registry_state_projection(
-                self.registry_variables
-            ),
+            "registry_variables": _registry_state_projection(self.registry_variables),
             "candidates": deepcopy(self.candidates),
             "applied_disturbances": deepcopy(self.applied_disturbances),
             "unresolved_inputs": list(self.unresolved_inputs),
@@ -793,12 +807,8 @@ class VerifiedDecisionState:
         return cls(
             schema_version=schema_version,
             scope=deepcopy(scope),
-            verified_evidence=deepcopy(
-                dict(value.get("verified_evidence") or {})
-            ),
-            registry_variables=_registry_state_items(
-                value.get("registry_variables")
-            ),
+            verified_evidence=deepcopy(dict(value.get("verified_evidence") or {})),
+            registry_variables=_registry_state_items(value.get("registry_variables")),
             candidates=[
                 deepcopy(dict(item))
                 for item in value.get("candidates") or []
@@ -873,16 +883,27 @@ class _VerifiedStateDelta:
 
 
 def _delta_from_verified_tool_results(
-    session_id: str, turn_id: int, question: str,
-    tool_results: Iterable[Dict[str, Any]], current: "VerifiedDecisionState",
+    session_id: str,
+    turn_id: int,
+    question: str,
+    tool_results: Iterable[Dict[str, Any]],
+    current: "VerifiedDecisionState",
 ) -> _VerifiedStateDelta:
     from .contract import GroundingContractBuilder, latest_decision_policy
 
     observed = [deepcopy(dict(item)) for item in tool_results if isinstance(item, dict)]
-    forecasts = [item for item in observed if item.get("name") == "run_pipeformer_forecast"]
+    forecasts = [
+        item for item in observed if item.get("name") == "run_pipeformer_forecast"
+    ]
     successful = [item for item in observed if _verified_state_tool_result(item)]
     if not successful:
-        scope = _forecast_scope(dict(forecasts[-1].get("arguments") or {}), [], current.scope) if forecasts else {}
+        scope = (
+            _forecast_scope(
+                dict(forecasts[-1].get("arguments") or {}), [], current.scope
+            )
+            if forecasts
+            else {}
+        )
         return _VerifiedStateDelta(
             scope=scope,
             requested_action_fingerprint=(
@@ -894,15 +915,25 @@ def _delta_from_verified_tool_results(
             ),
         )
 
-    current_forecasts = [item for item in successful if item.get("name") == "run_pipeformer_forecast"]
+    current_forecasts = [
+        item for item in successful if item.get("name") == "run_pipeformer_forecast"
+    ]
     scope: Dict[str, Any] = {}
     requested_action_fingerprint = None
     contract = GroundingContractBuilder().build(
-        question, successful, require_decision_policy=True,
-        prior_candidate_results=current.candidates, prior_decision_policy=current.decision_policy,
+        question,
+        successful,
+        require_decision_policy=True,
+        prior_candidate_results=current.candidates,
+        prior_decision_policy=current.decision_policy,
         prior_decision_policy_source_question=current.decision_policy_source_question,
-        prior_applied_disturbances=current.applied_disturbances)
-    applied = tuple(deepcopy(dict(item)) for item in contract.get("applied_disturbances") or [] if isinstance(item, dict))
+        prior_applied_disturbances=current.applied_disturbances,
+    )
+    applied = tuple(
+        deepcopy(dict(item))
+        for item in contract.get("applied_disturbances") or []
+        if isinstance(item, dict)
+    )
     if current_forecasts:
         scope = _forecast_scope(
             dict(current_forecasts[-1].get("arguments") or {}),
@@ -918,7 +949,8 @@ def _delta_from_verified_tool_results(
             dict(variable),
             provenance={"tool_call_id": call.get("tool_call_id")},
         )
-        for call in successful if call.get("name") == "search_pipeformer_registry"
+        for call in successful
+        if call.get("name") == "search_pipeformer_registry"
         for variable in dict(call.get("output") or {}).get("variables") or []
         if isinstance(variable, dict) and variable.get("variable")
     ]
@@ -930,8 +962,13 @@ def _delta_from_verified_tool_results(
     ]
     current_by_id = {}
     for call in current_forecasts:
-        candidate_id = str(dict(call.get("arguments") or {}).get("candidate_id") or dict(call.get("output") or {}).get("candidate_id") or "")
-        if candidate_id: current_by_id[candidate_id.casefold()] = call
+        candidate_id = str(
+            dict(call.get("arguments") or {}).get("candidate_id")
+            or dict(call.get("output") or {}).get("candidate_id")
+            or ""
+        )
+        if candidate_id:
+            current_by_id[candidate_id.casefold()] = call
     for candidate in candidates:
         call = current_by_id.get(str(candidate.get("candidate_id") or "").casefold())
         if call:
@@ -939,7 +976,8 @@ def _delta_from_verified_tool_results(
             for key in ("case_id", "forecast_horizon_minutes"):
                 if arguments.get(key) is not None:
                     candidate[key] = arguments[key]
-            if applied: candidate["disturbance"] = deepcopy(applied[-1])
+            if applied:
+                candidate["disturbance"] = deepcopy(applied[-1])
 
     policy = latest_decision_policy(successful) or dict(
         contract.get("decision_policy") or {}
@@ -982,7 +1020,9 @@ def _delta_from_verified_tool_results(
         registry_variables=tuple(registry),
         candidate_results=tuple(candidates),
         decision_policy=accepted_policy,
-        decision_policy_source_question=question if accepted_policy and question else None,
+        decision_policy_source_question=question
+        if accepted_policy and question
+        else None,
         applied_disturbances=applied,
         verified_evidence=evidence,
         single_forecast_snapshot=snapshot,
@@ -1002,16 +1042,12 @@ def _delta_from_history_turn(
     current: "VerifiedDecisionState",
 ) -> _VerifiedStateDelta:
     summary = dict(turn.get("verified_evidence_summary") or {})
-    pipeformer = dict(
-        turn.get("comparison_state") or summary.get("pipeformer") or {}
-    )
-    single_forecast_snapshot = dict(
-        summary.get("single_forecast_snapshot") or {}
-    )
+    pipeformer = dict(turn.get("comparison_state") or summary.get("pipeformer") or {})
+    single_forecast_snapshot = dict(summary.get("single_forecast_snapshot") or {})
     decision = dict(pipeformer.get("decision_summary") or {})
-    raw_policy = pipeformer.get("decision_policy") or decision.get(
-        "ranking_policy"
-    ) or {}
+    raw_policy = (
+        pipeformer.get("decision_policy") or decision.get("ranking_policy") or {}
+    )
     policy = dict(raw_policy) if isinstance(raw_policy, dict) else {}
     accepted_policy = _accepted_llm_policy(
         policy,
@@ -1095,8 +1131,7 @@ def _apply_verified_state_delta(
     scope_changed = bool(
         delta.scope
         and result.scope
-        and _scope_fingerprint(delta.scope)
-        != _scope_fingerprint(result.scope)
+        and _scope_fingerprint(delta.scope) != _scope_fingerprint(result.scope)
     )
     action_changed = bool(
         delta.requested_action_fingerprint
@@ -1135,9 +1170,9 @@ def _apply_verified_state_delta(
     if delta.decision_policy is not None:
         result.decision_policy = deepcopy(delta.decision_policy)
         if delta.decision_policy_source_question:
-            result.provenance[
-                "decision_policy_source_question"
-            ] = delta.decision_policy_source_question
+            result.provenance["decision_policy_source_question"] = (
+                delta.decision_policy_source_question
+            )
     result.applied_disturbances = _merge_applied_disturbances(
         result.applied_disturbances, delta.applied_disturbances
     )

@@ -1,5 +1,3 @@
-"""Adapter from the production PipeClaw agent trace to evaluator rollouts."""
-
 from __future__ import annotations
 
 import re

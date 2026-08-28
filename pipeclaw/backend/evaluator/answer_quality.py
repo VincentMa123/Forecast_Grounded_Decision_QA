@@ -146,9 +146,17 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
         issues.append("undisclosed_disturbance_assumption")
     if NO_DISPATCH_REQUEST.search(question) and DISPATCH_ADVICE.search(answer):
         issues.append("unrequested_dispatch_recommendation")
-    if pipeformer and safety_and_energy_checks_pass(pipeformer) and SAFETY_ENERGY_INCONSISTENCY_CLAIM.search(answer):
+    if (
+        pipeformer
+        and safety_and_energy_checks_pass(pipeformer)
+        and SAFETY_ENERGY_INCONSISTENCY_CLAIM.search(answer)
+    ):
         issues.append("unsupported_safety_energy_inconsistency_claim")
-    if pipeformer and UNSUPPORTED_UNIQUENESS_CLAIM.search(answer) and not _proves_unique_nonpass_variable(pipeformer):
+    if (
+        pipeformer
+        and UNSUPPORTED_UNIQUENESS_CLAIM.search(answer)
+        and not _proves_unique_nonpass_variable(pipeformer)
+    ):
         issues.append("unsupported_uniqueness_claim")
     if UNSUPPORTED_PROPAGATION_CLAIM.search(answer) and (
         not _counterfactual_supports_claim(answer, pipeformer)
@@ -157,9 +165,13 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
         and not _operational_inference_is_grounded(answer, grounding_evidence)
     ):
         issues.append("unsupported_causal_or_propagation_claim")
-    if not requested_data_retrieved(question, tool_outputs or [], conversation_context or []):
+    if not requested_data_retrieved(
+        question, tool_outputs or [], conversation_context or []
+    ):
         issues.append("requested_evidence_not_retrieved")
-    if topology_tool_required(question) and not topology_summary_from_tool_outputs(tool_outputs or []):
+    if topology_tool_required(question) and not topology_summary_from_tool_outputs(
+        tool_outputs or []
+    ):
         issues.append("required_topology_tool_not_called")
     if not numeric_claims_are_grounded(answer, question, grounding_evidence):
         issues.append("unsupported_numerical_claim")
@@ -186,9 +198,9 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
         for match in UNSUPPORTED_UNIT_CLAIM.finditer(answer)
     ):
         issues.append("unsupported_unit_claim")
-    if UNSUPPORTED_ABSOLUTE_ASSERTION.search(answer) and not _absolute_assertion_is_grounded(
-        answer, grounding_evidence
-    ):
+    if UNSUPPORTED_ABSOLUTE_ASSERTION.search(
+        answer
+    ) and not _absolute_assertion_is_grounded(answer, grounding_evidence):
         issues.append("unsupported_absolute_or_topology_claim")
     if pipeformer and not _variable_references_are_grounded(answer, grounding_evidence):
         issues.append("unsupported_variable_reference")
@@ -214,9 +226,7 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
         and item["output"].get("success") is True
         for item in tool_outputs or []
     )
-    saved_candidates = list(
-        dict(pipeformer or {}).get("candidate_forecasts") or []
-    )
+    saved_candidates = list(dict(pipeformer or {}).get("candidate_forecasts") or [])
     comparison_candidate_count = max(
         successful_forecast_count,
         len(saved_candidates),
@@ -224,8 +234,7 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
     is_forecast_comparison = comparison_candidate_count > 1
     budgeted_answer = answer_without_machine_disclosure(answer)
     has_chinese = any(
-        "\u4e00" <= character <= "\u9fff"
-        for character in budgeted_answer
+        "\u4e00" <= character <= "\u9fff" for character in budgeted_answer
     )
     if has_forecast_result or successful_forecast_count:
         if has_chinese and len(budgeted_answer) > (
@@ -240,7 +249,22 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
         issues.append("answer_too_long")
     if pipeformer and (
         ANSWER_FORMAT_VIOLATION.search(answer)
-        or any(symbol in answer for symbol in ("⚠", "✅", "❌", "📊", "👀", "🟡", "🔑", "📋", "🥇", "🥈", "🥉"))
+        or any(
+            symbol in answer
+            for symbol in (
+                "⚠",
+                "✅",
+                "❌",
+                "📊",
+                "👀",
+                "🟡",
+                "🔑",
+                "📋",
+                "🥇",
+                "🥈",
+                "🥉",
+            )
+        )
     ):
         issues.append("answer_format_contract_violation")
     return issues
@@ -276,9 +300,8 @@ def evaluate_answer_quality(
     issues.extend(comparison_answer_issues(answer, contract))
     issues.extend(tool_evidence_quality_issues(outputs))
     issues = list(dict.fromkeys(issues))
-    forecasts_pass = (
-        (pipeformer_call_count == 0 or bool(pipeformer_outputs))
-        and all(output.get("quality_flag") == "pass" for output in pipeformer_outputs)
+    forecasts_pass = (pipeformer_call_count == 0 or bool(pipeformer_outputs)) and all(
+        output.get("quality_flag") == "pass" for output in pipeformer_outputs
     )
     quality_flag = (
         "pass"
@@ -292,14 +315,20 @@ def safety_and_energy_checks_pass(pipeformer: Optional[Dict[str, Any]]) -> bool:
     constraint_check = (pipeformer or {}).get("constraint_check") or {}
     comparison = constraint_check.get("safety_energy_comparison") or {}
     if comparison.get("comparison_complete"):
-        return comparison.get("safety_status") == "pass" and comparison.get("energy_status") == "pass"
+        return (
+            comparison.get("safety_status") == "pass"
+            and comparison.get("energy_status") == "pass"
+        )
     checks = constraint_check.get("checks") or []
     safety_checks = [
         item
         for item in checks
-        if item.get("category") in {"pressure", "flow", "linepack", "abnormality_warning"}
+        if item.get("category")
+        in {"pressure", "flow", "linepack", "abnormality_warning"}
     ]
-    energy_checks = [item for item in checks if item.get("name") == "energy_consumption_cost"]
+    energy_checks = [
+        item for item in checks if item.get("name") == "energy_consumption_cost"
+    ]
     return (
         bool(safety_checks)
         and all(item.get("status") == "pass" for item in safety_checks)
@@ -325,15 +354,16 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         if item.get("name") == "run_pipeformer_forecast"
         and not tool_output_failed(item)
     ]
-    state = VerifiedDecisionState.from_dict(
-        dict(record.get("state_before") or {})
-    )
+    state = VerifiedDecisionState.from_dict(dict(record.get("state_before") or {}))
     pipeformer = None
     if successful_pipeformer_outputs:
         pipeformer = dict(successful_pipeformer_outputs[0])
         if len(successful_pipeformer_outputs) > 1:
             pipeformer["candidate_forecasts"] = successful_pipeformer_outputs
-    if pipeformer is None and str(record.get("scenario_type") or "").casefold() == "pipeformer":
+    if (
+        pipeformer is None
+        and str(record.get("scenario_type") or "").casefold() == "pipeformer"
+    ):
         saved_pipeformer = {
             "parsed_task": record.get("parsed_task") or {},
             "prediction_summary": record.get("prediction_summary") or {},
@@ -357,9 +387,7 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         state.verified_evidence.get("single_forecast_snapshot") or {}
     )
     if single_forecast_snapshot:
-        record_evidence["single_forecast_snapshot"] = (
-            single_forecast_snapshot
-        )
+        record_evidence["single_forecast_snapshot"] = single_forecast_snapshot
     if not record_evidence.get("topology_summary"):
         topology_summary = topology_summary_from_tool_outputs(tool_outputs)
         if topology_summary:
@@ -411,7 +439,7 @@ def _supply_demand_balance_claim_is_grounded(answer: str, evidence: Any) -> bool
     claim = SUPPLY_DEMAND_BALANCE_CLAIM.search(answer)
     if not claim:
         return False
-    nearby = answer[claim.start():claim.end() + 16].casefold()
+    nearby = answer[claim.start() : claim.end() + 16].casefold()
     if re.search(r"fail|violation|失败|失衡|不平衡", nearby):
         return bool(statuses & {"fail", "violation"})
     if re.search(r"warn|warning|告警|预警", nearby):
@@ -423,7 +451,10 @@ def _supply_demand_balance_claim_is_grounded(answer: str, evidence: Any) -> bool
 
 def _operational_inference_is_grounded(answer: str, evidence: Any) -> bool:
     evidence_text = json.dumps(evidence, ensure_ascii=False).casefold()
-    claims = [match.group(0).casefold() for match in OPERATIONAL_INFERENCE_CLAIM.finditer(answer)]
+    claims = [
+        match.group(0).casefold()
+        for match in OPERATIONAL_INFERENCE_CLAIM.finditer(answer)
+    ]
     if not claims:
         return False
     return all(
@@ -463,7 +494,9 @@ def _counterfactual_supports_claim(answer: str, pipeformer: Dict[str, Any]) -> b
     if not impacted_variables:
         return False
     disturbance_variable = str(comparison.get("disturbance_variable") or "")
-    allowed_variables = impacted_variables | ({disturbance_variable} if disturbance_variable else set())
+    allowed_variables = impacted_variables | (
+        {disturbance_variable} if disturbance_variable else set()
+    )
     claim_sentences = [
         sentence
         for sentence in re.split(r"[。！？.!?\n]+", answer)
@@ -483,7 +516,8 @@ def _proves_unique_nonpass_variable(pipeformer: Dict[str, Any]) -> bool:
     variables = {
         str(value.get("variable"))
         for finding in findings
-        for value in list(finding.get("evaluated_values") or []) + list(finding.get("offending_values") or [])
+        for value in list(finding.get("evaluated_values") or [])
+        + list(finding.get("offending_values") or [])
         if value.get("variable")
     }
     return len(findings) == 1 and len(variables) == 1
@@ -514,20 +548,14 @@ def _has_unsupported_evidence_description(
     contextual_variables: set[str] = set()
     for forecast in forecasts:
         verification = dict(
-            forecast.get("verification")
-            or forecast.get("constraint_check")
-            or {}
+            forecast.get("verification") or forecast.get("constraint_check") or {}
         )
-        engineering = dict(
-            verification.get("engineering_evidence") or {}
-        )
+        engineering = dict(verification.get("engineering_evidence") or {})
         for category, payload in engineering.items():
             for variable in VARIABLE_REFERENCE.findall(
                 json.dumps(payload, ensure_ascii=False)
             ):
-                typed_categories.setdefault(variable, set()).add(
-                    str(category)
-                )
+                typed_categories.setdefault(variable, set()).add(str(category))
         evidence = dict(forecast.get("evidence") or {})
         for key in ("top_watch_variables", "key_observation_variables"):
             for item in evidence.get(key) or []:
@@ -549,9 +577,7 @@ def _has_unsupported_evidence_description(
     }
     variables = contextual_variables | set(typed_categories)
     for variable in variables:
-        description = re.compile(
-            rf"`?{re.escape(variable)}`?\s*[（(]([^）)\n]*)[）)]"
-        )
+        description = re.compile(rf"`?{re.escape(variable)}`?\s*[（(]([^）)\n]*)[）)]")
         for match in description.finditer(answer):
             text = match.group(1)
             mentioned_categories = {
@@ -561,9 +587,6 @@ def _has_unsupported_evidence_description(
             }
             if not mentioned_categories:
                 continue
-            if not (
-                mentioned_categories
-                & typed_categories.get(variable, set())
-            ):
+            if not (mentioned_categories & typed_categories.get(variable, set())):
                 return True
     return False

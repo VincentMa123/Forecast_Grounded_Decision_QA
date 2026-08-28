@@ -50,7 +50,12 @@ _ERROR_CODES = (
     *_PRECONDITION_REJECTS,
 )
 _ABORT_STATUSES = frozenset(
-    {"max_turns_exceeded", "max_completion_length", "empty_response", "generation_error"}
+    {
+        "max_turns_exceeded",
+        "max_completion_length",
+        "empty_response",
+        "generation_error",
+    }
 )
 
 
@@ -107,9 +112,9 @@ def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
     for record in read_jsonl(schema_source):
         for message in record.get("messages") or []:
             if message.get("role") == "system":
-                frozen[str(record.get("sample_id") or record.get("example_id") or "")] = str(
-                    message["content"]
-                )
+                frozen[
+                    str(record.get("sample_id") or record.get("example_id") or "")
+                ] = str(message["content"])
     return frozen
 
 
@@ -137,7 +142,8 @@ def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
     for call, output in zip(calls, rollout.get("tool_outputs") or []):
         payload = output.get("output") if isinstance(output, Mapping) else None
         succeeded = call.get("execution_success") is not False and (
-            not isinstance(payload, Mapping) or payload.get("success", True) is not False
+            not isinstance(payload, Mapping)
+            or payload.get("success", True) is not False
         )
         signature = json.dumps(
             [call.get("name"), call.get("arguments")], sort_keys=True, default=str
@@ -145,7 +151,9 @@ def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
         pool = success_signatures if succeeded else failed_signatures
         pool[signature] = pool.get(signature, 0) + 1
     thrash = sum(count - 1 for count in failed_signatures.values() if count > 1)
-    duplicate_success = sum(count - 1 for count in success_signatures.values() if count > 1)
+    duplicate_success = sum(
+        count - 1 for count in success_signatures.values() if count > 1
+    )
     return {
         "turns": rollout.get("turns", 0),
         "trace_status": rollout.get("trace_status", ""),
@@ -210,7 +218,11 @@ def emit_grpo_prompts(
         return 5, sample_id
 
     by_key = {
-        (str(r.get("scenario_id") or ""), str(r.get("session_id") or ""), int(r.get("turn_id") or 1)): r
+        (
+            str(r.get("scenario_id") or ""),
+            str(r.get("session_id") or ""),
+            int(r.get("turn_id") or 1),
+        ): r
         for r in sorted(
             selected,
             key=lambda r: _vintage(str(r.get("sample_id") or "")),
@@ -308,7 +320,9 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def composite_reward(stats: Mapping[str, Any], report_fields: Mapping[str, Any]) -> float:
+def composite_reward(
+    stats: Mapping[str, Any], report_fields: Mapping[str, Any]
+) -> float:
     """Dense rule reward; mirrors the GRPO plugin so the gate measures what RL sees."""
     reward = 0.0
     reward += 0.55 * float(report_fields.get("overall_score") or 0.0) / 100.0
@@ -345,15 +359,14 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     records = read_jsonl(Path(args.source))
     if getattr(args, "all_scenarios", False):
         sources = [
-            dict(r)
-            for r in records
-            if r.get("tool_calls") or r.get("tool_outputs")
+            dict(r) for r in records if r.get("tool_calls") or r.get("tool_outputs")
         ]
     elif getattr(args, "pipeformer", False):
         sources = [
             dict(r)
             for r in records
-            if r.get("scenario_type") == "pipeformer" and int(r.get("turn_id") or 1) == 1
+            if r.get("scenario_type") == "pipeformer"
+            and int(r.get("turn_id") or 1) == 1
         ]
     else:
         sources = select_python_scenarios(
@@ -397,14 +410,18 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
         desc="pass_at_k",
         unit="episode",
     )
-    with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout, atomic_jsonl_writer(
-        trajectories_path, default=str
-    ) as write_trajectory:
+    with (
+        atomic_jsonl_writer(rollouts_path, default=str) as write_rollout,
+        atomic_jsonl_writer(trajectories_path, default=str) as write_trajectory,
+    ):
         for source in sources:
-            case_schemas = _schemas_for(source, schemas_by_key) or builder.build(
-                source,
-                workspace_root=workspace_for(output_dir, "schema-probe"),
-            ).tools
+            case_schemas = (
+                _schemas_for(source, schemas_by_key)
+                or builder.build(
+                    source,
+                    workspace_root=workspace_for(output_dir, "schema-probe"),
+                ).tools
+            )
             frozen_prompt = (
                 _frozen_prompt(frozen_prompts, source)
                 if args.execution_mode == "raw-student"
@@ -413,9 +430,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             )
             for temp in args.temps:
                 for k in range(args.episodes):
-                    env_key = (
-                        f"{evaluation_workspace_key(source)}__k{k}__t{temp:.2f}"
-                    )
+                    env_key = f"{evaluation_workspace_key(source)}__k{k}__t{temp:.2f}"
                     case = builder.build(
                         source,
                         workspace_root=workspace_for(output_dir, env_key),
@@ -548,7 +563,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--tool-schema-source", help="trace_level/*.jsonl for schemas")
     parser.add_argument("--adapters", help="LoRA adapter checkpoint directory")
     parser.add_argument("--model", help="Base model id/path when no --adapters")
-    parser.add_argument("--output-dir", default="pipeclaw/task2_student/outputs/evaluation/pass_at_k")
+    parser.add_argument(
+        "--output-dir", default="pipeclaw/task2_student/outputs/evaluation/pass_at_k"
+    )
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--temps", type=float, nargs="+", default=[0.7, 1.0])
     parser.add_argument(
@@ -567,8 +584,12 @@ def build_parser() -> argparse.ArgumentParser:
             "deployed OpenAI-compatible model through AgentOrchestrator"
         ),
     )
-    parser.add_argument("--system-prompt-mode", choices=["training", "production"], default="training")
-    parser.add_argument("--emit-grpo-prompts", help="write the GRPO prompt dataset and exit")
+    parser.add_argument(
+        "--system-prompt-mode", choices=["training", "production"], default="training"
+    )
+    parser.add_argument(
+        "--emit-grpo-prompts", help="write the GRPO prompt dataset and exit"
+    )
     parser.add_argument(
         "--pipeformer",
         action="store_true",

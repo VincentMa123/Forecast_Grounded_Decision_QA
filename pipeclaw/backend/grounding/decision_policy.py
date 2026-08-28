@@ -20,15 +20,78 @@ METRIC_CATALOG: Dict[str, MetricDefinition] = {
     for metric, path, direction, label_zh, label_en, unit_path in (
         ("warning.count", ("warning_count",), "minimize", "告警数", "warnings", ()),
         ("risk.rank", ("risk_rank",), "minimize", "风险等级", "risk rank", ()),
-        ("compressor.maximum_load", ("compressor_metrics", "maximum_load", "value"), "minimize", "压缩机最大负荷", "maximum compressor load", ()),
-        ("pressure.minimum_operating_window_margin", ("pressure_metrics", "minimum_operating_window_margin", "value"), "maximize", "最小压力窗裕度", "minimum pressure-window margin", ()),
-        ("flow.max_abs_supply_demand_gap", ("flow_metrics", "supply_demand_balance", "value"), "minimize", "最大供需差", "maximum absolute supply-demand gap", ()),
-        ("flow.maximum_segment_flow_change", ("flow_metrics", "maximum_segment_flow_change", "value"), "minimize", "最大管段流量变化", "maximum segment-flow change", ()),
-        ("linepack.maximum_decline_from_start", ("linepack_metrics", "maximum_decline_from_start", "value"), "minimize", "最大管存下降", "maximum linepack decline", ()),
-        ("linepack.maximum_continuous_decline_minutes", ("linepack_metrics", "maximum_continuous_decline_minutes"), "minimize", "管存最长连续下降分钟", "maximum continuous linepack-decline minutes", ()),
-        ("linepack.insufficient_recovery_count", ("linepack_metrics", "insufficient_recovery_count"), "minimize", "管存恢复不足次数", "insufficient linepack-recovery count", ()),
-        ("energy.delta_vs_baseline", ("energy_metrics", "delta_vs_baseline"), "minimize", "相对基线能耗变化", "energy delta versus baseline", ("energy_metrics", "unit")),
-        ("energy.total", ("energy_metrics", "total"), "minimize", "总能耗", "total energy", ("energy_metrics", "unit")),
+        (
+            "compressor.maximum_load",
+            ("compressor_metrics", "maximum_load", "value"),
+            "minimize",
+            "压缩机最大负荷",
+            "maximum compressor load",
+            (),
+        ),
+        (
+            "pressure.minimum_operating_window_margin",
+            ("pressure_metrics", "minimum_operating_window_margin", "value"),
+            "maximize",
+            "最小压力窗裕度",
+            "minimum pressure-window margin",
+            (),
+        ),
+        (
+            "flow.max_abs_supply_demand_gap",
+            ("flow_metrics", "supply_demand_balance", "value"),
+            "minimize",
+            "最大供需差",
+            "maximum absolute supply-demand gap",
+            (),
+        ),
+        (
+            "flow.maximum_segment_flow_change",
+            ("flow_metrics", "maximum_segment_flow_change", "value"),
+            "minimize",
+            "最大管段流量变化",
+            "maximum segment-flow change",
+            (),
+        ),
+        (
+            "linepack.maximum_decline_from_start",
+            ("linepack_metrics", "maximum_decline_from_start", "value"),
+            "minimize",
+            "最大管存下降",
+            "maximum linepack decline",
+            (),
+        ),
+        (
+            "linepack.maximum_continuous_decline_minutes",
+            ("linepack_metrics", "maximum_continuous_decline_minutes"),
+            "minimize",
+            "管存最长连续下降分钟",
+            "maximum continuous linepack-decline minutes",
+            (),
+        ),
+        (
+            "linepack.insufficient_recovery_count",
+            ("linepack_metrics", "insufficient_recovery_count"),
+            "minimize",
+            "管存恢复不足次数",
+            "insufficient linepack-recovery count",
+            (),
+        ),
+        (
+            "energy.delta_vs_baseline",
+            ("energy_metrics", "delta_vs_baseline"),
+            "minimize",
+            "相对基线能耗变化",
+            "energy delta versus baseline",
+            ("energy_metrics", "unit"),
+        ),
+        (
+            "energy.total",
+            ("energy_metrics", "total"),
+            "minimize",
+            "总能耗",
+            "total energy",
+            ("energy_metrics", "unit"),
+        ),
     )
 }
 
@@ -76,7 +139,9 @@ def number_value(value: Any) -> Optional[float]:
 def llm_policy_excerpts(policy: Mapping[str, Any]) -> List[str]:
     """Return the normalized source excerpts that must appear in the user question."""
     objectives = [dict(item or {}) for item in policy.get("objectives") or []]
-    legacy_excerpt = " ".join(str(policy.get("source_excerpt") or "").split()).casefold()
+    legacy_excerpt = " ".join(
+        str(policy.get("source_excerpt") or "").split()
+    ).casefold()
     excerpts = []
     for objective in objectives:
         excerpt = " ".join(
@@ -152,10 +217,10 @@ def normalize_decision_policy(
         objectives.append(normalized)
 
     normalized_policy = {
-            "source": source,
-            "hard_constraints": constraints,
-            "objectives": objectives,
-        }
+        "source": source,
+        "hard_constraints": constraints,
+        "objectives": objectives,
+    }
     if source_policy.get("source_excerpt"):
         normalized_policy["source_excerpt"] = str(source_policy["source_excerpt"])
     return normalized_policy, list(dict.fromkeys(errors))
@@ -179,10 +244,12 @@ def normalize_policy_tool_request(
             "decision_policy_objective_source_excerpt_missing:"
             f"{index}:{objective.get('metric') or 'missing'}"
         )
-    policy, errors = normalize_decision_policy({
-        "hard_constraints": hard_constraints,
-        "objectives": normalized_objectives,
-    })
+    policy, errors = normalize_decision_policy(
+        {
+            "hard_constraints": hard_constraints,
+            "objectives": normalized_objectives,
+        }
+    )
     errors.extend(source_errors)
     if errors:
         return {
@@ -240,7 +307,9 @@ def metric_evidence(
             result["source_metric"] = str(metric_container["metric"])
         if metric_container.get("status"):
             result["status"] = str(metric_container["status"])
-    unit = nested_value(candidate, definition.unit_path) if definition.unit_path else None
+    unit = (
+        nested_value(candidate, definition.unit_path) if definition.unit_path else None
+    )
     if unit:
         result["unit"] = str(unit)
     return result
@@ -300,7 +369,4 @@ def rank_candidate_groups(
                     buckets[-1].append(candidate_id)
             refined.extend(buckets)
         groups = refined
-    return [
-        sorted(group, key=str.casefold)
-        for group in groups
-    ]
+    return [sorted(group, key=str.casefold) for group in groups]

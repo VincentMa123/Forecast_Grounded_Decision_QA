@@ -16,7 +16,9 @@ from pipeclaw.backend.grounding.evidence.tool import (
     requested_artifacts,
     tool_output_failed,
 )
-from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
+from pipeclaw.backend.pipeline.forecast_registry_contract import (
+    authorize_forecast_registry,
+)
 from pipeclaw.backend.pipeline.forecast_result import (
     COMPACT_COMPARABLE_METRIC_KEYS,
     ForecastResult,
@@ -39,6 +41,8 @@ SFT_OMITTED_TOOL_KEYS = {
     "timestamp",
     "workspace",
 }
+
+
 def _evidence_blob(output: Optional[Dict[str, Any]]) -> str:
     return json.dumps((output or {}).get("output") or {}, ensure_ascii=False).casefold()
 
@@ -130,9 +134,9 @@ def _legacy_projection(
                 "resolved_output_variable_count",
             )
         },
-        "forecast_time_step_minutes": dict(
-            prediction.get("forecast_window") or {}
-        ).get("time_step_minutes"),
+        "forecast_time_step_minutes": dict(prediction.get("forecast_window") or {}).get(
+            "time_step_minutes"
+        ),
     }
     parsed_task = {key: item for key, item in parsed_task.items() if item is not None}
     return {
@@ -171,8 +175,12 @@ def export_trace_tools(
             and raw_output.get("success")
         ):
             arguments = dict(item.get("args") or {})
-            candidate_id = arguments.get("candidate_id") or raw_output.get("candidate_id")
-            candidate_role = arguments.get("candidate_role") or raw_output.get("candidate_role")
+            candidate_id = arguments.get("candidate_id") or raw_output.get(
+                "candidate_id"
+            )
+            candidate_role = arguments.get("candidate_role") or raw_output.get(
+                "candidate_role"
+            )
             forecast = ForecastResult.from_payload(raw_output)
             output = forecast.model_dump()
             pipeformer_results.append(
@@ -253,7 +261,9 @@ class TeacherTraceProjector:
             if pair[2] is not None and not tool_output_failed(pair[2])
         ]
         successful_pipeformer = [
-            pair for pair in successful if pair[1].get("name") == "run_pipeformer_forecast"
+            pair
+            for pair in successful
+            if pair[1].get("name") == "run_pipeformer_forecast"
         ]
         successful_decision_policies = [
             pair for pair in successful if pair[1].get("name") == "set_decision_policy"
@@ -343,7 +353,9 @@ class TeacherTraceProjector:
             if output is None:
                 continue
             raw_output = output.get("output")
-            if call.get("name") == "run_pipeformer_forecast" and isinstance(raw_output, dict):
+            if call.get("name") == "run_pipeformer_forecast" and isinstance(
+                raw_output, dict
+            ):
                 raw_output = self._select_forecast_evidence_for_sft(
                     raw_output,
                     answer,
@@ -354,9 +366,8 @@ class TeacherTraceProjector:
                         else max_pipeformer_variables
                     ),
                 )
-            elif (
-                call.get("name") == "search_pipeformer_registry"
-                and isinstance(raw_output, dict)
+            elif call.get("name") == "search_pipeformer_registry" and isinstance(
+                raw_output, dict
             ):
                 # Application-boundary contracts are already bounded; recurse
                 # only to apply the shared text sanitization rules.
@@ -408,7 +419,9 @@ class TeacherTraceProjector:
             ]
             if disturbance_call_ids:
                 required.add(disturbance_call_ids[-1])
-            for call_ids in (authorization.get("candidate_search_call_ids") or {}).values():
+            for call_ids in (
+                authorization.get("candidate_search_call_ids") or {}
+            ).values():
                 matching = [str(value) for value in call_ids if str(value)]
                 if matching:
                     required.add(matching[-1])
@@ -416,9 +429,9 @@ class TeacherTraceProjector:
 
     @staticmethod
     def _forecast_action_variables(call: Dict[str, Any]) -> set[str]:
-        boundary = dict(dict(call.get("arguments") or {}).get(
-            "boundary_conditions"
-        ) or {})
+        boundary = dict(
+            dict(call.get("arguments") or {}).get("boundary_conditions") or {}
+        )
         return {
             str(variable)
             for key in ("percentage_changes", "setpoints")
@@ -439,7 +452,15 @@ class TeacherTraceProjector:
             ranked = []
             for pair in available:
                 covered_count, covered = self._evidence_coverage(pair[2], remaining)
-                ranked.append((covered_count, self._evidence_score(pair[2], answer), -pair[0], pair, covered))
+                ranked.append(
+                    (
+                        covered_count,
+                        self._evidence_score(pair[2], answer),
+                        -pair[0],
+                        pair,
+                        covered,
+                    )
+                )
             _, _, _, best, covered = max(ranked, key=lambda item: item[:3])
             selected.append(best)
             remaining.difference_update(covered)
@@ -507,9 +528,7 @@ class TeacherTraceProjector:
                     for pair in pairs
                     if pair[1].get("name") == "run_command"
                     and path
-                    in command_python_scripts(
-                        dict(pair[1].get("arguments") or {})
-                    )
+                    in command_python_scripts(dict(pair[1].get("arguments") or {}))
                 ),
                 default=None,
             )
@@ -551,7 +570,10 @@ class TeacherTraceProjector:
                 if producers:
                     producer = producers[-1]
                     selected_by_index[producer[0]] = producer
-                elif script_path.startswith("temporary_dir/") or "/temporary_dir/" in script_path:
+                elif (
+                    script_path.startswith("temporary_dir/")
+                    or "/temporary_dir/" in script_path
+                ):
                     raise ValueError(
                         f"Generated script execution requires a preceding write_file: {script_path}"
                     )
@@ -618,7 +640,9 @@ class TeacherTraceProjector:
             token = reference.casefold().replace(",", "")
             for index, line in enumerate(normalized_lines):
                 if token in line:
-                    selected_indices.update({max(0, index - 1), index, min(len(lines) - 1, index + 1)})
+                    selected_indices.update(
+                        {max(0, index - 1), index, min(len(lines) - 1, index + 1)}
+                    )
                     break
         excerpt_lines = [lines[index] for index in sorted(selected_indices)]
         excerpt = "\n".join(excerpt_lines)
@@ -632,7 +656,8 @@ class TeacherTraceProjector:
         compact = {
             key: value
             for key, value in evidence.items()
-            if key not in {
+            if key
+            not in {
                 "top_watch_variables",
                 "key_observation_variables",
                 "verified_numeric_claims",
@@ -649,9 +674,7 @@ class TeacherTraceProjector:
         if isinstance(raw_policy, dict):
             compact_policy = {
                 "source": raw_policy.get("source"),
-                "hard_constraints": list(
-                    raw_policy.get("hard_constraints") or []
-                ),
+                "hard_constraints": list(raw_policy.get("hard_constraints") or []),
                 "objectives": [
                     _select_fields(objective, ("metric", "direction", "tolerance"))
                     for objective in raw_policy.get("objectives") or []
@@ -726,7 +749,9 @@ class TeacherTraceProjector:
                     if item.get("variable")
                 )
             for finding in verification.get("priority_findings") or []:
-                referenced.extend(str(value) for value in finding.get("affected_variables") or [])
+                referenced.extend(
+                    str(value) for value in finding.get("affected_variables") or []
+                )
         referenced = list(dict.fromkeys(referenced))[:max_variables]
         summary = dict(prediction.get("output_forecast_summary") or {})
         metric_keys = (
@@ -745,7 +770,10 @@ class TeacherTraceProjector:
             for variable in referenced
             if variable in summary
         }
-        if not include_auxiliary_variables and "counterfactual_comparison" in prediction:
+        if (
+            not include_auxiliary_variables
+            and "counterfactual_comparison" in prediction
+        ):
             prediction["counterfactual_comparison"] = _select_fields(
                 dict(prediction["counterfactual_comparison"] or {}),
                 (
@@ -817,6 +845,7 @@ class TeacherTraceProjector:
         compact.pop("manual_intervention_label", None)
         compact.pop("dispatch_recommendation", None)
         return compact
+
 
 DEFAULT_PROJECTOR = TeacherTraceProjector()
 

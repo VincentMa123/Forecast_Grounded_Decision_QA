@@ -31,13 +31,21 @@ class VariableRegistry:
     def read(cls, path: Path) -> "VariableRegistry":
         path = Path(path)
         if not path.is_file():
-            raise ValueError(f"Variable registry validation failed: variable registry does not exist: {path}")
+            raise ValueError(
+                f"Variable registry validation failed: variable registry does not exist: {path}"
+            )
         try:
             document = json.loads(path.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Variable registry validation failed: could not read {path}: {exc}") from exc
-        if not isinstance(document, dict) or not isinstance(document.get("variables"), list):
-            raise ValueError("Variable registry validation failed: registry must contain a variables array.")
+            raise ValueError(
+                f"Variable registry validation failed: could not read {path}: {exc}"
+            ) from exc
+        if not isinstance(document, dict) or not isinstance(
+            document.get("variables"), list
+        ):
+            raise ValueError(
+                "Variable registry validation failed: registry must contain a variables array."
+            )
         return cls(path=path, document=document)
 
     def validate(self, required_variables: Iterable[str]) -> Dict[str, Any]:
@@ -46,7 +54,9 @@ class VariableRegistry:
     def require(self, required_variables: Iterable[str]) -> Dict[str, Any]:
         report = self.validate(required_variables)
         if not report["supported"]:
-            raise ValueError("Variable registry validation failed: " + "; ".join(report["errors"]))
+            raise ValueError(
+                "Variable registry validation failed: " + "; ".join(report["errors"])
+            )
         return self.document
 
     @property
@@ -69,7 +79,9 @@ class VariableRegistry:
             method = "exact" if raw == stripped else "whitespace"
             return _variable_resolution(raw, stripped, method)
 
-        case_matches = [name for name in names if name.casefold() == stripped.casefold()]
+        case_matches = [
+            name for name in names if name.casefold() == stripped.casefold()
+        ]
         if case_matches:
             return _unique_resolution(raw, case_matches, "case_insensitive")
 
@@ -87,11 +99,15 @@ class VariableRegistry:
             name for name in names if name.casefold() == terminal_variant.casefold()
         ]
         if terminal_matches:
-            return _unique_resolution(raw, terminal_matches, "terminal_underscore_alias")
+            return _unique_resolution(
+                raw, terminal_matches, "terminal_underscore_alias"
+            )
 
         raise ValueError(f"Variable {raw!r} is not present in registry {self.path}.")
 
-    def require_controllable_inputs(self, variables: Iterable[str]) -> List[Dict[str, Any]]:
+    def require_controllable_inputs(
+        self, variables: Iterable[str]
+    ) -> List[Dict[str, Any]]:
         """Resolve and validate boundary adjustments against registry semantics."""
         validated = []
         for requested in variables:
@@ -125,13 +141,28 @@ class VariableRegistry:
         for item in self.by_name.values():
             if role is not None and str(item.get("role")).casefold() != role.casefold():
                 continue
-            if controllable is not None and item.get("controllable") is not controllable:
+            if (
+                controllable is not None
+                and item.get("controllable") is not controllable
+            ):
                 continue
-            if equipment_id_filter and str(item.get("equipment_id", "")).casefold() not in equipment_id_filter:
+            if (
+                equipment_id_filter
+                and str(item.get("equipment_id", "")).casefold()
+                not in equipment_id_filter
+            ):
                 continue
-            if equipment_type_filter and str(item.get("equipment_type", "")).casefold() not in equipment_type_filter:
+            if (
+                equipment_type_filter
+                and str(item.get("equipment_type", "")).casefold()
+                not in equipment_type_filter
+            ):
                 continue
-            if quantity_filter and str(item.get("physical_quantity", "")).casefold() not in quantity_filter:
+            if (
+                quantity_filter
+                and str(item.get("physical_quantity", "")).casefold()
+                not in quantity_filter
+            ):
                 continue
             effect_text = " ".join(
                 str(effect.get("physical_quantity") or "")
@@ -150,13 +181,21 @@ class VariableRegistry:
             ).casefold()
             variable = str(item.get("variable") or "").casefold()
             canonical_id_in_query = bool(variable and variable in str(query).casefold())
-            if query_terms and not canonical_id_in_query and not all(term in search_text for term in query_terms):
+            if (
+                query_terms
+                and not canonical_id_in_query
+                and not all(term in search_text for term in query_terms)
+            ):
                 continue
             exact_score = 0 if canonical_id_in_query else 1
             ranked.append((exact_score, str(item.get("variable")), item))
         ranked.sort(key=lambda value: (value[0], value[1]))
         start = max(0, int(offset))
-        page = ranked[start:] if limit is None else ranked[start : start + max(1, int(limit))]
+        page = (
+            ranked[start:]
+            if limit is None
+            else ranked[start : start + max(1, int(limit))]
+        )
         return [_compact_registry_entry(item) for _, _, item in page]
 
 
@@ -185,7 +224,9 @@ def _compact_registry_entry(item: Dict[str, Any]) -> Dict[str, Any]:
     return {key: copy.deepcopy(item[key]) for key in keys if key in item}
 
 
-def _unique_resolution(requested: str, matches: Iterable[str], method: str) -> Dict[str, Any]:
+def _unique_resolution(
+    requested: str, matches: Iterable[str], method: str
+) -> Dict[str, Any]:
     unique = list(dict.fromkeys(matches))
     if len(unique) != 1:
         raise ValueError(
@@ -228,7 +269,10 @@ def normalize_task_variables(
         resolved_values: Dict[str, Any] = {}
         for requested_name, value in values.items():
             resolved_name = resolve(requested_name)
-            if resolved_name in resolved_values and resolved_values[resolved_name] != value:
+            if (
+                resolved_name in resolved_values
+                and resolved_values[resolved_name] != value
+            ):
                 raise ValueError(
                     f"Multiple boundary values resolve to {resolved_name!r}."
                 )
@@ -282,7 +326,9 @@ def _registry_report(
     if duplicates:
         errors.append("Duplicate registry variables: " + ", ".join(duplicates))
     if missing_variables:
-        errors.append("Mapped variables missing from registry: " + ", ".join(missing_variables))
+        errors.append(
+            "Mapped variables missing from registry: " + ", ".join(missing_variables)
+        )
     if incomplete_variables:
         errors.append(
             "Registry entries missing required fields: "

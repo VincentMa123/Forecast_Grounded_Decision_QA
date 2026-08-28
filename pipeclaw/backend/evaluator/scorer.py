@@ -66,9 +66,7 @@ def _record_with_trace_status(
 
 def _legacy_name(name: str, variant: str) -> str:
     aliases = (
-        _PIPEFORMER_LEGACY_NAMES
-        if variant == "pipeformer"
-        else _GENERIC_LEGACY_NAMES
+        _PIPEFORMER_LEGACY_NAMES if variant == "pipeformer" else _GENERIC_LEGACY_NAMES
     )
     return aliases.get(name, name)
 
@@ -79,9 +77,7 @@ def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[st
     canonical_failed = list(report.failed_checks)
     canonical_critical = list(report.critical_failures)
     failed = [_legacy_name(name, variant) for name in canonical_failed]
-    failed_critical = [
-        _legacy_name(name, variant) for name in canonical_critical
-    ]
+    failed_critical = [_legacy_name(name, variant) for name in canonical_critical]
     checks = []
     for metric_result in report.metrics.values():
         if not metric_result.applicable:
@@ -114,9 +110,7 @@ def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[st
     for alias, canonical in _BOOLEAN_ALIASES.items():
         metric_result = report.metrics.get(canonical)
         payload[alias] = bool(
-            metric_result
-            and metric_result.applicable
-            and metric_result.passed
+            metric_result and metric_result.applicable and metric_result.passed
         )
     return payload
 
@@ -206,9 +200,7 @@ def summarize_evaluations(results: List[Dict[str, Any]]) -> Dict[str, Any]:
     summary = summarize(results)
     overall = dict(summary.get("overall") or {})
     issue_counts = Counter(
-        str(issue)
-        for result in results
-        for issue in result.get("quality_issues") or []
+        str(issue) for result in results for issue in result.get("quality_issues") or []
     )
     profile_counts = Counter(str(result.get("profile")) for result in results)
     summary.update(

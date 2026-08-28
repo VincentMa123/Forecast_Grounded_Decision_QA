@@ -33,10 +33,7 @@ def _json_compatible(value: Any) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, Mapping):
-        return {
-            str(key): _json_compatible(item)
-            for key, item in value.items()
-        }
+        return {str(key): _json_compatible(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
         return [_json_compatible(item) for item in value]
     if isinstance(value, (set, frozenset)):
@@ -98,10 +95,7 @@ class EvaluationReport:
         object.__setattr__(self, "critical_failures", tuple(self.critical_failures))
 
     def to_dict(self) -> dict[str, Any]:
-        metrics = {
-            str(name): metric.to_dict()
-            for name, metric in self.metrics.items()
-        }
+        metrics = {str(name): metric.to_dict() for name, metric in self.metrics.items()}
         return {
             "schema_version": str(self.schema_version),
             "profile": self.profile.value,

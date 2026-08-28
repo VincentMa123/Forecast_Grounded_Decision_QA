@@ -1,5 +1,3 @@
-"""Shared helpers for canonical evaluator checks."""
-
 from __future__ import annotations
 
 import json
@@ -9,7 +7,9 @@ from typing import Any
 
 from ..models import EvaluationContext, MetricResult
 from ..profiles import get_profile_policy
-from pipeclaw.backend.pipeline.forecast_registry_contract import authorize_forecast_registry
+from pipeclaw.backend.pipeline.forecast_registry_contract import (
+    authorize_forecast_registry,
+)
 from .assumptions import (
     expected_applied_disturbance,
     inferred_task_fields,
@@ -51,11 +51,17 @@ def mapping(value: Any) -> Mapping[str, Any]:
 
 
 def calls(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_calls")) if isinstance(item, Mapping)]
+    return [
+        item for item in sequence(record.get("tool_calls")) if isinstance(item, Mapping)
+    ]
 
 
 def output_wrappers(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    return [item for item in sequence(record.get("tool_outputs")) if isinstance(item, Mapping)]
+    return [
+        item
+        for item in sequence(record.get("tool_outputs"))
+        if isinstance(item, Mapping)
+    ]
 
 
 def task_views(record: Mapping[str, Any]) -> list[dict[str, Any]]:
@@ -195,9 +201,7 @@ def case_identity_matches(
     expected_condition = _finite_number(
         expected.get("current_operating_condition_number")
     )
-    actual_condition = _finite_number(
-        actual.get("current_operating_condition_number")
-    )
+    actual_condition = _finite_number(actual.get("current_operating_condition_number"))
     if expected_condition is not None and actual_condition is not None:
         return math.isclose(expected_condition, actual_condition, abs_tol=0.0)
     return normalize(expected.get("case_id")) == normalize(actual.get("case_id"))
@@ -235,10 +239,10 @@ def task_field_comparison(
         if field not in expected or field in assumed_fields:
             continue
         if field not in actual:
-            if (
-                field in {"case_id", "current_operating_condition_number"}
-                and case_identity_matches(expected, actual)
-            ):
+            if field in {
+                "case_id",
+                "current_operating_condition_number",
+            } and case_identity_matches(expected, actual):
                 matched_fields.append(field)
                 continue
             mismatches.append(field)
@@ -269,9 +273,7 @@ def disturbance_was_applied(
 ) -> bool:
     prediction = prediction_view(output)
     variable = str(
-        task.get("disturbance_variable")
-        or prediction.get("disturbance_variable")
-        or ""
+        task.get("disturbance_variable") or prediction.get("disturbance_variable") or ""
     )
     if not variable or variable != str(prediction.get("disturbance_variable") or ""):
         return False
@@ -333,7 +335,7 @@ def disturbance_was_applied(
             if direction not in {"up", "down"} or not numbers_match(
                 expected_value,
                 signed,
-                ):
+            ):
                 return False
     elif magnitude is not None and direction in {"up", "down"}:
         expected = expected_applied_disturbance(task, prediction, variable)
@@ -350,7 +352,9 @@ def disturbance_was_applied(
         isinstance(item, Mapping)
         and str(item.get("variable") or "") == variable
         and str(item.get("mode") or "") == expected_mode
-        and numbers_match(item.get("value", item.get("requested_value")), expected_value)
+        and numbers_match(
+            item.get("value", item.get("requested_value")), expected_value
+        )
         for item in applied
     )
 
@@ -358,9 +362,10 @@ def disturbance_was_applied(
 def checkpoint_inference_used(output: Mapping[str, Any]) -> bool:
     """Require both the checkpoint forecast mode and its compact provenance."""
 
-    return (
-        prediction_view(output).get("forecast_mode") == "checkpoint_inference"
-        and bool(mapping(output.get("provenance")).get("checkpoint_id"))
+    return prediction_view(output).get(
+        "forecast_mode"
+    ) == "checkpoint_inference" and bool(
+        mapping(output.get("provenance")).get("checkpoint_id")
     )
 
 
@@ -380,8 +385,7 @@ def horizon_is_consistent(output: Mapping[str, Any]) -> bool:
         except (TypeError, ValueError):
             return False
         return actual_value > 0 and (
-            not steps
-            or abs(actual_value - steps * step) <= max(step, 1e-6)
+            not steps or abs(actual_value - steps * step) <= max(step, 1e-6)
         )
     try:
         requested_value = float(requested)
@@ -392,7 +396,9 @@ def horizon_is_consistent(output: Mapping[str, Any]) -> bool:
 
 def requested_constraints_executed(output: Mapping[str, Any]) -> bool:
     verification = verification_view(output)
-    requested = {str(item) for item in sequence(verification.get("requested_categories"))}
+    requested = {
+        str(item) for item in sequence(verification.get("requested_categories"))
+    }
     category_status = {
         str(key): str(value)
         for key, value in mapping(verification.get("category_status")).items()

@@ -1,5 +1,3 @@
-"""Canonical metrics for native teacher traces."""
-
 from __future__ import annotations
 
 import json
@@ -39,32 +37,61 @@ from .evidence import evidence_consistency
 
 
 REQUIRED_RECORD_FIELDS = (
-    "sample_id", "scenario_id", "scenario_type", "user_input", "parsed_task",
-    "tool_calls", "tool_outputs", "prediction_summary", "constraint_check",
-    "evidence", "risk_level", "manual_intervention_label", "dispatch_recommendation",
-    "final_answer", "quality_flag",
+    "sample_id",
+    "scenario_id",
+    "scenario_type",
+    "user_input",
+    "parsed_task",
+    "tool_calls",
+    "tool_outputs",
+    "prediction_summary",
+    "constraint_check",
+    "evidence",
+    "risk_level",
+    "manual_intervention_label",
+    "dispatch_recommendation",
+    "final_answer",
+    "quality_flag",
 )
-TEACHER_TRACE_REQUIRED_FIELDS = (*REQUIRED_RECORD_FIELDS[:3], "state_before", "recent_turns", *REQUIRED_RECORD_FIELDS[3:])
+TEACHER_TRACE_REQUIRED_FIELDS = (
+    *REQUIRED_RECORD_FIELDS[:3],
+    "state_before",
+    "recent_turns",
+    *REQUIRED_RECORD_FIELDS[3:],
+)
 TEACHER_TRACE_EXPECTED_TYPES = {
-    "sample_id": str, "scenario_id": str, "scenario_type": str, "state_before": dict,
-    "recent_turns": list, "user_input": str, "parsed_task": dict, "tool_calls": list,
-    "tool_outputs": list, "prediction_summary": dict, "constraint_check": dict,
-    "evidence": dict, "final_answer": str, "quality_flag": str,
+    "sample_id": str,
+    "scenario_id": str,
+    "scenario_type": str,
+    "state_before": dict,
+    "recent_turns": list,
+    "user_input": str,
+    "parsed_task": dict,
+    "tool_calls": list,
+    "tool_outputs": list,
+    "prediction_summary": dict,
+    "constraint_check": dict,
+    "evidence": dict,
+    "final_answer": str,
+    "quality_flag": str,
 }
 ENTIRELY_SAFE_CLAIM = re.compile(
     r"完全安全|无任何风险|没有任何风险|所有(?:校核|规则|约束)均?通过|各项(?:校核|规则|约束)均?通过"
     r"|\b(?:entirely|completely|fully)\s+safe\b"
     r"|\ball\s+(?:requested\s+)?(?:checks|constraints|rules)\s+pass(?:ed)?\b"
-    r"|\bno\s+(?:operational\s+)?risk\b", re.IGNORECASE,
+    r"|\bno\s+(?:operational\s+)?risk\b",
+    re.IGNORECASE,
 )
 REDUCE_UPSTREAM_INJECTION = re.compile(
     r"(?:减少|降低|下调|削减).{0,24}(?:上游|气源).{0,16}(?:注气|供气|供给|流量)"
     r"|(?:上游|气源).{0,16}(?:注气|供气|供给|流量).{0,24}(?:减少|降低|下调|削减)"
-    r"|\b(?:reduce|decrease|lower|cut)\b.{0,40}\b(?:upstream\s+)?(?:injection|supply|inflow)\b", re.IGNORECASE,
+    r"|\b(?:reduce|decrease|lower|cut)\b.{0,40}\b(?:upstream\s+)?(?:injection|supply|inflow)\b",
+    re.IGNORECASE,
 )
 RAISE_COMPRESSOR_LOAD = re.compile(
     r"(?:提高|增加|上调).{0,24}压缩机.{0,12}负荷|压缩机.{0,12}负荷.{0,24}(?:提高|增加|上调)"
-    r"|\b(?:raise|increase|boost)\b.{0,40}\bcompressor\s+load\b", re.IGNORECASE,
+    r"|\b(?:raise|increase|boost)\b.{0,40}\bcompressor\s+load\b",
+    re.IGNORECASE,
 )
 
 
@@ -110,10 +137,7 @@ def _task_is_complete(task: Mapping[str, Any]) -> bool:
         and not sequence(task.get("unresolved_attention_targets"))
         and not sequence(task.get("unresolved_output_state_variables"))
         and not sequence(task.get("invalid_normalized_variables"))
-        and (
-            resolved_output_count is None
-            or int(resolved_output_count or 0) > 0
-        )
+        and (resolved_output_count is None or int(resolved_output_count or 0) > 0)
     )
 
 
@@ -158,12 +182,20 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
     """Return Task 1 compatibility diagnostics from the canonical evaluator."""
     missing = [name for name in TEACHER_TRACE_REQUIRED_FIELDS if name not in record]
     invalid_types = [
-        name for name, expected in TEACHER_TRACE_EXPECTED_TYPES.items()
+        name
+        for name, expected in TEACHER_TRACE_EXPECTED_TYPES.items()
         if name in record and not isinstance(record[name], expected)
     ]
     invalid_types.extend(
-        name for name in ("risk_level", "manual_intervention_label", "dispatch_recommendation")
-        if name in record and record[name] is not None and not isinstance(record[name], str)
+        name
+        for name in (
+            "risk_level",
+            "manual_intervention_label",
+            "dispatch_recommendation",
+        )
+        if name in record
+        and record[name] is not None
+        and not isinstance(record[name], str)
     )
     schema_issues = [f"missing:{name}" for name in missing]
     schema_issues.extend(f"invalid_type:{name}" for name in invalid_types)
@@ -174,49 +206,104 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
     rule_status = dict(constraint.get("rule_status") or {})
     rule_issues: list[str] = []
     if constraint:
-        if constraint.get("risk_level") is not None and record.get("risk_level") != constraint.get("risk_level"):
+        if constraint.get("risk_level") is not None and record.get(
+            "risk_level"
+        ) != constraint.get("risk_level"):
             rule_issues.append("risk_level_disagrees_with_constraint_check")
-        if constraint.get("human_intervention_label") is not None and record.get("manual_intervention_label") != constraint.get("human_intervention_label"):
+        if constraint.get("human_intervention_label") is not None and record.get(
+            "manual_intervention_label"
+        ) != constraint.get("human_intervention_label"):
             rule_issues.append("intervention_label_disagrees_with_constraint_check")
-        nonpass = any(value in {"warning", "fail"} for value in category_status.values()) or any(value in {"warning", "fail"} for value in rule_status.values())
+        nonpass = any(
+            value in {"warning", "fail"} for value in category_status.values()
+        ) or any(value in {"warning", "fail"} for value in rule_status.values())
         if nonpass and ENTIRELY_SAFE_CLAIM.search(answer):
             rule_issues.append("final_answer_claims_entirely_safe_despite_nonpass_rule")
-        pressure_fail = category_status.get("pressure") == "fail" or any(str(flag).startswith("pressure_violation") for flag in constraint.get("triggered_flags") or [])
+        pressure_fail = category_status.get("pressure") == "fail" or any(
+            str(flag).startswith("pressure_violation")
+            for flag in constraint.get("triggered_flags") or []
+        )
         if pressure_fail and record.get("risk_level") == "low":
             rule_issues.append("pressure_violation_cannot_have_low_risk")
-        if pressure_fail and record.get("manual_intervention_label") == "no_intervention":
+        if (
+            pressure_fail
+            and record.get("manual_intervention_label") == "no_intervention"
+        ):
             rule_issues.append("pressure_violation_cannot_require_no_intervention")
 
     dispatch_issues: list[str] = []
     if constraint:
         flags = {str(value) for value in constraint.get("triggered_flags") or []}
-        pressure_fail = category_status.get("pressure") == "fail" or any(value.startswith("pressure_violation") for value in flags) or rule_status.get("node_pressure_operating_window") == "fail"
-        compressor_overload = "compressor_overload" in flags or rule_status.get("compressor_load_limit") == "fail"
-        dispatch = "\n".join(str(value).strip() for value in (record.get("dispatch_recommendation") or "", answer) if str(value).strip())
+        pressure_fail = (
+            category_status.get("pressure") == "fail"
+            or any(value.startswith("pressure_violation") for value in flags)
+            or rule_status.get("node_pressure_operating_window") == "fail"
+        )
+        compressor_overload = (
+            "compressor_overload" in flags
+            or rule_status.get("compressor_load_limit") == "fail"
+        )
+        dispatch = "\n".join(
+            str(value).strip()
+            for value in (record.get("dispatch_recommendation") or "", answer)
+            if str(value).strip()
+        )
         if pressure_fail and REDUCE_UPSTREAM_INJECTION.search(dispatch):
-            dispatch_issues.append("pressure_violation_recommends_reducing_upstream_injection")
+            dispatch_issues.append(
+                "pressure_violation_recommends_reducing_upstream_injection"
+            )
         if compressor_overload and RAISE_COMPRESSOR_LOAD.search(dispatch):
-            dispatch_issues.append("compressor_overload_recommends_raising_compressor_load")
-        if constraint.get("dispatch_recommendation") and record.get("dispatch_recommendation") and str(constraint["dispatch_recommendation"]).strip() != str(record["dispatch_recommendation"]).strip():
-            dispatch_issues.append("dispatch_recommendation_disagrees_with_constraint_check")
-    grounded = numeric_claims_are_grounded(answer, str(record.get("user_input") or ""), numeric_grounding_evidence(dict(record)))
-    rule_check = {"status": "not_applicable", "issues": []} if not constraint else {
-        "status": "pass" if not rule_issues else "fail",
-        "issues": rule_issues,
-        "overall_constraint_status": constraint.get("overall_status"),
-    }
-    dispatch_check = {"status": "not_applicable", "issues": []} if not constraint else {
-        "status": "pass" if not dispatch_issues else "fail",
-        "issues": dispatch_issues,
-        "pressure_failure_present": pressure_fail,
-        "compressor_overload_present": compressor_overload,
-    }
+            dispatch_issues.append(
+                "compressor_overload_recommends_raising_compressor_load"
+            )
+        if (
+            constraint.get("dispatch_recommendation")
+            and record.get("dispatch_recommendation")
+            and str(constraint["dispatch_recommendation"]).strip()
+            != str(record["dispatch_recommendation"]).strip()
+        ):
+            dispatch_issues.append(
+                "dispatch_recommendation_disagrees_with_constraint_check"
+            )
+    grounded = numeric_claims_are_grounded(
+        answer,
+        str(record.get("user_input") or ""),
+        numeric_grounding_evidence(dict(record)),
+    )
+    rule_check = (
+        {"status": "not_applicable", "issues": []}
+        if not constraint
+        else {
+            "status": "pass" if not rule_issues else "fail",
+            "issues": rule_issues,
+            "overall_constraint_status": constraint.get("overall_status"),
+        }
+    )
+    dispatch_check = (
+        {"status": "not_applicable", "issues": []}
+        if not constraint
+        else {
+            "status": "pass" if not dispatch_issues else "fail",
+            "issues": dispatch_issues,
+            "pressure_failure_present": pressure_fail,
+            "compressor_overload_present": compressor_overload,
+        }
+    )
     return {
-        "schema": {"status": "pass" if not schema_issues else "fail", "issues": schema_issues},
-        "numerical_consistency": {"status": "pass" if grounded else "fail", "claimed_numeric_value_count": len(numeric_claim_values(answer)), "issues": [] if grounded else ["unsupported_numerical_claim"]},
+        "schema": {
+            "status": "pass" if not schema_issues else "fail",
+            "issues": schema_issues,
+        },
+        "numerical_consistency": {
+            "status": "pass" if grounded else "fail",
+            "claimed_numeric_value_count": len(numeric_claim_values(answer)),
+            "issues": [] if grounded else ["unsupported_numerical_claim"],
+        },
         "rule_consistency": rule_check,
         "dispatch_consistency": dispatch_check,
     }
+
+
 def _pipeformer_checks(
     context: EvaluationContext,
     issues: Sequence[str],
@@ -232,9 +319,7 @@ def _pipeformer_checks(
     outputs = [item for item in all_outputs if item.get("success") is True]
     trace_status = record.get("trace_status")
     successful = bool(
-        trace_status in (None, "completed")
-        and outputs
-        and len(tasks) == len(outputs)
+        trace_status in (None, "completed") and outputs and len(tasks) == len(outputs)
     )
     registry_pass, unauthorized = _registry_ordering(record)
     metrics = [
@@ -259,13 +344,15 @@ def _pipeformer_checks(
             context,
             "checkpoint_inference",
             applicable=True,
-            passed=successful and all(checkpoint_inference_used(output) for output in outputs),
+            passed=successful
+            and all(checkpoint_inference_used(output) for output in outputs),
         ),
         metric(
             context,
             "disturbance_application",
             applicable=True,
-            passed=successful and all(
+            passed=successful
+            and all(
                 disturbance_was_applied(output, task)
                 for output, task in zip(outputs, tasks)
             ),
@@ -274,19 +361,22 @@ def _pipeformer_checks(
             context,
             "forecast_horizon",
             applicable=True,
-            passed=successful and all(horizon_is_consistent(output) for output in outputs),
+            passed=successful
+            and all(horizon_is_consistent(output) for output in outputs),
         ),
         metric(
             context,
             "constraint_execution",
             applicable=True,
-            passed=bool(outputs) and all(requested_constraints_executed(output) for output in outputs),
+            passed=bool(outputs)
+            and all(requested_constraints_executed(output) for output in outputs),
         ),
         metric(
             context,
             "verification_completeness",
             applicable=True,
-            passed=bool(outputs) and all(verification_is_complete(output) for output in outputs),
+            passed=bool(outputs)
+            and all(verification_is_complete(output) for output in outputs),
         ),
         metric(
             context,
@@ -317,7 +407,9 @@ def _generic_checks(
         [dict(item) for item in calls(record)],
     )
     requested = requested_artifacts(str(record.get("user_input") or ""))
-    assessments = [classify_tool_evidence(item, requested=requested) for item in outputs]
+    assessments = [
+        classify_tool_evidence(item, requested=requested) for item in outputs
+    ]
     failed_count = sum(not item.evidence_found for item in assessments)
     successful_count = sum(item.evidence_found for item in assessments)
     requested_ok = "requested_evidence_not_retrieved" not in issues
@@ -404,7 +496,11 @@ def evaluate_teacher_checks(
             maximum_chars=maximum_chars,
         )
         variant = "generic"
-    return metrics, issues, {
-        "teacher_variant": variant,
-        "teacher_trace_checks": teacher_diagnostics,
-    }
+    return (
+        metrics,
+        issues,
+        {
+            "teacher_variant": variant,
+            "teacher_trace_checks": teacher_diagnostics,
+        },
+    )

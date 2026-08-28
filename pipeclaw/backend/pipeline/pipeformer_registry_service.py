@@ -67,7 +67,9 @@ class PipeFormerRegistrySearchService:
     def search(self, **filters: Any) -> Dict[str, Any]:
         try:
             registry = VariableRegistry.read(self._registry_path())
-            attention_targets = [str(value) for value in filters.pop("attention_targets", [])]
+            attention_targets = [
+                str(value) for value in filters.pop("attention_targets", [])
+            ]
             offset = max(0, int(filters.pop("offset", 0)))
             limit = max(1, min(int(filters.pop("limit", 12)), 50))
             variables = registry.search(
@@ -101,11 +103,7 @@ class PipeFormerRegistrySearchService:
             if offset + len(page) < len(variables):
                 result["next_offset"] = offset + len(page)
             result["variables"] = [
-                {
-                    key: item[key]
-                    for key in REGISTRY_RESULT_FIELDS
-                    if key in item
-                }
+                {key: item[key] for key in REGISTRY_RESULT_FIELDS if key in item}
                 for item in page
             ]
             return result

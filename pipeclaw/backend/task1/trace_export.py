@@ -130,7 +130,9 @@ def write_split_records(
             )
             projected = {key: item[key] for key in sft_fields if key in item}
             rebuilt = serialize_verified_decision_state(
-                VerifiedDecisionState.from_history(item.get("conversation_context") or []),
+                VerifiedDecisionState.from_history(
+                    item.get("conversation_context") or []
+                ),
                 max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
             )
             state_before = dict(projected.get("state_before") or {})
@@ -218,8 +220,7 @@ def write_split_records(
                 ):
                     continue
                 claimed_variables = {
-                    variable.casefold()
-                    for variable in variable_references(answer_text)
+                    variable.casefold() for variable in variable_references(answer_text)
                 }
                 supported_variables = {
                     variable.casefold()
@@ -240,7 +241,9 @@ def write_split_records(
                 )
                 continue
             split_records.append(projected)
-        write_jsonl(output_dir / f"teacher_trace_{split}.jsonl", split_records, force=force)
+        write_jsonl(
+            output_dir / f"teacher_trace_{split}.jsonl", split_records, force=force
+        )
         written_count += len(split_records)
     return written_count
 

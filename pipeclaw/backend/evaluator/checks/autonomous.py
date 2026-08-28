@@ -1,5 +1,3 @@
-"""Canonical metrics for held-out autonomous rollouts."""
-
 from __future__ import annotations
 
 import csv
@@ -45,15 +43,15 @@ def _output(wrapper: Mapping[str, Any]) -> Mapping[str, Any]:
 def _successful_forecast_pairs(
     record: Mapping[str, Any],
 ) -> list[tuple[Mapping[str, Any], Mapping[str, Any]]]:
-    calls_by_id = {
-        str(call.get("tool_call_id") or ""): call
-        for call in calls(record)
-    }
+    calls_by_id = {str(call.get("tool_call_id") or ""): call for call in calls(record)}
     pairs: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
     for wrapper in output_wrappers(record):
         value = _output(wrapper)
         call = calls_by_id.get(str(wrapper.get("tool_call_id") or ""), {})
-        is_forecast = wrapper.get("name") == PIPEFORMER_TOOL or call.get("name") == PIPEFORMER_TOOL
+        is_forecast = (
+            wrapper.get("name") == PIPEFORMER_TOOL
+            or call.get("name") == PIPEFORMER_TOOL
+        )
         if is_forecast and value.get("success", True) is not False:
             pairs.append((call, value))
     return pairs
@@ -166,7 +164,9 @@ def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
 
 def _oracle_tasks(context: EvaluationContext) -> list[Mapping[str, Any]]:
     return [
-        item for item in sequence(context.oracle.get("tasks")) if isinstance(item, Mapping)
+        item
+        for item in sequence(context.oracle.get("tasks"))
+        if isinstance(item, Mapping)
     ]
 
 
@@ -233,8 +233,12 @@ def _tool_metrics(
     context: EvaluationContext,
 ) -> tuple[MetricResult, MetricResult]:
     tool_calls = calls(context.record)
-    teacher_names = {str(item) for item in sequence(context.oracle.get("teacher_tool_names"))}
-    is_openclaw = str((context.reference or {}).get("scenario_type") or "").casefold() in {
+    teacher_names = {
+        str(item) for item in sequence(context.oracle.get("teacher_tool_names"))
+    }
+    is_openclaw = str(
+        (context.reference or {}).get("scenario_type") or ""
+    ).casefold() in {
         "openclaw",
         "pipeclaw",
     }
@@ -247,9 +251,17 @@ def _tool_metrics(
 
     if is_openclaw:
         required = capabilities(teacher_names)
-        state_evidence = mapping(mapping((context.reference or {}).get("state_before")).get("verified_evidence"))
+        state_evidence = mapping(
+            mapping((context.reference or {}).get("state_before")).get(
+                "verified_evidence"
+            )
+        )
         question = str((context.reference or {}).get("user_input") or "")
-        if required == {"read_file"} and state_evidence and not requested_artifacts(question):
+        if (
+            required == {"read_file"}
+            and state_evidence
+            and not requested_artifacts(question)
+        ):
             required.clear()
     else:
         required = {
@@ -280,7 +292,9 @@ def _tool_metrics(
     # retry passes ``tool_recovery`` but does not erase the failed call.
     failure_signatures: dict[str, int] = {}
     for call in failed_calls:
-        signature = json.dumps([call.get("name"), call.get("arguments")], sort_keys=True, default=str)
+        signature = json.dumps(
+            [call.get("name"), call.get("arguments")], sort_keys=True, default=str
+        )
         failure_signatures[signature] = failure_signatures.get(signature, 0) + 1
     repeated_failures = [s for s, count in failure_signatures.items() if count > 1]
     success_signatures: dict[str, int] = {}
@@ -307,7 +321,9 @@ def _tool_metrics(
         details={
             "expected_tool_names": sorted(teacher_names),
             "required_tool_names": sorted(required),
-            "emitted_tool_names": [str(call.get("name")) for call in tool_calls if call.get("name")],
+            "emitted_tool_names": [
+                str(call.get("name")) for call in tool_calls if call.get("name")
+            ],
             "failed_call_count": len(failed_calls),
             "repeated_failure_signatures": len(repeated_failures),
             "successful_call_count": len(valid_calls),
@@ -318,10 +334,14 @@ def _tool_metrics(
             "duplicate_successful_call_count": duplicate_successes,
         },
     )
-    recovered = bool(failed_calls) and recovery_targets <= set(last_required) and all(
-        call.get("schema_valid") is not False
-        and call.get("execution_success") is not False
-        for call in last_required.values()
+    recovered = (
+        bool(failed_calls)
+        and recovery_targets <= set(last_required)
+        and all(
+            call.get("schema_valid") is not False
+            and call.get("execution_success") is not False
+            for call in last_required.values()
+        )
     )
     recovery_result = metric(
         context,
@@ -376,7 +396,8 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
             context,
             name,
             applicable=applicable,
-            passed=applicable and bool(outputs)
+            passed=applicable
+            and bool(outputs)
             and all(pred(out, task) for out, task in zip(outputs, tasks)),
         )
         for name, pred in predicates.items()
@@ -386,8 +407,7 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         str(item) for item in sequence(context.oracle.get("required_constraints"))
     }
     actual_statuses = [
-        mapping(verification_view(output).get("category_status"))
-        for output in outputs
+        mapping(verification_view(output).get("category_status")) for output in outputs
     ]
     matched_statuses = [
         (
@@ -399,12 +419,16 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         if reference is not None
     ]
     judgment_applicable = applicable and bool(expected_constraints or matched_statuses)
-    judgment_pass = bool(actual_statuses) and all(
-        expected_constraints <= {str(key) for key in statuses}
-        for statuses in actual_statuses
-    ) and all(
-        all(str(actual.get(key)) == str(value) for key, value in expected.items())
-        for actual, expected in matched_statuses
+    judgment_pass = (
+        bool(actual_statuses)
+        and all(
+            expected_constraints <= {str(key) for key in statuses}
+            for statuses in actual_statuses
+        )
+        and all(
+            all(str(actual.get(key)) == str(value) for key, value in expected.items())
+            for actual, expected in matched_statuses
+        )
     )
     judgment = metric(
         context,
@@ -413,9 +437,9 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
         passed=judgment_pass,
         details={
             "expected_constraints": sorted(expected_constraints),
-            "actual_constraints": sorted({
-                str(key) for statuses in actual_statuses for key in statuses
-            }),
+            "actual_constraints": sorted(
+                {str(key) for statuses in actual_statuses for key in statuses}
+            ),
             "matched_reference_forecast_count": len(matched_statuses),
         },
     )
@@ -429,9 +453,7 @@ def _registry_metric(context: EvaluationContext) -> MetricResult:
         for item in output_wrappers(context.record)
     }
     _, unauthorized = forecast_registry_order(tool_calls, outputs_by_id)
-    applicable = bool(
-        any(call.get("name") == PIPEFORMER_TOOL for call in tool_calls)
-    )
+    applicable = bool(any(call.get("name") == PIPEFORMER_TOOL for call in tool_calls))
     return metric(
         context,
         "registry_ordering",
@@ -478,7 +500,11 @@ def _missing_resource_anchors(record: Mapping[str, Any]) -> list[str]:
     }
     anchors: list[str] = []
     for item in output_wrappers(record):
-        if not (output := item.get("output")) or not isinstance(output, Mapping) or output.get("success", True) is not False:
+        if (
+            not (output := item.get("output"))
+            or not isinstance(output, Mapping)
+            or output.get("success", True) is not False
+        ):
             continue
         error_code = str(output.get("error_code") or "")
         if not (str(output.get("error") or "").strip() or error_code):
@@ -490,14 +516,16 @@ def _missing_resource_anchors(record: Mapping[str, Any]) -> list[str]:
             or details.get("canonical_target_station")
             or ""
         )
-        station = station or calls_by_id.get(str(item.get("tool_call_id") or ""), {}).get(
-            "target_station", ""
-        )
+        station = station or calls_by_id.get(
+            str(item.get("tool_call_id") or ""), {}
+        ).get("target_station", "")
         if isinstance(station, str) and station.strip():
             anchors.append(station.strip())
         error_text = str(output.get("error") or "")
         if name == "read_file" and "not found" in error_text.casefold():
-            path = str(details.get("requested_path") or output.get("path") or error_text)
+            path = str(
+                details.get("requested_path") or output.get("path") or error_text
+            )
             anchors.extend(_BARE_DATE.findall(path))
     return sorted(dict.fromkeys(anchors))
 
@@ -538,7 +566,9 @@ def _question_anchor_metric(context: EvaluationContext) -> MetricResult:
         if (key := anchor.replace("-", "")) in question_compact
         and key not in success_compact
     ]
-    covered = sorted(anchor for anchor in retained if _covers(answer, compact_answer, anchor))
+    covered = sorted(
+        anchor for anchor in retained if _covers(answer, compact_answer, anchor)
+    )
     applicable = bool(retained)
     return metric(
         context,
@@ -573,7 +603,10 @@ def _count_near_entity(count: float, entity: str, text: str) -> bool:
     # Bounded digit match: claim "1" must not draw support from "1132" or "0.1".
     count_pattern = re.compile(rf"(?<![\d.]){re.escape(f'{count:g}')}(?![\d.])")
     for occurrence in re.finditer(re.escape(entity), text):
-        window = text[max(0, occurrence.start() - _CLAIM_SUPPORT_WINDOW): occurrence.end() + _CLAIM_SUPPORT_WINDOW]
+        window = text[
+            max(0, occurrence.start() - _CLAIM_SUPPORT_WINDOW) : occurrence.end()
+            + _CLAIM_SUPPORT_WINDOW
+        ]
         if count_pattern.search(window):
             return True
     return False
@@ -594,7 +627,9 @@ def _evidence_header_fields(context: EvaluationContext) -> set[str]:
             if payload.get("success", True) is False:
                 continue
             content_lines = [
-                line for line in str(payload.get("content") or "").splitlines() if line.strip()
+                line
+                for line in str(payload.get("content") or "").splitlines()
+                if line.strip()
             ]
             for row in csv.reader(content_lines[:1]):
                 fields.update(cell.strip() for cell in row if cell.strip())
@@ -620,7 +655,9 @@ def _claim_alignment_metric(context: EvaluationContext) -> MetricResult:
     # column as a data value. A claim naming a different concept word which
     # merely shares the header's spelling ("供气点 1个") is legitimate.
     ranked_dimensions = {
-        field for field in header_fields if f"按{field}" in question or f"个{field}" in question
+        field
+        for field in header_fields
+        if f"按{field}" in question or f"个{field}" in question
     }
     unsupported = sorted(
         (entity, count)
@@ -744,10 +781,26 @@ def _label_metric(
 _MIN_SUBSTANTIVE_ANSWER_CHARS = 8
 
 _ANSWER_WORD = re.compile(r"[A-Za-z][A-Za-z0-9_-]{2,}|[\u4e00-\u9fff]{2,}")
-_ANSWER_STOPWORDS = frozenset({
-    "the", "and", "that", "this", "with", "from", "answer", "result",
-    "现在", "记得", "回答", "结果", "可以", "需要", "这个", "那个",
-})
+_ANSWER_STOPWORDS = frozenset(
+    {
+        "the",
+        "and",
+        "that",
+        "this",
+        "with",
+        "from",
+        "answer",
+        "result",
+        "现在",
+        "记得",
+        "回答",
+        "结果",
+        "可以",
+        "需要",
+        "这个",
+        "那个",
+    }
+)
 
 
 def _answer_tokens(text: str) -> set[str]:
@@ -758,9 +811,9 @@ def _answer_tokens(text: str) -> set[str]:
             continue
         if re.fullmatch(r"[\u4e00-\u9fff]+", value):
             tokens.update(
-                value[index:index + 2]
+                value[index : index + 2]
                 for index in range(len(value) - 1)
-                if value[index:index + 2] not in _ANSWER_STOPWORDS
+                if value[index : index + 2] not in _ANSWER_STOPWORDS
             )
         else:
             tokens.add(value)
@@ -775,8 +828,8 @@ def _answer_metric(context: EvaluationContext) -> MetricResult:
     reference_tokens = _answer_tokens(reference_answer)
     answer_tokens = _answer_tokens(stripped)
     matched_tokens = sorted(reference_tokens & answer_tokens)
-    requires_relevance = (
-        not bool(context.oracle.get("has_tool_target")) and bool(reference_tokens)
+    requires_relevance = not bool(context.oracle.get("has_tool_target")) and bool(
+        reference_tokens
     )
     trace_completed = context.record.get("trace_status") == "completed"
     return metric(
@@ -807,9 +860,9 @@ def _json_metric(context: EvaluationContext) -> MetricResult:
         context,
         "json_validity",
         applicable=applicable,
-        passed=applicable and not errors and all(
-            call.get("schema_valid") is not False for call in tool_calls
-        ),
+        passed=applicable
+        and not errors
+        and all(call.get("schema_valid") is not False for call in tool_calls),
         details={"error_count": len(errors), "scope": "tool_call_json_and_schema"},
     )
 
@@ -854,7 +907,9 @@ def _hallucination_metric(
 
 
 def _artifact_metric(context: EvaluationContext) -> MetricResult:
-    requested = requested_artifacts(str((context.reference or {}).get("user_input") or ""))
+    requested = requested_artifacts(
+        str((context.reference or {}).get("user_input") or "")
+    )
     if not requested:
         return metric(
             context,

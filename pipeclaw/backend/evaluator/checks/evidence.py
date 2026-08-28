@@ -1,5 +1,3 @@
-"""Single canonical implementation of evidence-consistency evaluation."""
-
 from __future__ import annotations
 
 import math
@@ -25,10 +23,14 @@ from .common import mapping, metric, sequence
 _ROW_CLAUSE_SEPARATOR = re.compile(r"(?:\r?\n|[；;。，])")
 _LEADING_THINK = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 _BARE_DATE = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}")
-_IDENTIFIER_TOKEN = re.compile(r"[\w.\u4e00-\u9fa5-]+\.(?:csv|xlsx?|json|txt)|[A-Z]_[A-Za-z0-9]+[::][A-Za-z0-9_:-]+|[\u4e00-\u9fa5]{1,7}?站")
+_IDENTIFIER_TOKEN = re.compile(
+    r"[\w.\u4e00-\u9fa5-]+\.(?:csv|xlsx?|json|txt)|[A-Z]_[A-Za-z0-9]+[::][A-Za-z0-9_:-]+|[\u4e00-\u9fa5]{1,7}?站"
+)
 
 
-_DATE_SPAN = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{8})\s*(?:至|-)\s*(\d{4}-\d{2}-\d{2}|\d{8})")
+_DATE_SPAN = re.compile(
+    r"(\d{4}-\d{2}-\d{2}|\d{8})\s*(?:至|-)\s*(\d{4}-\d{2}-\d{2}|\d{8})"
+)
 
 
 def _source_outputs(source: Mapping[str, Any]) -> list[Mapping[str, Any]]:
@@ -73,9 +75,7 @@ def _unsupported_row_claims(
         for value in values
     }
     discriminative = {
-        value
-        for value, count in string_counts.items()
-        if count < len(row_strings)
+        value for value, count in string_counts.items() if count < len(row_strings)
     }
     issues: list[dict[str, Any]] = []
     for clause in _ROW_CLAUSE_SEPARATOR.split(answer):
@@ -156,7 +156,8 @@ def _ranking_row_issues(
             identifiers = [
                 str(value).strip()
                 for value in row.values()
-                if isinstance(value, str) and str(value).strip().casefold() in normalized
+                if isinstance(value, str)
+                and str(value).strip().casefold() in normalized
             ]
             if not identifiers:
                 continue
@@ -177,18 +178,22 @@ def _ranking_row_issues(
                 break
     if len(ranked) < 2:
         return []
-    ascending = bool(re.search(r"(?:升序|最小|lowest|ascending)", question, re.IGNORECASE))
+    ascending = bool(
+        re.search(r"(?:升序|最小|lowest|ascending)", question, re.IGNORECASE)
+    )
     ordered = all(
         left <= right if ascending else left >= right
         for (_, left), (_, right) in zip(ranked, ranked[1:])
     )
     if ordered:
         return []
-    return [{
-        "claim": "ranked rows are not in the requested order",
-        "identifiers": [identifier for identifier, _ in ranked],
-        "numeric_values": [number for _, number in ranked],
-    }]
+    return [
+        {
+            "claim": "ranked rows are not in the requested order",
+            "identifiers": [identifier for identifier, _ in ranked],
+            "numeric_values": [number for _, number in ranked],
+        }
+    ]
 
 
 def _prior_turn_evidence(source: Mapping[str, Any]) -> list[float]:
@@ -204,7 +209,9 @@ def _prior_turn_evidence(source: Mapping[str, Any]) -> list[float]:
     for turn in sequence(source.get("recent_turns")):
         if not isinstance(turn, Mapping):
             continue
-        numbers.extend(observed_numeric_claim_values(str(turn.get("assistant_output") or "")))
+        numbers.extend(
+            observed_numeric_claim_values(str(turn.get("assistant_output") or ""))
+        )
     return numbers
 
 
@@ -222,8 +229,12 @@ def _autonomous_evidence(
         evidence_numbers.extend(observed_numeric_values(output))
         evidence_numbers.extend(derived_numeric_values(output))
     state_before = mapping(source.get("state_before"))
-    evidence_numbers.extend(observed_numeric_values(state_before.get("verified_evidence")))
-    evidence_numbers.extend(derived_numeric_values(state_before.get("verified_evidence")))
+    evidence_numbers.extend(
+        observed_numeric_values(state_before.get("verified_evidence"))
+    )
+    evidence_numbers.extend(
+        derived_numeric_values(state_before.get("verified_evidence"))
+    )
     evidence_numbers.extend(observed_numeric_values(state_before.get("candidates")))
     evidence_numbers.extend(derived_numeric_values(state_before.get("candidates")))
     for task in sequence(oracle.get("tasks")):

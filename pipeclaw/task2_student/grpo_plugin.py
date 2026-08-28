@@ -15,7 +15,7 @@ if str(_ROOT) not in sys.path:
 from pipeclaw.task2_student.path_contract import canonicalize_recorded_tool_arguments
 from pipeclaw.task2_student.rollout.models import RolloutResult
 from pipeclaw.task2_student.rollout.runner import execution_success, schema_valid
-from pipeclaw.task2_student.rollout.scenarios import (ScenarioPolicy, build_dispatcher)
+from pipeclaw.task2_student.rollout.scenarios import ScenarioPolicy, build_dispatcher
 from pipeclaw.task2_student.rollout.tools import append_tool_exchange, parse_tool_calls
 from pipeclaw.task2_student.scripts.pass_at_k import composite_reward, episode_stats
 
@@ -38,7 +38,9 @@ class PythonScenarioScheduler(MultiTurnScheduler):
     def _tool_schemas(self) -> list[dict[str, Any]]:
         with self._lock:
             if self._schemas is None:
-                backend_root = Path(__file__).resolve().parents[2] / "pipeclaw" / "backend"
+                backend_root = (
+                    Path(__file__).resolve().parents[2] / "pipeclaw" / "backend"
+                )
                 from pipeclaw.backend.agent.tools.pipeformer_tools import (
                     register_pipeformer_tools,
                 )
@@ -89,7 +91,9 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                 str(data.get("scenario_id") or data.get("sample_id") or "scenario"),
             )
             workspace = (
-                _GRPO_WORKSPACES / f"{scenario}-{uuid.uuid4().hex[:8]}" / "workspace-grpo"
+                _GRPO_WORKSPACES
+                / f"{scenario}-{uuid.uuid4().hex[:8]}"
+                / "workspace-grpo"
             )
             workspace.mkdir(parents=True, exist_ok=True)
             state["workspace"] = workspace
@@ -110,16 +114,23 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         self, infer_request: Any, response_choice: Any, current_turn: int
     ) -> Dict[str, Any]:
         state = self._state(infer_request)
-        text, calls, errors = parse_tool_calls(getattr(response_choice, "message", response_choice))
+        text, calls, errors = parse_tool_calls(
+            getattr(response_choice, "message", response_choice)
+        )
         state["_last_parse"] = (id(response_choice), text, calls, errors)
         # ms-swift already appended this response as a raw assistant message;
         # replace it with its parsed text so history matches the offline runner.
-        if infer_request.messages and infer_request.messages[-1].get("role") == "assistant":
+        if (
+            infer_request.messages
+            and infer_request.messages[-1].get("role") == "assistant"
+        ):
             infer_request.messages[-1]["content"] = text
         self._dispatch_calls(state, infer_request, calls)
         return {"infer_request": infer_request}
 
-    def _dispatch_calls(self, state: dict, infer_request: Any, calls: Sequence[Any]) -> None:
+    def _dispatch_calls(
+        self, state: dict, infer_request: Any, calls: Sequence[Any]
+    ) -> None:
         for call in calls:
             normalized = state["dispatcher"].schema_normalized_call(call)
             with self._lock:
@@ -194,10 +205,9 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         state["_last_parse"] = (id(response_choice), text, calls, errors)
         # dispatch the capped turn's calls BEFORE building the snapshot: swift
         # skips step() on the capped turn, but the frame merges AFTER this hook.
-        capped = (
-            getattr(self, "max_turns", None) is not None
-            and int(current_turn) >= int(self.max_turns)
-        )
+        capped = getattr(self, "max_turns", None) is not None and int(
+            current_turn
+        ) >= int(self.max_turns)
         if calls and capped:
             self._dispatch_calls(state, infer_request, calls)
         state["json_errors"].extend(errors)

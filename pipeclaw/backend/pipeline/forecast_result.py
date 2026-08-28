@@ -1,5 +1,3 @@
-"""Typed compact boundary for successful PipeFormer forecast results."""
-
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
@@ -267,8 +265,7 @@ def _compact_verification(output: Mapping[str, Any]) -> Dict[str, Any]:
         "human_intervention_label": verification.get("human_intervention_label"),
         "dispatch_recommendation": verification.get("dispatch_recommendation"),
         "priority_findings": [
-            _compact_finding(item)
-            for item in verification.get("priority_findings", [])
+            _compact_finding(item) for item in verification.get("priority_findings", [])
         ],
         "engineering_evidence": verification.get("engineering_evidence", {}),
     }
@@ -372,6 +369,7 @@ class ForecastResult(BaseModel):
                 }
             )
         return cls.from_execution(value)
+
 
 __all__ = [
     "COMPACT_COMPARABLE_METRIC_KEYS",

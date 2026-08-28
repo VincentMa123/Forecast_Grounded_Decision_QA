@@ -55,7 +55,9 @@ def _merge_task_fields(
         # it, without overriding an explicit call value.
         if "disturbance_setpoint" not in call and "disturbance_setpoint" not in merged:
             variable = merged.get("disturbance_variable")
-            setpoints = mapping(mapping(merged.get("boundary_conditions")).get("setpoints"))
+            setpoints = mapping(
+                mapping(merged.get("boundary_conditions")).get("setpoints")
+            )
             if variable in setpoints:
                 merged["disturbance_setpoint"] = setpoints[variable]
 
@@ -117,7 +119,9 @@ def _inherited_assumption(source: Mapping[str, Any]) -> Mapping[str, Any] | None
     if not disturbance.get("variable"):
         return None
     source_name = str(disturbance.get("source") or "").casefold()
-    recent_text = json.dumps(source.get("recent_turns"), ensure_ascii=False, default=str).casefold()
+    recent_text = json.dumps(
+        source.get("recent_turns"), ensure_ascii=False, default=str
+    ).casefold()
     markers = (
         "llm provisional",
         "llm_assumption",
@@ -171,9 +175,7 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     first_output = outputs[0] if outputs else {}
     verification = verification_view(first_output)
     tool_calls = [
-        item
-        for item in sequence(source.get("tool_calls"))
-        if isinstance(item, Mapping)
+        item for item in sequence(source.get("tool_calls")) if isinstance(item, Mapping)
     ]
     forecast_tasks = [
         dict(item["arguments"])
@@ -189,9 +191,7 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     evidence = mapping(source.get("evidence"))
     decision_summary = mapping(source.get("decision_summary"))
     teacher_tool_names = [
-        str(item.get("name"))
-        for item in tool_calls
-        if item.get("name")
+        str(item.get("name")) for item in tool_calls if item.get("name")
     ]
 
     return {

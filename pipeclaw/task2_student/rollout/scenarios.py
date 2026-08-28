@@ -1,10 +1,3 @@
-"""Scenario-specific rollout policy: allow lists, workspaces, and compaction.
-
-PipeFormer and OpenClaw cases share the rollout runner but differ in which tools
-are authorized, how workspaces are isolated, and how tool output is projected
-into the bounded model-visible form.
-"""
-
 from __future__ import annotations
 
 import hashlib
@@ -142,7 +135,9 @@ def compact_openclaw_tool_result(
     if output_files:
         compact["output_files"] = output_files
     if value.get("warnings"):
-        compact["warnings"] = [redact_host_paths(str(item)) for item in value["warnings"]]
+        compact["warnings"] = [
+            redact_host_paths(str(item)) for item in value["warnings"]
+        ]
     if portability:
         for key in ("cwd_rebased", "portable_path_normalization"):
             if portability.get(key):
@@ -300,7 +295,8 @@ def openclaw_policy_error(
             )
         scope = arguments.get("pipeline_scope")
         if scope is not None and (
-            not isinstance(scope, list) or any(not isinstance(item, str) for item in scope)
+            not isinstance(scope, list)
+            or any(not isinstance(item, str) for item in scope)
         ):
             return sandbox_error(
                 "analyze_pipeline_topology pipeline_scope must be a list of strings"
@@ -330,7 +326,9 @@ def openclaw_policy_error(
         if not safe_openclaw_path(
             arguments.get("path"), workspace_root, allow_pipeline_data=False
         ):
-            return sandbox_error(f"{call.name} path is outside the evaluation workspace")
+            return sandbox_error(
+                f"{call.name} path is outside the evaluation workspace"
+            )
         return None
     if call.name == "run_command":
         return _run_command_policy_error(arguments, workspace_root)
@@ -349,14 +347,20 @@ def _run_command_policy_error(
             "only Python workspace scripts are allowed during OpenClaw evaluation"
         )
     if len(command) < 2 or str(command[1]).startswith("-"):
-        return sandbox_error("run_command must execute a workspace-relative Python script")
+        return sandbox_error(
+            "run_command must execute a workspace-relative Python script"
+        )
     if not safe_openclaw_path(command[1], workspace_root, allow_pipeline_data=False):
         return sandbox_error("run_command script is outside the evaluation workspace")
     if any(str(item) in {"-c", "-m"} for item in command[1:]):
-        return sandbox_error("inline and module Python execution are disabled during evaluation")
+        return sandbox_error(
+            "inline and module Python execution are disabled during evaluation"
+        )
     timeout = arguments.get("timeout_s", 30)
     if not isinstance(timeout, int) or not 1 <= timeout <= 60:
-        return sandbox_error("run_command timeout_s must be an integer from 1 through 60")
+        return sandbox_error(
+            "run_command timeout_s must be an integer from 1 through 60"
+        )
     cwd = arguments.get("cwd")
     if cwd is not None and is_host_absolute_path(cwd):
         # Legacy teacher/student traces may contain a host cwd.  It is rebased by
@@ -452,7 +456,9 @@ def build_pipeformer_dispatcher(
             # Share the orchestrator's full pre-execution guard chain:
             # decision-metric misuse, registry preconditions, duplicate-
             # equivalent forecast — not just the registry subset.
-            from pipeclaw.backend.agent.orchestrator import forecast_preexecution_failure
+            from pipeclaw.backend.agent.orchestrator import (
+                forecast_preexecution_failure,
+            )
 
             return forecast_preexecution_failure(
                 call.name,

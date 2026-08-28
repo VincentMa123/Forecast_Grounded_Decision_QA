@@ -39,7 +39,9 @@ def load_pipeline_constraints() -> Dict[str, Any]:
     required = {"library_name", "rule_files", "category_order"}
     missing = sorted(required - set(document))
     if missing:
-        raise ValueError(f"pipeline_constraints.json is missing required fields: {missing}")
+        raise ValueError(
+            f"pipeline_constraints.json is missing required fields: {missing}"
+        )
     return document
 
 

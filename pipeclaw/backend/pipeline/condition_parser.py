@@ -12,7 +12,16 @@ CATEGORY_MARKERS: Dict[str, List[str]] = {
     "flow": ["流量", "flow"],
     "linepack": ["管存", "linepack"],
     "compressor": ["压缩机", "compressor"],
-    "equipment_regulation": ["设备", "阀门", "调压", "边界控制", "equipment", "valve", "regulator", "boundary control"],
+    "equipment_regulation": [
+        "设备",
+        "阀门",
+        "调压",
+        "边界控制",
+        "equipment",
+        "valve",
+        "regulator",
+        "boundary control",
+    ],
     "abnormality_warning": ["异常", "泄漏", "突变", "abnormal", "leak", "sudden"],
     "dispatch_priority": ["能耗", "成本", "优先", "energy", "cost", "priority"],
 }
@@ -31,7 +40,12 @@ CATEGORY_OUTPUT_STATE_VARIABLES: Dict[str, List[str]] = {
     "pressure": ["pressure"],
     "flow": ["flow"],
     "linepack": ["linepack"],
-    "compressor": ["compressor_load", "compression_ratio", "compressor_speed", "compressor_power"],
+    "compressor": [
+        "compressor_load",
+        "compression_ratio",
+        "compressor_speed",
+        "compressor_power",
+    ],
     "equipment_regulation": ["valve_opening", "regulator_range"],
     "abnormality_warning": ["pressure", "flow", "compressor"],
     "dispatch_priority": ["energy_consumption", "operating_cost"],
@@ -44,7 +58,10 @@ CASE_PATTERNS = [
     re.compile(r"case[_\s-]*0*(\d+)", re.I),
 ]
 OPERATING_CONDITION_PATTERNS = [
-    re.compile(r"(?:operating[-\s]?condition|current\s+condition|condition)\s*(?:number|id|#|:)?\s*0*(\d+)", re.I),
+    re.compile(
+        r"(?:operating[-\s]?condition|current\s+condition|condition)\s*(?:number|id|#|:)?\s*0*(\d+)",
+        re.I,
+    ),
     re.compile(r"(?:工况|运行条件)\s*(?:编号|id|#|:|为|是)?\s*0*(\d+)", re.I),
 ]
 VARIABLE_RE = re.compile(
@@ -52,11 +69,19 @@ VARIABLE_RE = re.compile(
     r"(?![A-Za-z0-9_])"
 )
 PERCENT_PATTERNS = [
-    re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)\s*(\d+(?:\.\d+)?)\s*%", re.I),
-    re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%", re.I),
+    re.compile(
+        r"(上调|下调|increase|decrease|raise|lower|up|down)\s*(\d+(?:\.\d+)?)\s*%", re.I
+    ),
+    re.compile(
+        r"(上调|下调|increase|decrease|raise|lower|up|down)[^%]{0,80}?(\d+(?:\.\d+)?)\s*%",
+        re.I,
+    ),
 ]
 DIRECTION_RE = re.compile(r"(上调|下调|increase|decrease|raise|lower|up|down)", re.I)
-HORIZON_RE = re.compile(r"(?:未来|next|future|forecast\s*horizon)?\s*(\d+(?:\.\d+)?)\s*(小时|分钟|hours?|hrs?|minutes?|mins?)", re.I)
+HORIZON_RE = re.compile(
+    r"(?:未来|next|future|forecast\s*horizon)?\s*(\d+(?:\.\d+)?)\s*(小时|分钟|hours?|hrs?|minutes?|mins?)",
+    re.I,
+)
 STATUS_TARGET_PATTERNS = [
     (re.compile(r"(?:切换为|设为)\s*[\"'“”‘’]*(?:停机|关闭)"), 0.0),
     (re.compile(r"(?:切换为|设为)\s*[\"'“”‘’]*(?:开机|开启)"), 1.0),
@@ -74,7 +99,9 @@ VERIFICATION_MARKERS = ["校核", "检查", "verify", "verification", "check"]
 def parse_condition(question: str) -> Dict[str, Any]:
     """Parse bilingual scenario text using the repository's fixed grammar."""
     case_number = _first_matched_int(question, CASE_PATTERNS)
-    operating_condition_number = _first_matched_int(question, OPERATING_CONDITION_PATTERNS) or case_number
+    operating_condition_number = (
+        _first_matched_int(question, OPERATING_CONDITION_PATTERNS) or case_number
+    )
     variable_match = VARIABLE_RE.search(question)
     percent_match = _first_match(question, PERCENT_PATTERNS)
     direction_match = percent_match or DIRECTION_RE.search(question)
@@ -83,8 +110,12 @@ def parse_condition(question: str) -> Dict[str, Any]:
     if not variable_match:
         raise ValueError("Could not parse disturbance variable from scenario question.")
 
-    disturbance_direction = _parse_direction(direction_match.group(1) if direction_match else "")
-    disturbance_magnitude_percent = float(percent_match.group(2)) if percent_match else None
+    disturbance_direction = _parse_direction(
+        direction_match.group(1) if direction_match else ""
+    )
+    disturbance_magnitude_percent = (
+        float(percent_match.group(2)) if percent_match else None
+    )
     forecast_horizon_minutes = _parse_horizon_minutes(horizon_match)
     lowered = question.lower()
     constraint_verification_types = [
@@ -101,7 +132,9 @@ def parse_condition(question: str) -> Dict[str, Any]:
         if disturbance_variable.endswith(":ST")
         else None
     )
-    setpoints = {disturbance_variable: status_setpoint} if status_setpoint is not None else {}
+    setpoints = (
+        {disturbance_variable: status_setpoint} if status_setpoint is not None else {}
+    )
 
     task = {
         "case_id": f"mock_test_{case_number:03d}" if case_number is not None else None,
@@ -132,7 +165,9 @@ def parse_condition(question: str) -> Dict[str, Any]:
     return task
 
 
-def _first_match(text: str, patterns: Iterable[re.Pattern[str]]) -> Optional[re.Match[str]]:
+def _first_match(
+    text: str, patterns: Iterable[re.Pattern[str]]
+) -> Optional[re.Match[str]]:
     for pattern in patterns:
         match = pattern.search(text)
         if match:
@@ -181,9 +216,7 @@ def _parse_status_setpoint(
         if pattern.search(text):
             return value
     matched_values = {
-        value
-        for pattern, value in STATUS_VALUE_PATTERNS
-        if pattern.search(text)
+        value for pattern, value in STATUS_VALUE_PATTERNS if pattern.search(text)
     }
     return next(iter(matched_values)) if len(matched_values) == 1 else None
 

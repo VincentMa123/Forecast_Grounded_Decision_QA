@@ -1,10 +1,3 @@
-"""Prompt construction for autonomous rollouts.
-
-The training traces in this repository contain the teacher's future tool calls
-and answer.  This module deliberately builds a prompt from the pre-action state
-only.  It imports no evaluation code.
-"""
-
 from __future__ import annotations
 
 import json
@@ -50,11 +43,7 @@ def parse_tool_schemas(value: Any) -> list[dict[str, Any]]:
         value = [value]
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return []
-    return [
-        dict(m)
-        for item in value
-        if isinstance((m := jsonable(item)), Mapping)
-    ]
+    return [dict(m) for item in value if isinstance((m := jsonable(item)), Mapping)]
 
 
 class PromptCaseBuilder:

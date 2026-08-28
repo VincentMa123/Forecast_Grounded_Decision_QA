@@ -1,10 +1,3 @@
-"""Rollout contracts shared by prompting, tools, runner, and scenarios.
-
-This module is deliberately free of evaluation, scoring, and teacher-oracle
-imports: a rollout only produces a trajectory, and scoring happens afterwards
-through ``pipeclaw.backend.evaluator``.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -121,7 +114,6 @@ def jsonable(value: Any) -> Any:
     if mapped is not None:
         return {str(key): jsonable(item) for key, item in mapped.items()}
     return str(value)
-
 
 
 @dataclass

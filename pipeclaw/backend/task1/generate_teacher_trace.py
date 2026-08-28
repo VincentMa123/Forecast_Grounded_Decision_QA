@@ -48,8 +48,13 @@ from pipeclaw.backend.grounding.evidence.csv import record_csv_evidence
 from pipeclaw.backend.grounding.evidence.tool import (
     attach_tool_arguments,
 )
-from pipeclaw.backend.grounding.evidence.topology import topology_summary_from_tool_outputs
-from pipeclaw.backend.evaluator.scorer import NativeTraceEvaluator, apply_quality_aliases
+from pipeclaw.backend.grounding.evidence.topology import (
+    topology_summary_from_tool_outputs,
+)
+from pipeclaw.backend.evaluator.scorer import (
+    NativeTraceEvaluator,
+    apply_quality_aliases,
+)
 from pipeclaw.backend.pipeline.scenario_preflight import validate_scenario_sources
 from pipeclaw.backend.pipeline.teacher_trace_store import (
     TeacherTraceStore,
@@ -110,10 +115,12 @@ def agent_turn_message(
     description = str(scenario.get("scenario_description") or "").strip()
     parts = []
     if description:
-        parts.extend([
-            "Scenario context (scope and task intent only; verify factual claims with tools):",
-            description,
-        ])
+        parts.extend(
+            [
+                "Scenario context (scope and task intent only; verify factual claims with tools):",
+                description,
+            ]
+        )
     parts.extend(["Current user request:", question])
     return "\n\n".join(parts)
 
@@ -129,7 +136,9 @@ def load_backend_env() -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     root = BACKEND_ROOT
-    parser = argparse.ArgumentParser(description="Run PipeClaw and export teacher_trace records.")
+    parser = argparse.ArgumentParser(
+        description="Run PipeClaw and export teacher_trace records."
+    )
     parser.add_argument(
         "--scenario-file",
         type=Path,
@@ -137,10 +146,20 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         help="Scenario source JSON; repeat to combine sources. Defaults to PipeClaw v2, lifecycle v4, and lifecycle v7.",
     )
-    parser.add_argument("--dataset-source", default=None, help="Disambiguate --scenario-id when it exists in multiple sources.")
-    parser.add_argument("--scenario-id", default=None, help="Generate one scenario. Omit to generate all scenarios.")
+    parser.add_argument(
+        "--dataset-source",
+        default=None,
+        help="Disambiguate --scenario-id when it exists in multiple sources.",
+    )
+    parser.add_argument(
+        "--scenario-id",
+        default=None,
+        help="Generate one scenario. Omit to generate all scenarios.",
+    )
     parser.add_argument("--agent-id", default="teacher_trace")
-    parser.add_argument("--session-id", default=None, help="Only valid with --scenario-id.")
+    parser.add_argument(
+        "--session-id", default=None, help="Only valid with --scenario-id."
+    )
     parser.add_argument("--device", default=os.getenv("PIPEFORMER_DEVICE", "cpu"))
     parser.add_argument(
         "--output-jsonl",
@@ -261,6 +280,7 @@ def build_teacher_record(
         manual_intervention_label = pipeformer.get("manual_intervention_label")
         dispatch_recommendation = pipeformer.get("dispatch_recommendation")
     elif len(pipeformer_outputs) > 1:
+
         def candidate_projection(item: Dict[str, Any], field: str) -> Dict[str, Any]:
             return {
                 "candidate_id": candidate_ids[str(item["tool_call_id"])],
@@ -271,8 +291,7 @@ def build_teacher_record(
         projected_fields = {
             field: {
                 "candidate_forecasts": [
-                    candidate_projection(item, field)
-                    for item in pipeformer_results
+                    candidate_projection(item, field) for item in pipeformer_results
                 ]
             }
             for field in (
@@ -312,6 +331,7 @@ def build_teacher_record(
         evidence["topology_summary"] = topology_summary
     decision_summary = dict(grounding_contract.get("decision_summary") or {})
     fallback_applied = False
+
     def score_answer(answer_text: str) -> tuple[Any, list[Any]]:
         return evaluate_answer_quality(
             answer=answer_text,
@@ -384,9 +404,7 @@ def build_teacher_record(
         "quality_issues": quality_issues,
     }
     if grounding_contract.get("decision_policy"):
-        record["decision_policy"] = deepcopy(
-            grounding_contract["decision_policy"]
-        )
+        record["decision_policy"] = deepcopy(grounding_contract["decision_policy"])
     if disclosure_repair_applied:
         record["repair_provenance"] = {
             "method": "deterministic_disturbance_disclosure",
@@ -422,7 +440,9 @@ def build_teacher_record(
     return record
 
 
-def _turn_trace(full_trace: Dict[str, Any], message_start: int, tool_start: int) -> Dict[str, Any]:
+def _turn_trace(
+    full_trace: Dict[str, Any], message_start: int, tool_start: int
+) -> Dict[str, Any]:
     return {
         "session_id": full_trace.get("session_id"),
         "agent_id": full_trace.get("agent_id"),
@@ -451,7 +471,9 @@ def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, 
     for scenario_type, scenario_ids in groups.items():
         ordered = sorted(
             scenario_ids,
-            key=lambda value: hashlib.sha256(f"{seed}:{scenario_type}:{value}".encode("utf-8")).hexdigest(),
+            key=lambda value: hashlib.sha256(
+                f"{seed}:{scenario_type}:{value}".encode("utf-8")
+            ).hexdigest(),
         )
         count = len(ordered)
         holdout_count = max(1, round(count * 0.1)) if count >= 3 else 0
@@ -459,7 +481,13 @@ def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, 
         test_count = holdout_count
         train_end = count - valid_count - test_count
         for index, scenario_id in enumerate(ordered):
-            result[scenario_id] = "train" if index < train_end else "valid" if index < train_end + valid_count else "test"
+            result[scenario_id] = (
+                "train"
+                if index < train_end
+                else "valid"
+                if index < train_end + valid_count
+                else "test"
+            )
     return result
 
 
@@ -478,13 +506,25 @@ def run_backend_session(
 
     scenario_id = str(scenario.get("scenario_id") or f"scenario_{scenario_index:06d}")
     dataset_source = str(scenario.get("dataset_source") or "unknown_source")
-    source_session_id = str(source_session.get("session_id") or f"{scenario_id}_session_{session_index:03d}")
-    runtime_session_id = args.session_id or f"teacher_{scenario_index:04d}_{session_index:03d}_{run_stamp}"
+    source_session_id = str(
+        source_session.get("session_id") or f"{scenario_id}_session_{session_index:03d}"
+    )
+    runtime_session_id = (
+        args.session_id
+        or f"teacher_{scenario_index:04d}_{session_index:03d}_{run_stamp}"
+    )
     os.environ["PIPEFORMER_DEVICE"] = str(args.device)
 
-    logger.info("Session started: scenario=%s source_session=%s runtime_session=%s", scenario_id, source_session_id, runtime_session_id)
+    logger.info(
+        "Session started: scenario=%s source_session=%s runtime_session=%s",
+        scenario_id,
+        source_session_id,
+        runtime_session_id,
+    )
 
-    run_hash = hashlib.sha256(f"{dataset_source}:{scenario_id}:{run_stamp}".encode("utf-8")).hexdigest()[:10]
+    run_hash = hashlib.sha256(
+        f"{dataset_source}:{scenario_id}:{run_stamp}".encode("utf-8")
+    ).hexdigest()[:10]
     run_namespace = f"r{scenario_index:04d}_{run_hash}"
     orchestrator = AgentOrchestrator(
         data_loader=None,
@@ -503,14 +543,25 @@ def run_backend_session(
     raw_trace_paths: Dict[int, str] = {}
     message_count = 0
     tool_count = 0
-    for fallback_turn_id, turn in enumerate(source_session.get("dialogue") or [], start=1):
+    for fallback_turn_id, turn in enumerate(
+        source_session.get("dialogue") or [], start=1
+    ):
         question = str(turn.get("user_input") or "").strip()
         if not question:
             continue
         turn_id = int(turn.get("turn_id") or fallback_turn_id)
-        logger.info("Turn started: scenario=%s session=%s turn=%d question=%s", scenario_id, source_session_id, turn_id, short_text(question, 300))
+        logger.info(
+            "Turn started: scenario=%s session=%s turn=%d question=%s",
+            scenario_id,
+            source_session_id,
+            turn_id,
+            short_text(question, 300),
+        )
         try:
-            def validate_answer(answer: str, completed_calls: List[Dict[str, Any]]) -> List[str]:
+
+            def validate_answer(
+                answer: str, completed_calls: List[Dict[str, Any]]
+            ) -> List[str]:
                 history_state = VerifiedDecisionState.from_history(history)
                 outputs = [
                     item["output"]
@@ -526,7 +577,9 @@ def run_backend_session(
                     conversation_context=history,
                     tool_outputs=completed_calls,
                     record_evidence={
-                        "topology_summary": topology_summary_from_tool_outputs(completed_calls)
+                        "topology_summary": topology_summary_from_tool_outputs(
+                            completed_calls
+                        )
                     },
                 )
                 contract = GroundingContractBuilder().build(
@@ -568,7 +621,13 @@ def run_backend_session(
             )
             records.append(record)
             history.append(build_history_turn(record))
-            logger.info("Turn finished: scenario=%s session=%s turn=%d quality=%s", scenario_id, source_session_id, turn_id, record["quality_flag"])
+            logger.info(
+                "Turn finished: scenario=%s session=%s turn=%d quality=%s",
+                scenario_id,
+                source_session_id,
+                turn_id,
+                record["quality_flag"],
+            )
             if trace.get("status") != "completed":
                 errors.append(
                     {
@@ -579,8 +638,15 @@ def run_backend_session(
                 )
                 break
         except Exception as exc:
-            logger.exception("Turn failed: scenario=%s session=%s turn=%d", scenario_id, source_session_id, turn_id)
-            errors.append({"turn_id": turn_id, "user_input": question, "error": str(exc)})
+            logger.exception(
+                "Turn failed: scenario=%s session=%s turn=%d",
+                scenario_id,
+                source_session_id,
+                turn_id,
+            )
+            errors.append(
+                {"turn_id": turn_id, "user_input": question, "error": str(exc)}
+            )
             break
 
     session_record = {
@@ -611,7 +677,8 @@ def run_backend_session(
             }
             for record in records
         ],
-        "complete": not errors and len(records) == len(source_session.get("dialogue") or []),
+        "complete": not errors
+        and len(records) == len(source_session.get("dialogue") or []),
         "errors": errors,
     }
     return records, session_record
@@ -649,7 +716,9 @@ class _MergedGeneration:
 class TeacherTraceGenerator:
     """Coordinate scenario selection, generation, persistence, and SFT export."""
 
-    def __init__(self, args: argparse.Namespace, store: Optional[TeacherTraceStore] = None) -> None:
+    def __init__(
+        self, args: argparse.Namespace, store: Optional[TeacherTraceStore] = None
+    ) -> None:
         self.args = args
         self.store = store if store is not None else TeacherTraceStore.from_args(args)
 
@@ -657,7 +726,9 @@ class TeacherTraceGenerator:
         configure_logging(self.args.log_level)
         scope = self._select_scope()
         existing_records, existing_session_records = self._load_existing_records()
-        self._validate_replacement_target(scope, existing_records, existing_session_records)
+        self._validate_replacement_target(
+            scope, existing_records, existing_session_records
+        )
         preflight, selected_preflight = self._run_preflight(scope, existing_records)
         if self.args.preflight_only:
             print(json.dumps(preflight, ensure_ascii=False, indent=2))
@@ -681,20 +752,25 @@ class TeacherTraceGenerator:
         replacement_mode = bool(getattr(args, "replace_selected_scenario", False))
         if replacement_mode:
             if args.force:
-                raise ValueError("--replace-selected-scenario cannot be combined with --force.")
+                raise ValueError(
+                    "--replace-selected-scenario cannot be combined with --force."
+                )
             if not args.dataset_source or not args.scenario_id:
                 raise ValueError(
                     "--replace-selected-scenario requires both --dataset-source and --scenario-id."
                 )
             if args.session_id:
-                raise ValueError("Scenario replacement must regenerate every session; omit --session-id.")
+                raise ValueError(
+                    "Scenario replacement must regenerate every session; omit --session-id."
+                )
 
         scenario_files = tuple(args.scenario_file or default_scenario_files())
         all_sources = tuple(load_scenario_sources(list(scenario_files)))
         selected_sources = [
             source
             for source in all_sources
-            if args.dataset_source is None or source["dataset_source"] == args.dataset_source
+            if args.dataset_source is None
+            or source["dataset_source"] == args.dataset_source
         ]
         if args.dataset_source and not selected_sources:
             available = ", ".join(source["dataset_source"] for source in all_sources)
@@ -709,9 +785,13 @@ class TeacherTraceGenerator:
                 if str(scenario.get("scenario_id")) == args.scenario_id
             ]
             if not matches:
-                raise KeyError(f"Scenario {args.scenario_id!r} not found in the selected sources.")
+                raise KeyError(
+                    f"Scenario {args.scenario_id!r} not found in the selected sources."
+                )
             if len(matches) > 1:
-                candidates = ", ".join(source["dataset_source"] for source, _ in matches)
+                candidates = ", ".join(
+                    source["dataset_source"] for source, _ in matches
+                )
                 raise ValueError(
                     f"Scenario {args.scenario_id!r} exists in multiple sources ({candidates}); "
                     "pass --dataset-source."
@@ -720,9 +800,13 @@ class TeacherTraceGenerator:
             selected_sources = [{**source, "scenarios": [scenario]}]
         scenarios = tuple(flatten_source_scenarios(selected_sources))
         all_scenarios = tuple(flatten_source_scenarios(list(all_sources)))
-        source_session_count = sum(len(scenario.get("sessions") or []) for scenario in scenarios)
+        source_session_count = sum(
+            len(scenario.get("sessions") or []) for scenario in scenarios
+        )
         if args.session_id and (len(scenarios) != 1 or source_session_count != 1):
-            raise ValueError("--session-id requires one selected scenario containing exactly one source session.")
+            raise ValueError(
+                "--session-id requires one selected scenario containing exactly one source session."
+            )
         return _GenerationScope(
             scenario_files=scenario_files,
             all_sources=all_sources,
@@ -732,7 +816,9 @@ class TeacherTraceGenerator:
             replacement_mode=replacement_mode,
         )
 
-    def _load_existing_records(self) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def _load_existing_records(
+        self,
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         if self.args.force:
             return [], []
         return self.store.load_master(), self.store.load_sessions()
@@ -872,7 +958,9 @@ class TeacherTraceGenerator:
                 continue
             split = split_map[scenario_id]
             scenario_history: List[Dict[str, Any]] = []
-            for session_index, source_session in enumerate(scenario.get("sessions") or [], start=1):
+            for session_index, source_session in enumerate(
+                scenario.get("sessions") or [], start=1
+            ):
                 turn_records, session_record = run_backend_session(
                     scenario,
                     source_session,
@@ -930,12 +1018,14 @@ class TeacherTraceGenerator:
                 scenario_id=str(self.args.scenario_id),
                 id_field="sample_id",
             )
-            combined_session_records, removed_session_count = self.store.replace_scenario(
-                existing_session_records,
-                execution.session_records,
-                dataset_source=str(self.args.dataset_source),
-                scenario_id=str(self.args.scenario_id),
-                id_field="session_record_id",
+            combined_session_records, removed_session_count = (
+                self.store.replace_scenario(
+                    existing_session_records,
+                    execution.session_records,
+                    dataset_source=str(self.args.dataset_source),
+                    scenario_id=str(self.args.scenario_id),
+                    id_field="session_record_id",
+                )
             )
             merged = _MergedGeneration(
                 combined_records,
@@ -978,9 +1068,13 @@ class TeacherTraceGenerator:
         logger.info("Writing combined JSONL output: %s", self.args.output_jsonl)
         logger.info("Writing pretty JSON output: %s", self.args.output_json)
         self.store.write_master(merged.records)
-        logger.info("Writing session evaluation JSONL: %s", self.args.session_output_jsonl)
+        logger.info(
+            "Writing session evaluation JSONL: %s", self.args.session_output_jsonl
+        )
         self.store.write_sessions(merged.session_records)
-        logger.info("Writing scenario-isolated split files: %s", self.args.split_output_dir)
+        logger.info(
+            "Writing scenario-isolated split files: %s", self.args.split_output_dir
+        )
         sft_record_count = write_split_records(
             self.args.split_output_dir,
             merged.records,
@@ -995,7 +1089,11 @@ class TeacherTraceGenerator:
         )
         if failed_sessions:
             run_status = "completed_with_errors"
-        elif not scope.replacement_mode and not merged.appended_record_count and existing_records:
+        elif (
+            not scope.replacement_mode
+            and not merged.appended_record_count
+            and existing_records
+        ):
             run_status = "no_changes"
         elif sft_record_count < len(merged.records):
             run_status = "completed_with_quality_issues"
@@ -1017,8 +1115,12 @@ class TeacherTraceGenerator:
                     "status": run_status,
                     "append_mode": not self.args.force and not scope.replacement_mode,
                     "replacement_mode": scope.replacement_mode,
-                    "replaced_dataset_source": self.args.dataset_source if scope.replacement_mode else None,
-                    "replaced_scenario_id": self.args.scenario_id if scope.replacement_mode else None,
+                    "replaced_dataset_source": self.args.dataset_source
+                    if scope.replacement_mode
+                    else None,
+                    "replaced_scenario_id": self.args.scenario_id
+                    if scope.replacement_mode
+                    else None,
                     "removed_records": merged.removed_record_count,
                     "removed_sessions": merged.removed_session_count,
                     "records": len(merged.records),

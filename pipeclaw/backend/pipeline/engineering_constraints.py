@@ -12,17 +12,25 @@ from .constraints.common import (
 )
 from .constraints.compressor import run_compressor_checks
 from .constraints.abnormality_warning import run_abnormality_warning_checks
-from .constraints.dispatch_priority import run_dispatch_priority_checks, run_dispatch_priority_policy_checks
+from .constraints.dispatch_priority import (
+    run_dispatch_priority_checks,
+    run_dispatch_priority_policy_checks,
+)
 from .constraints.equipment_regulation import run_equipment_regulation_checks
 from .constraints.flow import run_flow_checks
-from .constraints.human_intervention import intervention_label_from_checks, run_human_intervention_checks
+from .constraints.human_intervention import (
+    intervention_label_from_checks,
+    run_human_intervention_checks,
+)
 from .constraints.linepack import run_linepack_checks
 from .constraints.pressure import run_pressure_checks
 from .constraints.common import PIPELINE_CONSTRAINTS, DISPATCH_RULES
 from .forecast_result import without_none_values
 
 
-CategoryRunner = Callable[[Dict[str, Dict[str, Any]], Dict[str, Any]], List[Dict[str, Any]]]
+CategoryRunner = Callable[
+    [Dict[str, Dict[str, Any]], Dict[str, Any]], List[Dict[str, Any]]
+]
 
 CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "pressure": run_pressure_checks,
@@ -33,6 +41,8 @@ CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "abnormality_warning": run_abnormality_warning_checks,
     "dispatch_priority": run_dispatch_priority_checks,
 }
+
+
 def run_engineering_constraint_checks(
     summaries: Dict[str, Dict[str, Any]],
     parsed_task: Optional[Dict[str, Any]] = None,
@@ -40,8 +50,12 @@ def run_engineering_constraint_checks(
     """Run the repository's fixed engineering category checks directly."""
     parsed_task = parsed_task or {}
     if not (parsed_task.get("_variable_registry") or []):
-        raise ValueError("Engineering constraint checks require variable registry metadata.")
-    selected_categories = select_requested_categories(parsed_task.get("constraint_verification_types"))
+        raise ValueError(
+            "Engineering constraint checks require variable registry metadata."
+        )
+    selected_categories = select_requested_categories(
+        parsed_task.get("constraint_verification_types")
+    )
     selected = set(selected_categories)
 
     checks: List[Dict[str, Any]] = []
@@ -52,13 +66,13 @@ def run_engineering_constraint_checks(
 
     overall = max_status(check["status"] for check in checks)
     not_evaluated_rules = [
-        check["name"]
-        for check in checks
-        if check.get("status") == "not_evaluated"
+        check["name"] for check in checks if check.get("status") == "not_evaluated"
     ]
     verification_complete = not not_evaluated_rules
     risk_escalations = _risk_escalations(checks)
-    risk_level = {"pass": "low", "warning": "medium", "fail": "high"}.get(overall, "unknown")
+    risk_level = {"pass": "low", "warning": "medium", "fail": "high"}.get(
+        overall, "unknown"
+    )
     if not verification_complete and overall in {"pass", "not_evaluated"}:
         risk_level = "unknown"
     if risk_escalations:
@@ -76,28 +90,42 @@ def run_engineering_constraint_checks(
     non_pass = [
         check
         for check in checks
-        if check["status"] in {"warning", "fail"} and check["category"] != "human_intervention"
+        if check["status"] in {"warning", "fail"}
+        and check["category"] != "human_intervention"
     ]
-    non_pass.sort(key=lambda check: (STATUS_RANK.get(check["status"], 0), -check["priority"]), reverse=True)
+    non_pass.sort(
+        key=lambda check: (STATUS_RANK.get(check["status"], 0), -check["priority"]),
+        reverse=True,
+    )
     failures = [check for check in non_pass if check["status"] == "fail"]
     warnings = [check for check in non_pass if check["status"] == "warning"]
-    selected_warnings = warnings[:max(0, 5 - len(failures))]
+    selected_warnings = warnings[: max(0, 5 - len(failures))]
     priority_findings = failures + selected_warnings
     dispatch_recommendation = _dispatch_recommendation(checks)
     category_statuses = category_status(checks)
     safety_checks = [
         check
         for check in checks
-        if check.get("category") in {"pressure", "flow", "linepack", "abnormality_warning"}
+        if check.get("category")
+        in {"pressure", "flow", "linepack", "abnormality_warning"}
     ]
-    energy_checks = [check for check in checks if check.get("name") == "energy_consumption_cost"]
+    energy_checks = [
+        check for check in checks if check.get("name") == "energy_consumption_cost"
+    ]
     comparison_complete = (
         bool(safety_checks)
         and bool(energy_checks)
-        and all(check.get("status") != "not_evaluated" for check in safety_checks + energy_checks)
+        and all(
+            check.get("status") != "not_evaluated"
+            for check in safety_checks + energy_checks
+        )
     )
-    safety_status = max_status(check.get("status", "not_evaluated") for check in safety_checks)
-    energy_status = max_status(check.get("status", "not_evaluated") for check in energy_checks)
+    safety_status = max_status(
+        check.get("status", "not_evaluated") for check in safety_checks
+    )
+    energy_status = max_status(
+        check.get("status", "not_evaluated") for check in energy_checks
+    )
 
     return {
         "requested_categories": selected_categories,
@@ -106,7 +134,9 @@ def run_engineering_constraint_checks(
             "comparison_complete": comparison_complete,
             "safety_status": safety_status,
             "energy_status": energy_status,
-            "consistent": safety_status == energy_status if comparison_complete else None,
+            "consistent": safety_status == energy_status
+            if comparison_complete
+            else None,
         },
         "dispatch_priority_order": DISPATCH_PRIORITY_ORDER,
         "overall_status": overall,
@@ -114,7 +144,9 @@ def run_engineering_constraint_checks(
         "not_evaluated_rules": not_evaluated_rules,
         "risk_level": risk_level,
         "risk_escalations": risk_escalations,
-        "rule_flags": list(dict.fromkeys(check.get("flag") for check in checks if check.get("flag"))),
+        "rule_flags": list(
+            dict.fromkeys(check.get("flag") for check in checks if check.get("flag"))
+        ),
         "triggered_flags": list(
             dict.fromkeys(check.get("flag") for check in non_pass if check.get("flag"))
         ),
@@ -187,7 +219,9 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
             {
                 "minimum_pressure": pressure.get("minimum_pressure"),
                 "maximum_pressure": pressure.get("maximum_pressure"),
-                "pressure_violation_nodes": pressure.get("pressure_violation_nodes", []),
+                "pressure_violation_nodes": pressure.get(
+                    "pressure_violation_nodes", []
+                ),
                 "pressure_warning_nodes": pressure.get("pressure_warning_nodes", []),
                 "at_risk_pressure_margins": {
                     variable: pressure_margins[variable]
@@ -203,7 +237,9 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "minimum_operating_window_margin": _minimum_operating_window_margin(
                     pressure_margins
                 ),
-                "violation_node_count": len(pressure.get("pressure_violation_nodes") or []),
+                "violation_node_count": len(
+                    pressure.get("pressure_violation_nodes") or []
+                ),
                 "warning_node_count": len(pressure.get("pressure_warning_nodes") or []),
                 "maximum_continuous_pressure_violation_minutes": pressure.get(
                     "maximum_continuous_pressure_violation_minutes"
@@ -238,7 +274,9 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "maximum_continuous_decline_minutes": max(
                     (
                         float(item.get("maximum_continuous_decline_minutes") or 0.0)
-                        for item in dict(linepack.get("linepack_recovery") or {}).values()
+                        for item in dict(
+                            linepack.get("linepack_recovery") or {}
+                        ).values()
                     ),
                     default=0.0,
                 ),
@@ -255,7 +293,9 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
         ),
         "compressor": without_none_values(
             {
-                "operating_envelope_status": compressor.get("operating_envelope_status"),
+                "operating_envelope_status": compressor.get(
+                    "operating_envelope_status"
+                ),
                 "maximum_load": _maximum_evaluated_value(compressor),
                 "maximum_compression_ratio": _maximum_evaluated_value(compressor_ratio),
                 "maximum_rotational_speed": _maximum_evaluated_value(compressor_speed),
@@ -263,8 +303,12 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
             }
         ),
         "equipment_regulation": {
-            "valve_opening_status": by_name.get("valve_opening_range", {}).get("status", "not_evaluated"),
-            "pressure_regulator_status": by_name.get("pressure_regulator_range", {}).get("status", "not_evaluated"),
+            "valve_opening_status": by_name.get("valve_opening_range", {}).get(
+                "status", "not_evaluated"
+            ),
+            "pressure_regulator_status": by_name.get(
+                "pressure_regulator_range", {}
+            ).get("status", "not_evaluated"),
             "boundary_adjustment_status": by_name.get(
                 "boundary_control_adjustment_magnitude", {}
             ).get("status", "not_evaluated"),
@@ -313,9 +357,7 @@ def _minimum_operating_window_margin(
     return {"variable": variable, "value": round(value, 6)}
 
 
-def _maximum_recovery_value(
-    recovery: Any, metric: str
-) -> Optional[Dict[str, Any]]:
+def _maximum_recovery_value(recovery: Any, metric: str) -> Optional[Dict[str, Any]]:
     candidates = [
         (str(variable), float(values[metric]))
         for variable, values in dict(recovery or {}).items()
@@ -369,18 +411,33 @@ def _minimum_evaluated_value(
 
 def _risk_escalations(checks: List[Dict[str, Any]]) -> List[str]:
     escalations = []
-    pressure_check = next((check for check in checks if check["name"] == "node_pressure_operating_window"), None)
+    pressure_check = next(
+        (
+            check
+            for check in checks
+            if check["name"] == "node_pressure_operating_window"
+        ),
+        None,
+    )
     risk_config = PIPELINE_CONSTRAINTS["risk_escalation"]
-    if pressure_check and pressure_check.get("simultaneous_end_user_warning_node_count", 0) >= int(risk_config["simultaneous_end_user_warning_nodes"]):
+    if pressure_check and pressure_check.get(
+        "simultaneous_end_user_warning_node_count", 0
+    ) >= int(risk_config["simultaneous_end_user_warning_nodes"]):
         escalations.append("multiple_end_user_nodes_near_pressure_lower_bound")
-    if pressure_check and max(pressure_check.get("pressure_recovery_time_minutes", {}).values(), default=0.0) > float(risk_config["pressure_recovery_warning_minutes"]):
+    if pressure_check and max(
+        pressure_check.get("pressure_recovery_time_minutes", {}).values(), default=0.0
+    ) > float(risk_config["pressure_recovery_warning_minutes"]):
         escalations.append("pressure_recovery_time_exceeds_30_minutes")
     pressure_at_risk = any(
         check.get("flag") in {"pressure_warning", "pressure_violation"}
         for check in checks
     )
     linepack_decline_check = next(
-        (check for check in checks if check.get("name") == "linepack_decline_and_recovery"),
+        (
+            check
+            for check in checks
+            if check.get("name") == "linepack_decline_and_recovery"
+        ),
         None,
     )
     linepack_declining = bool(

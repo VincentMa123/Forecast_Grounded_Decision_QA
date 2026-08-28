@@ -53,7 +53,9 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
                     flow = abs(float(value))
                 except ValueError:
                     continue
-                pipeline = row.get("管道划分") or row.get("管线") or row.get("所属地") or "?"
+                pipeline = (
+                    row.get("管道划分") or row.get("管线") or row.get("所属地") or "?"
+                )
                 per_line_sums[pipeline] = per_line_sums.get(pipeline, 0.0) + flow
                 per_line_counts[pipeline] = per_line_counts.get(pipeline, 0) + 1
         except csv.Error:
@@ -104,7 +106,9 @@ def numeric_claims_are_grounded(
     evidence: Dict[str, Any],
 ) -> bool:
     claimed = numeric_claim_values(answer)
-    return len(grounded_numeric_claim_values(answer, question, evidence)) == len(claimed)
+    return len(grounded_numeric_claim_values(answer, question, evidence)) == len(
+        claimed
+    )
 
 
 def numeric_grounding_evidence(record: Dict[str, Any]) -> Dict[str, Any]:
@@ -207,13 +211,21 @@ def derived_numeric_values(value: Any) -> List[float]:
         if rows and len(rows) <= 2_000:
             keys = sorted({key for row in rows for key in row})[:40]
             numeric_keys = [
-                key for key in keys if any(number(row.get(key)) is not None for row in rows)
+                key
+                for key in keys
+                if any(number(row.get(key)) is not None for row in rows)
             ]
             category_keys = [
-                key for key in keys if any(isinstance(row.get(key), str) for row in rows)
+                key
+                for key in keys
+                if any(isinstance(row.get(key), str) for row in rows)
             ][:8]
             for numeric_key in numeric_keys:
-                values = [value for row in rows if (value := number(row.get(numeric_key))) is not None]
+                values = [
+                    value
+                    for row in rows
+                    if (value := number(row.get(numeric_key))) is not None
+                ]
                 if not values:
                     continue
                 derived.extend(rounded(sum(values)))
@@ -235,7 +247,11 @@ def derived_numeric_values(value: Any) -> List[float]:
                             grouped[category] = grouped.get(category, 0.0) + value
                             counts[category] = counts.get(category, 0) + 1
                     if len(grouped) <= 200:
-                        derived.extend(value for total in grouped.values() for value in rounded(total))
+                        derived.extend(
+                            value
+                            for total in grouped.values()
+                            for value in rounded(total)
+                        )
                         derived.extend(float(count) for count in counts.values())
         return derived + [value for field in item for value in collect(field, totals)]
 

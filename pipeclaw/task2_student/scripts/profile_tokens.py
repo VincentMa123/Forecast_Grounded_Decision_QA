@@ -49,9 +49,7 @@ FIELD_NAMES = (
 DEFAULT_LOSS_SCALE = "default+ignore_empty_think"
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_DATA_ROOT = REPO_ROOT / "pipeclaw" / "task2_student" / "data"
-DEFAULT_MANIFEST_PATH = (
-    DEFAULT_DATA_ROOT / "manifests" / "task2_dataset_manifest.json"
-)
+DEFAULT_MANIFEST_PATH = DEFAULT_DATA_ROOT / "manifests" / "task2_dataset_manifest.json"
 DEFAULT_SUMMARY_PATH = (
     DEFAULT_DATA_ROOT / "token_profiles" / "qwen35_08b_token_profile.json"
 )
@@ -230,9 +228,7 @@ def load_swift_api(
     if not callable(getattr(swift_module, "get_processor", None)) or not callable(
         getattr(swift_module, "get_template", None)
     ):
-        raise TokenProfileError(
-            "installed MS-SWIFT lacks get_processor/get_template"
-        )
+        raise TokenProfileError("installed MS-SWIFT lacks get_processor/get_template")
     return swift_module
 
 
@@ -300,7 +296,9 @@ def profile_records(
 
     rows: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
-        example_id = _required_text(record, "example_id", f"{projection}/{split}:{index}")
+        example_id = _required_text(
+            record, "example_id", f"{projection}/{split}:{index}"
+        )
         source_sample_id = _required_text(record, "source_sample_id", example_id)
         scenario_type = _required_text(record, "scenario_type", example_id)
         measured = encoder.encode_record(record)
@@ -381,8 +379,7 @@ def summarize_profile_rows(
         "by_scenario_type": group_by("scenario_type"),
         "by_task_type": group_by("task_type"),
         "longest_examples": [
-            {field: row.get(field) for field in longest_fields}
-            for row in longest
+            {field: row.get(field) for field in longest_fields} for row in longest
         ],
     }
 
@@ -548,14 +545,16 @@ def validate_profile_provenance(
         else profile_projections
     )
     selected_splits = (
-        _selection(splits, "split selection")
-        if splits is not None
-        else profile_splits
+        _selection(splits, "split selection") if splits is not None else profile_splits
     )
     if set(selected_projections) != set(profile_projections):
-        raise TokenProfileError("profile projection selection does not match the requested selection")
+        raise TokenProfileError(
+            "profile projection selection does not match the requested selection"
+        )
     if set(selected_splits) != set(profile_splits):
-        raise TokenProfileError("profile split selection does not match the requested selection")
+        raise TokenProfileError(
+            "profile split selection does not match the requested selection"
+        )
 
     manifest_path = manifest_path.resolve()
     data_root = data_root.resolve()
@@ -704,10 +703,13 @@ def load_profile_inputs(
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise TokenProfileError(f"{manifest_path}: invalid or unreadable manifest") from exc
-    if not isinstance(manifest, dict) or manifest.get(
-        "schema_version"
-    ) != "task2_ms_swift_manifest_v1":
+        raise TokenProfileError(
+            f"{manifest_path}: invalid or unreadable manifest"
+        ) from exc
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != "task2_ms_swift_manifest_v1"
+    ):
         raise TokenProfileError("unsupported dataset manifest schema")
 
     data_root = data_root.resolve()
@@ -921,7 +923,11 @@ def main(
             splits=args.splits,
             records_path=args.records_output,
         )
-        print(_stable_json({"validated_profile": args.summary_output.resolve().as_posix()}))
+        print(
+            _stable_json(
+                {"validated_profile": args.summary_output.resolve().as_posix()}
+            )
+        )
         return 0
 
     inputs = load_profile_inputs(

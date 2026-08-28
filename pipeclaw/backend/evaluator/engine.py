@@ -29,9 +29,7 @@ def build_report(
     metric_values = list(metrics)
     if any(not isinstance(metric, MetricResult) for metric in metric_values):
         raise EvaluationInputError("Every metric must be a MetricResult.")
-    issue_values = tuple(
-        dict.fromkeys(str(issue) for issue in (hard_issues or ()))
-    )
+    issue_values = tuple(dict.fromkeys(str(issue) for issue in (hard_issues or ())))
 
     included = [
         metric
@@ -68,13 +66,9 @@ def build_report(
     else:
         passed = bool(hard_gate_passed and overall_score is not None)
 
-    failed_checks = tuple(
-        metric.name for metric in included if not metric.passed
-    )
+    failed_checks = tuple(metric.name for metric in included if not metric.passed)
     critical_failures = tuple(
-        metric.name
-        for metric in included
-        if metric.critical and not metric.passed
+        metric.name for metric in included if metric.critical and not metric.passed
     )
     diagnostic_values = dict(diagnostics or {})
     if issue_values or "hard_issues" not in diagnostic_values:
@@ -131,8 +125,7 @@ def evaluate(
         ) = evaluate_context(
             context,
             derive_hard_issues=(
-                profile is EvaluationProfile.TEACHER_TRACE
-                and hard_issues is None
+                profile is EvaluationProfile.TEACHER_TRACE and hard_issues is None
             ),
             maximum_chars=max_record_chars,
         )

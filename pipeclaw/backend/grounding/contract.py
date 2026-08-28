@@ -27,7 +27,11 @@ from .decision_trace_state import (
     canonical_json,
     has_boundary_action,
 )
-from .evidence.tool import attach_tool_arguments, classify_tool_evidence, requested_artifacts
+from .evidence.tool import (
+    attach_tool_arguments,
+    classify_tool_evidence,
+    requested_artifacts,
+)
 
 
 INTERVENTION_RANK = {
@@ -122,15 +126,9 @@ class CandidateResult:
             manual_intervention_label=str(
                 item.get("manual_intervention_label") or "no_intervention"
             ),
-            dispatch_recommendation=str(
-                item.get("dispatch_recommendation") or ""
-            ),
-            failed_rule_ids=[
-                str(rule) for rule in item.get("failed_rule_ids") or []
-            ],
-            warning_rule_ids=[
-                str(rule) for rule in item.get("warning_rule_ids") or []
-            ],
+            dispatch_recommendation=str(item.get("dispatch_recommendation") or ""),
+            failed_rule_ids=[str(rule) for rule in item.get("failed_rule_ids") or []],
+            warning_rule_ids=[str(rule) for rule in item.get("warning_rule_ids") or []],
             energy_consumption=(
                 float(item["energy_consumption"])
                 if item.get("energy_consumption") is not None
@@ -226,18 +224,10 @@ class GroundingContractBuilder:
         prior_applied_disturbances: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         baselines = self._deduplicate_candidate_results(
-            [
-                item
-                for item in results
-                if _candidate_role(item) == "baseline"
-            ]
+            [item for item in results if _candidate_role(item) == "baseline"]
         )
         candidates = self._deduplicate_candidate_results(
-            [
-                item
-                for item in results
-                if _candidate_role(item) != "baseline"
-            ]
+            [item for item in results if _candidate_role(item) != "baseline"]
         )
 
         current_action_candidates = any(
@@ -251,9 +241,8 @@ class GroundingContractBuilder:
             key = candidate.candidate_id.casefold()
             if not key:
                 continue
-            if (
-                current_action_candidates
-                and not has_boundary_action({"action": candidate.action})
+            if current_action_candidates and not has_boundary_action(
+                {"action": candidate.action}
             ):
                 continue
             if key not in parsed_by_id:
@@ -269,11 +258,12 @@ class GroundingContractBuilder:
             [parsed_by_id[key] for key in parsed_order]
         )
         contract: Dict[str, Any] = {
-            "answer_mode": "dispatch_comparison" if len(parsed) > 1 else "single_forecast",
+            "answer_mode": "dispatch_comparison"
+            if len(parsed) > 1
+            else "single_forecast",
             "current_candidate_forecast_count": len(candidates),
             "current_decision_policy_call_count": sum(
-                item.get("name") == "set_decision_policy"
-                for item in results
+                item.get("name") == "set_decision_policy" for item in results
             ),
             "candidate_results": [item.compact() for item in parsed],
             "worst_case_risk_level": self._worst(
@@ -356,9 +346,7 @@ class GroundingContractBuilder:
             payload = {
                 key: {
                     str(variable): value
-                    for variable, value in sorted(
-                        dict(action.get(key) or {}).items()
-                    )
+                    for variable, value in sorted(dict(action.get(key) or {}).items())
                 }
                 for key in ("setpoints", "percentage_changes")
                 if action.get(key)
@@ -384,7 +372,10 @@ class GroundingContractBuilder:
             sources = [parsed_task, prediction, output]
             for source in sources:
                 assumption = source.get("disturbance_assumption")
-                if not isinstance(assumption, dict) or assumption.get("source") != "llm_assumption":
+                if (
+                    not isinstance(assumption, dict)
+                    or assumption.get("source") != "llm_assumption"
+                ):
                     continue
                 variable = (
                     source.get("disturbance_variable")
@@ -450,10 +441,7 @@ class GroundingContractBuilder:
             application = next(
                 (
                     dict(value)
-                    for value in evidence.get(
-                        "boundary_application_evidence"
-                    )
-                    or []
+                    for value in evidence.get("boundary_application_evidence") or []
                     if str(dict(value or {}).get("variable") or "") == variable
                 ),
                 {},
@@ -472,9 +460,7 @@ class GroundingContractBuilder:
                 verified = False
             elif arguments.get("disturbance_magnitude_percent") is not None:
                 mode = "percent_change"
-                requested_value = arguments.get(
-                    "disturbance_magnitude_percent"
-                )
+                requested_value = arguments.get("disturbance_magnitude_percent")
                 before = []
                 applied = []
                 verified = False
@@ -524,9 +510,7 @@ class GroundingContractBuilder:
         engineering = dict(verification.get("engineering_evidence") or {})
         comparison = dict(prediction.get("counterfactual_comparison") or {})
         category_metrics = {
-            category: self._compact_category_metrics(
-                engineering.get(category), fields
-            )
+            category: self._compact_category_metrics(engineering.get(category), fields)
             for category, fields in ENGINEERING_METRIC_FIELDS.items()
         }
         return CandidateResult(
@@ -552,8 +536,12 @@ class GroundingContractBuilder:
                 or output.get("dispatch_recommendation")
                 or ""
             ),
-            failed_rule_ids=[str(value) for value in verification.get("failed_rule_ids") or []],
-            warning_rule_ids=[str(value) for value in verification.get("warning_rule_ids") or []],
+            failed_rule_ids=[
+                str(value) for value in verification.get("failed_rule_ids") or []
+            ],
+            warning_rule_ids=[
+                str(value) for value in verification.get("warning_rule_ids") or []
+            ],
             energy_consumption=(
                 number_value(metrics.get("energy_consumption_delta"))
                 if metrics.get("energy_consumption_delta") is not None
@@ -570,7 +558,9 @@ class GroundingContractBuilder:
             },
             energy_metrics={
                 "total": number_value(metrics.get("energy_consumption")),
-                "delta_vs_baseline": number_value(metrics.get("energy_consumption_delta")),
+                "delta_vs_baseline": number_value(
+                    metrics.get("energy_consumption_delta")
+                ),
                 "unit": metrics.get("energy_unit"),
                 "variable_count": self._integer(metrics.get("energy_variable_count")),
                 "evaluation_status": metrics.get("energy_evaluation_status"),
@@ -592,7 +582,9 @@ class GroundingContractBuilder:
             if key in source and source[key] is not None
         }
 
-    def _comparison_leaders(self, candidates: List[CandidateResult]) -> Dict[str, List[str]]:
+    def _comparison_leaders(
+        self, candidates: List[CandidateResult]
+    ) -> Dict[str, List[str]]:
         return {
             "pressure_preservation": self._leaders(
                 candidates,
@@ -605,8 +597,7 @@ class GroundingContractBuilder:
                 prefer="maximum",
             ),
             "slowest_linepack_decline": [
-                item.candidate_id
-                for item in self._linepack_best_candidates(candidates)
+                item.candidate_id for item in self._linepack_best_candidates(candidates)
             ],
             "lowest_energy_consumption": self._leaders(
                 candidates,
@@ -768,11 +759,7 @@ class GroundingContractBuilder:
             policy,
             objective_evidence,
         )
-        ranked_ids = [
-            candidate_id
-            for group in ranked_groups
-            for candidate_id in group
-        ]
+        ranked_ids = [candidate_id for group in ranked_groups for candidate_id in group]
         by_id = {item.candidate_id: item for item in viable}
         selected = by_id[ranked_ids[0]]
         return {
@@ -817,7 +804,9 @@ class GroundingContractBuilder:
             assessment = classify_tool_evidence(item, requested=requested)
             artifacts = sorted(assessment.matched_artifacts)
             if not artifacts:
-                artifacts = sorted(requested_artifacts(str(item.get("arguments") or "")))
+                artifacts = sorted(
+                    requested_artifacts(str(item.get("arguments") or ""))
+                )
             if not artifacts:
                 artifacts = [""]
             sources.extend(
@@ -835,11 +824,13 @@ class GroundingContractBuilder:
         }
 
     @staticmethod
-    def _worst(
-        values: Iterable[str], ranking: Dict[str, int], default: str
-    ) -> str:
+    def _worst(values: Iterable[str], ranking: Dict[str, int], default: str) -> str:
         candidates = list(values)
-        return max(candidates, key=lambda value: ranking.get(value, -1)) if candidates else default
+        return (
+            max(candidates, key=lambda value: ranking.get(value, -1))
+            if candidates
+            else default
+        )
 
     @staticmethod
     def _integer(value: Any) -> int:
@@ -847,6 +838,7 @@ class GroundingContractBuilder:
             return int(value or 0)
         except (TypeError, ValueError):
             return 0
+
 
 def _policy_unavailable_at_generation(record: Dict[str, Any]) -> bool:
     """Preserve a deliberately unsupported saved policy decision."""
@@ -998,7 +990,9 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
             else f"energy delta {format_number(energy)}"
         )
     metric_text = ("\uff1b" if chinese else "; ").join(metrics)
-    metric_text = metric_text or ("\u65e0\u53ef\u6bd4\u6307\u6807" if chinese else "no comparable metrics")
+    metric_text = metric_text or (
+        "\u65e0\u53ef\u6bd4\u6307\u6807" if chinese else "no comparable metrics"
+    )
     if chinese:
         return (
             f"- {candidate_id}\uff08{action}\uff09\uff1aF{candidate.get('failure_count', 0)}/"
@@ -1013,6 +1007,8 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
         f"risk {candidate.get('risk_level', 'unknown')}; "
         f"intervention {candidate.get('manual_intervention_label', 'unknown')}."
     )
+
+
 def _outcome_key(candidate: Dict[str, Any]) -> tuple[Any, ...]:
     return (
         candidate.get("failure_count", 0),
@@ -1138,15 +1134,9 @@ def canonical_applied_disturbance_lines(
                 value = _canonical_number(requested)
             primary = f"Applied disturbance: {variable}={value}%"
         elif mode == "setpoint":
-            primary = (
-                f"Applied setpoint: {variable}="
-                f"{_canonical_number(requested)}"
-            )
+            primary = f"Applied setpoint: {variable}={_canonical_number(requested)}"
         else:
-            primary = (
-                f"Applied disturbance: {variable}="
-                f"{_canonical_number(requested)}"
-            )
+            primary = f"Applied disturbance: {variable}={_canonical_number(requested)}"
         if primary not in seen:
             seen.add(primary)
             lines.append(primary)
@@ -1223,10 +1213,7 @@ def _canonical_assumption_source_lines(
         assignment = assignments.get(variable)
         if not assignment:
             continue
-        line = (
-            f"{_CANONICAL_ASSUMPTION_PREFIX} "
-            f"LLM provisional; {assignment}"
-        )
+        line = f"{_CANONICAL_ASSUMPTION_PREFIX} LLM provisional; {assignment}"
         if line not in lines:
             lines.append(line)
     return lines
@@ -1238,15 +1225,21 @@ def provisional_assumption_disclosed(
     numeric_values: List[float],
 ) -> bool:
     """Check canonical disclosures while retaining legacy teacher-trace wording."""
-    forecasts = [pipeformer] + [item for item in pipeformer.get("candidate_forecasts") or [] if isinstance(item, dict)]
+    forecasts = [pipeformer] + [
+        item
+        for item in pipeformer.get("candidate_forecasts") or []
+        if isinstance(item, dict)
+    ]
     assumptions = GroundingContractBuilder._provisional_assumptions(
         [{"output": forecast} for forecast in forecasts]
     )
-    magnitudes = list(dict.fromkeys(
-        abs(float(item["magnitude_percent"]))
-        for item in assumptions
-        if item.get("magnitude_percent") is not None
-    ))
+    magnitudes = list(
+        dict.fromkeys(
+            abs(float(item["magnitude_percent"]))
+            for item in assumptions
+            if item.get("magnitude_percent") is not None
+        )
+    )
     if not magnitudes:
         return True
     disclosed = any(
@@ -1268,9 +1261,7 @@ def finalize_applied_disturbance_disclosure(
         *canonical_applied_disturbance_lines(contract),
         *_canonical_assumption_source_lines(contract),
     ]
-    prose = normalize_not_evaluated_wording(
-        answer_without_machine_disclosure(answer)
-    )
+    prose = normalize_not_evaluated_wording(answer_without_machine_disclosure(answer))
     prose = _without_embedded_required_disclosures(prose, required)
     disclosure = "\n".join(required)
     if disclosure and prose:
@@ -1304,7 +1295,13 @@ _AUDIT_CATEGORIES = (
     ("pressure", "pressure_metrics", "压力", "pressure", r"压力|压裕|pressure"),
     ("flow", "flow_metrics", "流量", "flow", r"流量|供需|flow|supply.?demand"),
     ("linepack", "linepack_metrics", "管存", "linepack", r"管存|linepack"),
-    ("compressor", "compressor_metrics", "压缩机", "compressor", r"压缩机|负荷|compressor|load"),
+    (
+        "compressor",
+        "compressor_metrics",
+        "压缩机",
+        "compressor",
+        r"压缩机|负荷|compressor|load",
+    ),
     ("energy", "energy_metrics", "能耗", "energy", r"能耗|energy"),
 )
 
@@ -1328,27 +1325,20 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
         if not line.startswith("Application status:")
     ]
     required_status = [
-        line
-        for line in required_disclosure
-        if line.startswith("Application status:")
+        line for line in required_disclosure if line.startswith("Application status:")
     ]
     if any(line not in actual_disclosure for line in required_primary):
         issues.append("applied_disturbance_disclosure_missing")
     if any(line not in actual_disclosure for line in required_status):
         issues.append("disturbance_no_op_disclosure_missing")
-    disclosure_occurrences = sum(
-        answer.count(line)
-        for line in required_disclosure
-    )
+    disclosure_occurrences = sum(answer.count(line) for line in required_disclosure)
     if (
-        actual_disclosure != required_disclosure
-        and actual_disclosure
+        actual_disclosure != required_disclosure and actual_disclosure
     ) or disclosure_occurrences != len(required_disclosure):
         issues.append("unexpected_applied_disturbance_disclosure")
     if (
         required_disclosure
-        and normalized_answer_lines[: len(required_disclosure)]
-        != required_disclosure
+        and normalized_answer_lines[: len(required_disclosure)] != required_disclosure
     ):
         issues.append("canonical_disclosure_block_not_at_start")
     if contract.get("answer_mode") != "dispatch_comparison":
@@ -1367,7 +1357,9 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
         issues.append("candidate_comparison_incomplete")
 
     known = {candidate.casefold() for candidate in candidates}
-    referenced = {match.group(0).casefold() for match in _CANDIDATE_REFERENCE.finditer(answer)}
+    referenced = {
+        match.group(0).casefold() for match in _CANDIDATE_REFERENCE.finditer(answer)
+    }
     if referenced - known:
         issues.append("unknown_candidate_reference")
 
@@ -1393,12 +1385,16 @@ def comparison_answer_issues(answer: str, contract: Dict[str, Any]) -> List[str]
                 continue
             for metric, evidence in dict(metrics or {}).items():
                 expected_value = dict(evidence or {}).get("value")
-                if expected_value is not None and not _number_disclosed(answer, expected_value):
+                if expected_value is not None and not _number_disclosed(
+                    answer, expected_value
+                ):
                     missing_objective_values.append(f"{candidate_id}:{metric}")
         if missing_objective_values:
             issues.append("decision_objective_evidence_incomplete")
 
-        if any(variable.casefold() not in answer_folded for variable in action_variables):
+        if any(
+            variable.casefold() not in answer_folded for variable in action_variables
+        ):
             issues.append("candidate_action_mapping_incomplete")
 
         present_categories = {
@@ -1497,9 +1493,7 @@ def applied_disturbance_disclosure(
     return "\n".join(canonical_applied_disturbance_lines(contract))
 
 
-def _compact_assumption_lines(
-    contract: Dict[str, Any], chinese: bool
-) -> List[str]:
+def _compact_assumption_lines(contract: Dict[str, Any], chinese: bool) -> List[str]:
     lines: List[str] = []
     seen = set()
     for item in contract.get("provisional_assumptions") or []:
@@ -1525,11 +1519,15 @@ def _compact_assumption_lines(
                 )
             continue
         if chinese:
-            direction_label = {"up": "上调", "down": "下调"}.get(direction.casefold(), direction)
+            direction_label = {"up": "上调", "down": "下调"}.get(
+                direction.casefold(), direction
+            )
             if magnitude is None:
                 lines.append(f"LLM临时假设：{variable}{direction_label}。")
             else:
-                lines.append(f"LLM临时假设：{variable}{direction_label}{format_number(magnitude)}%。")
+                lines.append(
+                    f"LLM临时假设：{variable}{direction_label}{format_number(magnitude)}%。"
+                )
         else:
             if magnitude is None:
                 lines.append(f"Provisional LLM assumption: {variable} {direction}.")
@@ -1549,7 +1547,9 @@ def _objective_label(objective: Dict[str, Any], chinese: bool) -> str:
     proxy = str(objective.get("proxy_for") or "")
     if proxy:
         if chinese:
-            proxy_label = "末压代理" if proxy == "terminal_pressure_preservation" else "代理"
+            proxy_label = (
+                "末压代理" if proxy == "terminal_pressure_preservation" else "代理"
+            )
             label += f"({proxy_label})"
         else:
             label += f" (proxy for {proxy.replace('_', ' ')})"
@@ -1630,7 +1630,9 @@ def _selected_comparison_answer(
         action = _compact_action(dict(candidate.get("action") or {}))
         evidence = dict(objective_evidence.get(candidate_id) or {})
         metric_tokens = [
-            _objective_token(objective, dict(evidence.get(objective["metric"]) or {}), chinese)
+            _objective_token(
+                objective, dict(evidence.get(objective["metric"]) or {}), chinese
+            )
             for objective in objectives
         ]
         if chinese:
@@ -1658,9 +1660,7 @@ def _selected_comparison_answer(
         + ("。" if chinese else ".")
     )
     eliminated = list(decision.get("eliminated_candidates") or [])
-    eliminated_ids = {
-        str(item.get("candidate_id") or "") for item in eliminated
-    }
+    eliminated_ids = {str(item.get("candidate_id") or "") for item in eliminated}
     rejected = [
         candidate_id
         for candidate_id in ranking
@@ -1671,21 +1671,19 @@ def _selected_comparison_answer(
         [selected_id],
     )
     tied_with_selected = [
-        candidate_id
-        for candidate_id in rejected
-        if candidate_id in selected_group
+        candidate_id for candidate_id in rejected if candidate_id in selected_group
     ]
     lower_ranked = [
-        candidate_id
-        for candidate_id in rejected
-        if candidate_id not in selected_group
+        candidate_id for candidate_id in rejected if candidate_id not in selected_group
     ]
     eliminated_text = ";".join(
         f"{item.get('candidate_id')}={','.join(item.get('failed_rules') or ['rule_failure'])}"
         for item in eliminated
     )
     if chinese:
-        rejection_parts = [f"淘汰：{eliminated_text}" if eliminated_text else "淘汰：无"]
+        rejection_parts = [
+            f"淘汰：{eliminated_text}" if eliminated_text else "淘汰：无"
+        ]
         if lower_ranked:
             rejection_parts.append(f"未选：{','.join(lower_ranked)}仅因目标次优")
         if tied_with_selected:
@@ -1706,8 +1704,7 @@ def _selected_comparison_answer(
         if tied_with_selected:
             rejection_parts.append(
                 "tied with the selected candidate on requested objectives; "
-                "stable candidate-ID tie-break: "
-                + ", ".join(tied_with_selected)
+                "stable candidate-ID tie-break: " + ", ".join(tied_with_selected)
             )
         rejection_line = "; ".join(rejection_parts) + "."
 
@@ -1732,6 +1729,7 @@ def _selected_comparison_answer(
         maximum_words=None if chinese else ENGLISH_MAX_WORDS,
     )
 
+
 def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
     """Render a compact, instruction-complete answer from deterministic facts."""
     decision = dict(contract.get("decision_summary") or {})
@@ -1752,15 +1750,19 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
         *canonical_applied_disturbance_lines(contract),
         *_compact_assumption_lines(contract, chinese),
     ]
-    shared_outcome = not ranking and len(candidates) > 1 and len({
-        _outcome_key(candidate) for candidate in candidates
-    }) == 1
+    shared_outcome = (
+        not ranking
+        and len(candidates) > 1
+        and len({_outcome_key(candidate) for candidate in candidates}) == 1
+    )
     lines = [
         *assumption_lines,
-        (
-            "\u5019\u9009\u52a8\u4f5c\uff1a" if chinese else "Candidate actions:"
-        ) if shared_outcome else (
-            "\u5019\u9009\u52a8\u4f5c\u6bd4\u8f83\uff1a" if chinese else "Candidate comparison:"
+        ("\u5019\u9009\u52a8\u4f5c\uff1a" if chinese else "Candidate actions:")
+        if shared_outcome
+        else (
+            "\u5019\u9009\u52a8\u4f5c\u6bd4\u8f83\uff1a"
+            if chinese
+            else "Candidate comparison:"
         ),
     ]
     if shared_outcome:
@@ -1776,11 +1778,9 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
     missing = [str(value) for value in decision.get("missing_metrics") or []]
 
     all_eliminated = bool(candidates) and len(eliminated) == len(candidates)
-    failed_rules = sorted({
-        str(rule)
-        for item in eliminated
-        for rule in item.get("failed_rules") or []
-    })
+    failed_rules = sorted(
+        {str(rule) for item in eliminated for rule in item.get("failed_rules") or []}
+    )
     if chinese:
         conclusion = (
             "\u7ed3\u8bba\uff1a\u6ca1\u6709\u6ee1\u8db3\u7ea6\u675f\u7684\u5019\u9009\u52a8\u4f5c\uff0c"
@@ -1797,11 +1797,15 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
                 + ", ".join(failed_rules)
             )
         if missing and not all_eliminated:
-            conditions.append("\u9700\u8865\u5145\u53ef\u6bd4\u8bc1\u636e " + ", ".join(missing))
-        lines.extend([
-            conclusion,
-            "\u9002\u7528\u524d\u63d0\uff1a" + "\uff1b".join(conditions) + "\u3002",
-        ])
+            conditions.append(
+                "\u9700\u8865\u5145\u53ef\u6bd4\u8bc1\u636e " + ", ".join(missing)
+            )
+        lines.extend(
+            [
+                conclusion,
+                "\u9002\u7528\u524d\u63d0\uff1a" + "\uff1b".join(conditions) + "\u3002",
+            ]
+        )
     else:
         conclusion = (
             "Conclusion: no candidate satisfies the constraints, so none can proceed to execution."
@@ -1813,7 +1817,8 @@ def grounded_fallback_answer(question: str, contract: Dict[str, Any]) -> str:
             conditions.append(
                 "adjust the actions and clear the failed rules above"
                 if shared_outcome
-                else "adjust the actions and clear failed rules " + ", ".join(failed_rules)
+                else "adjust the actions and clear failed rules "
+                + ", ".join(failed_rules)
             )
         if missing and not all_eliminated:
             conditions.append("provide comparable evidence " + ", ".join(missing))

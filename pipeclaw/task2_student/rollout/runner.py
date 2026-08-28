@@ -1,10 +1,3 @@
-"""The bounded model/tool conversation loop.
-
-``RolloutRunner`` performs execution only.  It has no teacher-oracle, metric, or
-score dependency: scoring happens afterwards through
-``pipeclaw.backend.evaluator``.
-"""
-
 from __future__ import annotations
 
 from pathlib import Path

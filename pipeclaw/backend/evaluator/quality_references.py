@@ -1,11 +1,3 @@
-"""Stable reference parsing shared by answer quality and evaluator checks.
-
-The final-answer parser deliberately excludes identifiers, dates, file names,
-and list numbering.  Tool-evidence parsing is slightly broader because it must
-retain values read from serialized rows.  Their intentionally different
-filters live together, rather than drifting as duplicate parsers in callers.
-"""
-
 from __future__ import annotations
 
 import re
@@ -15,11 +7,13 @@ from typing import Any
 from pipeclaw.backend.grounding.evidence.tool import DATA_FILE_REFERENCE
 
 
-NUMERIC_SIGN_TRANSLATION = str.maketrans({
-    "\u2212": "-",
-    "\ufe63": "-",
-    "\uff0d": "-",
-})
+NUMERIC_SIGN_TRANSLATION = str.maketrans(
+    {
+        "\u2212": "-",
+        "\ufe63": "-",
+        "\uff0d": "-",
+    }
+)
 NUMERIC_SPAN = re.compile(
     r"(?<![A-Za-z0-9_.])[-+]?(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?"
     r"(?:[eE][-+]?\d+)?"
@@ -80,16 +74,12 @@ YEAR_REFERENCE = re.compile(r"(?<!\d)(?:19|20)\d{2}(?=年|[-/.]\d)")
 VARIABLE_REFERENCE = re.compile(
     r"(?<![A-Za-z0-9_])[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?(?![A-Za-z0-9_:])"
 )
-SFT_FILE_REFERENCE = re.compile(
-    r"(?i)\b[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)\b"
-)
+SFT_FILE_REFERENCE = re.compile(r"(?i)\b[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)\b")
 
 # Tool-output parsing treats serialized rows as evidence.  It intentionally
 # accepts leading-decimal values while final-answer parsing retains its stricter
 # historical contract.
-_OBSERVED_DATE_SPAN = re.compile(
-    r"\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?"
-)
+_OBSERVED_DATE_SPAN = re.compile(r"\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?")
 _OBSERVED_NUMERIC_SPAN = re.compile(
     r"(?<![A-Za-z0-9_])[+\-−]?"
     r"(?:\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?|\.\d+)"
@@ -121,22 +111,41 @@ def numeric_claim_values(text: str) -> list[float]:
     """Return final-answer numbers while excluding metadata and list labels."""
 
     normalized = text.translate(NUMERIC_SIGN_TRANSLATION)
-    ignored_spans = [match.span() for match in DATE_RANGE_REFERENCE.finditer(normalized)]
+    ignored_spans = [
+        match.span() for match in DATE_RANGE_REFERENCE.finditer(normalized)
+    ]
     ignored_spans.extend(match.span() for match in DATE_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in COMPACT_DATE_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in DATA_FILE_REFERENCE.finditer(normalized))
+    ignored_spans.extend(
+        match.span() for match in COMPACT_DATE_REFERENCE.finditer(normalized)
+    )
+    ignored_spans.extend(
+        match.span() for match in DATA_FILE_REFERENCE.finditer(normalized)
+    )
     ignored_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in CANDIDATE_IDENTIFIER.finditer(normalized))
-    ignored_spans.extend(match.span() for match in CHINESE_ORDINAL_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in ENGLISH_ORDINAL_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in ENGLISH_RANK_REFERENCE.finditer(normalized))
-    ignored_spans.extend(match.span() for match in NEGATED_NUMERIC_REFERENCE.finditer(normalized))
+    ignored_spans.extend(
+        match.span() for match in CANDIDATE_IDENTIFIER.finditer(normalized)
+    )
+    ignored_spans.extend(
+        match.span() for match in CHINESE_ORDINAL_REFERENCE.finditer(normalized)
+    )
+    ignored_spans.extend(
+        match.span() for match in ENGLISH_ORDINAL_REFERENCE.finditer(normalized)
+    )
+    ignored_spans.extend(
+        match.span() for match in ENGLISH_RANK_REFERENCE.finditer(normalized)
+    )
+    ignored_spans.extend(
+        match.span() for match in NEGATED_NUMERIC_REFERENCE.finditer(normalized)
+    )
     values = []
     for match in NUMERIC_SPAN.finditer(normalized):
         raw_value = match.group(0)
         if raw_value.lstrip("+-").startswith("."):
             continue
-        if any(start <= match.start() and match.end() <= end for start, end in ignored_spans):
+        if any(
+            start <= match.start() and match.end() <= end
+            for start, end in ignored_spans
+        ):
             continue
         previous = normalized[match.start() - 1 : match.start()]
         following = normalized[match.end() : match.end() + 1]
@@ -162,9 +171,11 @@ def time_values_in_minutes(text: str) -> list[tuple[float, float]]:
 
     def append(raw_value: str, unit: str) -> None:
         number = float(raw_value)
-        multiplier = 60.0 if unit.casefold() in {
-            "hour", "hours", "hr", "hrs", "h", "小时", "小時"
-        } else 1.0
+        multiplier = (
+            60.0
+            if unit.casefold() in {"hour", "hours", "hr", "hrs", "h", "小时", "小時"}
+            else 1.0
+        )
         values.append((number, number * multiplier))
 
     for match in TIME_RANGE.finditer(text):
@@ -189,8 +200,10 @@ def observed_numeric_claim_items(text: str) -> list[tuple[float, int, int]]:
         is_integer = digits.isdigit()
         if is_integer and _is_compact_date(digits):
             continue
-        if is_integer and remainder[:1] in {".", ")", "、"} and (
-            len(remainder) == 1 or remainder[1].isspace()
+        if (
+            is_integer
+            and remainder[:1] in {".", ")", "、"}
+            and (len(remainder) == 1 or remainder[1].isspace())
         ):
             continue
         prefix = text[max(0, match.start() - 24) : match.start()]
@@ -207,9 +220,17 @@ def observed_numeric_claim_items(text: str) -> list[tuple[float, int, int]]:
             re.IGNORECASE,
         ):
             continue
-        if is_integer and prefix.rstrip().endswith("第") and _CHINESE_ORDINAL_SUFFIX.match(suffix):
+        if (
+            is_integer
+            and prefix.rstrip().endswith("第")
+            and _CHINESE_ORDINAL_SUFFIX.match(suffix)
+        ):
             continue
-        if is_integer and prefix.rstrip().endswith("至") and _DATE_COMPONENT_SUFFIX.match(suffix):
+        if (
+            is_integer
+            and prefix.rstrip().endswith("至")
+            and _DATE_COMPONENT_SUFFIX.match(suffix)
+        ):
             continue
         try:
             value = float(raw_value.replace("−", "-").replace(",", ""))

@@ -22,9 +22,7 @@ MAX_EVIDENCE_ROWS = 12
 MAX_EVIDENCE_FIELDS = 10
 MAX_VALUE_CHARS = 160
 MAX_COMPUTED_OUTPUT_CHARS = 8_000
-NUMBER_RE = re.compile(
-    r"(?<![A-Za-z0-9_.])[-+]?\d+(?:\.\d+)?(?![A-Za-z0-9_.])"
-)
+NUMBER_RE = re.compile(r"(?<![A-Za-z0-9_.])[-+]?\d+(?:\.\d+)?(?![A-Za-z0-9_.])")
 CSV_FILE_RE = re.compile(r"(?i)(?<![\w.-])[\w.-]+\.csv(?![\w.-])")
 DATE_RE = re.compile(r"(?<!\d)20\d{6}(?!\d)")
 JSON_BLOCK_RE = re.compile(r"```(?:json)?\s*(.*?)\s*```", re.IGNORECASE | re.DOTALL)
@@ -77,7 +75,9 @@ def build_csv_evidence(
     answer_text = answer.casefold()
     answer_numbers = {_normalized_number(value) for value in NUMBER_RE.findall(answer)}
     folded_scope = scope_text.casefold()
-    scope_numbers = {_normalized_number(value) for value in NUMBER_RE.findall(scope_text)}
+    scope_numbers = {
+        _normalized_number(value) for value in NUMBER_RE.findall(scope_text)
+    }
     scoped_dates = _expanded_scope_dates(scope_text)
     candidates: List[tuple[int, int, str, Dict[str, Any]]] = []
     scoped_rows: List[tuple[str, Dict[str, Any]]] = []
@@ -87,7 +87,9 @@ def build_csv_evidence(
     row_index = 0
 
     for item in outputs:
-        if str(item.get("name") or "").casefold() != "read_file" or tool_output_failed(item):
+        if str(item.get("name") or "").casefold() != "read_file" or tool_output_failed(
+            item
+        ):
             continue
         output = item.get("output") or {}
         if not isinstance(output, dict):
@@ -123,7 +125,9 @@ def build_csv_evidence(
             source_files.append(source_file)
 
     for item in outputs:
-        if str(item.get("name") or "").casefold() != "run_command" or tool_output_failed(item):
+        if str(
+            item.get("name") or ""
+        ).casefold() != "run_command" or tool_output_failed(item):
             continue
         output = item.get("output") or {}
         if not isinstance(output, dict):
@@ -165,10 +169,7 @@ def build_csv_evidence(
             }
             for _, _, source_file, row in selected
         ]
-        selected_rows = [
-            (source_file, row)
-            for _, _, source_file, row in selected
-        ]
+        selected_rows = [(source_file, row) for _, _, source_file, row in selected]
         selection_summary = _selection_summary(selected_rows)
         if selection_summary:
             evidence["selection_summary"] = selection_summary
@@ -234,9 +235,7 @@ def _dynamic_script_csv_files(
                 if any(marker in source for marker in markers)
             ]
             source_files.extend(
-                f"{date}_{kind}.csv"
-                for date in sorted(dates)
-                for kind in kinds
+                f"{date}_{kind}.csv" for date in sorted(dates) for kind in kinds
             )
     return list(dict.fromkeys(source_files))
 
@@ -510,12 +509,16 @@ def _named_group_column(
     combined_text: str,
 ) -> str:
     for column in PIPELINE_COLUMNS:
-        values = list(dict.fromkeys(
-            str(row.get(column) or "").strip()
-            for _, row in selected_rows
-            if str(row.get(column) or "").strip()
-        ))
-        if len(values) >= 2 and all(value.casefold() in combined_text for value in values):
+        values = list(
+            dict.fromkeys(
+                str(row.get(column) or "").strip()
+                for _, row in selected_rows
+                if str(row.get(column) or "").strip()
+            )
+        )
+        if len(values) >= 2 and all(
+            value.casefold() in combined_text for value in values
+        ):
             return column
     return ""
 
@@ -524,11 +527,7 @@ def _numeric_measure_column(
     selected_rows: List[tuple[str, Dict[str, Any]]],
     combined_text: str,
 ) -> str:
-    columns = list(dict.fromkeys(
-        key
-        for _, row in selected_rows
-        for key in row
-    ))
+    columns = list(dict.fromkeys(key for _, row in selected_rows for key in row))
     candidates = []
     for column in columns:
         values = [_decimal_value(row.get(column)) for _, row in selected_rows]
@@ -536,7 +535,10 @@ def _numeric_measure_column(
             continue
         folded = column.casefold()
         score = int(folded in combined_text) * 2 + int(
-            any(token in folded for token in ("流量", "flow", "value", "amount", "volume"))
+            any(
+                token in folded
+                for token in ("流量", "flow", "value", "amount", "volume")
+            )
         )
         candidates.append((score, column))
     if not candidates:
@@ -590,7 +592,9 @@ def _structured_computation_results(
     scalar values is repeated in the answer.
     """
     for item in reversed(list(outputs)):
-        if str(item.get("name") or "").casefold() != "run_command" or tool_output_failed(item):
+        if str(
+            item.get("name") or ""
+        ).casefold() != "run_command" or tool_output_failed(item):
             continue
         output = item.get("output") or {}
         if not isinstance(output, dict):
@@ -603,17 +607,23 @@ def _structured_computation_results(
         except (json.JSONDecodeError, TypeError):
             value = stdout
         if isinstance(value, (dict, list)):
-            supports_answer = _structured_value_supports_answer(value, answer_text, answer_numbers)
+            supports_answer = _structured_value_supports_answer(
+                value, answer_text, answer_numbers
+            )
             compact_value = _compact_json_value(value)
         else:
-            supports_answer = _plain_computation_supports_answer(stdout, answer_text, answer_numbers)
+            supports_answer = _plain_computation_supports_answer(
+                stdout, answer_text, answer_numbers
+            )
             compact_value = stdout[:MAX_COMPUTED_OUTPUT_CHARS]
         if not supports_answer:
             continue
-        return [{
-            "tool_call_id": item.get("tool_call_id"),
-            "value": compact_value,
-        }]
+        return [
+            {
+                "tool_call_id": item.get("tool_call_id"),
+                "value": compact_value,
+            }
+        ]
     return []
 
 
@@ -682,7 +692,9 @@ def _compact_json_value(value: Any, *, depth: int = 0) -> Any:
 
 def _csv_filename(item: Dict[str, Any], output: Dict[str, Any]) -> str:
     arguments = item.get("arguments") or {}
-    candidate = arguments.get("path") or output.get("path") or output.get("abs_path") or ""
+    candidate = (
+        arguments.get("path") or output.get("path") or output.get("abs_path") or ""
+    )
     normalized = str(candidate).replace("\\", "/")
     name = Path(normalized).name
     return name if name.casefold().endswith(".csv") else ""

@@ -11,7 +11,10 @@ from pipeclaw.backend.grounding.evidence.tool import (
     command_python_scripts,
     normalized_tool_path,
 )
-from pipeclaw.task2_student.path_contract import is_host_absolute_path, redact_host_paths
+from pipeclaw.task2_student.path_contract import (
+    is_host_absolute_path,
+    redact_host_paths,
+)
 from pipeclaw.task2_student.release_artifacts import (
     read_jsonl_domain,
     required_text,
@@ -166,9 +169,10 @@ def validate_release(
         raise DatasetValidationError(
             f"{manifest_path}: invalid or unreadable manifest"
         ) from exc
-    if not isinstance(manifest, dict) or manifest.get(
-        "schema_version"
-    ) != "task2_ms_swift_manifest_v1":
+    if (
+        not isinstance(manifest, dict)
+        or manifest.get("schema_version") != "task2_ms_swift_manifest_v1"
+    ):
         raise DatasetValidationError("unsupported dataset manifest schema")
 
     source_by_split: dict[str, dict[str, dict[str, Any]]] = {}
@@ -189,8 +193,7 @@ def validate_release(
             prior_split = all_source_ids.get(sample_id)
             if prior_split is not None:
                 raise DatasetValidationError(
-                    f"source split leakage for {sample_id}: "
-                    f"{prior_split} and {split}"
+                    f"source split leakage for {sample_id}: {prior_split} and {split}"
                 )
             all_source_ids[sample_id] = split
         source_details = (manifest.get("sources") or {}).get(split) or {}
@@ -199,9 +202,7 @@ def validate_release(
                 f"{split}: source manifest record count mismatch"
             )
         if source_details.get("sha256") != _sha256_file(source_path):
-            raise DatasetValidationError(
-                f"{split}: source checksum mismatch"
-            )
+            raise DatasetValidationError(f"{split}: source checksum mismatch")
 
     registered_names = set(registered_tool_names)
     tool_manifest = manifest.get("tool_schemas")
@@ -214,9 +215,7 @@ def validate_release(
     observed_tool_schema_hashes: set[str] = set()
     validated_files = 0
     for projection in projection_names:
-        projection_manifest = (manifest.get("projections") or {}).get(
-            projection
-        )
+        projection_manifest = (manifest.get("projections") or {}).get(projection)
         if not isinstance(projection_manifest, dict):
             raise DatasetValidationError(
                 f"{projection}: projection manifest is missing"
@@ -274,9 +273,7 @@ def validate_release(
     correction_manifest = (manifest.get("corrective_datasets") or {}).get(
         "python_script"
     )
-    if correction_manifest is not None and not isinstance(
-        correction_manifest, dict
-    ):
+    if correction_manifest is not None and not isinstance(correction_manifest, dict):
         raise DatasetValidationError("python correction manifest is invalid")
     for split in ("train", "valid") if correction_manifest is not None else ():
         details = correction_manifest.get(split)
@@ -364,7 +361,9 @@ def _validate_source_tool_pairs(
             raise DatasetValidationError(f"{sample_id}: tool call must be an object")
         call_id = _required_text(call, "tool_call_id", sample_id)
         if call_id in calls_by_id:
-            raise DatasetValidationError(f"{sample_id}: duplicate tool_call_id {call_id}")
+            raise DatasetValidationError(
+                f"{sample_id}: duplicate tool_call_id {call_id}"
+            )
         _required_text(call, "name", sample_id)
         if not isinstance(call.get("arguments"), dict):
             raise DatasetValidationError(
@@ -412,22 +411,24 @@ def _validate_source_tool_pairs(
 
 
 def _validate_v8_dispatch_lifecycle(record: dict[str, Any], sample_id: str) -> None:
-    is_v8 = (
-        record.get("dataset_source") == "Pipeline_Full_Life_Cycle_Test_Dataset-v8"
-        or sample_id.startswith("Pipeline_Full_Life_Cycle_Test_Dataset-v8:")
+    is_v8 = record.get(
+        "dataset_source"
+    ) == "Pipeline_Full_Life_Cycle_Test_Dataset-v8" or sample_id.startswith(
+        "Pipeline_Full_Life_Cycle_Test_Dataset-v8:"
     )
-    if (
-        not is_v8
-        or not str(record.get("scenario_id") or "").startswith(
-            "scenario_pipeformer_dispatch_"
-        )
+    if not is_v8 or not str(record.get("scenario_id") or "").startswith(
+        "scenario_pipeformer_dispatch_"
     ):
         return
 
     calls = record.get("tool_calls") or []
     names = [call.get("name") for call in calls]
     registry_count = next(
-        (index for index, name in enumerate(names) if name != "search_pipeformer_registry"),
+        (
+            index
+            for index, name in enumerate(names)
+            if name != "search_pipeformer_registry"
+        ),
         len(names),
     )
     expected_names = ["search_pipeformer_registry"] * registry_count + [
@@ -460,9 +461,7 @@ def _validate_v8_dispatch_lifecycle(record: dict[str, Any], sample_id: str) -> N
     actions = {
         json.dumps(
             {
-                key: dict(
-                    (arguments.get("boundary_conditions") or {}).get(key) or {}
-                )
+                key: dict((arguments.get("boundary_conditions") or {}).get(key) or {})
                 for key in ("setpoints", "percentage_changes")
             },
             sort_keys=True,
@@ -525,7 +524,10 @@ def _validate_messages(
                 f"{example_id}: message {message_index} content must be a string"
             )
         content = message["content"]
-        if message.get("role") in {"system", "tool_call"} and "windows-first" in content.casefold():
+        if (
+            message.get("role") in {"system", "tool_call"}
+            and "windows-first" in content.casefold()
+        ):
             raise DatasetValidationError(
                 f"{example_id}: generated contract contains host-specific path policy"
             )
@@ -536,7 +538,9 @@ def _validate_messages(
                 parsed_call = None
             if isinstance(parsed_call, dict):
                 arguments = parsed_call.get("arguments")
-                if isinstance(arguments, dict) and is_host_absolute_path(arguments.get("cwd")):
+                if isinstance(arguments, dict) and is_host_absolute_path(
+                    arguments.get("cwd")
+                ):
                     raise DatasetValidationError(
                         f"{example_id}: tool_call cwd must be workspace-relative or omitted"
                     )
@@ -637,9 +641,7 @@ def _validate_tools(record: dict[str, Any], example_id: str) -> set[str]:
         if not isinstance(name, str) or not name:
             raise DatasetValidationError(f"{example_id}: tool schema name is required")
         if name in names:
-            raise DatasetValidationError(
-                f"{example_id}: duplicate tool schema {name}"
-            )
+            raise DatasetValidationError(f"{example_id}: duplicate tool schema {name}")
         names.add(name)
     return names
 
@@ -672,9 +674,7 @@ def _validate_tool_messages(
             )
         name = call.get("name")
         if name not in registered_tool_names:
-            raise DatasetValidationError(
-                f"{example_id}: unregistered tool {name!r}"
-            )
+            raise DatasetValidationError(f"{example_id}: unregistered tool {name!r}")
         if not isinstance(call.get("arguments"), dict):
             raise DatasetValidationError(
                 f"{example_id}: tool_call arguments must be an object"
@@ -682,9 +682,10 @@ def _validate_tool_messages(
         parsed_calls.append(call)
         if message.get("loss") is not True:
             raise DatasetValidationError(f"{example_id}: tool_call must receive loss")
-        if index + 1 >= len(messages) or messages[index + 1].get(
-            "role"
-        ) != "tool_response":
+        if (
+            index + 1 >= len(messages)
+            or messages[index + 1].get("role") != "tool_response"
+        ):
             raise DatasetValidationError(
                 f"{example_id}: tool_call must have a matching tool_response"
             )
@@ -693,9 +694,7 @@ def _validate_tool_messages(
             raise DatasetValidationError(
                 f"{example_id}: tool_response must not receive loss"
             )
-        payload = _parse_json(
-            response["content"], f"{example_id}: tool_response"
-        )
+        payload = _parse_json(response["content"], f"{example_id}: tool_response")
         if not isinstance(payload, dict) or payload.get("success") is not True:
             if not allow_failed_responses:
                 raise DatasetValidationError(
@@ -792,13 +791,11 @@ def _validate_derived_identities(
         messages = record["messages"]
         if projection in {"answer_only", "trace_level"}:
             user_messages = [
-                message
-                for message in messages
-                if message.get("role") == "user"
+                message for message in messages if message.get("role") == "user"
             ]
-            if not user_messages or user_messages[0].get(
-                "content"
-            ) != source.get("user_input"):
+            if not user_messages or user_messages[0].get("content") != source.get(
+                "user_input"
+            ):
                 raise DatasetValidationError(
                     f"{record['example_id']}: user input changed"
                 )
@@ -887,9 +884,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         output_root=args.output_root,
         manifest_path=args.manifest_path,
         expected_counts=EXPECTED_SOURCE_COUNTS,
-        registered_tool_names={
-            str(schema["function"]["name"]) for schema in schemas
-        },
+        registered_tool_names={str(schema["function"]["name"]) for schema in schemas},
         tool_schemas=schemas,
     )
     print(stable_json(result))

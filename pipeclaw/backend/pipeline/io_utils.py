@@ -23,8 +23,7 @@ def load_records(path: Path) -> List[Dict[str, Any]]:
     if isinstance(value, list):
         return [item for item in value if isinstance(item, dict)]
     raise TypeError(
-        "Teacher trace must contain a JSON object, list, or JSONL records: "
-        f"{path}"
+        f"Teacher trace must contain a JSON object, list, or JSONL records: {path}"
     )
 
 
@@ -60,7 +59,9 @@ def write_json(path: Path, payload: Any, force: bool) -> None:
     _atomic_write(
         Path(path),
         force,
-        lambda handle: handle.write(json.dumps(payload, ensure_ascii=False, indent=2) + "\n"),
+        lambda handle: handle.write(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+        ),
     )
 
 

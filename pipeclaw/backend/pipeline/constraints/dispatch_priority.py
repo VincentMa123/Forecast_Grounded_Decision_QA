@@ -10,7 +10,9 @@ DISPATCH_RULES = load_rule_document("dispatch_priority")
 DISPATCH_PRIORITY_SPECS = load_constraint_specs("dispatch_priority")
 
 
-def run_dispatch_priority_checks(summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]) -> List[Dict[str, Any]]:
+def run_dispatch_priority_checks(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> List[Dict[str, Any]]:
     return run_specs(DISPATCH_PRIORITY_SPECS, summaries, parsed_task)
 
 

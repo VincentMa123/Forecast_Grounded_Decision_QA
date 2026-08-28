@@ -51,17 +51,25 @@ def variables_matching(
     controllable: Optional[bool] = None,
 ) -> List[str]:
     if not registry:
-        raise ValueError("Variable registry metadata is required for constraint selection.")
+        raise ValueError(
+            "Variable registry metadata is required for constraint selection."
+        )
     result = []
     for name in names:
         metadata = registry.get(name, {})
-        if physical_quantities and metadata.get("physical_quantity") not in physical_quantities:
+        if (
+            physical_quantities
+            and metadata.get("physical_quantity") not in physical_quantities
+        ):
             continue
         if equipment_types and metadata.get("equipment_type") not in equipment_types:
             continue
         if roles and metadata.get("role") not in roles:
             continue
-        if controllable is not None and bool(metadata.get("controllable")) != controllable:
+        if (
+            controllable is not None
+            and bool(metadata.get("controllable")) != controllable
+        ):
             continue
         result.append(name)
     return result
@@ -106,9 +114,18 @@ def range_limits_for_variable(
         warning_high = metadata.get("warning_upper_limit", spec.warning_high)
         fail_low = metadata.get("lower_limit", spec.fail_low)
         fail_high = metadata.get("upper_limit", spec.fail_high)
-        if any(value is not None for value in (warning_low, warning_high, fail_low, fail_high)):
+        if any(
+            value is not None
+            for value in (warning_low, warning_high, fail_low, fail_high)
+        ):
             return warning_low, warning_high, fail_low, fail_high, "variable_registry"
-    return spec.warning_low, spec.warning_high, spec.fail_low, spec.fail_high, "rule_library"
+    return (
+        spec.warning_low,
+        spec.warning_high,
+        spec.fail_low,
+        spec.fail_high,
+        "rule_library",
+    )
 
 
 def threshold_limits_for_variable(
@@ -118,18 +135,30 @@ def threshold_limits_for_variable(
 ) -> Tuple[Optional[float], Optional[float], str]:
     metadata = registry_index(parsed_task).get(variable, {})
     if spec.use_registry_limits and metadata:
-        warning = _absolute_limit(metadata.get("warning_lower_limit"), metadata.get("warning_upper_limit"))
+        warning = _absolute_limit(
+            metadata.get("warning_lower_limit"), metadata.get("warning_upper_limit")
+        )
         fail = _absolute_limit(metadata.get("lower_limit"), metadata.get("upper_limit"))
         if warning is not None or fail is not None:
-            return warning if warning is not None else spec.warning_threshold, fail if fail is not None else spec.fail_threshold, "variable_registry"
+            return (
+                warning if warning is not None else spec.warning_threshold,
+                fail if fail is not None else spec.fail_threshold,
+                "variable_registry",
+            )
     return spec.warning_threshold, spec.fail_threshold, "rule_library"
 
 
 def max_status(statuses: Iterable[str]) -> str:
-    return max(statuses, key=lambda status: STATUS_RANK.get(status, -1), default="not_evaluated")
+    return max(
+        statuses,
+        key=lambda status: STATUS_RANK.get(status, -1),
+        default="not_evaluated",
+    )
 
 
-def status_from_threshold(value: float, warning: Optional[float], fail: Optional[float]) -> str:
+def status_from_threshold(
+    value: float, warning: Optional[float], fail: Optional[float]
+) -> str:
     magnitude = abs(value)
     if fail is not None and magnitude >= fail:
         return "fail"
@@ -142,7 +171,9 @@ def category_status(checks: Sequence[Dict[str, Any]]) -> Dict[str, str]:
     result = {category: "not_evaluated" for category in CATEGORY_ORDER}
     for check in checks:
         category = check["category"]
-        result[category] = max_status([result.get(category, "not_evaluated"), check["status"]])
+        result[category] = max_status(
+            [result.get(category, "not_evaluated"), check["status"]]
+        )
     return result
 
 
@@ -176,8 +207,8 @@ def evaluate_range(
 
     statuses = []
     for variable in variables:
-        warning_low, warning_high, fail_low, fail_high, limit_source = range_limits_for_variable(
-            spec, variable, parsed_task
+        warning_low, warning_high, fail_low, fail_high, limit_source = (
+            range_limits_for_variable(spec, variable, parsed_task)
         )
         predicted_values = summaries.get(variable, {}).get("predicted_values", [])
         variable_statuses = []
@@ -189,7 +220,10 @@ def evaluate_range(
                 status = "warning"
             statuses.append(status)
             variable_statuses.append(status)
-            if status != "pass" and len(check["offending_values"]) < MAX_OFFENDING_VALUES:
+            if (
+                status != "pass"
+                and len(check["offending_values"]) < MAX_OFFENDING_VALUES
+            ):
                 check["offending_values"].append(
                     {
                         "variable": variable,
@@ -216,7 +250,9 @@ def evaluate_range(
                     "status": max_status(variable_statuses),
                     "warning_range": [warning_low, warning_high],
                     "fail_range": [fail_low, fail_high],
-                    "warning_margin": _range_margin(minimum, maximum, warning_low, warning_high),
+                    "warning_margin": _range_margin(
+                        minimum, maximum, warning_low, warning_high
+                    ),
                     "fail_margin": _range_margin(minimum, maximum, fail_low, fail_high),
                     "limit_source": limit_source,
                 }
@@ -226,11 +262,17 @@ def evaluate_range(
     check["evaluation_status"] = "evaluated" if statuses else "not_evaluated"
     check["flag"] = _flag_for_status(spec, check["status"])
     if check["status"] == "not_evaluated":
-        check["message"] = "Matching variables did not contain forecast values for this rule."
+        check["message"] = (
+            "Matching variables did not contain forecast values for this rule."
+        )
     elif check["status"] == "pass":
-        check["message"] = "All selected variables are inside the configured operating window."
+        check["message"] = (
+            "All selected variables are inside the configured operating window."
+        )
     else:
-        check["message"] = f"{len(check['offending_values'])} value(s) crossed the configured operating window."
+        check["message"] = (
+            f"{len(check['offending_values'])} value(s) crossed the configured operating window."
+        )
     return check
 
 
@@ -268,9 +310,14 @@ def evaluate_summary_metric(
                 "limit_source": limit_source,
             }
             if spec.metric == "max_abs_prediction":
-                predicted_values = summaries.get(variable, {}).get("predicted_values", [])
+                predicted_values = summaries.get(variable, {}).get(
+                    "predicted_values", []
+                )
                 if predicted_values:
-                    peak_step_index = max(range(len(predicted_values)), key=lambda index: abs(predicted_values[index]))
+                    peak_step_index = max(
+                        range(len(predicted_values)),
+                        key=lambda index: abs(predicted_values[index]),
+                    )
                     evaluated["peak_value"] = predicted_values[peak_step_index]
                     evaluated["peak_step_index"] = peak_step_index
             check["evaluated_values"].append(evaluated)
@@ -291,21 +338,26 @@ def evaluate_summary_metric(
     check["evaluation_status"] = "evaluated" if statuses else "not_evaluated"
     check["flag"] = _flag_for_status(spec, check["status"])
     if check["status"] == "not_evaluated":
-        check["message"] = f"Matching variables did not provide the {spec.metric} metric."
+        check["message"] = (
+            f"Matching variables did not provide the {spec.metric} metric."
+        )
     elif check["status"] == "pass":
         check["message"] = f"All selected variables pass {spec.metric}."
     else:
-        check["message"] = f"{len(check['offending_values'])} variable(s) crossed {spec.metric} threshold."
+        check["message"] = (
+            f"{len(check['offending_values'])} variable(s) crossed {spec.metric} threshold."
+        )
     return check
 
 
-def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
+def evaluate_boundary_change(
+    spec: ConstraintSpec, parsed_task: Dict[str, Any]
+) -> Dict[str, Any]:
     boundary = dict(parsed_task.get("boundary_conditions") or {})
     percentage_adjustments = [
         (str(variable), float(value))
         for variable, value in dict(boundary.get("percentage_changes") or {}).items()
     ]
-
 
     if parsed_task.get("disturbance_source") != "external_condition":
         disturbance_variable = parsed_task.get("disturbance_variable")
@@ -313,9 +365,12 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
         if (
             disturbance_variable
             and disturbance_percent is not None
-            and str(disturbance_variable) not in {variable for variable, _ in percentage_adjustments}
+            and str(disturbance_variable)
+            not in {variable for variable, _ in percentage_adjustments}
         ):
-            percentage_adjustments.append((str(disturbance_variable), float(disturbance_percent)))
+            percentage_adjustments.append(
+                (str(disturbance_variable), float(disturbance_percent))
+            )
 
     binary_setpoints = [
         (str(variable), float(value))
@@ -337,7 +392,9 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
     statuses = []
     for variable, value in percentage_adjustments:
         magnitude = abs(value)
-        status = status_from_threshold(magnitude, spec.warning_threshold, spec.fail_threshold)
+        status = status_from_threshold(
+            magnitude, spec.warning_threshold, spec.fail_threshold
+        )
         statuses.append(status)
         evaluated = {
             "variable": variable,
@@ -351,17 +408,19 @@ def evaluate_boundary_change(spec: ConstraintSpec, parsed_task: Dict[str, Any]) 
         }
         check["evaluated_values"].append(evaluated)
         if status != "pass":
-            check["offending_values"].append({
-                key: evaluated[key]
-                for key in (
-                    "variable",
-                    "metric",
-                    "value",
-                    "status",
-                    "warning_threshold",
-                    "fail_threshold",
-                )
-            })
+            check["offending_values"].append(
+                {
+                    key: evaluated[key]
+                    for key in (
+                        "variable",
+                        "metric",
+                        "value",
+                        "status",
+                        "warning_threshold",
+                        "fail_threshold",
+                    )
+                }
+            )
 
     application_evidence = {
         str(item.get("variable") or ""): dict(item)
@@ -406,16 +465,27 @@ def supply_demand_gaps(
     demand_variables: List[str],
 ) -> tuple[List[str], List[float]]:
     usable_supply = [
-        name for name in supply_variables if summaries.get(name, {}).get("predicted_values")
+        name
+        for name in supply_variables
+        if summaries.get(name, {}).get("predicted_values")
     ]
     usable_demand = [
-        name for name in demand_variables if summaries.get(name, {}).get("predicted_values")
+        name
+        for name in demand_variables
+        if summaries.get(name, {}).get("predicted_values")
     ]
-    lengths = [len(summaries[name]["predicted_values"]) for name in usable_supply + usable_demand]
+    lengths = [
+        len(summaries[name]["predicted_values"])
+        for name in usable_supply + usable_demand
+    ]
     step_count = min(lengths, default=0) if usable_supply and usable_demand else 0
     gaps = [
-        sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply) / len(usable_supply)
-        - sum(float(summaries[name]["predicted_values"][index]) for name in usable_demand) / len(usable_demand)
+        sum(float(summaries[name]["predicted_values"][index]) for name in usable_supply)
+        / len(usable_supply)
+        - sum(
+            float(summaries[name]["predicted_values"][index]) for name in usable_demand
+        )
+        / len(usable_demand)
         for index in range(step_count)
     ]
     return usable_supply + usable_demand, gaps
@@ -468,7 +538,9 @@ def contiguous_episodes(
             {
                 "start_step_index": start_index,
                 "end_step_index": end_index,
-                "start_timestamp": labels[start_index] if start_index < len(labels) else None,
+                "start_timestamp": labels[start_index]
+                if start_index < len(labels)
+                else None,
                 "end_timestamp": labels[end_index] if end_index < len(labels) else None,
                 "duration_steps": len(group),
                 "duration_minutes": round(len(group) * time_step_minutes, 6),
@@ -491,11 +563,15 @@ def threshold_episodes(
 
 
 def longest_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
-    return max((float(item.get("duration_minutes") or 0.0) for item in episodes), default=0.0)
+    return max(
+        (float(item.get("duration_minutes") or 0.0) for item in episodes), default=0.0
+    )
 
 
 def total_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
-    return round(sum(float(item.get("duration_minutes") or 0.0) for item in episodes), 6)
+    return round(
+        sum(float(item.get("duration_minutes") or 0.0) for item in episodes), 6
+    )
 
 
 def _outside_range(value: float, low: Optional[float], high: Optional[float]) -> bool:

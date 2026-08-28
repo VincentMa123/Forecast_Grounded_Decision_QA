@@ -1,9 +1,3 @@
-"""Tool-call parsing, schema validation, and allow-listed dispatch.
-
-This module owns the model-facing tool protocol only.  It imports no evaluation
-code: nothing here knows about teacher oracles, metrics, or scores.
-"""
-
 from __future__ import annotations
 
 import asyncio
@@ -67,7 +61,7 @@ def _parse_qwen_parameter_value(value: str) -> Any:
     stripped = value.strip()
     if not stripped:
         return ""
-    if stripped[0] in "[{\"-0123456789" or stripped in {"true", "false", "null"}:
+    if stripped[0] in '[{"-0123456789' or stripped in {"true", "false", "null"}:
         try:
             return json.loads(stripped)
         except json.JSONDecodeError:
@@ -117,7 +111,9 @@ def parse_tool_calls(response: Any) -> tuple[str, list[ToolCall], list[str]]:
     message = get_field(response, "message", message)
 
     raw_calls = get_field(message, "tool_calls")
-    content = response if isinstance(response, str) else get_field(message, "content", "")
+    content = (
+        response if isinstance(response, str) else get_field(message, "content", "")
+    )
     native_calls: list[ToolCall] = []
     native_errors: list[str] = []
     if raw_calls:
@@ -267,9 +263,7 @@ def schema_error(
         required = schema.get("required", [])
         missing = [name for name in required if name not in value]
         if missing:
-            return (
-                f"{path}: missing required field(s) {', '.join(map(str, missing))}"
-            )
+            return f"{path}: missing required field(s) {', '.join(map(str, missing))}"
         if schema.get("additionalProperties") is False:
             extras = [name for name in value if name not in properties]
             if extras:
@@ -395,8 +389,12 @@ class ToolDispatcher:
         if call.name not in self.allowed_names:
             return "tool_not_allowed"
         function = schema.get("function", schema)
-        parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
-        if not isinstance(parameters, Mapping) or not isinstance(call.arguments, Mapping):
+        parameters = (
+            function.get("parameters", {}) if isinstance(function, Mapping) else {}
+        )
+        if not isinstance(parameters, Mapping) or not isinstance(
+            call.arguments, Mapping
+        ):
             return "invalid_arguments"
         return "invalid_arguments" if schema_error(call.arguments, parameters) else None
 
@@ -405,7 +403,9 @@ class ToolDispatcher:
         if schema is None:
             return call
         function = schema.get("function", schema)
-        parameters = function.get("parameters", {}) if isinstance(function, Mapping) else {}
+        parameters = (
+            function.get("parameters", {}) if isinstance(function, Mapping) else {}
+        )
         if not isinstance(parameters, Mapping):
             return call
         normalized = coerce_schema_value(call.arguments, parameters)
@@ -484,7 +484,9 @@ class ToolDispatcher:
             result = {"success": True, "result": result}
             self._record(normalized_call, result)
             return result
-        except Exception as exc:  # evaluation records the failure; it must not abort the suite
+        except (
+            Exception
+        ) as exc:  # evaluation records the failure; it must not abort the suite
             result = {
                 "success": False,
                 "error_code": "tool_execution_error",

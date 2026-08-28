@@ -1,15 +1,3 @@
-"""Model loading and generation for autonomous rollouts.
-
-``SwiftGenerator`` is the only place in the rollout package that imports PEFT
-or MS-SWIFT and owns model weights.  The suite only imports torch lazily for
-between-case allocator cleanup, keeping dry runs hardware-free.
-
-Base-model quantization is resolved from the adapter checkpoint's own
-``args.json`` so evaluation loads the same weight representation that training
-used.  ``--quant-bits`` overrides it explicitly and ``--no-quantization``
-restores full-precision loading.
-"""
-
 from __future__ import annotations
 
 import json
@@ -111,7 +99,8 @@ def resolve_model_load_kwargs(
     kwargs: dict[str, Any] = {
         "quant_method": method,
         "quant_bits": bits,
-        "torch_dtype": normalize_dtype_name(saved_args.get("torch_dtype")) or "bfloat16",
+        "torch_dtype": normalize_dtype_name(saved_args.get("torch_dtype"))
+        or "bfloat16",
     }
     if bits == 4:
         kwargs.update(
@@ -161,7 +150,9 @@ def build_model_load_kwargs(model_load_spec: Mapping[str, Any]) -> dict[str, Any
                 "bnb_4bit_compute_dtype": model_load_spec.get(
                     "bnb_4bit_compute_dtype", "bfloat16"
                 ),
-                "bnb_4bit_quant_type": model_load_spec.get("bnb_4bit_quant_type", "nf4"),
+                "bnb_4bit_quant_type": model_load_spec.get(
+                    "bnb_4bit_quant_type", "nf4"
+                ),
                 "bnb_4bit_use_double_quant": model_load_spec.get(
                     "bnb_4bit_use_double_quant", True
                 ),
@@ -241,6 +232,7 @@ class SwiftGenerator:
         try:
             from swift import get_model_processor, get_template
             from swift.infer_engine import TransformersEngine
+
             if adapters:
                 from peft import PeftModel
         except ImportError as exc:  # pragma: no cover - depends on the training env

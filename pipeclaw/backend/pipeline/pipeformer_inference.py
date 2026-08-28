@@ -30,13 +30,17 @@ def build_hybrid_token_features(
     medians, half_widths = tokenizer.get_token_value_stats()
     token_medians = np.asarray(medians, dtype=np.float32)[token_ids]
     token_half_widths = np.asarray(half_widths, dtype=np.float32)[token_ids]
-    safe_half_widths = np.where(np.abs(token_half_widths) < 1e-4, 1.0, token_half_widths)
+    safe_half_widths = np.where(
+        np.abs(token_half_widths) < 1e-4, 1.0, token_half_widths
+    )
     offsets = (np.asarray(values, dtype=np.float32) - token_medians) / safe_half_widths
     offsets = np.where(np.abs(token_half_widths) < 1e-4, 0.0, offsets)
     return token_medians.astype(np.float32), offsets.astype(np.float32)
 
 
-def attach_hybrid_token_statistics(model: Any, model_config: dict[str, Any], tokenizer: Any) -> None:
+def attach_hybrid_token_statistics(
+    model: Any, model_config: dict[str, Any], tokenizer: Any
+) -> None:
     import torch
 
     if str(model_config.get("input_projection_type", "")).lower() != "hybrid":
@@ -48,7 +52,9 @@ def attach_hybrid_token_statistics(model: Any, model_config: dict[str, Any], tok
     )
 
 
-def decode_model_predictions(outputs: Any, tokenizer: Any, projection_type: str) -> np.ndarray:
+def decode_model_predictions(
+    outputs: Any, tokenizer: Any, projection_type: str
+) -> np.ndarray:
     """Prefer hybrid continuous values; retain argmax decoding for token-only checkpoints."""
     import numpy as np
     import torch
@@ -59,7 +65,9 @@ def decode_model_predictions(outputs: Any, tokenizer: Any, projection_type: str)
             return value_predictions.detach().cpu().numpy()
     token_logits = outputs.get("token_logits") if isinstance(outputs, dict) else None
     if token_logits is None:
-        raise RuntimeError("PipeFormer checkpoint inference did not return decodable predictions.")
+        raise RuntimeError(
+            "PipeFormer checkpoint inference did not return decodable predictions."
+        )
     predicted_tokens = torch.argmax(token_logits, dim=-1)
     decoded = tokenizer.tokens_to_values(predicted_tokens)
     if isinstance(decoded, torch.Tensor):
@@ -137,7 +145,9 @@ def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
             raw_name = row.get("variable_name")
             name = str(raw_name or "").strip()
             if not name or raw_name != name:
-                raise ValueError(f"Invalid PipeFormer mapping variable name at row {line_number}.")
+                raise ValueError(
+                    f"Invalid PipeFormer mapping variable name at row {line_number}."
+                )
             if name in mapping:
                 raise ValueError(f"Duplicate PipeFormer mapping variable name: {name}")
             try:
@@ -154,7 +164,9 @@ def load_variable_mapping(path: Path) -> Dict[str, Dict[str, Any]]:
             if index in mapping_indices:
                 raise ValueError(f"Duplicate PipeFormer mapping index: {index}")
             if global_index in global_indices:
-                raise ValueError(f"Duplicate PipeFormer mapping global_index: {global_index}")
+                raise ValueError(
+                    f"Duplicate PipeFormer mapping global_index: {global_index}"
+                )
             mapping[name] = {
                 "index": index,
                 "global_index": global_index,
@@ -178,17 +190,27 @@ def find_default_checkpoint_dir(repo_root: Path) -> Path:
         try:
             active = json.loads(active_manifest.read_text(encoding="utf-8-sig"))
         except (OSError, json.JSONDecodeError) as exc:
-            raise ValueError(f"Invalid PipeFormer active manifest: {active_manifest}") from exc
+            raise ValueError(
+                f"Invalid PipeFormer active manifest: {active_manifest}"
+            ) from exc
         if not isinstance(active, dict):
-            raise ValueError(f"PipeFormer active manifest must contain a JSON object: {active_manifest}")
+            raise ValueError(
+                f"PipeFormer active manifest must contain a JSON object: {active_manifest}"
+            )
         if active.get("accepted") is not True:
-            raise ValueError(f"PipeFormer active manifest is not accepted: {active_manifest}")
+            raise ValueError(
+                f"PipeFormer active manifest is not accepted: {active_manifest}"
+            )
         checkpoint_value = active.get("checkpoint_dir")
         if not isinstance(checkpoint_value, str) or not checkpoint_value.strip():
-            raise ValueError(f"PipeFormer active manifest is missing checkpoint_dir: {active_manifest}")
+            raise ValueError(
+                f"PipeFormer active manifest is missing checkpoint_dir: {active_manifest}"
+            )
         relative_checkpoint = Path(checkpoint_value)
         if relative_checkpoint.is_absolute():
-            raise ValueError(f"PipeFormer active manifest checkpoint_dir must be relative: {checkpoint_value}")
+            raise ValueError(
+                f"PipeFormer active manifest checkpoint_dir must be relative: {checkpoint_value}"
+            )
         candidate = (outputs_root / relative_checkpoint).resolve()
         try:
             candidate.relative_to(outputs_root.resolve())
@@ -212,7 +234,9 @@ def find_default_checkpoint_dir(repo_root: Path) -> Path:
         )
         if checkpoints:
             return checkpoints[0]
-    raise FileNotFoundError(f"No PipeFormer checkpoint directory found under: {output_dirs}")
+    raise FileNotFoundError(
+        f"No PipeFormer checkpoint directory found under: {output_dirs}"
+    )
 
 
 def resolve_relative(path_value: Optional[str], base_dir: Path) -> Optional[Path]:
@@ -225,7 +249,10 @@ def resolve_relative(path_value: Optional[str], base_dir: Path) -> Optional[Path
 
 
 def load_training_config(checkpoint_dir: Path, pipeformer_root: Path) -> Dict[str, Any]:
-    candidates = [checkpoint_dir / "training_config.json", checkpoint_dir.parent / "training_config.json"]
+    candidates = [
+        checkpoint_dir / "training_config.json",
+        checkpoint_dir.parent / "training_config.json",
+    ]
     for candidate in candidates:
         if candidate.exists():
             logger.info("Loading PipeFormer training config: %s", candidate)
@@ -233,7 +260,9 @@ def load_training_config(checkpoint_dir: Path, pipeformer_root: Path) -> Dict[st
                 config = json.load(fh)
             config["_training_config_path"] = candidate.as_posix()
             return config
-    raise FileNotFoundError(f"training_config.json not found near {checkpoint_dir} or {pipeformer_root}")
+    raise FileNotFoundError(
+        f"training_config.json not found near {checkpoint_dir} or {pipeformer_root}"
+    )
 
 
 def add_pipeformer_import_paths(pipeformer_root: Path) -> None:
@@ -259,14 +288,21 @@ def ensure_optional_matplotlib() -> None:
     matplotlib_stub.use = lambda *args, **kwargs: None
     pyplot_stub = types.ModuleType("matplotlib.pyplot")
     pyplot_stub.subplots = lambda *args, **kwargs: (_ for _ in ()).throw(
-        RuntimeError("matplotlib is not installed; attention-mask plotting is unavailable.")
+        RuntimeError(
+            "matplotlib is not installed; attention-mask plotting is unavailable."
+        )
     )
     pyplot_stub.close = lambda *args, **kwargs: None
     sys.modules.setdefault("matplotlib", matplotlib_stub)
     sys.modules.setdefault("matplotlib.pyplot", pyplot_stub)
 
+
 def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: str):
-    logger.info("Loading PipeFormer checkpoint: checkpoint_dir=%s device=%s", checkpoint_dir, device)
+    logger.info(
+        "Loading PipeFormer checkpoint: checkpoint_dir=%s device=%s",
+        checkpoint_dir,
+        device,
+    )
     add_pipeformer_import_paths(pipeformer_root)
     ensure_optional_matplotlib()
     import torch
@@ -277,14 +313,18 @@ def load_pipeformer_model(checkpoint_dir: Path, pipeformer_root: Path, device: s
     if not config_path.exists():
         config_path = checkpoint_dir.parent / "config.json"
     if not config_path.exists():
-        raise FileNotFoundError(f"PipeFormer model config not found near {checkpoint_dir}")
+        raise FileNotFoundError(
+            f"PipeFormer model config not found near {checkpoint_dir}"
+        )
 
     logger.info("Loading PipeFormer model config: %s", config_path)
     with config_path.open("r", encoding="utf-8") as fh:
         model_config = json.load(fh)
 
     config_fields = {field.name for field in fields(DecoderConfig)}
-    filtered_config = {key: value for key, value in model_config.items() if key in config_fields}
+    filtered_config = {
+        key: value for key, value in model_config.items() if key in config_fields
+    }
     model = FluidDecoder(DecoderConfig.from_dict(filtered_config))
     weights_path = checkpoint_dir / "pytorch_model.bin"
     if not weights_path.exists():
@@ -310,10 +350,16 @@ def load_tokenizer(static_dir: Path, vocab_size: Optional[int] = None):
     # which pulls optional training dependencies such as tensordict.
     from tokenizer_save import load_tokenizer as load_tokenizer_from_stats
 
-    logger.info("Loading PipeFormer tokenizer: static_dir=%s vocab_size=%s", static_dir, vocab_size)
+    logger.info(
+        "Loading PipeFormer tokenizer: static_dir=%s vocab_size=%s",
+        static_dir,
+        vocab_size,
+    )
     tokenizer = load_tokenizer_from_stats(static_dir, vocab_size=vocab_size)
     if tokenizer is None:
-        raise RuntimeError(f"Tokenizer statistics not found under {static_dir / 'tokenizer_save'}")
+        raise RuntimeError(
+            f"Tokenizer statistics not found under {static_dir / 'tokenizer_save'}"
+        )
     return tokenizer
 
 
@@ -330,9 +376,15 @@ def candidate_case_dirs(data_dir: Path, parsed_task: Dict[str, Any]) -> Iterable
     case_id = parsed_task.get("case_id") or "mock_test_001"
     case_digits = "".join(ch for ch in case_id if ch.isdigit()) or "001"
     operating_condition_number = parsed_task.get("current_operating_condition_number")
-    condition_number = int(operating_condition_number) if operating_condition_number is not None else int(case_digits)
+    condition_number = (
+        int(operating_condition_number)
+        if operating_condition_number is not None
+        else int(case_digits)
+    )
     if condition_number < 1:
-        raise ValueError("current_operating_condition_number must be a positive integer.")
+        raise ValueError(
+            "current_operating_condition_number must be a positive integer."
+        )
     case_name = f"case_{condition_number:03d}"
     cn_name = f"\u7b2c{condition_number:03d}\u4e2a\u7b97\u4f8b"
     dataset_dir = data_dir / "dataset"
@@ -346,8 +398,12 @@ def resolve_case_dir(data_dir: Path, parsed_task: Dict[str, Any]) -> Path:
     for candidate in candidate_case_dirs(data_dir, parsed_task):
         if candidate.exists():
             return candidate
-    candidates = ", ".join(path.as_posix() for path in candidate_case_dirs(data_dir, parsed_task))
-    raise FileNotFoundError(f"Could not find mock PipeFormer case directory. Tried: {candidates}")
+    candidates = ", ".join(
+        path.as_posix() for path in candidate_case_dirs(data_dir, parsed_task)
+    )
+    raise FileNotFoundError(
+        f"Could not find mock PipeFormer case directory. Tried: {candidates}"
+    )
 
 
 def align_frame_to_master_index(frame, master_index, source_name: str):
@@ -357,7 +413,13 @@ def align_frame_to_master_index(frame, master_index, source_name: str):
     if source_name == "Boundary.csv":
         # Boundary controls are sparse operator setpoints. Match PipeFormer preprocessing by
         # holding the latest control value until the next boundary update arrives.
-        return frame.reindex(frame.index.union(master_index)).sort_index().ffill().bfill().reindex(master_index)
+        return (
+            frame.reindex(frame.index.union(master_index))
+            .sort_index()
+            .ffill()
+            .bfill()
+            .reindex(master_index)
+        )
 
     # Equipment/state files are expected on the model timeline. Missing measurements are
     # treated as unavailable, matching PipeFormer's sentinel-fill behavior.
@@ -380,15 +442,27 @@ def load_case_matrix(case_dir: Path, variable_names: List[str]):
         frame["TIME"] = pd.to_datetime(frame["TIME"])
         frames[source_name] = frame.set_index("TIME")
 
-    master_source_name, master_source = max(frames.items(), key=lambda item: len(item[1].index))
+    master_source_name, master_source = max(
+        frames.items(), key=lambda item: len(item[1].index)
+    )
     master_index = master_source.index
-    logger.info("PipeFormer case master timeline selected: source=%s rows=%d", master_source_name, len(master_index))
+    logger.info(
+        "PipeFormer case master timeline selected: source=%s rows=%d",
+        master_source_name,
+        len(master_index),
+    )
 
     aligned_frames: Dict[str, Any] = {}
     for source_name, source_frame in frames.items():
-        aligned_frame = align_frame_to_master_index(source_frame, master_index, source_name)
+        aligned_frame = align_frame_to_master_index(
+            source_frame, master_index, source_name
+        )
         if not source_frame.index.equals(master_index):
-            strategy = "forward_fill_boundary_controls" if source_name == "Boundary.csv" else "sentinel_fill_equipment_state"
+            strategy = (
+                "forward_fill_boundary_controls"
+                if source_name == "Boundary.csv"
+                else "sentinel_fill_equipment_state"
+            )
             logger.info(
                 "Aligned %s to master timeline: source_rows=%d target_rows=%d strategy=%s",
                 source_name,
@@ -404,8 +478,12 @@ def load_case_matrix(case_dir: Path, variable_names: List[str]):
         source_name = source_file_for_variable(variable_name)
         source_frame = aligned_frames[source_name]
         if variable_name not in source_frame.columns:
-            raise ValueError(f"Variable {variable_name} not found in {case_dir / source_name}")
-        matrix[:, variable_idx] = source_frame[variable_name].astype(float).to_numpy(dtype=np.float32)
+            raise ValueError(
+                f"Variable {variable_name} not found in {case_dir / source_name}"
+            )
+        matrix[:, variable_idx] = (
+            source_frame[variable_name].astype(float).to_numpy(dtype=np.float32)
+        )
 
     return matrix, [str(item) for item in master_index]
 
@@ -426,7 +504,9 @@ def resolve_boundary_adjustments(
                 f"Binary status variable {disturbance_variable} cannot use a percentage disturbance; "
                 "provide boundary_conditions.setpoints with 0 or 1."
             )
-        signed_percent = abs(float(percent)) if direction == "up" else -abs(float(percent))
+        signed_percent = (
+            abs(float(percent)) if direction == "up" else -abs(float(percent))
+        )
         adjustments[disturbance_variable] = {
             "variable": disturbance_variable,
             "mode": "percent_change",
@@ -461,9 +541,13 @@ def resolve_boundary_adjustments(
             "source": "boundary_conditions.setpoints",
         }
 
-    unknown = sorted(variable for variable in adjustments if variable not in variable_mapping)
+    unknown = sorted(
+        variable for variable in adjustments if variable not in variable_mapping
+    )
     if unknown:
-        raise ValueError(f"Boundary-condition variables are not in the PipeFormer mapping: {unknown}")
+        raise ValueError(
+            f"Boundary-condition variables are not in the PipeFormer mapping: {unknown}"
+        )
 
     keep_other = bool(boundary_conditions.get("keep_other_boundary_controls", True))
     if not keep_other:
@@ -487,8 +571,12 @@ def apply_condition_to_matrix(
     import numpy as np
 
     scenario_matrix = np.array(matrix, copy=True)
-    resolved_adjustments = adjustments or resolve_boundary_adjustments(parsed_task, variable_mapping)
-    row_selection = slice(None) if timing_mode == DISTURBANCE_TIMING_LEGACY else slice(-1, None)
+    resolved_adjustments = adjustments or resolve_boundary_adjustments(
+        parsed_task, variable_mapping
+    )
+    row_selection = (
+        slice(None) if timing_mode == DISTURBANCE_TIMING_LEGACY else slice(-1, None)
+    )
     if timing_mode not in {DISTURBANCE_TIMING_LEGACY, DISTURBANCE_TIMING_CURRENT_STEP}:
         raise ValueError(f"Unsupported disturbance timing mode: {timing_mode}")
     for adjustment in resolved_adjustments:
@@ -496,7 +584,9 @@ def apply_condition_to_matrix(
         if adjustment["mode"] == "setpoint":
             scenario_matrix[row_selection, variable_idx] = float(adjustment["value"])
         else:
-            scenario_matrix[row_selection, variable_idx] *= 1.0 + float(adjustment["value"]) / 100.0
+            scenario_matrix[row_selection, variable_idx] *= (
+                1.0 + float(adjustment["value"]) / 100.0
+            )
     return scenario_matrix
 
 
@@ -530,16 +620,18 @@ def boundary_application_evidence(
                 np.isclose(actual, target, rtol=1e-7, atol=1e-8)
                 for actual, target in zip(applied, expected)
             )
-        evidence.append({
-            "variable": variable,
-            "mode": adjustment["mode"],
-            "requested_value": requested,
-            "source": adjustment.get("source"),
-            "applied_step_indices": row_indices,
-            "input_values_before": before,
-            "input_values_applied": applied,
-            "verified": bool(verified),
-        })
+        evidence.append(
+            {
+                "variable": variable,
+                "mode": adjustment["mode"],
+                "requested_value": requested,
+                "source": adjustment.get("source"),
+                "applied_step_indices": row_indices,
+                "input_values_before": before,
+                "input_values_applied": applied,
+                "verified": bool(verified),
+            }
+        )
     return evidence
 
 
@@ -578,7 +670,9 @@ def load_prediction_mask(static_dir: Path, variable_names: List[str]):
             raise ValueError(f"Unexpected prediction_mask.csv header: {header}")
         for line_number, row in enumerate(reader, start=2):
             if len(row) != 2 or not row[0]:
-                raise ValueError(f"Invalid prediction_mask.csv row {line_number}: {row}")
+                raise ValueError(
+                    f"Invalid prediction_mask.csv row {line_number}: {row}"
+                )
             variable_name, raw_mask = row
             if variable_name in mask_by_name:
                 raise ValueError(f"Duplicate prediction mask variable: {variable_name}")
@@ -597,7 +691,9 @@ def load_prediction_mask(static_dir: Path, variable_names: List[str]):
     if actual_names != expected_names:
         missing = sorted(expected_names - actual_names)
         extra = sorted(actual_names - expected_names)
-        raise ValueError(f"Prediction mask variables do not match mapping; missing={missing}, extra={extra}")
+        raise ValueError(
+            f"Prediction mask variables do not match mapping; missing={missing}, extra={extra}"
+        )
     return np.asarray([mask_by_name[name] for name in variable_names], dtype=np.int32)
 
 
@@ -636,7 +732,7 @@ def future_time_labels(
     steps: int,
     time_step_minutes: Optional[float],
 ) -> List[str]:
-    labels = list(time_labels[start_index:start_index + steps])
+    labels = list(time_labels[start_index : start_index + steps])
     if len(labels) >= steps:
         return labels
 
@@ -667,7 +763,10 @@ def rows_from_arrays(
         rows.append(
             ForecastRow(
                 label=label,
-                values={name: round(float(row_values[var_idx]), 6) for var_idx, name in enumerate(variable_names)},
+                values={
+                    name: round(float(row_values[var_idx]), 6)
+                    for var_idx, name in enumerate(variable_names)
+                },
             )
         )
     return rows
@@ -717,7 +816,9 @@ def _repo_root_for_config(config: PipeFormerInferenceConfig) -> Optional[Path]:
     try:
         return backend_root.parents[1]
     except IndexError as exc:
-        raise ValueError(f"Could not derive repository root from backend root: {backend_root}") from exc
+        raise ValueError(
+            f"Could not derive repository root from backend root: {backend_root}"
+        ) from exc
 
 
 def resolve_pipeformer_environment(
@@ -730,20 +831,28 @@ def resolve_pipeformer_environment(
     )
     if pipeformer_root is None:
         if repo_root is None:
-            raise ValueError("PipeFormer root is required when backend_root is not supplied.")
+            raise ValueError(
+                "PipeFormer root is required when backend_root is not supplied."
+            )
         pipeformer_root = (repo_root / "pipeFormer").resolve()
     if not pipeformer_root.is_dir():
-        raise FileNotFoundError(f"PipeFormer root directory not found: {pipeformer_root}")
+        raise FileNotFoundError(
+            f"PipeFormer root directory not found: {pipeformer_root}"
+        )
 
     checkpoint_dir = _configured_path(config.checkpoint_dir) or _configured_path(
         os.getenv("PIPEFORMER_CHECKPOINT_DIR")
     )
     if checkpoint_dir is None:
         if repo_root is None:
-            raise ValueError("PipeFormer checkpoint is required when backend_root is not supplied.")
+            raise ValueError(
+                "PipeFormer checkpoint is required when backend_root is not supplied."
+            )
         checkpoint_dir = find_default_checkpoint_dir(repo_root).resolve()
     if not checkpoint_dir.is_dir():
-        raise FileNotFoundError(f"PipeFormer checkpoint directory not found: {checkpoint_dir}")
+        raise FileNotFoundError(
+            f"PipeFormer checkpoint directory not found: {checkpoint_dir}"
+        )
 
     training_config = load_training_config(checkpoint_dir, pipeformer_root)
     if not isinstance(training_config, dict):
@@ -759,7 +868,9 @@ def resolve_pipeformer_environment(
         or resolve_relative(training_config.get("static_dir"), pipeformer_root)
     )
     if data_dir is None or static_dir is None:
-        raise ValueError("Could not resolve PipeFormer data_dir/static_dir for checkpoint inference.")
+        raise ValueError(
+            "Could not resolve PipeFormer data_dir/static_dir for checkpoint inference."
+        )
     if not data_dir.is_dir() or not static_dir.is_dir():
         raise FileNotFoundError(
             f"PipeFormer data/static directories not found: data_dir={data_dir}, static_dir={static_dir}"
@@ -771,7 +882,10 @@ def resolve_pipeformer_environment(
     )
     variable_mapping = load_variable_mapping(mapping_path)
     variable_names = tuple(
-        name for name, _ in sorted(variable_mapping.items(), key=lambda item: item[1]["index"])
+        name
+        for name, _ in sorted(
+            variable_mapping.items(), key=lambda item: item[1]["index"]
+        )
     )
     registry = VariableRegistry.read(static_dir / "variable_registry.json")
     registry.require(variable_names)
@@ -803,7 +917,9 @@ class PipeFormerInferenceEngine:
         self.environment = environment
 
     def forecast(self, parsed_task: Dict[str, Any]) -> Dict[str, Any]:
-        return _run_checkpoint_inference(parsed_task=parsed_task, environment=self.environment)
+        return _run_checkpoint_inference(
+            parsed_task=parsed_task, environment=self.environment
+        )
 
 
 def run_checkpoint_inference(
@@ -848,12 +964,21 @@ def _run_checkpoint_inference(
         environment.disturbance_timing_mode,
     )
     started_at = time.perf_counter()
-    logger.info("PipeFormer checkpoint inference started: checkpoint=%s device=%s", checkpoint_dir, device)
+    logger.info(
+        "PipeFormer checkpoint inference started: checkpoint=%s device=%s",
+        checkpoint_dir,
+        device,
+    )
     import numpy as np
     import torch
 
     training_config = environment.training_config
-    logger.info("PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s", data_dir, static_dir, mapping_path)
+    logger.info(
+        "PipeFormer data paths resolved: data_dir=%s static_dir=%s mapping=%s",
+        data_dir,
+        static_dir,
+        mapping_path,
+    )
 
     add_pipeformer_import_paths(pipeformer_root)
     variable_mapping = environment.variable_mapping
@@ -884,17 +1009,25 @@ def _run_checkpoint_inference(
         disturbance_variable,
     )
     if disturbance_variable not in variable_mapping:
-        raise ValueError(f"Parsed variable {disturbance_variable} is not in PipeFormer mapping {mapping_path}")
+        raise ValueError(
+            f"Parsed variable {disturbance_variable} is not in PipeFormer mapping {mapping_path}"
+        )
 
     sequence_length = int(training_config.get("sequence_length", 3))
     time_step_offset = int(training_config.get("time_step_offset", 1))
     case_dir = resolve_case_dir(data_dir, parsed_task)
     logger.info("Loading PipeFormer case CSVs: case_dir=%s", case_dir)
     base_matrix, time_labels = load_case_matrix(case_dir, variable_names)
-    logger.info("Loaded PipeFormer case matrix: shape=%s time_steps=%d", base_matrix.shape, len(time_labels))
+    logger.info(
+        "Loaded PipeFormer case matrix: shape=%s time_steps=%d",
+        base_matrix.shape,
+        len(time_labels),
+    )
     boundary_adjustments = resolve_boundary_adjustments(parsed_task, variable_mapping)
     if len(base_matrix) < sequence_length + time_step_offset:
-        raise ValueError(f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}")
+        raise ValueError(
+            f"Case {case_dir} is too short for sequence_length={sequence_length}, offset={time_step_offset}"
+        )
     input_values = apply_condition_to_matrix(
         base_matrix[:sequence_length],
         parsed_task,
@@ -910,7 +1043,9 @@ def _run_checkpoint_inference(
         disturbance_timing_mode,
     )
     if any(not item["verified"] for item in application_evidence):
-        raise RuntimeError("One or more boundary controls were not applied to the model input as requested.")
+        raise RuntimeError(
+            "One or more boundary controls were not applied to the model input as requested."
+        )
     logger.info(
         "Applied parsed condition: variable=%s direction=%s percent=%s timing=%s",
         disturbance_variable,
@@ -919,10 +1054,16 @@ def _run_checkpoint_inference(
         disturbance_timing_mode,
     )
     time_step_minutes = infer_time_step_minutes(time_labels)
-    steps_requested = requested_forecast_steps(parsed_task, time_step_minutes, sequence_length)
+    steps_requested = requested_forecast_steps(
+        parsed_task, time_step_minutes, sequence_length
+    )
 
-    tokenizer = load_tokenizer(static_dir, vocab_size=training_config.get("tokenizer_vocab_size"))
-    model, model_config, weights_path, model_config_path = load_pipeformer_model(checkpoint_dir, pipeformer_root, device)
+    tokenizer = load_tokenizer(
+        static_dir, vocab_size=training_config.get("tokenizer_vocab_size")
+    )
+    model, model_config, weights_path, model_config_path = load_pipeformer_model(
+        checkpoint_dir, pipeformer_root, device
+    )
     attach_hybrid_token_statistics(model, model_config, tokenizer)
     projection_type = str(model_config.get("input_projection_type", "token_embedding"))
     attention_indices = load_attention_indices(static_dir)
@@ -968,10 +1109,18 @@ def _run_checkpoint_inference(
             input_tokens.shape,
         )
         with torch.no_grad():
-            input_tensor = torch.as_tensor(rollout_window, dtype=torch.float32, device=device).unsqueeze(0)
-            token_tensor = torch.as_tensor(input_tokens, dtype=torch.long, device=device).unsqueeze(0)
-            attention_tensor = torch.as_tensor(attention_indices, dtype=torch.long, device=device).unsqueeze(0)
-            mask_tensor = torch.as_tensor(prediction_mask, dtype=torch.float32, device=device).unsqueeze(0)
+            input_tensor = torch.as_tensor(
+                rollout_window, dtype=torch.float32, device=device
+            ).unsqueeze(0)
+            token_tensor = torch.as_tensor(
+                input_tokens, dtype=torch.long, device=device
+            ).unsqueeze(0)
+            attention_tensor = torch.as_tensor(
+                attention_indices, dtype=torch.long, device=device
+            ).unsqueeze(0)
+            mask_tensor = torch.as_tensor(
+                prediction_mask, dtype=torch.float32, device=device
+            ).unsqueeze(0)
             outputs = model(
                 input_ids=input_tensor,
                 input_tokens=token_tensor,
@@ -994,16 +1143,28 @@ def _run_checkpoint_inference(
             new_predictions[:, control_columns] = rollout_window[-1, control_columns]
         generated_chunks.append(new_predictions)
         generated_steps += int(new_predictions.shape[0])
-        rollout_window = np.concatenate([rollout_window[new_predictions.shape[0]:], new_predictions], axis=0)
-        logger.info("PipeFormer forward pass finished: generated_steps=%d/%d", generated_steps, steps_requested)
+        rollout_window = np.concatenate(
+            [rollout_window[new_predictions.shape[0] :], new_predictions], axis=0
+        )
+        logger.info(
+            "PipeFormer forward pass finished: generated_steps=%d/%d",
+            generated_steps,
+            steps_requested,
+        )
 
     predictions = np.concatenate(generated_chunks, axis=0)
-    target_values = base_matrix[sequence_length:sequence_length + predictions.shape[0]]
-    forecast_time_labels = future_time_labels(time_labels, sequence_length, int(predictions.shape[0]), time_step_minutes)
-    observed_future_labels = forecast_time_labels[:len(target_values)]
+    target_values = base_matrix[
+        sequence_length : sequence_length + predictions.shape[0]
+    ]
+    forecast_time_labels = future_time_labels(
+        time_labels, sequence_length, int(predictions.shape[0]), time_step_minutes
+    )
+    observed_future_labels = forecast_time_labels[: len(target_values)]
     actual_horizon_minutes = None
     if time_step_minutes is not None:
-        actual_horizon_minutes = round(float(time_step_minutes) * int(predictions.shape[0]), 6)
+        actual_horizon_minutes = round(
+            float(time_step_minutes) * int(predictions.shape[0]), 6
+        )
     logger.info(
         "PipeFormer autoregressive rollout finished: predictions_shape=%s actual_horizon_minutes=%s elapsed_s=%.3f",
         predictions.shape,
@@ -1013,7 +1174,9 @@ def _run_checkpoint_inference(
     data_provenance = {
         "registry_schema_version": variable_registry.get("schema_version"),
         "synthetic": bool(variable_registry.get("synthetic")),
-        "physical_validation_status": variable_registry.get("physical_validation_status"),
+        "physical_validation_status": variable_registry.get(
+            "physical_validation_status"
+        ),
     }
     return {
         "mode": "checkpoint_inference",
@@ -1028,7 +1191,9 @@ def _run_checkpoint_inference(
         "time_labels": time_labels[:sequence_length] + forecast_time_labels,
         "sequence_length": sequence_length,
         "time_step_offset": time_step_offset,
-        "requested_forecast_horizon_minutes": parsed_task.get("forecast_horizon_minutes"),
+        "requested_forecast_horizon_minutes": parsed_task.get(
+            "forecast_horizon_minutes"
+        ),
         "time_step_minutes": time_step_minutes,
         "requested_forecast_steps": steps_requested,
         "actual_forecast_steps": int(predictions.shape[0]),
@@ -1040,15 +1205,24 @@ def _run_checkpoint_inference(
         "data_provenance": data_provenance,
         "variable_registry": list(variable_registry.get("variables") or []),
         "disturbance_variable_mapping": variable_mapping[disturbance_variable],
-        "operating_condition_number_used": parsed_task.get("current_operating_condition_number"),
+        "operating_condition_number_used": parsed_task.get(
+            "current_operating_condition_number"
+        ),
         "disturbance_timing_mode": disturbance_timing_mode,
         "adjusted_input_step_count": (
             sequence_length
-            if boundary_adjustments and disturbance_timing_mode == DISTURBANCE_TIMING_LEGACY
-            else 1 if boundary_adjustments else 0
+            if boundary_adjustments
+            and disturbance_timing_mode == DISTURBANCE_TIMING_LEGACY
+            else 1
+            if boundary_adjustments
+            else 0
         ),
         "applied_boundary_conditions": boundary_adjustments,
         "boundary_application_evidence": application_evidence,
-        "real_rows": rows_from_arrays("real", target_values, variable_names, observed_future_labels),
-        "predict_rows": rows_from_arrays("predict", predictions, variable_names, forecast_time_labels),
+        "real_rows": rows_from_arrays(
+            "real", target_values, variable_names, observed_future_labels
+        ),
+        "predict_rows": rows_from_arrays(
+            "predict", predictions, variable_names, forecast_time_labels
+        ),
     }

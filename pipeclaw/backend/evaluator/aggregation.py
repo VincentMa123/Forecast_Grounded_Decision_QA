@@ -32,7 +32,9 @@ def _metric_summary(
         "numerator": numerator,
         "denominator": denominator,
         "pass_rate": numerator / denominator if denominator else None,
-        "failure_rate": (denominator - numerator) / denominator if denominator else None,
+        "failure_rate": (denominator - numerator) / denominator
+        if denominator
+        else None,
         "status": "ok" if denominator else "not_applicable",
     }
 
@@ -69,7 +71,9 @@ def summarize(
         for report in payloads:
             metrics = report.get("metrics")
             metric = metrics.get(name) if isinstance(metrics, Mapping) else None
-            if isinstance(metric, Mapping) and not metric.get("included_in_score", True):
+            if isinstance(metric, Mapping) and not metric.get(
+                "included_in_score", True
+            ):
                 diagnostic_names.add(name)
                 break
     metrics = {
@@ -95,14 +99,14 @@ def summarize(
             if isinstance(report_metrics, Mapping)
             else None
         )
-        details = tool_metric.get("details") if isinstance(tool_metric, Mapping) else None
+        details = (
+            tool_metric.get("details") if isinstance(tool_metric, Mapping) else None
+        )
         if not isinstance(details, Mapping):
             continue
         tool_successes += int(details.get("successful_call_count") or 0)
         tool_calls += int(details.get("total_call_count") or 0)
-        duplicate_successes += int(
-            details.get("duplicate_successful_call_count") or 0
-        )
+        duplicate_successes += int(details.get("duplicate_successful_call_count") or 0)
     portability = {
         key: sum(
             int(

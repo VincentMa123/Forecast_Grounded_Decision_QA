@@ -471,9 +471,7 @@ def select_python_correction_records(
             str(record.get("example_id") or "").encode("utf-8")
         ),
     )[: 2 * len(code_ids)]
-    selected_ids = code_ids | {
-        str(record.get("example_id") or "") for record in replay
-    }
+    selected_ids = code_ids | {str(record.get("example_id") or "") for record in replay}
     return [
         record
         for record in records

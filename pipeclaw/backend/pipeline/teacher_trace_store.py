@@ -80,7 +80,9 @@ class TeacherTraceStore:
         for item in generated:
             record_id = str(item.get(id_field) or "")
             if not record_id:
-                raise ValueError(f"Generated record is missing required id field {id_field!r}.")
+                raise ValueError(
+                    f"Generated record is missing required id field {id_field!r}."
+                )
             if record_id in seen:
                 duplicate_count += 1
                 continue
@@ -103,7 +105,9 @@ class TeacherTraceStore:
         for item in generated:
             record_id = str(item.get("session_record_id") or "")
             if not record_id:
-                raise ValueError("Generated session record is missing session_record_id.")
+                raise ValueError(
+                    "Generated session record is missing session_record_id."
+                )
             if record_id not in positions:
                 positions[record_id] = len(merged)
                 merged.append(item)
@@ -137,9 +141,11 @@ class TeacherTraceStore:
     ) -> bool:
         return any(
             str(item.get("dataset_source") or "") == dataset_source
-            and str(item.get("source_scenario_id") or item.get("scenario_id") or "") == scenario_id
+            and str(item.get("source_scenario_id") or item.get("scenario_id") or "")
+            == scenario_id
             for item in records
         )
+
     @staticmethod
     def replace_scenario(
         existing: List[Dict[str, Any]],
@@ -150,6 +156,7 @@ class TeacherTraceStore:
         id_field: str,
     ) -> tuple[List[Dict[str, Any]], int]:
         """Replace one fully generated source/scenario pair without touching collisions."""
+
         def matches(item: Dict[str, Any]) -> bool:
             item_scenario = item.get("source_scenario_id") or item.get("scenario_id")
             return (
@@ -157,17 +164,25 @@ class TeacherTraceStore:
                 and str(item_scenario or "") == scenario_id
             )
 
-        target_positions = [index for index, item in enumerate(existing) if matches(item)]
+        target_positions = [
+            index for index, item in enumerate(existing) if matches(item)
+        ]
         if not target_positions:
             raise ValueError(
                 f"No existing records match dataset {dataset_source!r} and scenario {scenario_id!r}."
             )
         if not generated or any(not matches(item) for item in generated):
-            raise ValueError("Generated replacement contains a foreign or missing scenario record.")
+            raise ValueError(
+                "Generated replacement contains a foreign or missing scenario record."
+            )
 
         generated_ids = [str(item.get(id_field) or "") for item in generated]
-        if any(not value for value in generated_ids) or len(generated_ids) != len(set(generated_ids)):
-            raise ValueError(f"Generated replacement has missing or duplicate {id_field} values.")
+        if any(not value for value in generated_ids) or len(generated_ids) != len(
+            set(generated_ids)
+        ):
+            raise ValueError(
+                f"Generated replacement has missing or duplicate {id_field} values."
+            )
         retained = [item for item in existing if not matches(item)]
         retained_ids = {str(item.get(id_field) or "") for item in retained}
         collisions = retained_ids & set(generated_ids)
@@ -203,9 +218,16 @@ class TeacherTraceStore:
         source = str(scenario.get("dataset_source") or "unknown_source")
         scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
         result = []
-        for session_index, session in enumerate(scenario.get("sessions") or [], start=1):
-            session_id = str(session.get("session_id") or f"{scenario_id}_session_{session_index:03d}")
-            for fallback_turn_id, turn in enumerate(session.get("dialogue") or [], start=1):
+        for session_index, session in enumerate(
+            scenario.get("sessions") or [], start=1
+        ):
+            session_id = str(
+                session.get("session_id")
+                or f"{scenario_id}_session_{session_index:03d}"
+            )
+            for fallback_turn_id, turn in enumerate(
+                session.get("dialogue") or [], start=1
+            ):
                 if not str(turn.get("user_input") or "").strip():
                     continue
                 turn_id = int(turn.get("turn_id") or fallback_turn_id)
