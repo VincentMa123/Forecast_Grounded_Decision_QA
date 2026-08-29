@@ -1,105 +1,71 @@
-太好了，你这份表格里每台“C_***”设备都给了**水头(m)**、**流量(m³/h)**、**转速(RPM)**、**效率**的多转速特性点。要把不同压缩机（这里更像离心泵/透平类机器，列了“水头”）映射到**一个统一的 embedding**，核心思路是：
+# Compressor-curve embeddings
 
-1) **先做物理归一化**，消掉转速的影响（同一台机组不同 RPM 的曲线会“塌缩”到一条内在曲线）；  
-2) **把曲线形状**（而不是具体工况点）变成**固定长度向量**；  
-3) 再用 PCA/自编码器/对比学习把这个向量压缩成你要的 embedding 维度。
+This package turns compressor performance curves into fixed-size numeric
+features. It is used by the parent `pipeFormer/data/process_eq_argu.py`
+processor when static equipment features are prepared.
 
----
+## What it does
 
-## 我已经用你的文件跑出一个可直接用的 baseline
+1. Normalizes flow and head with the affinity-law approximation
+   (`Q / RPM` and `H / RPM²`).
+2. Resamples each compressor's normalized head and efficiency curves onto a
+   fixed grid (32 points by default).
+3. Adds interpretable descriptors such as peak efficiency, best-efficiency
+   point, efficiency-band width, and local head slope.
+4. Standardizes the resulting vectors and applies PCA when processing a whole
+   workbook.
 
-基于“相似律/亲和定律”（Head ∝ N²、Flow ∝ N），我把每台设备的散点做了如下无量纲化：
+The default per-compressor shape vector has `2 × 32 + 4 = 68` values. Workbook
+embeddings contain the requested PCA components (8 by default) plus an `id`
+column.
 
-- $Q^* = \frac{Q}{N}$ ，$H^* = \frac{H}{N^2}$（没有叶轮直径 D 的情况下，这是最稳妥的 RPM 归一化）
-- 效率保持 0~1（如果表里是百分数则除以 100）
+## Input workbook
 
-然后在 $Q^*$ 轴上均匀取 32 个采样点，用带权平滑把 **$H^*-Q^*$** 与 **$\eta-Q^*$** 两条曲线**重采样**到固定长度；再拼上几个曲线形状的描述子（峰值效率、BEP 位置、90%效率带宽、BEP 附近 $dH/dQ$ 斜率），得到 **68 维“曲线形状向量”**。最后用 PCA 压到 8 维，作为统一 embedding。
+`embed_from_excel()` reads sheets whose names start with `C_`. Each usable sheet
+needs columns whose headers identify:
 
-我已经把结果文件和可复用工具脚本生成好：
+- head in metres (`水头` plus `m`/`M`),
+- flow in `m³/h`, `m3/h`, `m3h`, or `/h`,
+- speed in `RPM`/`rpm`, and
+- optionally efficiency (`效率`).
 
-- **8 维 embedding（每台设备一行）**：  
-  [下载 `compressor_embedding_pca8.csv`](sandbox:/mnt/data/compressor_embedding_pca8.csv)
-- **PC1–PC2 可视化散点图**：  
-  [下载 `compressor_embedding_pc12.png`](sandbox:/mnt/data/compressor_embedding_pc12.png)
-- **可复用的 Python 工具模块**（一行代码可对新文件重算 embedding）：  
-  [下载 `compressor_embedding_utils.py`](sandbox:/mnt/data/compressor_embedding_utils.py)
+Efficiency percentages are converted to the `0..1` range. At least one valid
+`C_` sheet is required.
 
-> 说明：我原本尝试用交互表格控件展示数据预览，环境回调报错，我已切换为控制台预览并完成全部计算。
+## Usage
 
----
+Run from `pipeFormer/`:
 
-## 这个 baseline 的技术细节（你可以照此扩展）
-
-### 1) 物理归一化（速度无关）
-- **已用**：$Q^* = Q/N$，$H^* = H/N^2$ —— 把同机不同转速的点“塌缩”为单条内在曲线，最大限度反映几何/水力特性。  
-- **如果将来能拿到叶轮直径 D**，推荐改用**严格的无量纲系数**：  
-  $$
-  \phi = \frac{Q}{N D^3},\qquad 
-  \psi = \frac{gH}{N^2 D^2}
-  $$
-  这样 embedding 会更能跨机型/跨尺寸比较。
-
-### 2) 曲线 → 固定长度向量
-- 在 $Q^*$ 的 **5%~95% 分位范围**上取 32 个等距点；对 $H^*$ 和 $\eta$ 做**核权重平滑**再插值到该网格（抑制噪声与重复点）。  
-- 形状向量 = $[H^*_{\text{grid}}/H^*_{\max},\; \eta_{\text{grid}},\; \eta_{\max},\; q_{\text{BEP}},\; \text{band}_{90\%},\; (dH/dQ)_{\text{BEP}}]$  
-  - 这样既保留了曲线**形状**，又给了几个**可解释**的标量。
-
-### 3) 降维得到 embedding
-- 先对 68 维形状向量做 z-score，再用 **PCA→8 维**（你也可以换成 16 维；或用**自编码器**学到更非线性的压缩表示）。  
-- 用这个 embedding 做**检索/聚类**通常已经够用；同系列、相似水力型线的机会靠得较近。
-
----
-
-## 如何在你这边复用/重算
-
-**一行代码**对整本 Excel 重算（输出 DataFrame，可另存为 CSV）：
 ```python
-import compressor_embedding_utils as ceu
-df_embed = ceu.embed_from_excel("/path/to/你的文件.xlsx", k=8, grid_size=32)
+from data.process_eq_argu import embed_from_excel
+
+# Replace this path with your workbook.
+embeddings = embed_from_excel("path/to/C_arguments.xlsx")
+embeddings.to_csv("data/equipment_arguments/compressor_embeddings.csv", index=False)
 ```
 
-**把单台设备的数据框变成形状向量（68 维）**：
+For one already-loaded compressor table, use the lower-level helpers:
+
 ```python
-vec = ceu.embed_from_dataframe(df_one_compressor, grid_size=32)
+import pandas as pd
+
+from data.process_eq_argu.process_c_argument import (
+    embed_from_dataframe,
+    physics_normalize,
+)
+
+frame = pd.read_excel("path/to/C_arguments.xlsx", sheet_name="C_001")
+normalized = physics_normalize(frame)
+shape_vector = embed_from_dataframe(frame, grid_size=32)
 ```
 
-> 我提供的 `compressor_embedding_utils.py` 里已经封装了归一化、平滑采样、打包向量、PCA 等步骤。
+`embed_from_dataframe()` returns the 68-value shape vector. `embed_from_excel()`
+returns a pandas `DataFrame` with one row per compressor and columns `id`,
+`pc1`, `pc2`, ... . The helper does not write files by itself.
 
----
+## Limitations
 
-## 如果你要把它做成“深度学习”方案
-
-Baseline 很好用，但如果你打算**端到端学习更强的表示**，建议如下：
-
-### A. 曲线/点集编码器
-- **输入**：每个特性点一个 token：$(Q^*, H^*, \eta, \tilde{N})$，其中 $\tilde{N}=N/N_{\max}$；按 $Q^*$ 排序。  
-- **模型**：  
-  - **Set Transformer / Perceiver IO**：天然处理变长点集、顺序不敏感；  
-  - 或 **1D Transformer**（把 $Q^*$ 当作“位置编码”）；  
-  - 或 **1D CNN** 对重采样后的曲线做卷积。
-- **输出**：固定维度向量（比如 32/64 维）作为 embedding。
-
-### B. 自监督/度量学习的目标函数
-- **对比学习（SimCLR/BYOL 类）**：  
-  - 同一台机器的两种“增强视图”（随机抽子集、加噪、扰动单位/采样密度）作为**正样本对**；不同机器互为**负样本**。  
-  - 用 InfoNCE 拉近“同机不同视图”，拉远“不同机器”。  
-- **多任务辅助**（如果你有标签/额外参数）：同时预测 $\eta_{\max}$、BEP 位置、90%带宽等**可解释指标**，帮助 embedding 学到物理意义。  
-- **物理约束正则**（极有用）：  
-  - $dH/dQ \le 0$ 的惩罚（单调性）；  
-  - 效率曲线在一个峰值附近**单峰**；  
-  - 对 RPM 做**尺度等变**（让模型对 $Q, H$ 同比按相似律缩放前后输出一致）。
-
-### C. 评估策略
-- **同机不同转速**的 embedding 距离应显著小于**不同机器**；  
-- **检索任务**：给一台机器，Top-K 结果应为同系列/相似型线；  
-- **外推**：用 embedding 预测未给定转速的曲线，计算 MAPE / RMSE。
-
----
-
-## 小结与建议
-
-- 这份数据非常适合做**“相似律归一化 → 曲线形状编码 → 降维/对比学习”**。  
-- 你现在就可以直接用我生成的 **8 维 embedding**（上面的 CSV），作为后续聚类/检索/回归模型的输入。  
-- 后续如果能补充**叶轮直径 D**，就把 $Q^*, H^*$ 换成 $\phi,\psi$ 做真正的**跨尺寸**对比，embedding 的可迁移性会更强。
-
-如果你愿意，我也可以把 **自监督对比学习的 PyTorch 训练脚手架**按你现有的目录结构写好（输入是这本 Excel），包括数据增强与评估脚本。
+The normalization uses RPM because no impeller diameter is supplied. It is a
+baseline representation for retrieval or downstream modeling, not a validated
+hydraulic simulator. Add a domain-specific normalization or embedding method
+in a separate module if stricter physical comparability is required.

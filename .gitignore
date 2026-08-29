@@ -23,18 +23,18 @@ pipeclaw/backend/generated_teacher_traces/teacher_trace_sessions.jsonl
 pipeclaw/backend/generated_teacher_traces/backups
 pipeclaw/backend/scripts
 pipeclaw/tests/
-pipeclaw/task2_student/graphify-out/
+pipeclaw/student_distillation/graphify-out/
 pipeFormer/data/mock_lifecycle/static/mock_lifecycle/cache/
 pipeFormer/models/tests
 docs
 
 # Task 2 student-distillation generated artifacts
-pipeclaw/task2_student/.cache/
-pipeclaw/task2_student/data/answer_only/*.tmp
-pipeclaw/task2_student/data/trace_level/*.tmp
-pipeclaw/task2_student/data/constraint_multitask/*.tmp
-pipeclaw/task2_student/data/manifests/*.tmp
-pipeclaw/task2_student/outputs/*
-!pipeclaw/task2_student/outputs/.gitkeep
-pipeclaw/task2_student/tests/test_scaffold_contract.py
-pipeclaw/task2_student/tests/test_scaffold_contract.py
+pipeclaw/student_distillation/.cache/
+pipeclaw/student_distillation/data/answer_only/*.tmp
+pipeclaw/student_distillation/data/trace_level/*.tmp
+pipeclaw/student_distillation/data/constraint_multitask/*.tmp
+pipeclaw/student_distillation/data/manifests/*.tmp
+pipeclaw/student_distillation/outputs/*
+!pipeclaw/student_distillation/outputs/.gitkeep
+pipeclaw/student_distillation/tests/test_scaffold_contract.py
+pipeclaw/student_distillation/tests/test_scaffold_contract.py

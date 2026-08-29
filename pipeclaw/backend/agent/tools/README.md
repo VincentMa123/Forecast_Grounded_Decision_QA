@@ -1,92 +1,99 @@
-# Tools directory
+# Agent tools
 
-## Workspace tools (recommended)
-Minimal toolset for the agent:
-- `write_file`: write or overwrite files in the session workspace
-- `edit_file`: exact string replacement in a workspace file
-- `run_command`: run approved commands (python/pip/node, powershell/cmd/bash, FS ops like mkdir/cp/copy/xcopy/robocopy) inside the workspace
-- `read_file`: read workspace files or read-only `pipeline_data/...` files (JSON auto-parse supported)
-- `run_pipeformer_forecast`: run PipeFormer checkpoint inference for forecast, what-if, risk, dispatch, or transient-operation questions.
-- `search_pipeformer_registry`: find canonical controllable inputs and nearby equipment before proposing dispatch actions.
-- `set_decision_policy`: convert the user's natural-language dispatch priorities into a validated ordered metric policy before evaluating multiple candidates.
+These are the tools registered by the PipeClaw agent. They let a run inspect
+data, write and execute a small analysis, query PipeFormer's registry, request
+a forecast, and preserve the resulting evidence.
 
-### Workflow
-1. Create or update `plan.md` first.
-2. Write your script (e.g. `task.py`).
-3. Run it with `run_command(["python", "task.py"])`.
-4. Read results from `runs/run_<timestamp>[_NN]/output/answer.txt` or `.json` (use run_command output_files).
+## Registered tools
 
-### Environment variables for scripts
-- `BACKEND_DIR`
-- `NODE_FLOW_DIR`
-- `PIPELINE_FLOW_DIR`
-- `CONSUMER_FLOW_DIR`
-- `OUTPUT_DIR`
+| Tool | Use |
+| --- | --- |
+| `read_file` | Read a workspace file or a logical `pipeline_data/...` CSV. |
+| `write_file` | Create or replace a file in the session workspace. |
+| `edit_file` | Apply an exact string replacement in a workspace file. |
+| `run_command` | Run an approved command in the session workspace. |
+| `search_pipeformer_registry` | Find canonical controllable variables and nearby equipment. |
+| `set_decision_policy` | Record the user's ordered objectives before ranking candidates. |
+| `run_pipeformer_forecast` | Run checkpoint inference and return grounded forecast evidence. |
+
+## Recommended workflow
+
+1. Create or update `plan.md`.
+2. Read the required data with `read_file`.
+3. Write a short script with `write_file` and execute it with `run_command`.
+4. For PipeFormer dispatch questions, call
+   `search_pipeformer_registry` before the first forecast and
+   `set_decision_policy` before ranking candidates when the user has stated
+   priorities.
+5. Read the output artifact from `runs/run_<timestamp>/output/` and answer from
+   successful structured results only.
+
+`run_command` executes inside an isolated workspace. It does not expose a
+`pipeline_data/` directory; scripts must use the injected environment variables
+below to locate CSVs.
+
+## Workspace variables
+
+The executor provides these variables to analysis scripts:
+
+```text
+BACKEND_DIR       backend root
+WORKSPACE_DIR     current session workspace
+NODE_FLOW_DIR     node-flow CSV directory
+PIPELINE_FLOW_DIR pipeline-flow CSV directory
+CONSUMER_FLOW_DIR consumer-flow CSV directory
+OUTPUT_DIR        current run output directory
+RUN_DIR           current run directory
+```
 
 Example:
+
 ```python
 import os
 from pathlib import Path
-import pandas as pd
 
-node_flow_dir = Path(os.environ["NODE_FLOW_DIR"])
-output_dir = Path(os.environ["OUTPUT_DIR"])
-
-# Read a daily node flow file
-# filename patterns: YYYYMMDD_node.csv, YYYYMMDD_pipeline.csv, YYYYMMDD_consumer.csv
-# (use the actual date string, e.g. 20190101_node.csv)
-
-output_dir.mkdir(parents=True, exist_ok=True)
-(output_dir / "answer.txt").write_text("done", encoding="utf-8")
+nodes = Path(os.environ["NODE_FLOW_DIR"])
+output = Path(os.environ["OUTPUT_DIR"])
+rows = list(nodes.glob("*_node.csv"))
+output.joinpath("answer.txt").write_text(f"files={len(rows)}", encoding="utf-8")
 ```
 
-## Deprecated tools
-`data_tools.py` and `analytics_tools.py` are no longer registered as tools.
-If needed, import them inside your scripts instead of calling them directly.
+Use logical paths such as `pipeline_data/node_flow/20190114_node.csv` only with
+`read_file`; do not paste host-specific paths into scripts or tool calls.
 
-## PipeFormer tool configuration
-For dispatch comparisons, call `search_pipeformer_registry` before the first forecast. Filter with `role=input` and
-`controllable=true`; optionally pass `attention_targets` to rank controls by graph distance. The tool returns a small
-semantic projection rather than exposing the full registry or local file paths.
+## PipeFormer configuration
 
-Before the second dispatch candidate, call `set_decision_policy`. The agent must infer the objective order from the
-user request and preserve that visible tool call in the trace; scenario metadata must not supply a hidden ranking label.
+`run_pipeformer_forecast` uses the mock-tiny checkpoint by default. Override it
+with environment variables when running another checkpoint or data root:
 
-`run_pipeformer_forecast` uses the mock-tiny checkpoint by default. Override paths with environment variables when running another checkpoint or a separate PipeFormer environment:
+```text
+PIPEFORMER_ROOT
+PIPEFORMER_CHECKPOINT_DIR
+PIPEFORMER_DATA_DIR
+PIPEFORMER_STATIC_DIR
+PIPEFORMER_MAPPING_CSV
+PIPEFORMER_DEVICE
+```
 
-- `PIPEFORMER_ROOT`
-- `PIPEFORMER_CHECKPOINT_DIR`
-- `PIPEFORMER_DATA_DIR`
-- `PIPEFORMER_STATIC_DIR`
-- `PIPEFORMER_MAPPING_CSV`
-- `PIPEFORMER_DEVICE`
+The forecast tool is read-only. It requires registry grounding for dispatch
+recommendations and returns compact evidence suitable for the agent trace.
 
-## LLM provider configuration
+## Model provider configuration
 
-DeepSeek and other OpenAI-compatible endpoints use:
+Create `pipeclaw/backend/.env` for live agent calls. The provider defaults to
+OpenAI-compatible mode:
 
 ```env
 LLM_PROVIDER=openai
 OPENAI_API_KEY=your_key
-OPENAI_API_BASE=https://api.deepseek.com
-OPENAI_MODEL=deepseek-v4-flash
-OPENAI_THINKING=true
+OPENAI_MODEL=your_model
+OPENAI_API_BASE=https://your-endpoint/v1
 OPENAI_REASONING_EFFORT=high
 ```
 
-The thinking settings are optional and are forwarded through `extra_body` for
-OpenAI-compatible providers that support them.
+For the native Z.AI client, use `LLM_PROVIDER=zai` with `ZAI_API_KEY`,
+`ZAI_MODEL`, `ZAI_THINKING`, `ZAI_REASONING_EFFORT`, `ZAI_MAX_TOKENS`, and
+`ZAI_TEMPERATURE`. Keep credentials out of source control.
 
-Omitting `LLM_PROVIDER` also defaults to `openai`. Native GLM uses the Z.AI SDK:
-
-```env
-LLM_PROVIDER=zai
-ZAI_API_KEY=your_key
-ZAI_MODEL=glm-5.2
-ZAI_THINKING=enabled
-ZAI_REASONING_EFFORT=max
-ZAI_MAX_TOKENS=65536
-ZAI_TEMPERATURE=1.0
-```
-
-`LLM_PROVIDER=None` is invalid; remove the setting or select `openai` when returning to DeepSeek.
+For backend installation and startup, see
+[the backend guide](../../README.md).
