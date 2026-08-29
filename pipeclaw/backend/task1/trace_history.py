@@ -14,7 +14,7 @@ from pipeclaw.backend.grounding.evidence.tool import (
     classify_tool_evidence,
     requested_artifacts,
 )
-from pipeclaw.backend.pipeline.forecast_result import (
+from pipeclaw.backend.pipeline.forecast.result import (
     compact_parsed_task,
     without_none_values,
 )

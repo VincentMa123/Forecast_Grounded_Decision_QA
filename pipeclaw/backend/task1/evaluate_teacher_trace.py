@@ -55,7 +55,7 @@ DEFAULT_REVIEWER_ANNOTATIONS = (
     DEFAULT_DELIVERABLE_DIR / "manual_quality_decisions.jsonl"
 )
 DEFAULT_COMPACT_SPLITS = GENERATED_ROOT / "splits"
-CONSTRAINT_LIBRARY = BACKEND_ROOT / "pipeline" / "constraint_library"
+CONSTRAINT_LIBRARY = BACKEND_ROOT / "pipeline" / "constraints" / "library"
 REQUIRED_RULE_FILES = (
     "pipeline_constraints.json",
     "pressure_rules.json",

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Sequence
 
-from ..rule_library import load_rule_document
+from .rule_library import load_rule_document
 from .common import CATEGORY_DETAILS
 
 

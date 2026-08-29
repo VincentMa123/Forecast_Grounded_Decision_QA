@@ -7,7 +7,7 @@ from typing import Any
 
 from ..models import EvaluationContext, MetricResult
 from ..profiles import get_profile_policy
-from pipeclaw.backend.pipeline.forecast_registry_contract import (
+from pipeclaw.backend.pipeline.forecast.registry_contract import (
     authorize_forecast_registry,
 )
 from .assumptions import (

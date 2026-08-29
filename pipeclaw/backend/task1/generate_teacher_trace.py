@@ -76,13 +76,6 @@ from pipeclaw.backend.task1.trace_sources import (
 logger = logging.getLogger("teacher_trace")
 
 
-def _ensure_applied_disturbance_disclosure(
-    answer: str, question: str, contract: Dict[str, Any]
-) -> str:
-    del question
-    return finalize_applied_disturbance_disclosure(answer, contract)
-
-
 def configure_logging(level_name: str) -> None:
     level = getattr(logging, level_name.upper(), logging.INFO)
     logging.basicConfig(
@@ -690,7 +683,6 @@ class _GenerationScope:
     all_sources: tuple[Dict[str, Any], ...]
     selected_sources: tuple[Dict[str, Any], ...]
     scenarios: tuple[Dict[str, Any], ...]
-    all_scenarios: tuple[Dict[str, Any], ...]
     replacement_mode: bool
 
 
@@ -799,7 +791,6 @@ class TeacherTraceGenerator:
             source, scenario = matches[0]
             selected_sources = [{**source, "scenarios": [scenario]}]
         scenarios = tuple(flatten_source_scenarios(selected_sources))
-        all_scenarios = tuple(flatten_source_scenarios(list(all_sources)))
         source_session_count = sum(
             len(scenario.get("sessions") or []) for scenario in scenarios
         )
@@ -812,7 +803,6 @@ class TeacherTraceGenerator:
             all_sources=all_sources,
             selected_sources=tuple(selected_sources),
             scenarios=scenarios,
-            all_scenarios=all_scenarios,
             replacement_mode=replacement_mode,
         )
 
@@ -926,7 +916,9 @@ class TeacherTraceGenerator:
         run_stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
         records: List[Dict[str, Any]] = []
         session_records: List[Dict[str, Any]] = []
-        split_map = scenario_split_map(list(scope.all_scenarios), DEFAULT_SPLIT_SEED)
+        split_map = scenario_split_map(
+            flatten_source_scenarios(list(scope.all_sources)), DEFAULT_SPLIT_SEED
+        )
         existing_sample_ids = {
             str(record.get("sample_id"))
             for record in existing_records

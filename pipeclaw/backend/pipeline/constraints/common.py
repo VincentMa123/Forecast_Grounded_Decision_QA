@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
-from ..rule_library import load_pipeline_constraints, load_rule_document
+from .rule_library import load_pipeline_constraints, load_rule_document
 from ..schemas import ConstraintSpec
 
 

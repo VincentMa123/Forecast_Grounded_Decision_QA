@@ -4,10 +4,10 @@ import json
 from pathlib import Path
 from typing import Any, Dict, Tuple
 
-from .schemas import ConstraintSpec
+from ..schemas import ConstraintSpec
 
 
-RULE_LIBRARY_ROOT = Path(__file__).resolve().parent / "constraint_library"
+RULE_LIBRARY_ROOT = Path(__file__).resolve().parent / "library"
 GENERIC_EVALUATORS = {
     "predicted_range",
     "max_abs_prediction",

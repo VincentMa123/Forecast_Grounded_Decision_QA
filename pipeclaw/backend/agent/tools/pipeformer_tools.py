@@ -7,10 +7,10 @@ import re
 from typing import Any, Dict, List, Optional
 
 from .registry import register_tool
-from pipeclaw.backend.pipeline.pipeformer_registry_service import (
+from pipeclaw.backend.pipeline.registry.search_service import (
     PipeFormerRegistrySearchService,
 )
-from pipeclaw.backend.pipeline.pipeformer_tool_runtime import PipeFormerForecastService
+from pipeclaw.backend.pipeline.forecast.runtime import PipeFormerForecastService
 from pipeclaw.backend.grounding.decision_policy import (
     METRIC_CATALOG,
     normalize_policy_tool_request,

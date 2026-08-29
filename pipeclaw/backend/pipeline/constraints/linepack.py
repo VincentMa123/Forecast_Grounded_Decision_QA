@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from ..rule_library import load_constraint_specs, load_rule_definition
+from .rule_library import load_constraint_specs, load_rule_definition
 from .common import (
     CATEGORY_DETAILS,
     contiguous_episodes,

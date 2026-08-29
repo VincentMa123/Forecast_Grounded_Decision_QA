@@ -16,10 +16,10 @@ from pipeclaw.backend.grounding.evidence.tool import (
     requested_artifacts,
     tool_output_failed,
 )
-from pipeclaw.backend.pipeline.forecast_registry_contract import (
+from pipeclaw.backend.pipeline.forecast.registry_contract import (
     authorize_forecast_registry,
 )
-from pipeclaw.backend.pipeline.forecast_result import (
+from pipeclaw.backend.pipeline.forecast.result import (
     COMPACT_COMPARABLE_METRIC_KEYS,
     ForecastResult,
 )

@@ -33,7 +33,7 @@ from pipeclaw.backend.grounding.contract import (
     finalize_applied_disturbance_disclosure,
 )
 from pipeclaw.backend.agent.prompt_policy import candidate_contract_message
-from pipeclaw.backend.pipeline.forecast_registry_contract import forecast_registry_failure_result
+from pipeclaw.backend.pipeline.forecast.registry_contract import forecast_registry_failure_result
 from pipeclaw.task2_student.rollout.tools import (
     ToolCall,
     coerce_schema_value,

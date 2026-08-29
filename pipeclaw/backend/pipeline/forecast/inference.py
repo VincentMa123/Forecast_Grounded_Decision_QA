@@ -12,8 +12,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional
 
-from .schemas import ForecastRow
-from .variable_registry import VariableRegistry, normalize_task_variables
+from ..schemas import ForecastRow
+from ..registry.variable_registry import VariableRegistry, normalize_task_variables
 
 
 logger = logging.getLogger(__name__)

@@ -5,7 +5,7 @@ import re
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from pipeclaw.backend.pipeline.forecast_result import ForecastResult
+from pipeclaw.backend.pipeline.forecast.result import ForecastResult
 
 from ..path_contract import (
     canonicalize_recorded_tool_arguments,

@@ -284,7 +284,7 @@ def evaluate_answer_quality(
     grounding_contract: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, List[str]]:
     outputs = tool_outputs or []
-    issues = answer_quality_issues(
+    base_issues = answer_quality_issues(
         answer=answer,
         question=question,
         pipeformer=pipeformer,
@@ -297,9 +297,12 @@ def evaluate_answer_quality(
         if grounding_contract is not None
         else GroundingContractBuilder().build(question, outputs)
     )
-    issues.extend(comparison_answer_issues(answer, contract))
-    issues.extend(tool_evidence_quality_issues(outputs))
-    issues = list(dict.fromkeys(issues))
+    issues = _compose_answer_quality_issues(
+        base_issues,
+        answer=answer,
+        contract=contract,
+        tool_outputs=outputs,
+    )
     forecasts_pass = (pipeformer_call_count == 0 or bool(pipeformer_outputs)) and all(
         output.get("quality_flag") == "pass" for output in pipeformer_outputs
     )
@@ -309,6 +312,19 @@ def evaluate_answer_quality(
         else "needs_review"
     )
     return quality_flag, issues
+
+
+def _compose_answer_quality_issues(
+    base_issues: List[str],
+    *,
+    answer: str,
+    contract: Dict[str, Any],
+    tool_outputs: List[Dict[str, Any]],
+) -> List[str]:
+    issues = list(base_issues)
+    issues.extend(comparison_answer_issues(answer, contract))
+    issues.extend(tool_evidence_quality_issues(tool_outputs))
+    return list(dict.fromkeys(issues))
 
 
 def safety_and_energy_checks_pass(pipeformer: Optional[Dict[str, Any]]) -> bool:
@@ -344,10 +360,6 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         record.get("tool_calls") or [],
     )
     contract = record_grounding_contract(record, tool_outputs)
-    contract_issues = comparison_answer_issues(
-        str(record.get("final_answer") or ""),
-        contract,
-    )
     successful_pipeformer_outputs = [
         dict(item.get("output") or {})
         for item in tool_outputs
@@ -401,10 +413,12 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         tool_outputs=tool_outputs,
         record_evidence=record_evidence,
     )
-    issues = _answer_quality_issues(context)
-    issues.extend(contract_issues)
-    issues.extend(tool_evidence_quality_issues(tool_outputs))
-    return list(dict.fromkeys(issues))
+    return _compose_answer_quality_issues(
+        _answer_quality_issues(context),
+        answer=context.answer,
+        contract=contract,
+        tool_outputs=tool_outputs,
+    )
 
 
 def _absolute_assertion_is_grounded(answer: str, evidence: Any) -> bool:

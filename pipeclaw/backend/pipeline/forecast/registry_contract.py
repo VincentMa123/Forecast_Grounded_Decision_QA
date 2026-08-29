@@ -5,7 +5,6 @@ from typing import Any, Dict, Iterable, List, Optional
 
 
 REGISTRY_SEARCH_TOOL = "search_pipeformer_registry"
-FORECAST_TOOL = "run_pipeformer_forecast"
 
 
 def _normalized(value: Any) -> str:

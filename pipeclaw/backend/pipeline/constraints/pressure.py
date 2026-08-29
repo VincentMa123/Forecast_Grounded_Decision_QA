@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from ..rule_library import load_constraint_specs
+from .rule_library import load_constraint_specs
 from .common import (
     longest_episode_minutes,
     range_limits_for_variable,

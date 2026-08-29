@@ -2,30 +2,31 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional
 
-from .constraints.common import (
+from .common import (
     CATEGORY_ORDER,
     DISPATCH_PRIORITY_ORDER,
+    DISPATCH_RULES,
+    PIPELINE_CONSTRAINTS,
     STATUS_RANK,
     category_status,
     max_status,
     select_requested_categories,
 )
-from .constraints.compressor import run_compressor_checks
-from .constraints.abnormality_warning import run_abnormality_warning_checks
-from .constraints.dispatch_priority import (
+from .compressor import run_compressor_checks
+from .abnormality_warning import run_abnormality_warning_checks
+from .dispatch_priority import (
     run_dispatch_priority_checks,
     run_dispatch_priority_policy_checks,
 )
-from .constraints.equipment_regulation import run_equipment_regulation_checks
-from .constraints.flow import run_flow_checks
-from .constraints.human_intervention import (
+from .equipment_regulation import run_equipment_regulation_checks
+from .flow import run_flow_checks
+from .human_intervention import (
     intervention_label_from_checks,
     run_human_intervention_checks,
 )
-from .constraints.linepack import run_linepack_checks
-from .constraints.pressure import run_pressure_checks
-from .constraints.common import PIPELINE_CONSTRAINTS, DISPATCH_RULES
-from .forecast_result import without_none_values
+from .linepack import run_linepack_checks
+from .pressure import run_pressure_checks
+from ..forecast.result import without_none_values
 
 
 CategoryRunner = Callable[

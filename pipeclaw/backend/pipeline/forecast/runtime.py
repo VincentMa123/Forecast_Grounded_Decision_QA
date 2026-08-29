@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any, Dict, List, Optional
 
-from .condition_parser import (
+from .parser import (
     CATEGORY_ATTENTION_TARGETS,
     CATEGORY_OUTPUT_STATE_VARIABLES,
     DEFAULT_CONSTRAINT_VERIFICATION_TYPES,
@@ -16,15 +16,16 @@ from .condition_parser import (
     parse_condition,
     targets_for_checks,
 )
-from .constraints.common import variables_matching
-from .engineering_constraints import run_engineering_constraint_checks
-from .evidence_extractor import summarize_variables, top_variables
-from .forecast_result import (
+from ..constraints.common import variables_matching
+from ..constraints.engine import run_engineering_constraint_checks
+from .evidence import summarize_variables, top_variables
+from .result import (
     ForecastResult,
     compact_forecast_window,
     source_name,
 )
-from .pipeformer_inference import (
+from .request import ForecastRequest
+from .inference import (
     PipeFormerInferenceConfig,
     PipeFormerInferenceEngine,
     resolve_pipeformer_environment,
@@ -753,10 +754,11 @@ class PipeFormerForecastService:
         )
 
     def analyze(self, **request: Any) -> Dict[str, Any]:
+        typed_request = ForecastRequest.from_mapping(request)
         result = _analyze_pipeformer_forecast(
+            typed_request,
             backend_root=self.backend_root,
             baseline_cache=self.baseline_cache,
-            **request,
         )
         return (
             ForecastResult.from_payload(result).model_dump()
@@ -804,34 +806,35 @@ def run_pipeformer_forecast_analysis(
 
 
 def _analyze_pipeformer_forecast(
+    request: ForecastRequest,
     *,
-    question: str,
     backend_root: Path,
-    candidate_id: Optional[str] = None,
-    candidate_role: str = "candidate",
-    case_id: Optional[str] = None,
-    forecast_horizon_minutes: Optional[int] = None,
-    current_operating_condition_number: Optional[int] = None,
-    boundary_conditions: Optional[Dict[str, Any]] = None,
-    disturbance_variable: Optional[str] = None,
-    disturbance_setpoint: Optional[int] = None,
-    disturbance_direction: Optional[str] = None,
-    disturbance_magnitude_percent: Optional[float] = None,
-    disturbance_assumption: Optional[str] = None,
-    disturbance_source: Optional[str] = None,
-    attention_targets: Optional[List[str]] = None,
-    output_state_variables: Optional[List[str]] = None,
-    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
-    constraint_verification_types: Optional[List[str]] = None,
-    include_baseline_comparison: Optional[bool] = None,
     baseline_cache: BaselineForecastCache,
-    pipeformer_root: Optional[str] = None,
-    checkpoint_dir: Optional[str] = None,
-    data_dir: Optional[str] = None,
-    static_dir: Optional[str] = None,
-    mapping_csv: Optional[str] = None,
-    device: Optional[str] = None,
 ) -> Dict[str, Any]:
+    question = request.question
+    candidate_id = request.candidate_id
+    candidate_role = request.candidate_role
+    case_id = request.case_id
+    forecast_horizon_minutes = request.forecast_horizon_minutes
+    current_operating_condition_number = request.current_operating_condition_number
+    boundary_conditions = request.boundary_conditions
+    disturbance_variable = request.disturbance_variable
+    disturbance_setpoint = request.disturbance_setpoint
+    disturbance_direction = request.disturbance_direction
+    disturbance_magnitude_percent = request.disturbance_magnitude_percent
+    disturbance_assumption = request.disturbance_assumption
+    disturbance_source = request.disturbance_source
+    attention_targets = request.attention_targets
+    output_state_variables = request.output_state_variables
+    vocabulary_normalizations = request.vocabulary_normalizations
+    constraint_verification_types = request.constraint_verification_types
+    include_baseline_comparison = request.include_baseline_comparison
+    pipeformer_root = request.pipeformer_root
+    checkpoint_dir = request.checkpoint_dir
+    data_dir = request.data_dir
+    static_dir = request.static_dir
+    mapping_csv = request.mapping_csv
+    device = request.device
     logger.info("PipeFormer forecast tool started")
     candidate_role = str(candidate_role or "candidate").casefold()
     if candidate_role not in {"candidate", "baseline"}:

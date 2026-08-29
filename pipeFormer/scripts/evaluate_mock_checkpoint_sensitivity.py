@@ -296,7 +296,7 @@ def diagnose_causal_stages(
     backend_root = repo_root / "pipeclaw" / "backend"
     if str(backend_root) not in sys.path:
         sys.path.insert(0, str(backend_root))
-    from pipeline.pipeformer_inference import (
+    from pipeline.forecast.inference import (
         add_pipeformer_import_paths,
         apply_condition_to_matrix,
         attach_hybrid_token_statistics,
@@ -524,7 +524,7 @@ def evaluate_checkpoint(
     if forecast_runner is None:
         backend_root = repo_root / "pipeclaw" / "backend"
         sys.path.insert(0, str(backend_root))
-        from pipeline.pipeformer_inference import run_checkpoint_inference
+        from pipeline.forecast.inference import run_checkpoint_inference
 
         def forecast_runner(task: dict[str, Any]) -> dict[str, Any]:
             return run_checkpoint_inference(

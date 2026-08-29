@@ -5,7 +5,10 @@ import re
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from .variable_registry import registry_path_for_mapping, validate_variable_registry
+from .registry.variable_registry import (
+    registry_path_for_mapping,
+    validate_variable_registry,
+)
 
 
 VARIABLE_RE = re.compile(r"\b[A-Z]+_\d+(?::[A-Za-z0-9_]+|_[A-Za-z0-9_]+)?\b")
