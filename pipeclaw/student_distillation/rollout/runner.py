@@ -8,10 +8,10 @@ from .models import (
     PromptCase,
     RolloutConfig,
     RolloutResult,
-    ToolCall,
-    jsonable,
 )
-from .tools import ToolDispatcher, append_tool_exchange, parse_tool_calls
+from .episode import dispatch_and_record, execution_success, schema_valid
+from .tools import ToolDispatcher
+from pipeclaw.protocols.tool_calls import ToolCall, jsonable, parse_tool_calls
 
 
 class RolloutPolicy(Protocol):
@@ -57,27 +57,6 @@ class PassthroughPolicy:
     ) -> Any:
         del call, portability
         return result
-
-
-_SCHEMA_ERROR_CODES = {"unknown_tool", "invalid_arguments", "tool_not_allowed"}
-_EXECUTION_ERROR_CODES = {
-    "tool_execution_error",
-    "forecast_registry_precondition_failed",
-}
-_PORTABILITY_RECORD_KEYS = ("cwd_rebased", "portable_path_normalization")
-
-
-def schema_valid(result: Mapping[str, Any]) -> bool:
-    return result.get("error_code") not in _SCHEMA_ERROR_CODES
-
-
-def execution_success(result: Mapping[str, Any]) -> bool:
-    return (
-        result.get("success", True) is not False
-        and not result.get("error")
-        and result.get("error_code") not in _EXECUTION_ERROR_CODES
-        and result.get("exit_code") in (None, 0)
-    )
 
 
 class RolloutRunner:
@@ -160,13 +139,16 @@ class RolloutRunner:
             self.dispatcher, "set_current_user_request", None
         )
         if callable(set_current_user_request):
-            user_messages = [
-                message.get("content")
-                for message in case.messages
-                if message.get("role") == "user"
-                and isinstance(message.get("content"), str)
-            ]
-            set_current_user_request(user_messages[-1] if user_messages else "")
+            user_message = next(
+                (
+                    message["content"]
+                    for message in reversed(case.messages)
+                    if message.get("role") == "user"
+                    and isinstance(message.get("content"), str)
+                ),
+                "",
+            )
+            set_current_user_request(user_message)
         set_case_workspace = getattr(self.dispatcher, "set_case_workspace", None)
         if callable(set_case_workspace) and case.workspace_root is not None:
             set_case_workspace(Path(case.workspace_root))
@@ -179,49 +161,19 @@ class RolloutRunner:
         calls: list[ToolCall],
         text: str,
     ) -> None:
-        for index, call in enumerate(calls):
-            # Record the schema-normalized form: identical logical calls stay one
-            # thrash signature even when the model stringifies typed values.
-            normalized = self.dispatcher.schema_normalized_call(call)
-            portability = dict(self.policy.portability_metadata(normalized, case))
-            tool_result = self.dispatcher.dispatch(normalized)
-            call_record: dict[str, Any] = {
-                "tool_call_id": call.call_id,
-                "name": call.name,
-                "arguments": dict(self.policy.recorded_arguments(normalized, case)),
-                "schema_valid": schema_valid(tool_result),
-                "execution_success": execution_success(tool_result),
-            }
-            call_record.update(
-                {
-                    key: portability[key]
-                    for key in _PORTABILITY_RECORD_KEYS
-                    if portability.get(key)
-                }
-            )
-            result.tool_calls.append(call_record)
-            compact_tool_result = self.policy.compact_tool_result(
+        dispatch_and_record(
+            calls,
+            dispatcher=self.dispatcher,
+            messages=messages,
+            tool_calls=result.tool_calls,
+            tool_outputs=result.tool_outputs,
+            raw_tool_outputs=result.raw_tool_outputs,
+            portability_metadata=lambda call: self.policy.portability_metadata(
+                call, case
+            ),
+            record_arguments=lambda call: self.policy.recorded_arguments(call, case),
+            compact_result=lambda call, tool_result, portability: self.policy.compact_tool_result(
                 call, tool_result, portability=portability
-            )
-            result.tool_outputs.append(
-                {
-                    "tool_call_id": call.call_id,
-                    "name": call.name,
-                    "output": compact_tool_result,
-                }
-            )
-            if result.raw_tool_outputs is not None:
-                raw_entry: dict[str, Any] = {
-                    "tool_call_id": call.call_id,
-                    "name": call.name,
-                    "output": jsonable(tool_result),
-                }
-                if portability:
-                    raw_entry["diagnostics"] = dict(portability)
-                result.raw_tool_outputs.append(raw_entry)
-            append_tool_exchange(
-                messages,
-                call,
-                compact_tool_result,
-                assistant_content=text if index == 0 else "",
-            )
+            ),
+            assistant_content=text,
+        )

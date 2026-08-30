@@ -18,45 +18,37 @@ def _issues(values: Iterable[str] | None) -> tuple[str, ...]:
     return tuple(dict.fromkeys(str(item) for item in (values or ())))
 
 
-class TeacherTraceAdapter:
-    """Normalize a native teacher trace into an evaluation context."""
+def build_evaluation_context(
+    profile: EvaluationProfile,
+    record: Mapping[str, Any],
+    *,
+    reference: Mapping[str, Any] | None = None,
+    hard_issues: Iterable[str] | None = None,
+    diagnostics: Mapping[str, Any] | None = None,
+) -> EvaluationContext:
+    """Normalize one teacher trace or rollout for the canonical checks."""
 
-    def adapt(
-        self,
-        record: Mapping[str, Any],
-        *,
-        hard_issues: Iterable[str] | None = None,
-        diagnostics: Mapping[str, Any] | None = None,
-    ) -> EvaluationContext:
+    profile = EvaluationProfile(profile)
+    if profile is EvaluationProfile.TEACHER_TRACE:
         return EvaluationContext(
-            profile=EvaluationProfile.TEACHER_TRACE,
+            profile=profile,
             record=_copy_mapping(record, "Teacher record"),
             hard_issues=_issues(hard_issues),
             diagnostics=_copy_mapping(diagnostics or {}, "Diagnostics"),
         )
-
-
-class AutonomousRolloutAdapter:
-    """Normalize a rollout and its required held-out teacher reference."""
-
-    def adapt(
-        self,
-        rollout: Mapping[str, Any],
-        *,
-        reference: Mapping[str, Any] | None = None,
-        hard_issues: Iterable[str] | None = None,
-        diagnostics: Mapping[str, Any] | None = None,
-    ) -> EvaluationContext:
-        if reference is None:
-            raise EvaluationInputError(
-                "Autonomous rollout evaluation requires a teacher reference."
-            )
-        copied_reference = _copy_mapping(reference, "Teacher reference")
-        return EvaluationContext(
-            profile=EvaluationProfile.AUTONOMOUS_ROLLOUT,
-            record=_copy_mapping(rollout, "Autonomous rollout"),
-            reference=copied_reference,
-            oracle=build_teacher_oracle(copied_reference),
-            hard_issues=_issues(hard_issues),
-            diagnostics=_copy_mapping(diagnostics or {}, "Diagnostics"),
+    if reference is None:
+        raise EvaluationInputError(
+            "Autonomous rollout evaluation requires a teacher reference."
         )
+    copied_reference = _copy_mapping(reference, "Teacher reference")
+    return EvaluationContext(
+        profile=profile,
+        record=_copy_mapping(record, "Autonomous rollout"),
+        reference=copied_reference,
+        oracle=build_teacher_oracle(copied_reference),
+        hard_issues=_issues(hard_issues),
+        diagnostics=_copy_mapping(diagnostics or {}, "Diagnostics"),
+    )
+
+
+__all__ = ["build_evaluation_context"]

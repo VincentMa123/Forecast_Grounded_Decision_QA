@@ -8,36 +8,13 @@ from typing import Any, Dict, Iterable, List, Optional
 from .aggregation import summarize
 from .engine import evaluate
 from .models import EvaluationProfile, EvaluationReport
-from .profiles import DEFAULT_TEACHER_MINIMUM_SCORE as DEFAULT_MINIMUM_SCORE
+from .profiles import (
+    DEFAULT_MAX_RECORD_CHARS,
+    DEFAULT_TEACHER_MINIMUM_SCORE as DEFAULT_MINIMUM_SCORE,
+    get_profile_policy,
+    legacy_boolean_aliases,
+)
 from pipeclaw.backend.pipeline.io_utils import load_records
-
-
-DEFAULT_MAX_RECORD_CHARS = 24_000
-
-_PIPEFORMER_LEGACY_NAMES = {
-    "task_parsing": "parsed_task_correct",
-    "tool_call": "forecast_tool_succeeded",
-    "checkpoint_inference": "checkpoint_inference_used",
-    "disturbance_application": "disturbance_applied_correctly",
-    "forecast_horizon": "forecast_horizon_consistent",
-    "constraint_execution": "requested_constraints_executed",
-    "verification_completeness": "verification_complete",
-    "registry_ordering": "registry_search_precedes_forecast",
-    "evidence_consistency": "answer_grounded",
-    "record_contract": "compact_record_contract",
-}
-_GENERIC_LEGACY_NAMES = {
-    "task_parsing": "trace_completed",
-    "answer_completeness": "answer_present",
-    "tool_call": "tool_trajectory_valid",
-    "evidence_consistency": "answer_grounded",
-    "record_contract": "compact_record_contract",
-}
-_BOOLEAN_ALIASES = {
-    legacy: canonical
-    for canonical, legacy in _PIPEFORMER_LEGACY_NAMES.items()
-    if legacy != canonical
-}
 
 
 @dataclass(frozen=True)
@@ -54,36 +31,44 @@ def _record_with_trace_status(
     effective_status = trace_status
     if effective_status is None:
         effective_status = copied.get("trace_status")
-    if effective_status is None and {
-        "trace_completed",
-        "forecast_tool_succeeded",
-    } & set(copied.get("quality_failed_checks") or []):
+    policy_aliases = (
+        get_profile_policy(
+            EvaluationProfile.TEACHER_TRACE,
+            teacher_variant="generic",
+        ).legacy_name("task_parsing"),
+        get_profile_policy(
+            EvaluationProfile.TEACHER_TRACE,
+            teacher_variant="pipeformer",
+        ).legacy_name("tool_call"),
+    )
+    if effective_status is None and set(policy_aliases) & set(
+        copied.get("quality_failed_checks") or []
+    ):
         effective_status = "unknown"
     if effective_status is not None:
         copied["trace_status"] = effective_status
     return copied
 
 
-def _legacy_name(name: str, variant: str) -> str:
-    aliases = (
-        _PIPEFORMER_LEGACY_NAMES if variant == "pipeformer" else _GENERIC_LEGACY_NAMES
-    )
-    return aliases.get(name, name)
-
-
 def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[str, Any]:
     payload = report.to_dict()
     variant = str(report.diagnostics.get("teacher_variant") or "pipeformer")
+    if variant not in {"pipeformer", "generic"}:
+        variant = "generic"
+    policy = get_profile_policy(
+        EvaluationProfile.TEACHER_TRACE,
+        teacher_variant=variant,
+    )
     canonical_failed = list(report.failed_checks)
     canonical_critical = list(report.critical_failures)
-    failed = [_legacy_name(name, variant) for name in canonical_failed]
-    failed_critical = [_legacy_name(name, variant) for name in canonical_critical]
+    failed = [policy.legacy_name(name) for name in canonical_failed]
+    failed_critical = [policy.legacy_name(name) for name in canonical_critical]
     checks = []
     for metric_result in report.metrics.values():
         if not metric_result.applicable:
             continue
         check = {
-            "name": _legacy_name(metric_result.name, variant),
+            "name": policy.legacy_name(metric_result.name),
             "weight": metric_result.weight,
             "status": "pass" if metric_result.passed else "fail",
         }
@@ -107,7 +92,9 @@ def _serialize_legacy(report: EvaluationReport, minimum_score: float) -> Dict[st
             "checks": checks,
         }
     )
-    for alias, canonical in _BOOLEAN_ALIASES.items():
+    for alias, canonical in legacy_boolean_aliases(
+        EvaluationProfile.TEACHER_TRACE,
+    ).items():
         metric_result = report.metrics.get(canonical)
         payload[alias] = bool(
             metric_result and metric_result.applicable and metric_result.passed

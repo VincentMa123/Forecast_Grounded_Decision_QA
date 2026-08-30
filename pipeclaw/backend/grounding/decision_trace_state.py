@@ -8,7 +8,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
 from .decision_policy import llm_policy_excerpts
-from .evidence.tool import tool_result_failed
+from .evidence.tool import tool_execution_failed
 
 
 VERIFIED_DECISION_STATE_SCHEMA_VERSION = "verified_decision_state_v1"
@@ -429,7 +429,7 @@ def _verified_state_tool_result(item: Dict[str, Any]) -> bool:
     if not (
         isinstance(output, dict)
         and output.get("success") is True
-        and not tool_result_failed(output)
+        and not tool_execution_failed(output)
     ):
         return False
     if item.get("name") != "run_pipeformer_forecast":
@@ -889,7 +889,7 @@ def _delta_from_verified_tool_results(
     tool_results: Iterable[Dict[str, Any]],
     current: "VerifiedDecisionState",
 ) -> _VerifiedStateDelta:
-    from .contract import GroundingContractBuilder, latest_decision_policy
+    from .construction import build_grounding_contract, latest_decision_policy
 
     observed = [deepcopy(dict(item)) for item in tool_results if isinstance(item, dict)]
     forecasts = [
@@ -920,7 +920,7 @@ def _delta_from_verified_tool_results(
     ]
     scope: Dict[str, Any] = {}
     requested_action_fingerprint = None
-    contract = GroundingContractBuilder().build(
+    contract = build_grounding_contract(
         question,
         successful,
         require_decision_policy=True,

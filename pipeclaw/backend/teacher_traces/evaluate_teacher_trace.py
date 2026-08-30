@@ -29,8 +29,8 @@ from pipeclaw.backend.evaluator.numeric_grounding import (
     numeric_claims_are_grounded,
     numeric_grounding_evidence,
 )
-from pipeclaw.backend.task1.trace_export import write_split_records
-from pipeclaw.backend.task1.trace_history import (
+from pipeclaw.backend.teacher_traces.trace_export import write_split_records
+from pipeclaw.backend.teacher_traces.trace_history import (
     build_history_turn,
     summarize_record_tool_evidence,
 )

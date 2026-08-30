@@ -13,7 +13,7 @@ from .tool import (
     attach_tool_arguments,
     command_python_scripts,
     normalized_tool_path,
-    tool_output_failed,
+    tool_evidence_unavailable,
 )
 from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
 
@@ -87,7 +87,7 @@ def build_csv_evidence(
     row_index = 0
 
     for item in outputs:
-        if str(item.get("name") or "").casefold() != "read_file" or tool_output_failed(
+        if str(item.get("name") or "").casefold() != "read_file" or tool_evidence_unavailable(
             item
         ):
             continue
@@ -127,7 +127,7 @@ def build_csv_evidence(
     for item in outputs:
         if str(
             item.get("name") or ""
-        ).casefold() != "run_command" or tool_output_failed(item):
+        ).casefold() != "run_command" or tool_evidence_unavailable(item):
             continue
         output = item.get("output") or {}
         if not isinstance(output, dict):
@@ -202,7 +202,7 @@ def _dynamic_script_csv_files(
             str(dict(item.get("output") or {}).get("stdout") or "")
             for item in outputs
             if str(item.get("name") or "").casefold() == "run_command"
-            and not tool_output_failed(item)
+            and not tool_evidence_unavailable(item)
         ),
     ):
         for payload in _json_payloads(text):
@@ -215,7 +215,7 @@ def _dynamic_script_csv_files(
     scripts: Dict[str, str] = {}
     source_files = []
     for item in outputs:
-        if tool_output_failed(item):
+        if tool_evidence_unavailable(item):
             continue
         name = str(item.get("name") or "").casefold()
         arguments = dict(item.get("arguments") or {})
@@ -594,7 +594,7 @@ def _structured_computation_results(
     for item in reversed(list(outputs)):
         if str(
             item.get("name") or ""
-        ).casefold() != "run_command" or tool_output_failed(item):
+        ).casefold() != "run_command" or tool_evidence_unavailable(item):
             continue
         output = item.get("output") or {}
         if not isinstance(output, dict):

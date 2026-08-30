@@ -12,8 +12,9 @@ metric definitions, profiles, and report schema.
 | Runtime grounding used while a trace is generated | `pipeclaw/backend/grounding/` |
 | Metrics, weights, gates, and aggregation for a finished record | `pipeclaw/backend/evaluator/` |
 
-`rollout/suite.py` is the only student-distillation module that imports this package. A
-rollout is generated first and scored afterward.
+Student-distillation imports this package only at its scoring entry points:
+`rollout/suite.py`, `grpo_plugin.py`, and `scripts/pass_at_k.py`. A rollout is
+generated first and scored afterward.
 
 ## Python API
 
@@ -90,14 +91,8 @@ scenario-type breakdowns. Use the `pipeformer` filter for PipeFormer cases and
 
 ## Repair and regenerate
 
-List repairable teacher records without calling a model:
-
-```powershell
-python -m pipeclaw.backend.scripts.repair_teacher_trace `
-  --list-regeneration-targets
-```
-
-After an approved repair, regenerate the evaluation deliverables:
+Regenerate evaluation deliverables with the deterministic grounded-record
+repair enabled:
 
 ```powershell
 python -m pipeclaw.backend.teacher_traces.evaluate_teacher_trace `

@@ -1,9 +1,9 @@
 """Canonical evaluation API for teacher traces and autonomous rollouts."""
 
-from .adapters import AutonomousRolloutAdapter, TeacherTraceAdapter
+from .adapters import build_evaluation_context
 from .aggregation import summarize
 from .checks import assumption_consistency, inferred_task_fields
-from .engine import evaluate
+from .engine import build_report, evaluate
 from .models import (
     EVALUATION_SCHEMA_VERSION,
     EvaluationContext,
@@ -15,14 +15,14 @@ from .models import (
 from .oracle import build_teacher_oracle
 
 __all__ = [
-    "AutonomousRolloutAdapter",
+    "build_evaluation_context",
+    "build_report",
     "EVALUATION_SCHEMA_VERSION",
     "EvaluationContext",
     "EvaluationInputError",
     "EvaluationProfile",
     "EvaluationReport",
     "MetricResult",
-    "TeacherTraceAdapter",
     "build_teacher_oracle",
     "assumption_consistency",
     "evaluate",

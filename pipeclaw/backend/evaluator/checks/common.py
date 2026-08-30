@@ -5,7 +5,7 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from ..models import EvaluationContext, MetricResult
+from ..models import EvaluationContext, EvaluationProfile, MetricResult
 from ..profiles import get_profile_policy
 from pipeclaw.backend.pipeline.forecast.registry_contract import (
     authorize_forecast_registry,
@@ -18,26 +18,12 @@ from .assumptions import (
 
 
 PIPEFORMER_TOOL = "run_pipeformer_forecast"
-CANONICAL_METRIC_NAMES = (
-    "task_parsing",
-    "assumption_consistency",
-    "tool_call",
-    "checkpoint_inference",
-    "disturbance_application",
-    "forecast_horizon",
-    "constraint_execution",
-    "constraint_judgment",
-    "verification_completeness",
-    "registry_ordering",
-    "risk",
-    "manual_intervention",
-    "dispatch",
-    "evidence_consistency",
-    "answer_completeness",
-    "json_validity",
-    "artifact_evidence",
-    "record_contract",
-)
+# Compatibility export for callers that still import the canonical teacher
+# order from this helper module.  The registry in ``profiles.py`` is the sole
+# owner of the sequence.
+CANONICAL_METRIC_NAMES = get_profile_policy(
+    EvaluationProfile.TEACHER_TRACE
+).metric_order
 
 
 def sequence(value: Any) -> Sequence[Any]:
@@ -79,17 +65,20 @@ def ordered_canonical_metrics(
     metrics: Sequence[MetricResult],
     *,
     teacher_variant: str = "pipeformer",
-    extra: Sequence[MetricResult] = (),
 ) -> list[MetricResult]:
+    order = get_profile_policy(
+        context.profile,
+        teacher_variant=teacher_variant,
+    ).metric_order
     present = {item.name for item in metrics}
     metrics = list(metrics)
     metrics.extend(
         metric(context, name, applicable=False, teacher_variant=teacher_variant)
-        for name in CANONICAL_METRIC_NAMES
+        for name in order
         if name not in present
     )
     by_name = {item.name: item for item in metrics}
-    return [by_name[name] for name in CANONICAL_METRIC_NAMES] + list(extra)
+    return [by_name[name] for name in order]
 
 
 def metric(

@@ -3,13 +3,13 @@ ENV:
 
 model: Qwen/Qwen3.5-0.8B
 use_hf: false
-output_dir: pipeclaw/task2_student/outputs/qwen35_08b_answer_only_smoke
+output_dir: pipeclaw/student_distillation/outputs/qwen35_08b_answer_only_smoke
 add_version: false
 
 dataset:
-  - pipeclaw/task2_student/data/answer_only/train.jsonl#32
+  - pipeclaw/student_distillation/data/answer_only/train.jsonl#32
 val_dataset:
-  - pipeclaw/task2_student/data/answer_only/valid.jsonl#8
+  - pipeclaw/student_distillation/data/answer_only/valid.jsonl#8
 split_dataset_ratio: 0.0
 load_from_cache_file: true
 dataset_num_proc: 1

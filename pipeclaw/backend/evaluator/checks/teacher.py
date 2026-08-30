@@ -141,15 +141,6 @@ def _task_is_complete(task: Mapping[str, Any]) -> bool:
     )
 
 
-def _registry_ordering(record: Mapping[str, Any]) -> tuple[bool, list[str]]:
-    tool_calls = calls(record)
-    outputs_by_id = {
-        str(item.get("tool_call_id") or ""): item.get("output")
-        for item in output_wrappers(record)
-    }
-    return forecast_registry_order(tool_calls, outputs_by_id)
-
-
 def _record_contract(
     context: EvaluationContext,
     *,
@@ -311,6 +302,7 @@ def _pipeformer_checks(
     maximum_chars: int,
 ) -> list[MetricResult]:
     record = context.record
+    tool_calls = calls(record)
     tasks = task_views(record)
     referenced_ids = [
         str(task.get("tool_call_id")) for task in tasks if task.get("tool_call_id")
@@ -321,7 +313,11 @@ def _pipeformer_checks(
     successful = bool(
         trace_status in (None, "completed") and outputs and len(tasks) == len(outputs)
     )
-    registry_pass, unauthorized = _registry_ordering(record)
+    outputs_by_id = {
+        str(item.get("tool_call_id") or ""): item.get("output")
+        for item in output_wrappers(record)
+    }
+    registry_pass, unauthorized = forecast_registry_order(tool_calls, outputs_by_id)
     metrics = [
         metric(
             context,

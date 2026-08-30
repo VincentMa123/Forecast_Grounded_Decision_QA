@@ -11,8 +11,8 @@ from pipeclaw.backend.grounding.answer_limits import (
     chinese_comparison_max_chars,
 )
 from pipeclaw.backend.grounding.contract import (
-    GroundingContractBuilder,
     answer_without_machine_disclosure,
+    build_grounding_contract,
     comparison_answer_issues,
     provisional_assumption_disclosed,
     record_grounding_contract,
@@ -22,7 +22,7 @@ from pipeclaw.backend.grounding.evidence.tool import (
     attach_tool_arguments,
     requested_data_retrieved,
     tool_evidence_quality_issues,
-    tool_output_failed,
+    tool_evidence_unavailable,
 )
 from pipeclaw.backend.grounding.evidence.topology import (
     topology_quality_issues,
@@ -33,9 +33,9 @@ from pipeclaw.backend.evaluator.numeric_grounding import (
     numeric_claims_are_grounded,
 )
 from pipeclaw.backend.evaluator.quality_references import (
-    VARIABLE_REFERENCE,
     file_references,
     numeric_claim_values,
+    variable_references,
 )
 from pipeclaw.backend.evaluator.quality_context import (
     QualityContext,
@@ -283,8 +283,10 @@ def evaluate_answer_quality(
     record_evidence: Optional[Dict[str, Any]] = None,
     grounding_contract: Optional[Dict[str, Any]] = None,
 ) -> tuple[str, List[str]]:
+    """Evaluate generation inputs using the live trust boundary."""
+
     outputs = tool_outputs or []
-    base_issues = answer_quality_issues(
+    context = build_quality_context(
         answer=answer,
         question=question,
         pipeformer=pipeformer,
@@ -295,14 +297,9 @@ def evaluate_answer_quality(
     contract = (
         dict(grounding_contract)
         if grounding_contract is not None
-        else GroundingContractBuilder().build(question, outputs)
+        else build_grounding_contract(question, outputs)
     )
-    issues = _compose_answer_quality_issues(
-        base_issues,
-        answer=answer,
-        contract=contract,
-        tool_outputs=outputs,
-    )
+    issues = _answer_quality_core(context, contract)
     forecasts_pass = (pipeformer_call_count == 0 or bool(pipeformer_outputs)) and all(
         output.get("quality_flag") == "pass" for output in pipeformer_outputs
     )
@@ -314,16 +311,15 @@ def evaluate_answer_quality(
     return quality_flag, issues
 
 
-def _compose_answer_quality_issues(
-    base_issues: List[str],
-    *,
-    answer: str,
+def _answer_quality_core(
+    context: QualityContext,
     contract: Dict[str, Any],
-    tool_outputs: List[Dict[str, Any]],
 ) -> List[str]:
-    issues = list(base_issues)
-    issues.extend(comparison_answer_issues(answer, contract))
-    issues.extend(tool_evidence_quality_issues(tool_outputs))
+    """Evaluate one trusted context against its grounding contract."""
+
+    issues = _answer_quality_issues(context)
+    issues.extend(comparison_answer_issues(context.answer, contract))
+    issues.extend(tool_evidence_quality_issues(list(context.tool_outputs)))
     return list(dict.fromkeys(issues))
 
 
@@ -364,7 +360,7 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         dict(item.get("output") or {})
         for item in tool_outputs
         if item.get("name") == "run_pipeformer_forecast"
-        and not tool_output_failed(item)
+        and not tool_evidence_unavailable(item)
     ]
     state = VerifiedDecisionState.from_dict(dict(record.get("state_before") or {}))
     pipeformer = None
@@ -413,12 +409,7 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         tool_outputs=tool_outputs,
         record_evidence=record_evidence,
     )
-    return _compose_answer_quality_issues(
-        _answer_quality_issues(context),
-        answer=context.answer,
-        contract=contract,
-        tool_outputs=tool_outputs,
-    )
+    return _answer_quality_core(context, contract)
 
 
 def _absolute_assertion_is_grounded(answer: str, evidence: Any) -> bool:
@@ -519,7 +510,7 @@ def _counterfactual_supports_claim(answer: str, pipeformer: Dict[str, Any]) -> b
     claimed_variables = {
         variable
         for sentence in claim_sentences
-        for variable in VARIABLE_REFERENCE.findall(sentence)
+        for variable in variable_references(sentence)
     }
     return not claimed_variables or claimed_variables <= allowed_variables
 
@@ -538,9 +529,9 @@ def _proves_unique_nonpass_variable(pipeformer: Dict[str, Any]) -> bool:
 
 
 def _variable_references_are_grounded(answer: str, grounding_evidence: Any) -> bool:
-    claimed = set(VARIABLE_REFERENCE.findall(answer))
+    claimed = set(variable_references(answer))
     supported = set(
-        VARIABLE_REFERENCE.findall(json.dumps(grounding_evidence, ensure_ascii=False))
+        variable_references(json.dumps(grounding_evidence, ensure_ascii=False))
     )
     return claimed <= supported
 
@@ -566,7 +557,7 @@ def _has_unsupported_evidence_description(
         )
         engineering = dict(verification.get("engineering_evidence") or {})
         for category, payload in engineering.items():
-            for variable in VARIABLE_REFERENCE.findall(
+            for variable in variable_references(
                 json.dumps(payload, ensure_ascii=False)
             ):
                 typed_categories.setdefault(variable, set()).add(str(category))

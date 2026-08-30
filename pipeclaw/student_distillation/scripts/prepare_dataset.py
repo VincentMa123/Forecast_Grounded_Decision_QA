@@ -9,18 +9,18 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 from pipeclaw.backend.agent.prompt_policy import static_forecast_policy
-from pipeclaw.task2_student.path_contract import (
+from pipeclaw.student_distillation.path_contract import (
     canonicalize_recorded_tool_arguments,
     redact_host_paths,
 )
-from pipeclaw.task2_student.release_artifacts import (
+from pipeclaw.student_distillation.release_artifacts import (
     atomic_write_text as _atomic_write_text,
     sha256_bytes as _sha256_bytes,
     sha256_file as _sha256_file,
     stable_json,
     utc_now as _utc_now,
 )
-from pipeclaw.task2_student.scripts.validate_dataset import (
+from pipeclaw.student_distillation.scripts.validate_dataset import (
     DatasetValidationError,
     projection_writes_python,
     read_jsonl,
@@ -71,7 +71,7 @@ EXPECTED_SOURCE_COUNTS = {"train": 1073, "valid": 147, "test": 139}
 DEFAULT_SOURCE_ROOT = (
     REPO_ROOT / "pipeclaw" / "backend" / "generated_teacher_traces" / "splits"
 )
-DEFAULT_OUTPUT_ROOT = REPO_ROOT / "pipeclaw" / "task2_student" / "data"
+DEFAULT_OUTPUT_ROOT = REPO_ROOT / "pipeclaw" / "student_distillation" / "data"
 DEFAULT_MANIFEST_PATH = (
     DEFAULT_OUTPUT_ROOT / "manifests" / "task2_dataset_manifest.json"
 )
@@ -81,6 +81,19 @@ def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
     """Project one compact Task 1 record into the answer-only baseline."""
 
     validate_source_records([source], split=split, expected_count=1)
+    record = _project_answer_only(source, split)
+    validate_projection_records(
+        [record],
+        projection="answer_only",
+        split=split,
+        registered_tool_names=set(),
+    )
+    return record
+
+
+def _project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
+    """Build one answer-only row from a source already validated for its split."""
+
     source = redact_host_paths(source)
     record = _identity_fields(
         source,
@@ -100,12 +113,6 @@ def project_answer_only(source: dict[str, Any], split: str) -> dict[str, Any]:
             "loss": True,
         },
     ]
-    validate_projection_records(
-        [record],
-        projection="answer_only",
-        split=split,
-        registered_tool_names=set(),
-    )
     return record
 
 
@@ -117,15 +124,33 @@ def project_trace_level(
     """Project one compact Task 1 record into MS-SWIFT agent format."""
 
     validate_source_records([source], split=split, expected_count=1)
-    source = redact_host_paths(source)
     normalized_schemas, registered_names = _normalize_tool_schemas(tool_schemas)
+    record = _project_trace_level(source, split, normalized_schemas, registered_names)
+    validate_projection_records(
+        [record],
+        projection="trace_level",
+        split=split,
+        registered_tool_names=registered_names,
+    )
+    return record
+
+
+def _project_trace_level(
+    source: dict[str, Any],
+    split: str,
+    tool_schemas: Sequence[dict[str, Any]],
+    registered_names: set[str],
+) -> dict[str, Any]:
+    """Build one trace row from a source and normalized schemas."""
+
+    source = redact_host_paths(source)
     record = _identity_fields(
         source,
         split=split,
         projection="trace_level",
         example_id=str(source["sample_id"]),
     )
-    record["tools"] = stable_json(normalized_schemas)
+    record["tools"] = stable_json(tool_schemas)
     record["messages"] = [
         {
             "role": "system",
@@ -139,12 +164,6 @@ def project_trace_level(
             "loss": True,
         },
     ]
-    validate_projection_records(
-        [record],
-        projection="trace_level",
-        split=split,
-        registered_tool_names=registered_names,
-    )
     return record
 
 
@@ -156,8 +175,31 @@ def project_constraint_multitask(
     """Create nonempty structured auxiliary examples for the five Task 2 skills."""
 
     validate_source_records([source], split=split, expected_count=1)
-    source = redact_host_paths(source)
     normalized_schemas, registered_names = _normalize_tool_schemas(tool_schemas)
+    examples = _project_constraint_multitask(
+        source,
+        split,
+        normalized_schemas,
+        registered_names,
+    )
+    validate_projection_records(
+        examples,
+        projection="constraint_multitask",
+        split=split,
+        registered_tool_names=registered_names,
+    )
+    return examples
+
+
+def _project_constraint_multitask(
+    source: dict[str, Any],
+    split: str,
+    tool_schemas: Sequence[dict[str, Any]],
+    registered_names: set[str],
+) -> list[dict[str, Any]]:
+    """Build auxiliary rows from a source and normalized schemas."""
+
+    source = redact_host_paths(source)
     examples: list[dict[str, Any]] = []
 
     if source.get("parsed_task"):
@@ -173,7 +215,7 @@ def project_constraint_multitask(
 
     if source.get("tool_calls"):
         planning = _task_identity(source, split, "tool_planning")
-        planning["tools"] = stable_json(normalized_schemas)
+        planning["tools"] = stable_json(tool_schemas)
         planning["messages"] = [
             {
                 "role": "system",
@@ -233,12 +275,6 @@ def project_constraint_multitask(
         )
     )
 
-    validate_projection_records(
-        examples,
-        projection="constraint_multitask",
-        split=split,
-        registered_tool_names=registered_names,
-    )
     return examples
 
 
@@ -342,12 +378,12 @@ def generate_datasets(
         }
 
     projectors = {
-        "answer_only": lambda record, split: [project_answer_only(record, split)],
+        "answer_only": lambda record, split: [_project_answer_only(record, split)],
         "trace_level": lambda record, split: [
-            project_trace_level(record, split, tool_schemas)
+            _project_trace_level(record, split, tool_schemas, registered_names)
         ],
-        "constraint_multitask": lambda record, split: project_constraint_multitask(
-            record, split, tool_schemas
+        "constraint_multitask": lambda record, split: _project_constraint_multitask(
+            record, split, tool_schemas, registered_names
         ),
     }
     trace_records: dict[str, list[dict[str, Any]]] = {}

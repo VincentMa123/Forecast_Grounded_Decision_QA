@@ -11,11 +11,11 @@ from pipeclaw.backend.grounding.evidence.tool import (
     command_python_scripts,
     normalized_tool_path,
 )
-from pipeclaw.task2_student.path_contract import (
+from pipeclaw.student_distillation.path_contract import (
     is_host_absolute_path,
     redact_host_paths,
 )
-from pipeclaw.task2_student.release_artifacts import (
+from pipeclaw.student_distillation.release_artifacts import (
     read_jsonl_domain,
     required_text,
     sha256_bytes as _sha256_bytes,
@@ -857,7 +857,7 @@ def _validate_derived_identities(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    from pipeclaw.task2_student.scripts.prepare_dataset import (
+    from pipeclaw.student_distillation.scripts.prepare_dataset import (
         DEFAULT_MANIFEST_PATH,
         DEFAULT_OUTPUT_ROOT,
         DEFAULT_SOURCE_ROOT,

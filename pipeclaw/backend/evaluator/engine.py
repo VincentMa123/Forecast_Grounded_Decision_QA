@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from typing import Any
 
-from .adapters import AutonomousRolloutAdapter, TeacherTraceAdapter
+from .adapters import build_evaluation_context
 from .checks import evaluate_context
 from .models import (
     EVALUATION_SCHEMA_VERSION,
@@ -12,7 +12,7 @@ from .models import (
     EvaluationReport,
     MetricResult,
 )
-from .profiles import get_profile_policy
+from .profiles import DEFAULT_MAX_RECORD_CHARS, get_profile_policy
 
 
 def build_report(
@@ -92,44 +92,34 @@ def evaluate(
     *,
     profile: EvaluationProfile,
     reference: Mapping[str, Any] | None = None,
-    metrics: Iterable[MetricResult] | None = None,
     hard_issues: Iterable[str] | None = None,
     diagnostics: Mapping[str, Any] | None = None,
     minimum_score: float | None = None,
-    max_record_chars: int = 24_000,
+    max_record_chars: int = DEFAULT_MAX_RECORD_CHARS,
 ) -> EvaluationReport:
     """Normalize one input, run canonical checks, and build one report."""
 
     profile = EvaluationProfile(profile)
-    if profile is EvaluationProfile.TEACHER_TRACE:
-        context = TeacherTraceAdapter().adapt(
-            record,
-            hard_issues=hard_issues,
-            diagnostics=diagnostics,
-        )
-    else:
-        context = AutonomousRolloutAdapter().adapt(
-            record,
-            reference=reference,
-            hard_issues=hard_issues,
-            diagnostics=diagnostics,
-        )
-    evaluated_metrics = list(metrics) if metrics is not None else None
-    evaluated_issues = tuple(context.hard_issues)
+    context = build_evaluation_context(
+        profile,
+        record,
+        reference=reference,
+        hard_issues=hard_issues,
+        diagnostics=diagnostics,
+    )
     evaluated_diagnostics = dict(context.diagnostics)
-    if evaluated_metrics is None:
-        (
-            evaluated_metrics,
-            evaluated_issues,
-            check_diagnostics,
-        ) = evaluate_context(
-            context,
-            derive_hard_issues=(
-                profile is EvaluationProfile.TEACHER_TRACE and hard_issues is None
-            ),
-            maximum_chars=max_record_chars,
-        )
-        evaluated_diagnostics.update(check_diagnostics)
+    (
+        evaluated_metrics,
+        evaluated_issues,
+        check_diagnostics,
+    ) = evaluate_context(
+        context,
+        derive_hard_issues=(
+            profile is EvaluationProfile.TEACHER_TRACE and hard_issues is None
+        ),
+        maximum_chars=max_record_chars,
+    )
+    evaluated_diagnostics.update(check_diagnostics)
     return build_report(
         context.profile,
         evaluated_metrics,

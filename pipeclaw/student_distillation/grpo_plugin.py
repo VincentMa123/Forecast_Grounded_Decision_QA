@@ -12,17 +12,17 @@ _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from pipeclaw.task2_student.path_contract import canonicalize_recorded_tool_arguments
-from pipeclaw.task2_student.rollout.models import RolloutResult
-from pipeclaw.task2_student.rollout.runner import execution_success, schema_valid
-from pipeclaw.task2_student.rollout.scenarios import ScenarioPolicy, build_dispatcher
-from pipeclaw.task2_student.rollout.tools import append_tool_exchange, parse_tool_calls
-from pipeclaw.task2_student.scripts.pass_at_k import composite_reward, episode_stats
+from pipeclaw.student_distillation.path_contract import canonicalize_recorded_tool_arguments
+from pipeclaw.student_distillation.rollout.episode import dispatch_and_record
+from pipeclaw.student_distillation.rollout.models import RolloutResult
+from pipeclaw.student_distillation.rollout.scenarios import ScenarioPolicy, build_dispatcher
+from pipeclaw.protocols.tool_calls import parse_tool_calls
+from pipeclaw.student_distillation.reward import composite_reward, episode_stats
 
 from swift.rewards import ORM, orms
 from swift.rollout.multi_turn import MultiTurnScheduler, multi_turns
 
-_GRPO_WORKSPACES = _ROOT / "pipeclaw/task2_student/outputs/grpo/workspaces"
+_GRPO_WORKSPACES = _ROOT / "pipeclaw/student_distillation/outputs/grpo/workspaces"
 
 
 class PythonScenarioScheduler(MultiTurnScheduler):
@@ -131,13 +131,15 @@ class PythonScenarioScheduler(MultiTurnScheduler):
     def _dispatch_calls(
         self, state: dict, infer_request: Any, calls: Sequence[Any]
     ) -> None:
-        for call in calls:
-            normalized = state["dispatcher"].schema_normalized_call(call)
+        dispatcher = state["dispatcher"]
+
+        def dispatch_locked(call: Any) -> Mapping[str, Any]:
             with self._lock:
-                tool_result = state["dispatcher"].dispatch(normalized)
+                return dispatcher.dispatch(call)
+
+        def report_unknown(call: Any, tool_result: Mapping[str, Any]) -> None:
             if (
-                isinstance(tool_result, Mapping)
-                and tool_result.get("error_code") == "unknown_tool"
+                tool_result.get("error_code") == "unknown_tool"
                 and not state.get("_unknown_reported")
             ):
                 state["_unknown_reported"] = True
@@ -146,28 +148,26 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                         "call": call.name,
                         "plugin": __file__,
                         "scenario_type": state.get("scenario_type"),
-                        "schemas": sorted(state["dispatcher"].schemas),
-                        "allowed": sorted(state["dispatcher"].allowed_names),
+                        "schemas": sorted(dispatcher.schemas),
+                        "allowed": sorted(dispatcher.allowed_names),
                     }
                 ]
-            compact = self._policy.compact_tool_result(normalized, tool_result)
-            state["tool_calls"].append(
-                {
-                    "tool_call_id": call.call_id,
-                    "name": call.name,
-                    "arguments": canonicalize_recorded_tool_arguments(
-                        call.name, normalized.arguments
-                    ),
-                    "execution_success": execution_success(tool_result),
-                    "schema_valid": schema_valid(tool_result),
-                }
-            )
-            state["tool_outputs"].append(
-                {"tool_call_id": call.call_id, "name": call.name, "output": compact}
-            )
-            append_tool_exchange(
-                infer_request.messages, call, compact, assistant_content=""
-            )
+
+        dispatch_and_record(
+            calls,
+            dispatcher=dispatcher,
+            messages=infer_request.messages,
+            tool_calls=state["tool_calls"],
+            tool_outputs=state["tool_outputs"],
+            record_arguments=lambda call: canonicalize_recorded_tool_arguments(
+                call.name, call.arguments
+            ),
+            compact_result=lambda call, tool_result, portability: self._policy.compact_tool_result(
+                call, tool_result, portability=portability
+            ),
+            dispatch=dispatch_locked,
+            on_result=report_unknown,
+        )
 
     @staticmethod
     def _cleanup_workspace(state: Mapping[str, Any]) -> None:

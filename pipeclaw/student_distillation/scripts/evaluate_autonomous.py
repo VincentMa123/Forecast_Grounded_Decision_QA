@@ -4,7 +4,7 @@ import argparse
 import json
 from typing import Sequence
 
-from pipeclaw.task2_student.rollout.suite import evaluate_dataset
+from pipeclaw.student_distillation.rollout.suite import evaluate_dataset
 
 
 def build_parser() -> argparse.ArgumentParser:

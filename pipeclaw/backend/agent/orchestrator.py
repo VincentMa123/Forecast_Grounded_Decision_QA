@@ -29,12 +29,12 @@ from pipeclaw.backend.grounding.decision_trace_state import (
     transition_forecast_scope,
 )
 from pipeclaw.backend.grounding.contract import (
-    GroundingContractBuilder,
+    build_grounding_contract,
     finalize_applied_disturbance_disclosure,
 )
 from pipeclaw.backend.agent.prompt_policy import candidate_contract_message
 from pipeclaw.backend.pipeline.forecast.registry_contract import forecast_registry_failure_result
-from pipeclaw.task2_student.rollout.tools import (
+from pipeclaw.protocols.tool_calls import (
     ToolCall,
     coerce_schema_value,
     parse_tool_calls,
@@ -63,7 +63,7 @@ def finalize_runtime_answer(
                 state,
                 dict(item.get("arguments") or {}),
             )
-    contract = GroundingContractBuilder().build(
+    contract = build_grounding_contract(
         question,
         completed_tool_calls,
         require_decision_policy=True,

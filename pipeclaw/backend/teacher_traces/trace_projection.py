@@ -14,7 +14,7 @@ from pipeclaw.backend.grounding.evidence.tool import (
     command_python_scripts,
     normalized_tool_path,
     requested_artifacts,
-    tool_output_failed,
+    tool_evidence_unavailable,
 )
 from pipeclaw.backend.pipeline.forecast.registry_contract import (
     authorize_forecast_registry,
@@ -23,7 +23,7 @@ from pipeclaw.backend.pipeline.forecast.result import (
     COMPACT_COMPARABLE_METRIC_KEYS,
     ForecastResult,
 )
-from pipeclaw.backend.task1.trace_history import compact_tool_call_arguments
+from pipeclaw.backend.teacher_traces.trace_history import compact_tool_call_arguments
 
 
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
@@ -258,7 +258,7 @@ class TeacherTraceProjector:
         successful = [
             pair
             for pair in pairs
-            if pair[2] is not None and not tool_output_failed(pair[2])
+            if pair[2] is not None and not tool_evidence_unavailable(pair[2])
         ]
         successful_pipeformer = [
             pair

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..models import EvaluationContext, EvaluationProfile, MetricResult
+from ..profiles import DEFAULT_MAX_RECORD_CHARS
 from .assumptions import assumption_consistency, inferred_task_fields
 from .autonomous import evaluate_autonomous_checks
 from .common import CANONICAL_METRIC_NAMES
@@ -15,7 +16,7 @@ def evaluate_context(
     context: EvaluationContext,
     *,
     derive_hard_issues: bool = False,
-    maximum_chars: int = 24_000,
+    maximum_chars: int = DEFAULT_MAX_RECORD_CHARS,
 ) -> tuple[list[MetricResult], tuple[str, ...], dict[str, Any]]:
     if context.profile is EvaluationProfile.TEACHER_TRACE:
         return evaluate_teacher_checks(

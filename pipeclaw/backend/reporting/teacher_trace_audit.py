@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 from pipeclaw.backend.evaluator.checks.teacher import TEACHER_TRACE_REQUIRED_FIELDS
 from pipeclaw.backend.grounding.evidence.tool import (
     attach_tool_arguments,
-    tool_output_failed,
+    tool_evidence_unavailable,
 )
 
 
@@ -279,8 +279,8 @@ def _evaluation_row(record: Mapping[str, Any], native: Mapping[str, Any]) -> dic
         "task1_failed_checks": failed,
         "evidence_item_count": TeacherTraceQualityAuditor.evidence_item_count(record.get("evidence") or {}),
         "final_answer_chars": len(str(record.get("final_answer") or "")),
-        "successful_tool_output_count": sum(not tool_output_failed(item) for item in outputs),
-        "failed_tool_output_count": sum(tool_output_failed(item) for item in outputs),
+        "successful_tool_output_count": sum(not tool_evidence_unavailable(item) for item in outputs),
+        "failed_tool_output_count": sum(tool_evidence_unavailable(item) for item in outputs),
         "checks": checks,
     }
 

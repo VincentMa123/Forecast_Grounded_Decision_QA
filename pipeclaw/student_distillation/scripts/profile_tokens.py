@@ -12,7 +12,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, Protocol
 
-from pipeclaw.task2_student.release_artifacts import (
+from pipeclaw.student_distillation.release_artifacts import (
     atomic_write_text as _atomic_write_text,
     read_jsonl_domain,
     required_text,
@@ -48,7 +48,7 @@ FIELD_NAMES = (
 )
 DEFAULT_LOSS_SCALE = "default+ignore_empty_think"
 REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_DATA_ROOT = REPO_ROOT / "pipeclaw" / "task2_student" / "data"
+DEFAULT_DATA_ROOT = REPO_ROOT / "pipeclaw" / "student_distillation" / "data"
 DEFAULT_MANIFEST_PATH = DEFAULT_DATA_ROOT / "manifests" / "task2_dataset_manifest.json"
 DEFAULT_SUMMARY_PATH = (
     DEFAULT_DATA_ROOT / "token_profiles" / "qwen35_08b_token_profile.json"

@@ -12,8 +12,9 @@ from ..path_contract import (
     is_host_absolute_path,
     redact_host_paths,
 )
-from .models import PromptCase, ToolCall
+from .models import PromptCase
 from .tools import ToolDispatcher
+from pipeclaw.protocols.tool_calls import ToolCall
 
 
 OPENCLAW_PYTHON_COMMANDS = {"python", "python3", "py"}

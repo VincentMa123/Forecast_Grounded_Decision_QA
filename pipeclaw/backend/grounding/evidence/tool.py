@@ -50,7 +50,7 @@ class ToolEvidenceAssessment:
         return self.state is ToolEvidenceState.CONTENT_EVIDENCE
 
 
-def tool_result_failed(output: Any) -> bool:
+def tool_execution_failed(output: Any) -> bool:
     return bool(
         output.get("success") is False
         or output.get("error")
@@ -163,7 +163,7 @@ def classify_tool_evidence(
             ToolEvidenceState.NO_EVIDENCE, "empty_tool_result"
         )
 
-    if tool_result_failed(output):
+    if tool_execution_failed(output):
         return ToolEvidenceAssessment(
             ToolEvidenceState.EXECUTION_FAILED, "tool_execution_failed"
         )
@@ -268,8 +268,8 @@ def classify_tool_evidence(
     )
 
 
-def tool_output_failed(output: Any) -> bool:
-    """Compatibility predicate: only evidence-bearing output can ground a trace."""
+def tool_evidence_unavailable(output: Any) -> bool:
+    """Return whether a tool result cannot provide grounding evidence."""
     return not classify_tool_evidence(output).evidence_found
 
 

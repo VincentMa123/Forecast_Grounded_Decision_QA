@@ -6,8 +6,8 @@ import json
 from typing import Any, Dict, Iterable, Optional
 
 from pipeclaw.backend.grounding.contract import (
-    GroundingContractBuilder,
     applied_disturbance_disclosure,
+    build_grounding_contract,
 )
 
 
@@ -87,7 +87,7 @@ def candidate_contract_message(
 ) -> Optional[str]:
     """Render accumulated multi-candidate facts for the next model request."""
     results = [dict(item) for item in tool_results]
-    contract = GroundingContractBuilder().build(
+    contract = build_grounding_contract(
         question,
         results,
         decision_policy=decision_policy,
@@ -130,10 +130,7 @@ def candidate_contract_message(
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        required_disclosure = applied_disturbance_disclosure(
-            question,
-            contract,
-        )
+        required_disclosure = applied_disturbance_disclosure(contract)
         return (
             "CURRENT PIPEFORMER FORECAST ANSWER CONTRACT\n"
             f"Required disturbance disclosure (copy verbatim): {required_disclosure}\n"
@@ -159,10 +156,7 @@ def candidate_contract_message(
         "candidate_results": candidates,
         "decision_summary": decision_summary,
         "comparison_leaders": contract.get("comparison_leaders") or {},
-        "required_application_disclosure": applied_disturbance_disclosure(
-            question,
-            contract,
-        ),
+        "required_application_disclosure": applied_disturbance_disclosure(contract),
         "worst_case_risk_level": contract.get("worst_case_risk_level"),
         "worst_case_intervention_label": contract.get(
             "worst_case_intervention_label"

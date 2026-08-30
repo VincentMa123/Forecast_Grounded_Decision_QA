@@ -1,7 +1,7 @@
 # GRPO stage: python-scenario reliability training on the SFT checkpoint.
 # Launch from the repository root in the task2-ms-swift env:
 #
-#   swift rlhf pipeclaw/task2_student/configs/qwen35_9b_grpo.yaml --rlhf_type grpo
+#   swift rlhf pipeclaw/student_distillation/configs/qwen35_9b_grpo.yaml --rlhf_type grpo
 #
 # Before the first real run, execute the preflight in grpo_plugin.py's docstring
 # (python -c import check + a 1-step smoke with --max_steps 1).
@@ -25,15 +25,15 @@ model: Qwen/Qwen3.5-9B
 # version, merge first (swift export --merge_lora true --adapters "$CKPT") and point
 # `model:` at the merged directory instead.
 adapters:
-  - pipeclaw/task2_student/outputs/qwen35_9b_32l_trace_level/checkpoint-44
+  - pipeclaw/student_distillation/outputs/qwen35_9b_32l_trace_level/checkpoint-44
 use_hf: false
-output_dir: pipeclaw/task2_student/outputs/qwen35_9b_grpo
+output_dir: pipeclaw/student_distillation/outputs/qwen35_9b_grpo
 add_version: false
 
 dataset:
-  - pipeclaw/task2_student/data/grpo/rl_train.jsonl
+  - pipeclaw/student_distillation/data/grpo/rl_train.jsonl
 external_plugins:
-  - pipeclaw/task2_student/grpo_plugin.py
+  - pipeclaw/student_distillation/grpo_plugin.py
 
 multi_turn_scheduler: python_scenario_scheduler
 reward_funcs:

@@ -14,18 +14,8 @@ class PromptCase:
     scenario_type: str
     messages: list[dict[str, Any]]
     tools: list[dict[str, Any]]
-    source_record: dict[str, Any]
+    source_record: Mapping[str, Any]
     workspace_root: Path | None = None
-
-
-@dataclass(frozen=True)
-class ToolCall:
-    """A normalized function call emitted by a model."""
-
-    call_id: str
-    name: str
-    arguments: dict[str, Any]
-    raw: Any
 
 
 @dataclass(frozen=True)
@@ -50,72 +40,6 @@ class Generator(Protocol):
     ) -> Any:
         """Generate one response for the current conversation."""
         raise NotImplementedError
-
-
-def as_mapping(value: Any) -> Mapping[str, Any] | None:
-    """View an SDK response object as a mapping when possible."""
-
-    if isinstance(value, Mapping):
-        return value
-    if value is None:
-        return None
-    if hasattr(value, "model_dump"):
-        try:
-            dumped = value.model_dump()
-            if isinstance(dumped, Mapping):
-                return dumped
-        except Exception:
-            pass
-    if hasattr(value, "dict"):
-        try:
-            dumped = value.dict()
-            if isinstance(dumped, Mapping):
-                return dumped
-        except Exception:
-            pass
-    # Lightweight SDK response objects are sometimes plain classes rather than
-    # pydantic models.  Expose the small set of fields needed by the parser.
-    fields = (
-        "id",
-        "type",
-        "function",
-        "name",
-        "arguments",
-        "content",
-        "tool_calls",
-        "choices",
-        "message",
-    )
-    attrs = {field: getattr(value, field) for field in fields if hasattr(value, field)}
-    if attrs:
-        return attrs
-    return None
-
-
-def get_field(value: Any, key: str, default: Any = None) -> Any:
-    """Read one field from a mapping-like or attribute-based response object."""
-
-    mapped = as_mapping(value)
-    if mapped is not None:
-        return mapped.get(key, default)
-    return getattr(value, key, default)
-
-
-def jsonable(value: Any) -> Any:
-    """Convert SDK response objects into JSON-compatible values."""
-
-    if value is None or isinstance(value, (str, int, float, bool)):
-        return value
-    if isinstance(value, Mapping):
-        return {str(key): jsonable(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [jsonable(item) for item in value]
-    mapped = as_mapping(value)
-    if mapped is not None:
-        return {str(key): jsonable(item) for key, item in mapped.items()}
-    return str(value)
-
-
 @dataclass
 class RolloutResult:
     """The complete trajectory of one bounded model/tool conversation.

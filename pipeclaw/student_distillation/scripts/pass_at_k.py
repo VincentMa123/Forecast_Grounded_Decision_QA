@@ -7,17 +7,18 @@ import sys
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
-from pipeclaw.task2_student.release_artifacts import (
+from pipeclaw.student_distillation.release_artifacts import (
     atomic_jsonl_writer,
     atomic_write_text,
 )
-from pipeclaw.task2_student.rollout.models import RolloutConfig
-from pipeclaw.task2_student.rollout.prompting import PromptCaseBuilder
-from pipeclaw.task2_student.rollout.scenarios import (
+from pipeclaw.student_distillation.reward import composite_reward, episode_stats
+from pipeclaw.student_distillation.rollout.models import RolloutConfig
+from pipeclaw.student_distillation.rollout.prompting import build_prompt_case
+from pipeclaw.student_distillation.rollout.scenarios import (
     evaluation_workspace_key,
     workspace_for,
 )
-from pipeclaw.task2_student.rollout.suite import (
+from pipeclaw.student_distillation.rollout.suite import (
     read_jsonl,
     release_cuda_cache,
     sample_keys,
@@ -29,34 +30,6 @@ from tqdm.auto import tqdm
 
 RUN_TOOL = "run_command"
 TOPOLOGY_TOOL = "analyze_pipeline_topology"
-# Policy-ladder rejects priced identically to sandbox_violation; keep in one
-# shared lane or each dodge reopens with its own price discovery.
-_PRECONDITION_REJECTS = (
-    "sandbox_violation",
-    "forecast_registry_precondition_failed",
-    "decision_metric_used_as_output_state_variable",
-    "duplicate_equivalent_forecast",
-    "decision_policy_source_not_in_current_user_request",
-)
-# Any of these means the episode died before presenting a real final answer.
-_ERROR_CODES = (
-    "python_syntax_error",
-    "sandbox_violation",
-    "tool_arguments_schema_invalid",
-    "duplicate_failed_tool_call",
-    "invalid_arguments",
-    "unknown_tool",
-    "tool_not_allowed",
-    *_PRECONDITION_REJECTS,
-)
-_ABORT_STATUSES = frozenset(
-    {
-        "max_turns_exceeded",
-        "max_completion_length",
-        "empty_response",
-        "generation_error",
-    }
-)
 
 
 def select_python_scenarios(
@@ -97,7 +70,7 @@ def training_system_prompt(record: Mapping[str, Any]) -> str:
     use frozen_system_prompt() with the released trace_level data when the
     model must see the exact SFT prompt distribution.
     """
-    from pipeclaw.task2_student.scripts.prepare_dataset import trace_system_content
+    from pipeclaw.student_distillation.scripts.prepare_dataset import trace_system_content
 
     return trace_system_content(dict(record))
 
@@ -116,58 +89,6 @@ def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
                     str(record.get("sample_id") or record.get("example_id") or "")
                 ] = str(message["content"])
     return frozen
-
-
-def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
-    """Rule-based per-episode stats used by the gate and the GRPO reward."""
-    errors = {code: 0 for code in _ERROR_CODES}
-    first_run: Mapping[str, Any] | None = None
-    for output in rollout.get("tool_outputs") or []:
-        payload = output.get("output")
-        if not isinstance(payload, Mapping):
-            continue
-        code = payload.get("error_code")
-        if code in errors:
-            errors[code] += 1
-        if output.get("name") == RUN_TOOL and first_run is None:
-            first_run = payload
-    first_run_compile = bool(
-        first_run
-        and first_run.get("exit_code") is not None
-        and first_run.get("error_code") != "python_syntax_error"
-    )
-    calls = rollout.get("tool_calls") or []
-    failed_signatures: dict[str, int] = {}
-    success_signatures: dict[str, int] = {}
-    for call, output in zip(calls, rollout.get("tool_outputs") or []):
-        payload = output.get("output") if isinstance(output, Mapping) else None
-        succeeded = call.get("execution_success") is not False and (
-            not isinstance(payload, Mapping)
-            or payload.get("success", True) is not False
-        )
-        signature = json.dumps(
-            [call.get("name"), call.get("arguments")], sort_keys=True, default=str
-        )
-        pool = success_signatures if succeeded else failed_signatures
-        pool[signature] = pool.get(signature, 0) + 1
-    thrash = sum(count - 1 for count in failed_signatures.values() if count > 1)
-    duplicate_success = sum(
-        count - 1 for count in success_signatures.values() if count > 1
-    )
-    return {
-        "turns": rollout.get("turns", 0),
-        "trace_status": rollout.get("trace_status", ""),
-        "first_run_compile": first_run_compile,
-        "first_run_exit0": first_run is not None and first_run.get("exit_code") == 0,
-        "error_counts": errors,
-        "thrash_count": thrash,
-        "duplicate_success_count": duplicate_success,
-        # error_codes cover only sandbox/audit rejections; plain exit!=0 failures
-        # arrive with error_code=None, so track failed calls directly.
-        "failed_call_count": sum(failed_signatures.values()),
-        "malformed_json": bool(rollout.get("json_errors")),
-        "timeout_hit": rollout.get("trace_status") in _ABORT_STATUSES,
-    }
 
 
 def _schemas_for(
@@ -320,41 +241,6 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     }
 
 
-def composite_reward(
-    stats: Mapping[str, Any], report_fields: Mapping[str, Any]
-) -> float:
-    """Dense rule reward; mirrors the GRPO plugin so the gate measures what RL sees."""
-    reward = 0.0
-    reward += 0.55 * float(report_fields.get("overall_score") or 0.0) / 100.0
-    reward += 0.20 * (1.0 if report_fields.get("hard_gate_passed") else 0.0)
-    reward += 0.10 * (1.0 if stats["first_run_compile"] else 0.0)
-    reward += 0.05 * (1.0 if stats["first_run_exit0"] else 0.0)
-    reward += 0.05 * (1.0 if report_fields.get("passed") else 0.0)
-    reward -= 0.05 * (1.0 if stats["timeout_hit"] else 0.0)
-    reward -= min(0.15, 0.05 * int(stats["thrash_count"]))
-    reward -= 0.10 * (1.0 if stats["malformed_json"] else 0.0)
-    # Repeated identical *successful* calls are free in rollout training but
-    # rejected by the live audit layer; make them cost reward here too.
-    reward -= min(0.06, 0.02 * int(stats.get("duplicate_success_count", 0)))
-    # Rotated-arg retry loops dodge the identical-signature thrash signature;
-    # count every failed call past the first (the first failure is free: an
-    # honest one-shot error is information, not a loop).
-    reward -= min(0.10, 0.05 * max(0, int(stats.get("failed_call_count", 0)) - 1))
-    # A sandbox-policy attempt is the cheapest possible reject: the tool never
-    # validates arguments, the failure costs only the free allowance. Its
-    # precondition siblings (registry-less forecast, metric-guarded forecast,
-    # duplicate forecast, decision-policy quote rejects) inherit the same
-    # ladder — the bare attempt and the metric-padded dodge must BOTH lose to
-    # stop-and-declare (AGENTS rule 3).
-    reward -= 0.10 * float(
-        any(stats.get("error_counts", {}).get(code) for code in _PRECONDITION_REJECTS)
-    )
-    # A recovery bonus (+0.05 for pass-with-any-failure) enabled the "1 junk
-    # fail then pass outscores clean" exploit; ranking is already safe via the
-    # penalty ladders above, so no bonus is emitted.
-    return round(reward, 6)
-
-
 def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     records = read_jsonl(Path(args.source))
     if getattr(args, "all_scenarios", False):
@@ -399,7 +285,6 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
 
     from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
 
-    builder = PromptCaseBuilder()
     all_schemas = _union_schemas(sources, schemas_by_key)
     runner = _build_runner(args, all_schemas)
     rows: list[dict[str, Any]] = []
@@ -417,7 +302,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
         for source in sources:
             case_schemas = (
                 _schemas_for(source, schemas_by_key)
-                or builder.build(
+                or build_prompt_case(
                     source,
                     workspace_root=workspace_for(output_dir, "schema-probe"),
                 ).tools
@@ -431,7 +316,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             for temp in args.temps:
                 for k in range(args.episodes):
                     env_key = f"{evaluation_workspace_key(source)}__k{k}__t{temp:.2f}"
-                    case = builder.build(
+                    case = build_prompt_case(
                         source,
                         workspace_root=workspace_for(output_dir, env_key),
                         tool_schemas=case_schemas,
@@ -526,18 +411,18 @@ def _union_schemas(
 
 def _build_runner(args: argparse.Namespace, schemas: Sequence[Mapping[str, Any]]):
     if getattr(args, "execution_mode", "raw-student") == "production-agent":
-        from pipeclaw.task2_student.rollout.production_agent import (
+        from pipeclaw.student_distillation.rollout.production_agent import (
             ProductionAgentRunner,
         )
 
         return ProductionAgentRunner()
 
-    from pipeclaw.task2_student.rollout.runner import RolloutRunner
-    from pipeclaw.task2_student.rollout.scenarios import (
+    from pipeclaw.student_distillation.rollout.runner import RolloutRunner
+    from pipeclaw.student_distillation.rollout.scenarios import (
         ScenarioPolicy,
         build_openclaw_dispatcher,
     )
-    from pipeclaw.task2_student.rollout.swift_generator import (
+    from pipeclaw.student_distillation.rollout.swift_generator import (
         SwiftGenerator,
         discover_base_model,
     )
@@ -564,7 +449,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--adapters", help="LoRA adapter checkpoint directory")
     parser.add_argument("--model", help="Base model id/path when no --adapters")
     parser.add_argument(
-        "--output-dir", default="pipeclaw/task2_student/outputs/evaluation/pass_at_k"
+        "--output-dir", default="pipeclaw/student_distillation/outputs/evaluation/pass_at_k"
     )
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--temps", type=float, nargs="+", default=[0.7, 1.0])

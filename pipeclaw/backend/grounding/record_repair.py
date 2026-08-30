@@ -9,8 +9,8 @@ from .answer_limits import (
     chinese_comparison_max_chars,
 )
 from .contract import (
-    GroundingContractBuilder,
     canonical_applied_disturbance_lines,
+    build_grounding_contract,
     forecast_views,
     format_number,
     grounded_fallback_answer,
@@ -93,7 +93,7 @@ def _single_forecast_answer(question: str, tool_result: Dict[str, Any]) -> str:
     output = dict(tool_result.get("output") or {})
     prediction, verification = forecast_views(output)
     chinese = is_chinese(question)
-    contract = GroundingContractBuilder().build(question, [tool_result])
+    contract = build_grounding_contract(question, [tool_result])
     lines: List[str] = canonical_applied_disturbance_lines(contract)
     comparison = dict(prediction.get("counterfactual_comparison") or {})
     impact_count = comparison.get("nonzero_impacted_variable_count")
@@ -208,15 +208,17 @@ def _compact_answer(answer: str, maximum_chars: int) -> str:
 def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
     """Repair supported answers from stored evidence without an LLM call."""
     repaired = dict(record)
+    question = str(repaired.get("user_input") or "")
     tool_results = attach_tool_arguments(
         repaired.get("tool_outputs") or [], repaired.get("tool_calls") or []
     )
-    contract = GroundingContractBuilder().build(
-        str(repaired.get("user_input") or ""),
+    contract = build_grounding_contract(
+        question,
         tool_results,
         decision_policy=dict(repaired.get("decision_policy") or {}) or None,
     )
-    repaired["answer_mode"] = contract.get("answer_mode")
+    answer_mode = contract.get("answer_mode")
+    repaired["answer_mode"] = answer_mode
     repaired["grounding_contract"] = contract
     repaired["decision_summary"] = dict(contract.get("decision_summary") or {})
     issues = {str(value) for value in repaired.get("quality_issues") or []}
@@ -225,11 +227,9 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
     )
     pipeformer_results = successful_pipeformer_results(tool_results)
 
-    if contract.get("answer_mode") == "dispatch_comparison":
+    if answer_mode == "dispatch_comparison":
         decision = dict(contract.get("decision_summary") or {})
-        repaired["final_answer"] = grounded_fallback_answer(
-            str(repaired.get("user_input") or ""), contract
-        )
+        repaired["final_answer"] = grounded_fallback_answer(question, contract)
         repaired["risk_level"] = contract.get("worst_case_risk_level")
         repaired["manual_intervention_label"] = contract.get(
             "worst_case_intervention_label"
@@ -247,9 +247,9 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
         legacy_method == "offline_deterministic_repair"
         or bool(issues & {"answer_too_long", "unsupported_unit_claim"})
     )
-    if contract.get("answer_mode") != "dispatch_comparison" and should_render_single:
+    if answer_mode != "dispatch_comparison" and should_render_single:
         repaired["final_answer"] = _single_forecast_answer(
-            str(repaired.get("user_input") or ""), pipeformer_results[0]
+            question, pipeformer_results[0]
         )
         output = dict(pipeformer_results[0].get("output") or {})
         _, verification = forecast_views(output)
@@ -282,7 +282,7 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
     if "answer_too_long" in issues:
         maximum_chars = (
             chinese_comparison_max_chars(len(contract.get("candidate_results") or []))
-            if contract.get("answer_mode") == "dispatch_comparison"
+            if answer_mode == "dispatch_comparison"
             else CHINESE_SINGLE_FORECAST_MAX_CHARS
             if repaired.get("scenario_type") == "pipeformer"
             else GENERIC_MAX_CHARS

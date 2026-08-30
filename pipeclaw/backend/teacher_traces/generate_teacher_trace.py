@@ -29,7 +29,7 @@ from pipeclaw.backend.grounding.decision_trace_state import (
     serialize_verified_decision_state,
 )
 from pipeclaw.backend.grounding.contract import (
-    GroundingContractBuilder,
+    build_grounding_contract,
     comparison_answer_issues,
     finalize_applied_disturbance_disclosure,
     grounded_fallback_answer,
@@ -59,13 +59,13 @@ from pipeclaw.backend.pipeline.scenario_preflight import validate_scenario_sourc
 from pipeclaw.backend.pipeline.teacher_trace_store import (
     TeacherTraceStore,
 )
-from pipeclaw.backend.task1.trace_history import build_history_turn
-from pipeclaw.backend.task1.trace_projection import (
+from pipeclaw.backend.teacher_traces.trace_history import build_history_turn
+from pipeclaw.backend.teacher_traces.trace_projection import (
     export_trace_tools,
     final_answer,
 )
-from pipeclaw.backend.task1.trace_export import write_split_records
-from pipeclaw.backend.task1.trace_sources import (
+from pipeclaw.backend.teacher_traces.trace_export import write_split_records
+from pipeclaw.backend.teacher_traces.trace_sources import (
     combined_preflight_sources,
     default_scenario_files,
     flatten_source_scenarios,
@@ -102,9 +102,7 @@ def scenario_evidence_text(scenario: Dict[str, Any], question: str) -> str:
 def agent_turn_message(
     scenario: Dict[str, Any],
     question: str,
-    history: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    del history
     description = str(scenario.get("scenario_description") or "").strip()
     parts = []
     if description:
@@ -199,19 +197,16 @@ def build_parser() -> argparse.ArgumentParser:
 DEFAULT_NATIVE_EVALUATOR = NativeTraceEvaluator()
 
 
-def build_teacher_record(
-    scenario: Dict[str, Any],
+def _project_forecast_fields(
     question: str,
     trace: Dict[str, Any],
+    conversation_context: Optional[List[Dict[str, Any]]],
     *,
-    source_session_id: str = "session_001",
-    turn_id: int = 1,
-    conversation_context: Optional[List[Dict[str, Any]]] = None,
-    split: str = "train",
+    verified_state_max_chars: int,
+    recent_turns_max_chars: int,
 ) -> Dict[str, Any]:
-    dataset_source = str(scenario.get("dataset_source") or "unknown_source")
-    scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
-    record_id = f"{dataset_source}:{source_session_id}::turn_{turn_id:03d}"
+    """Project tool output into legacy forecast fields and trusted state."""
+
     tool_calls, tool_outputs, pipeformer_results = export_trace_tools(trace)
     pipeformer_call_count = sum(
         item.get("tool_name") == "run_pipeformer_forecast"
@@ -221,14 +216,14 @@ def build_teacher_record(
     history_state = VerifiedDecisionState.from_history(conversation_context or [])
     state_before = serialize_verified_decision_state(
         history_state,
-        max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+        max_chars=verified_state_max_chars,
     )
     recent_turns = bounded_recent_turns(
         conversation_context or [],
         max_turns=2,
-        max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+        max_chars=recent_turns_max_chars,
     )
-    grounding_contract = GroundingContractBuilder().build(
+    grounding_contract = build_grounding_contract(
         question,
         grounded_tool_outputs,
         prior_candidate_results=history_state.candidate_results,
@@ -253,10 +248,6 @@ def build_teacher_record(
     projections = [item["projection"] for item in pipeformer_results]
     pipeformer = pipeformer_outputs[0] if len(pipeformer_outputs) == 1 else None
     projection = projections[0] if len(projections) == 1 else None
-    answer = final_answer(trace).strip()
-    original_answer = answer
-    answer = finalize_applied_disturbance_disclosure(answer, grounding_contract)
-    disclosure_repair_applied = answer != original_answer
     parsed_task: Dict[str, Any] = {}
     prediction_summary: Dict[str, Any] = {}
     constraint_check: Dict[str, Any] = {}
@@ -265,10 +256,10 @@ def build_teacher_record(
     manual_intervention_label = None
     dispatch_recommendation = None
     if pipeformer and projection:
-        parsed_task = projection["parsed_task"]
-        prediction_summary = projection["prediction_summary"]
-        constraint_check = projection["constraint_check"]
-        evidence = projection["evidence"]
+        parsed_task = deepcopy(projection["parsed_task"])
+        prediction_summary = deepcopy(projection["prediction_summary"])
+        constraint_check = deepcopy(projection["constraint_check"])
+        evidence = deepcopy(projection["evidence"])
         risk_level = pipeformer.get("risk_level")
         manual_intervention_label = pipeformer.get("manual_intervention_label")
         dispatch_recommendation = pipeformer.get("dispatch_recommendation")
@@ -308,33 +299,70 @@ def build_teacher_record(
             )
             or ""
         )
+    return {
+        "tool_calls": tool_calls,
+        "tool_outputs": tool_outputs,
+        "grounded_tool_outputs": grounded_tool_outputs,
+        "pipeformer_call_count": pipeformer_call_count,
+        "pipeformer_results": pipeformer_results,
+        "pipeformer_outputs": pipeformer_outputs,
+        "pipeformer": pipeformer,
+        "grounding_contract": grounding_contract,
+        "state_before": state_before,
+        "recent_turns": recent_turns,
+        "parsed_task": parsed_task,
+        "prediction_summary": prediction_summary,
+        "constraint_check": constraint_check,
+        "evidence": evidence,
+        "risk_level": risk_level,
+        "manual_intervention_label": manual_intervention_label,
+        "dispatch_recommendation": dispatch_recommendation,
+    }
+
+
+def _evaluate_and_repair_answer(
+    scenario: Dict[str, Any],
+    question: str,
+    trace: Dict[str, Any],
+    conversation_context: Optional[List[Dict[str, Any]]],
+    forecast: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Evaluate the answer and apply deterministic grounding repairs."""
+
+    answer = final_answer(trace).strip()
+    grounding_contract = forecast["grounding_contract"]
+    evidence = deepcopy(forecast["evidence"])
+    original_answer = answer
+    answer = finalize_applied_disturbance_disclosure(answer, grounding_contract)
+    disclosure_repair_applied = answer != original_answer
     quality_question = scenario_evidence_text(scenario, question)
     csv_evidence = record_csv_evidence(
         {
-            "tool_calls": tool_calls,
-            "tool_outputs": tool_outputs,
+            "tool_calls": forecast["tool_calls"],
+            "tool_outputs": forecast["tool_outputs"],
             "final_answer": answer,
         },
         scope_text=quality_question,
     )
     if csv_evidence:
         evidence["csv_evidence"] = csv_evidence
-    topology_summary = topology_summary_from_tool_outputs(grounded_tool_outputs)
+    topology_summary = topology_summary_from_tool_outputs(
+        forecast["grounded_tool_outputs"]
+    )
     if topology_summary:
         evidence["topology_summary"] = topology_summary
-    decision_summary = dict(grounding_contract.get("decision_summary") or {})
     fallback_applied = False
 
     def score_answer(answer_text: str) -> tuple[Any, list[Any]]:
         return evaluate_answer_quality(
             answer=answer_text,
             question=question,
-            pipeformer=pipeformer,
+            pipeformer=forecast["pipeformer"],
             trace_status=trace.get("status"),
-            pipeformer_call_count=pipeformer_call_count,
-            pipeformer_outputs=pipeformer_outputs,
+            pipeformer_call_count=forecast["pipeformer_call_count"],
+            pipeformer_outputs=forecast["pipeformer_outputs"],
             conversation_context=conversation_context,
-            tool_outputs=grounded_tool_outputs,
+            tool_outputs=forecast["grounded_tool_outputs"],
             record_evidence=evidence,
             grounding_contract=grounding_contract,
         )
@@ -357,14 +385,40 @@ def build_teacher_record(
         if numeric_claims_are_grounded(
             str(value),
             "",
-            {"pipeformer_outputs": pipeformer_outputs},
+            {"pipeformer_outputs": forecast["pipeformer_outputs"]},
         )
     ]
     if verified_numeric_claims:
         evidence["verified_numeric_claims"] = verified_numeric_claims
-    if quality_issues:
-        logger.warning("Teacher answer requires review: %s", ", ".join(quality_issues))
+    return {
+        "answer": answer,
+        "evidence": evidence,
+        "answer_quality_flag": answer_quality_flag,
+        "quality_issues": quality_issues,
+        "disclosure_repair_applied": disclosure_repair_applied,
+        "fallback_applied": fallback_applied,
+    }
 
+
+def _assemble_teacher_record(
+    scenario: Dict[str, Any],
+    question: str,
+    trace: Dict[str, Any],
+    *,
+    source_session_id: str,
+    turn_id: int,
+    conversation_context: Optional[List[Dict[str, Any]]],
+    split: str,
+    forecast: Dict[str, Any],
+    answer: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Assemble the canonical record and persist native evaluator aliases."""
+
+    dataset_source = str(scenario.get("dataset_source") or "unknown_source")
+    scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
+    record_id = f"{dataset_source}:{source_session_id}::turn_{turn_id:03d}"
+    grounding_contract = forecast["grounding_contract"]
+    quality_issues = answer["quality_issues"]
     record = {
         "sample_id": record_id,
         "dataset_source": dataset_source,
@@ -377,28 +431,30 @@ def build_teacher_record(
         "split": split,
         "answer_mode": grounding_contract.get("answer_mode"),
         "grounding_contract": deepcopy(grounding_contract),
-        "decision_summary": deepcopy(decision_summary),
+        "decision_summary": deepcopy(
+            dict(grounding_contract.get("decision_summary") or {})
+        ),
         "conversation_context": deepcopy(conversation_context or []),
-        "state_before": deepcopy(state_before),
-        "recent_turns": deepcopy(recent_turns),
+        "state_before": deepcopy(forecast["state_before"]),
+        "recent_turns": deepcopy(forecast["recent_turns"]),
         "user_input": question,
-        "parsed_task": deepcopy(parsed_task),
-        "tool_calls": tool_calls,
-        "tool_outputs": tool_outputs,
-        "prediction_summary": deepcopy(prediction_summary),
-        "constraint_check": deepcopy(constraint_check),
-        "evidence": deepcopy(evidence),
-        "risk_level": risk_level,
-        "manual_intervention_label": manual_intervention_label,
-        "dispatch_recommendation": dispatch_recommendation,
-        "final_answer": answer,
+        "parsed_task": deepcopy(forecast["parsed_task"]),
+        "tool_calls": forecast["tool_calls"],
+        "tool_outputs": forecast["tool_outputs"],
+        "prediction_summary": deepcopy(forecast["prediction_summary"]),
+        "constraint_check": deepcopy(forecast["constraint_check"]),
+        "evidence": deepcopy(answer["evidence"]),
+        "risk_level": forecast["risk_level"],
+        "manual_intervention_label": forecast["manual_intervention_label"],
+        "dispatch_recommendation": forecast["dispatch_recommendation"],
+        "final_answer": answer["answer"],
         "trace_status": trace.get("status"),
-        "quality_flag": answer_quality_flag,
+        "quality_flag": answer["answer_quality_flag"],
         "quality_issues": quality_issues,
     }
     if grounding_contract.get("decision_policy"):
         record["decision_policy"] = deepcopy(grounding_contract["decision_policy"])
-    if disclosure_repair_applied:
+    if answer["disclosure_repair_applied"]:
         record["repair_provenance"] = {
             "method": "deterministic_disturbance_disclosure",
             "external_llm_calls": 0,
@@ -407,7 +463,7 @@ def build_teacher_record(
                 "execution evidence without changing the model's substantive answer."
             ),
         }
-    elif fallback_applied:
+    elif answer["fallback_applied"]:
         record["repair_provenance"] = {
             "method": "deterministic_grounding_contract",
             "external_llm_calls": 0,
@@ -431,6 +487,50 @@ def build_teacher_record(
         ),
     )
     return record
+
+
+def build_teacher_record(
+    scenario: Dict[str, Any],
+    question: str,
+    trace: Dict[str, Any],
+    *,
+    source_session_id: str = "session_001",
+    turn_id: int = 1,
+    conversation_context: Optional[List[Dict[str, Any]]] = None,
+    split: str = "train",
+) -> Dict[str, Any]:
+    """Build one canonical teacher record from a completed turn trace."""
+
+    forecast = _project_forecast_fields(
+        question,
+        trace,
+        conversation_context,
+        verified_state_max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+        recent_turns_max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+    )
+    answer = _evaluate_and_repair_answer(
+        scenario,
+        question,
+        trace,
+        conversation_context,
+        forecast,
+    )
+    if answer["quality_issues"]:
+        logger.warning(
+            "Teacher answer requires review: %s",
+            ", ".join(answer["quality_issues"]),
+        )
+    return _assemble_teacher_record(
+        scenario,
+        question,
+        trace,
+        source_session_id=source_session_id,
+        turn_id=turn_id,
+        conversation_context=conversation_context,
+        split=split,
+        forecast=forecast,
+        answer=answer,
+    )
 
 
 def _turn_trace(
@@ -482,199 +582,6 @@ def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, 
                 else "test"
             )
     return result
-
-
-def run_backend_session(
-    scenario: Dict[str, Any],
-    source_session: Dict[str, Any],
-    args: argparse.Namespace,
-    scenario_index: int,
-    session_index: int,
-    run_stamp: str,
-    split: str,
-    scenario_history: List[Dict[str, Any]],
-) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
-    from pipeclaw.backend.agent.orchestrator import AgentOrchestrator
-    from pipeclaw.backend.agent.schemas import AgentChatRequest
-
-    scenario_id = str(scenario.get("scenario_id") or f"scenario_{scenario_index:06d}")
-    dataset_source = str(scenario.get("dataset_source") or "unknown_source")
-    source_session_id = str(
-        source_session.get("session_id") or f"{scenario_id}_session_{session_index:03d}"
-    )
-    runtime_session_id = (
-        args.session_id
-        or f"teacher_{scenario_index:04d}_{session_index:03d}_{run_stamp}"
-    )
-    os.environ["PIPEFORMER_DEVICE"] = str(args.device)
-
-    logger.info(
-        "Session started: scenario=%s source_session=%s runtime_session=%s",
-        scenario_id,
-        source_session_id,
-        runtime_session_id,
-    )
-
-    run_hash = hashlib.sha256(
-        f"{dataset_source}:{scenario_id}:{run_stamp}".encode("utf-8")
-    ).hexdigest()[:10]
-    run_namespace = f"r{scenario_index:04d}_{run_hash}"
-    orchestrator = AgentOrchestrator(
-        data_loader=None,
-        agent_id=args.agent_id,
-        session_id=runtime_session_id,
-        enable_skills=False,
-        workspace_root_base=BACKEND_ROOT / ".openclaw" / "tt_runs" / run_namespace,
-    )
-    orchestrator.verified_state_manager.commit(
-        runtime_session_id,
-        VerifiedDecisionState.from_history(scenario_history),
-    )
-    records: List[Dict[str, Any]] = []
-    history = scenario_history
-    errors: List[Dict[str, Any]] = []
-    raw_trace_paths: Dict[int, str] = {}
-    message_count = 0
-    tool_count = 0
-    for fallback_turn_id, turn in enumerate(
-        source_session.get("dialogue") or [], start=1
-    ):
-        question = str(turn.get("user_input") or "").strip()
-        if not question:
-            continue
-        turn_id = int(turn.get("turn_id") or fallback_turn_id)
-        logger.info(
-            "Turn started: scenario=%s session=%s turn=%d question=%s",
-            scenario_id,
-            source_session_id,
-            turn_id,
-            short_text(question, 300),
-        )
-        try:
-
-            def validate_answer(
-                answer: str, completed_calls: List[Dict[str, Any]]
-            ) -> List[str]:
-                history_state = VerifiedDecisionState.from_history(history)
-                outputs = [
-                    item["output"]
-                    for item in completed_calls
-                    if item.get("name") == "run_pipeformer_forecast"
-                    and isinstance(item.get("output"), dict)
-                    and item["output"].get("success")
-                ]
-                issues = answer_quality_issues(
-                    answer,
-                    question,
-                    outputs[0] if len(outputs) == 1 else None,
-                    conversation_context=history,
-                    tool_outputs=completed_calls,
-                    record_evidence={
-                        "topology_summary": topology_summary_from_tool_outputs(
-                            completed_calls
-                        )
-                    },
-                )
-                contract = GroundingContractBuilder().build(
-                    question,
-                    completed_calls,
-                    require_decision_policy=True,
-                    prior_candidate_results=history_state.candidate_results,
-                    prior_decision_policy=history_state.decision_policy,
-                    prior_decision_policy_source_question=(
-                        history_state.decision_policy_source_question
-                    ),
-                    prior_applied_disturbances=history_state.applied_disturbances,
-                )
-                issues.extend(comparison_answer_issues(answer, contract))
-                return list(dict.fromkeys(issues))
-
-            result = orchestrator.run_agent(
-                AgentChatRequest(
-                    agent_id=args.agent_id,
-                    session_id=runtime_session_id,
-                    message=agent_turn_message(scenario, question),
-                ),
-                answer_validator=validate_answer,
-            )
-            trace_path = Path(result.trace_summary.trace_path)
-            raw_trace_paths[turn_id] = str(trace_path.resolve())
-            full_trace = json.loads(trace_path.read_text(encoding="utf-8"))
-            trace = _turn_trace(full_trace, message_count, tool_count)
-            message_count = len(full_trace.get("messages") or [])
-            tool_count = len(full_trace.get("tool_calls") or [])
-            record = build_teacher_record(
-                scenario,
-                question,
-                trace,
-                source_session_id=source_session_id,
-                turn_id=turn_id,
-                conversation_context=history,
-                split=split,
-            )
-            records.append(record)
-            history.append(build_history_turn(record))
-            logger.info(
-                "Turn finished: scenario=%s session=%s turn=%d quality=%s",
-                scenario_id,
-                source_session_id,
-                turn_id,
-                record["quality_flag"],
-            )
-            if trace.get("status") != "completed":
-                errors.append(
-                    {
-                        "turn_id": turn_id,
-                        "user_input": question,
-                        "error": f"Agent run ended with status {trace.get('status') or 'unknown'}.",
-                    }
-                )
-                break
-        except Exception as exc:
-            logger.exception(
-                "Turn failed: scenario=%s session=%s turn=%d",
-                scenario_id,
-                source_session_id,
-                turn_id,
-            )
-            errors.append(
-                {"turn_id": turn_id, "user_input": question, "error": str(exc)}
-            )
-            break
-
-    session_record = {
-        "session_record_id": f"{dataset_source}:{source_session_id}",
-        "dataset_source": dataset_source,
-        "source_scenario_id": scenario_id,
-        "scenario_id": scenario_id,
-        "split_group_id": scenario_id,
-        "session_id": source_session_id,
-        "scenario_type": scenario.get("scenario_type"),
-        "offset_hours": source_session.get("offset_hours"),
-        "split": split,
-        "turns": [
-            {
-                "turn_id": record["turn_id"],
-                "user_input": record["user_input"],
-                "expected_answer": record["final_answer"],
-                "state_before": record.get("state_before"),
-                "recent_turns": record.get("recent_turns"),
-                "tool_calls": record["tool_calls"],
-                "tool_outputs": record["tool_outputs"],
-                "quality_flag": record["quality_flag"],
-                "quality_score": record["quality_score"],
-                "quality_profile": record["quality_profile"],
-                "quality_failed_checks": record["quality_failed_checks"],
-                "quality_issues": record["quality_issues"],
-                "raw_trace_path": raw_trace_paths.get(record["turn_id"]),
-            }
-            for record in records
-        ],
-        "complete": not errors
-        and len(records) == len(source_session.get("dialogue") or []),
-        "errors": errors,
-    }
-    return records, session_record
 
 
 @dataclass(frozen=True)
@@ -901,6 +808,204 @@ class TeacherTraceGenerator:
         problems.extend(preflight["variable_registry"]["errors"])
         raise ValueError("Scenario preflight failed; " + "; ".join(problems))
 
+    def _run_session(
+        self,
+        scenario: Dict[str, Any],
+        source_session: Dict[str, Any],
+        scenario_index: int,
+        session_index: int,
+        run_stamp: str,
+        split: str,
+        scenario_history: List[Dict[str, Any]],
+    ) -> tuple[List[Dict[str, Any]], Dict[str, Any]]:
+        """Run one source session using this generator's runtime settings."""
+
+        from pipeclaw.backend.agent.orchestrator import AgentOrchestrator
+        from pipeclaw.backend.agent.schemas import AgentChatRequest
+
+        args = self.args
+        scenario_id = str(
+            scenario.get("scenario_id") or f"scenario_{scenario_index:06d}"
+        )
+        dataset_source = str(scenario.get("dataset_source") or "unknown_source")
+        source_session_id = str(
+            source_session.get("session_id")
+            or f"{scenario_id}_session_{session_index:03d}"
+        )
+        runtime_session_id = (
+            args.session_id
+            or f"teacher_{scenario_index:04d}_{session_index:03d}_{run_stamp}"
+        )
+        os.environ["PIPEFORMER_DEVICE"] = str(args.device)
+
+        logger.info(
+            "Session started: scenario=%s source_session=%s runtime_session=%s",
+            scenario_id,
+            source_session_id,
+            runtime_session_id,
+        )
+
+        run_hash = hashlib.sha256(
+            f"{dataset_source}:{scenario_id}:{run_stamp}".encode("utf-8")
+        ).hexdigest()[:10]
+        run_namespace = f"r{scenario_index:04d}_{run_hash}"
+        orchestrator = AgentOrchestrator(
+            data_loader=None,
+            agent_id=args.agent_id,
+            session_id=runtime_session_id,
+            enable_skills=False,
+            workspace_root_base=BACKEND_ROOT / ".openclaw" / "tt_runs" / run_namespace,
+        )
+        orchestrator.verified_state_manager.commit(
+            runtime_session_id,
+            VerifiedDecisionState.from_history(scenario_history),
+        )
+        records: List[Dict[str, Any]] = []
+        history = scenario_history
+        errors: List[Dict[str, Any]] = []
+        raw_trace_paths: Dict[int, str] = {}
+        message_count = 0
+        tool_count = 0
+        for fallback_turn_id, turn in enumerate(
+            source_session.get("dialogue") or [], start=1
+        ):
+            question = str(turn.get("user_input") or "").strip()
+            if not question:
+                continue
+            turn_id = int(turn.get("turn_id") or fallback_turn_id)
+            logger.info(
+                "Turn started: scenario=%s session=%s turn=%d question=%s",
+                scenario_id,
+                source_session_id,
+                turn_id,
+                short_text(question, 300),
+            )
+            try:
+
+                def validate_answer(
+                    answer: str, completed_calls: List[Dict[str, Any]]
+                ) -> List[str]:
+                    history_state = VerifiedDecisionState.from_history(history)
+                    outputs = [
+                        item["output"]
+                        for item in completed_calls
+                        if item.get("name") == "run_pipeformer_forecast"
+                        and isinstance(item.get("output"), dict)
+                        and item["output"].get("success")
+                    ]
+                    issues = answer_quality_issues(
+                        answer,
+                        question,
+                        outputs[0] if len(outputs) == 1 else None,
+                        conversation_context=history,
+                        tool_outputs=completed_calls,
+                        record_evidence={
+                            "topology_summary": topology_summary_from_tool_outputs(
+                                completed_calls
+                            )
+                        },
+                    )
+                    contract = build_grounding_contract(
+                        question,
+                        completed_calls,
+                        require_decision_policy=True,
+                        prior_candidate_results=history_state.candidate_results,
+                        prior_decision_policy=history_state.decision_policy,
+                        prior_decision_policy_source_question=(
+                            history_state.decision_policy_source_question
+                        ),
+                        prior_applied_disturbances=history_state.applied_disturbances,
+                    )
+                    issues.extend(comparison_answer_issues(answer, contract))
+                    return list(dict.fromkeys(issues))
+
+                result = orchestrator.run_agent(
+                    AgentChatRequest(
+                        agent_id=args.agent_id,
+                        session_id=runtime_session_id,
+                        message=agent_turn_message(scenario, question),
+                    ),
+                    answer_validator=validate_answer,
+                )
+                trace_path = Path(result.trace_summary.trace_path)
+                raw_trace_paths[turn_id] = str(trace_path.resolve())
+                full_trace = json.loads(trace_path.read_text(encoding="utf-8"))
+                trace = _turn_trace(full_trace, message_count, tool_count)
+                message_count = len(full_trace.get("messages") or [])
+                tool_count = len(full_trace.get("tool_calls") or [])
+                record = build_teacher_record(
+                    scenario,
+                    question,
+                    trace,
+                    source_session_id=source_session_id,
+                    turn_id=turn_id,
+                    conversation_context=history,
+                    split=split,
+                )
+                records.append(record)
+                history.append(build_history_turn(record))
+                logger.info(
+                    "Turn finished: scenario=%s session=%s turn=%d quality=%s",
+                    scenario_id,
+                    source_session_id,
+                    turn_id,
+                    record["quality_flag"],
+                )
+                if trace.get("status") != "completed":
+                    errors.append(
+                        {
+                            "turn_id": turn_id,
+                            "user_input": question,
+                            "error": f"Agent run ended with status {trace.get('status') or 'unknown'}.",
+                        }
+                    )
+                    break
+            except Exception as exc:
+                logger.exception(
+                    "Turn failed: scenario=%s session=%s turn=%d",
+                    scenario_id,
+                    source_session_id,
+                    turn_id,
+                )
+                errors.append(
+                    {"turn_id": turn_id, "user_input": question, "error": str(exc)}
+                )
+                break
+
+        session_record = {
+            "session_record_id": f"{dataset_source}:{source_session_id}",
+            "dataset_source": dataset_source,
+            "source_scenario_id": scenario_id,
+            "scenario_id": scenario_id,
+            "split_group_id": scenario_id,
+            "session_id": source_session_id,
+            "scenario_type": scenario.get("scenario_type"),
+            "offset_hours": source_session.get("offset_hours"),
+            "split": split,
+            "turns": [
+                {
+                    "turn_id": record["turn_id"],
+                    "user_input": record["user_input"],
+                    "expected_answer": record["final_answer"],
+                    "state_before": record.get("state_before"),
+                    "recent_turns": record.get("recent_turns"),
+                    "tool_calls": record["tool_calls"],
+                    "tool_outputs": record["tool_outputs"],
+                    "quality_flag": record["quality_flag"],
+                    "quality_score": record["quality_score"],
+                    "quality_profile": record["quality_profile"],
+                    "quality_failed_checks": record["quality_failed_checks"],
+                    "quality_issues": record["quality_issues"],
+                    "raw_trace_path": raw_trace_paths.get(record["turn_id"]),
+                }
+                for record in records
+            ],
+            "complete": not errors
+            and len(records) == len(source_session.get("dialogue") or []),
+            "errors": errors,
+        }
+        return records, session_record
+
     def _execute_sessions(
         self,
         scope: _GenerationScope,
@@ -953,10 +1058,9 @@ class TeacherTraceGenerator:
             for session_index, source_session in enumerate(
                 scenario.get("sessions") or [], start=1
             ):
-                turn_records, session_record = run_backend_session(
+                turn_records, session_record = self._run_session(
                     scenario,
                     source_session,
-                    self.args,
                     index,
                     session_index,
                     run_stamp,

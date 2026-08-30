@@ -4,7 +4,7 @@ import csv
 import json
 import re
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, NamedTuple
 
 from pipeclaw.backend.grounding.evidence.tool import (
     attach_tool_arguments,
@@ -57,6 +57,88 @@ def _successful_forecast_pairs(
     return pairs
 
 
+class _ResolvedForecast(NamedTuple):
+    call: Mapping[str, Any]
+    output: Mapping[str, Any]
+    arguments: dict[str, Any]
+
+
+class _ForecastIndex(NamedTuple):
+    successful: tuple[_ResolvedForecast, ...]
+    tasks: tuple[dict[str, Any], ...]
+
+
+def _resolve_forecast_arguments(
+    call: Mapping[str, Any],
+    output: Mapping[str, Any],
+) -> dict[str, Any]:
+    return {
+        **prediction_view(output),
+        **mapping(output.get("parsed_task")),
+        **mapping(call.get("arguments")),
+    }
+
+
+def _resolved_actual_call(
+    actual_call: Mapping[str, Any],
+    forecast_index: _ForecastIndex,
+    actual_arguments: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    if actual_arguments is not None:
+        return {**actual_call, "arguments": actual_arguments}
+    call_id = str(actual_call.get("tool_call_id") or "")
+    entry = next(
+        (
+            entry
+            for entry in forecast_index.successful
+            if str(entry.call.get("tool_call_id") or "") == call_id
+        ),
+        None,
+    )
+    return {
+        **actual_call,
+        "arguments": (
+            _resolve_forecast_arguments(actual_call, entry.output)
+            if entry is not None
+            else mapping(actual_call.get("arguments"))
+        ),
+    }
+
+
+def _resolved_forecast_index(record: Mapping[str, Any]) -> _ForecastIndex:
+    """Resolve one episode's forecast calls once for all matching checks."""
+
+    pairs = _successful_forecast_pairs(record)
+    first_outputs: dict[str, Mapping[str, Any]] = {}
+    for call, output in pairs:
+        first_outputs.setdefault(str(call.get("tool_call_id") or ""), output)
+    successful = tuple(
+        _ResolvedForecast(
+            call,
+            output,
+            _resolve_forecast_arguments(
+                call,
+                first_outputs[str(call.get("tool_call_id") or "")],
+            ),
+        )
+        for call, output in pairs
+    )
+    tasks = tuple(
+        _resolve_forecast_arguments(
+            call,
+            first_outputs.get(str(call.get("tool_call_id") or ""), {}),
+        )
+        for call in calls(record)
+        if call.get("name") == PIPEFORMER_TOOL
+        and isinstance(call.get("arguments"), Mapping)
+    )
+    if not tasks:
+        tasks = tuple(
+            dict(prediction_view(entry.output)) for entry in successful[:1]
+        )
+    return _ForecastIndex(successful, tasks)
+
+
 def _same_forecast_action(
     expected_call: Mapping[str, Any],
     actual_call: Mapping[str, Any],
@@ -95,71 +177,53 @@ def _same_forecast_action(
     )
 
 
-def _resolved_forecast_arguments(
-    record: Mapping[str, Any],
-    call: Mapping[str, Any],
-) -> dict[str, Any]:
-    call_id = str(call.get("tool_call_id") or "")
-    resolved_output = next(
-        (
-            output
-            for paired_call, output in _successful_forecast_pairs(record)
-            if str(paired_call.get("tool_call_id") or "") == call_id
-        ),
-        {},
-    )
-    return {
-        **prediction_view(resolved_output),
-        **mapping(resolved_output.get("parsed_task")),
-        **mapping(call.get("arguments")),
-    }
-
-
 def _matching_reference_output(
     context: EvaluationContext,
     actual_call: Mapping[str, Any],
+    *,
+    forecast_index: _ForecastIndex | None = None,
+    reference_index: _ForecastIndex | None = None,
+    actual_arguments: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any] | None:
-    resolved_call = {
-        **actual_call,
-        "arguments": _resolved_forecast_arguments(context.record, actual_call),
-    }
-    reference = context.reference or {}
-    for call, output in _successful_forecast_pairs(reference):
-        expected_arguments = _resolved_forecast_arguments(reference, call)
-        expected_call = {**call, "arguments": expected_arguments}
+    forecast_index = forecast_index or _resolved_forecast_index(context.record)
+    reference_index = reference_index or _resolved_forecast_index(
+        context.reference or {}
+    )
+    resolved_call = _resolved_actual_call(
+        actual_call,
+        forecast_index,
+        actual_arguments,
+    )
+    for entry in reference_index.successful:
+        expected_call = {**entry.call, "arguments": entry.arguments}
         if _same_forecast_action(expected_call, resolved_call):
-            return output
+            return entry.output
     return None
 
 
 def _matches_reference_contract(
-    context: EvaluationContext, actual_call: Mapping[str, Any]
+    context: EvaluationContext,
+    actual_call: Mapping[str, Any],
+    *,
+    forecast_index: _ForecastIndex | None = None,
+    reference_index: _ForecastIndex | None = None,
+    actual_arguments: Mapping[str, Any] | None = None,
 ) -> bool:
     """Accept a different action only when its underlying task still matches."""
 
-    resolved_call = {
-        **actual_call,
-        "arguments": _resolved_forecast_arguments(context.record, actual_call),
-    }
-    reference = context.reference or {}
-    return any(
-        task_field_comparison(expected_arguments, resolved_call["arguments"])[0]
-        for call, _output_value in _successful_forecast_pairs(reference)
-        for expected_arguments in [_resolved_forecast_arguments(reference, call)]
+    forecast_index = forecast_index or _resolved_forecast_index(context.record)
+    reference_index = reference_index or _resolved_forecast_index(
+        context.reference or {}
     )
-
-
-def _student_tasks(record: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-    tasks = [
-        _resolved_forecast_arguments(record, call)
-        for call in calls(record)
-        if call.get("name") == PIPEFORMER_TOOL
-        and isinstance(call.get("arguments"), Mapping)
-    ]
-    if tasks:
-        return tasks
-    pairs = _successful_forecast_pairs(record)
-    return [prediction_view(pairs[0][1])] if pairs else []
+    resolved_call = _resolved_actual_call(
+        actual_call,
+        forecast_index,
+        actual_arguments,
+    )
+    return any(
+        task_field_comparison(entry.arguments, resolved_call["arguments"])[0]
+        for entry in reference_index.successful
+    )
 
 
 def _oracle_tasks(context: EvaluationContext) -> list[Mapping[str, Any]]:
@@ -174,7 +238,10 @@ def _assumed_task_fields(tasks: list[Mapping[str, Any]]) -> list[str]:
     return sorted({field for task in tasks for field in inferred_task_fields(task)})
 
 
-def _task_parsing(context: EvaluationContext) -> MetricResult:
+def _task_parsing(
+    context: EvaluationContext,
+    forecast_index: _ForecastIndex,
+) -> MetricResult:
     expected_tasks = _oracle_tasks(context)
     if not expected_tasks:
         task = mapping(context.oracle.get("task"))
@@ -189,7 +256,7 @@ def _task_parsing(context: EvaluationContext) -> MetricResult:
         ):
             distinct_tasks.append(task)
     expected_tasks = distinct_tasks
-    actual_tasks = _student_tasks(context.record)
+    actual_tasks = list(forecast_index.tasks)
     unmatched = list(expected_tasks)
     mismatches: list[str] = []
     matched_fields: list[str] = []
@@ -361,12 +428,15 @@ def _tool_metrics(
     return tool_result, recovery_result
 
 
-def _assumption_metric(context: EvaluationContext) -> MetricResult:
+def _assumption_metric(
+    context: EvaluationContext,
+    forecast_index: _ForecastIndex,
+) -> MetricResult:
     expected_tasks = _oracle_tasks(context)
     assumed = _assumed_task_fields(expected_tasks)
-    pairs = _successful_forecast_pairs(context.record)
-    actual_task = mapping(pairs[0][0].get("arguments")) if pairs else {}
-    output = pairs[0][1] if pairs else {}
+    forecast = forecast_index.successful[0] if forecast_index.successful else None
+    actual_task = mapping(forecast.call.get("arguments")) if forecast else {}
+    output = forecast.output if forecast else {}
     passed, mismatches = assumption_consistency(expected_tasks, actual_task, output)
     return metric(
         context,
@@ -377,13 +447,17 @@ def _assumption_metric(context: EvaluationContext) -> MetricResult:
     )
 
 
-def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
-    pairs = _successful_forecast_pairs(context.record)
+def _pipeformer_metrics(
+    context: EvaluationContext,
+    forecast_index: _ForecastIndex,
+    reference_index: _ForecastIndex,
+) -> list[MetricResult]:
+    pairs = forecast_index.successful
     applicable = PIPEFORMER_TOOL in {
         str(item) for item in sequence(context.oracle.get("teacher_tool_names"))
     }
-    outputs = [output for _, output in pairs]
-    tasks = [mapping(call.get("arguments")) for call, _ in pairs]
+    outputs = [entry.output for entry in pairs]
+    tasks = [mapping(entry.call.get("arguments")) for entry in pairs]
     predicates = {
         "checkpoint_inference": lambda out, _task: checkpoint_inference_used(out),
         "disturbance_application": disturbance_was_applied,
@@ -414,8 +488,16 @@ def _pipeformer_metrics(context: EvaluationContext) -> list[MetricResult]:
             actual,
             mapping(verification_view(reference).get("category_status")),
         )
-        for (call, _), actual in zip(pairs, actual_statuses)
-        for reference in [_matching_reference_output(context, call)]
+        for entry, actual in zip(pairs, actual_statuses)
+        for reference in [
+            _matching_reference_output(
+                context,
+                entry.call,
+                forecast_index=forecast_index,
+                reference_index=reference_index,
+                actual_arguments=entry.arguments,
+            )
+        ]
         if reference is not None
     ]
     judgment_applicable = applicable and bool(expected_constraints or matched_statuses)
@@ -723,16 +805,29 @@ def _label_metric(
     context: EvaluationContext,
     name: str,
     output_key: str,
+    forecast_index: _ForecastIndex,
+    reference_index: _ForecastIndex,
 ) -> MetricResult:
-    pairs = _successful_forecast_pairs(context.record)
     matched: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
     student_evidence: list[Mapping[str, Any]] = []
-    for call, output in pairs:
-        reference = _matching_reference_output(context, call)
+    for entry in forecast_index.successful:
+        reference = _matching_reference_output(
+            context,
+            entry.call,
+            forecast_index=forecast_index,
+            reference_index=reference_index,
+            actual_arguments=entry.arguments,
+        )
         if reference is not None:
-            matched.append((reference, output))
-        elif _matches_reference_contract(context, call):
-            student_evidence.append(output)
+            matched.append((reference, entry.output))
+        elif _matches_reference_contract(
+            context,
+            entry.call,
+            forecast_index=forecast_index,
+            reference_index=reference_index,
+            actual_arguments=entry.arguments,
+        ):
+            student_evidence.append(entry.output)
 
     def value(output: Mapping[str, Any]) -> Any:
         verification = verification_view(output)
@@ -980,19 +1075,27 @@ def evaluate_autonomous_checks(
 ) -> tuple[list[MetricResult], dict[str, Any]]:
     """Return every canonical autonomous metric plus unscored diagnostics."""
 
+    forecast_index = _resolved_forecast_index(context.record)
+    reference_index = _resolved_forecast_index(context.reference or {})
     tool_call, tool_recovery = _tool_metrics(context)
     claim_support = _claim_support_metric(context)
     evidence = evidence_consistency(context)
     claim_alignment = _claim_alignment_metric(context)
     question_anchor = _question_anchor_metric(context)
     metrics = [
-        _task_parsing(context),
-        _assumption_metric(context),
+        _task_parsing(context, forecast_index),
+        _assumption_metric(context, forecast_index),
         tool_call,
-        *_pipeformer_metrics(context),
+        *_pipeformer_metrics(context, forecast_index, reference_index),
         _registry_metric(context),
         *(
-            _label_metric(context, name, key)
+            _label_metric(
+                context,
+                name,
+                key,
+                forecast_index,
+                reference_index,
+            )
             for name, key in (
                 ("risk", "risk_level"),
                 ("manual_intervention", "human_intervention_label"),
@@ -1005,19 +1108,13 @@ def evaluate_autonomous_checks(
         _artifact_metric(context),
         _record_contract(context),
         tool_recovery,
-    ]
-    ordered = ordered_canonical_metrics(
-        context,
-        metrics,
-        extra=(
-            tool_recovery,
-            claim_support,
-            claim_alignment,
-            question_anchor,
-            _hallucination_metric(
-                context,
-                [evidence, claim_support, claim_alignment, question_anchor],
-            ),
+        claim_support,
+        claim_alignment,
+        question_anchor,
+        _hallucination_metric(
+            context,
+            [evidence, claim_support, claim_alignment, question_anchor],
         ),
-    )
+    ]
+    ordered = ordered_canonical_metrics(context, metrics)
     return ordered, {"portability": _portability_diagnostics(context.record)}

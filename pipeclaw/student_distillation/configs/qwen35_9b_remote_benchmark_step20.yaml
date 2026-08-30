@@ -4,13 +4,13 @@ ENV:
 
 model: Qwen/Qwen3.5-9B
 use_hf: false
-output_dir: pipeclaw/task2_student/outputs/qwen35_9b_trace_level_benchmark
+output_dir: pipeclaw/student_distillation/outputs/qwen35_9b_trace_level_benchmark
 add_version: false
 
 dataset:
-  - pipeclaw/task2_student/data/trace_level/train.jsonl
+  - pipeclaw/student_distillation/data/trace_level/train.jsonl
 val_dataset:
-  - pipeclaw/task2_student/data/trace_level/valid.jsonl
+  - pipeclaw/student_distillation/data/trace_level/valid.jsonl
 split_dataset_ratio: 0.0
 load_from_cache_file: true
 dataset_num_proc: 4

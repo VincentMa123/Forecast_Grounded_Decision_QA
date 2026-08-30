@@ -1,7 +1,7 @@
 # Remote server main experiment: Qwen3.5-9B, trace-level projection, 4-bit QLoRA,
 # lossless 16,384-token context, multi-GPU with DeepSpeed ZeRO-2.
 #
-#   swift sft pipeclaw/task2_student/configs/qwen35_9b_remote_trace_level.yaml
+#   swift sft pipeclaw/student_distillation/configs/qwen35_9b_remote_trace_level.yaml
 #
 # Run qwen35_9b_remote_benchmark_step20.yaml first: it is the same configuration
 # capped at 20 steps and tells you peak VRAM and tokens/sec, which is what the
@@ -32,13 +32,13 @@ ENV:
 
 model: Qwen/Qwen3.5-9B
 use_hf: false
-output_dir: pipeclaw/task2_student/outputs/qwen35_9b_trace_level
+output_dir: pipeclaw/student_distillation/outputs/qwen35_9b_trace_level
 add_version: false
 
 dataset:
-  - pipeclaw/task2_student/data/trace_level/train.jsonl
+  - pipeclaw/student_distillation/data/trace_level/train.jsonl
 val_dataset:
-  - pipeclaw/task2_student/data/trace_level/valid.jsonl
+  - pipeclaw/student_distillation/data/trace_level/valid.jsonl
 split_dataset_ratio: 0.0
 load_from_cache_file: true
 dataset_num_proc: 4
@@ -60,8 +60,8 @@ bnb_4bit_use_double_quant: true
 torch_dtype: bfloat16
 attn_impl: flash_attn
 
-# 100% of the released records fit in 16,384 tokens (trace-level maximum 12,136)
-max_length: 16384
+# 100% of the released records fit in 18,432 tokens
+max_length: 18432
 truncation_strategy: delete
 loss_scale: default+ignore_empty_think
 add_non_thinking_prefix: true

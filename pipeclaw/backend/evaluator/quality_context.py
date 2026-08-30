@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional
 
-from pipeclaw.backend.grounding.evidence.tool import tool_output_failed
+from pipeclaw.backend.grounding.evidence.tool import tool_evidence_unavailable
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ def build_quality_context(
     trusted_context = trusted_conversation_context(conversation_context or [])
     normalized_outputs = tuple(dict(item) for item in tool_outputs or [])
     trusted_tool_outputs = tuple(
-        item for item in normalized_outputs if not tool_output_failed(item)
+        item for item in normalized_outputs if not tool_evidence_unavailable(item)
     )
     normalized_pipeformer = dict(pipeformer) if pipeformer else None
     normalized_record_evidence = dict(record_evidence or {})

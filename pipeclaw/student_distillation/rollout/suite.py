@@ -12,14 +12,14 @@ from pipeclaw.backend.evaluator import (
     evaluate,
     summarize,
 )
-from pipeclaw.task2_student.release_artifacts import (
+from pipeclaw.student_distillation.release_artifacts import (
     atomic_jsonl_writer,
     atomic_write_text,
     read_jsonl_domain,
 )
 
 from .models import PromptCase, RolloutConfig
-from .prompting import PromptCaseBuilder, parse_tool_schemas
+from .prompting import build_prompt_case, parse_tool_schemas
 from .runner import RolloutRunner
 from .scenarios import (
     ScenarioPolicy,
@@ -180,15 +180,14 @@ def build_cases(
     scenario_type: str | None = None,
     limit: int | None = None,
     allow_generic_schemas: bool = False,
-) -> list[tuple[dict[str, Any], PromptCase]]:
+) -> list[PromptCase]:
     """Build prompt-only cases with per-scenario isolated workspaces.
 
     Generic schemas are intentionally opt-in for dry-run inspection only.
     """
 
-    builder = PromptCaseBuilder()
     requested = str(scenario_type or "")
-    cases: list[tuple[dict[str, Any], PromptCase]] = []
+    cases: list[PromptCase] = []
     for source in source_records:
         if not _scenario_matches(source, requested):
             continue
@@ -197,25 +196,25 @@ def build_cases(
             schemas_by_key,
             allow_generic_schemas=allow_generic_schemas,
         )
-        case = builder.build(
+        case = build_prompt_case(
             source,
             workspace_root=workspace_for(output_dir, evaluation_workspace_key(source)),
             tool_schemas=schemas,
         )
-        cases.append((dict(source), case))
+        cases.append(case)
         if limit is not None and len(cases) >= limit:
             break
     return cases
 
 
 def schemas_by_scenario_family(
-    cases: Sequence[tuple[Mapping[str, Any], PromptCase]],
+    cases: Sequence[PromptCase],
 ) -> dict[str, list[Mapping[str, Any]]]:
     """Union each family's tool schemas, deduplicated by function name."""
 
     families: dict[str, list[Mapping[str, Any]]] = {}
     seen: dict[str, set[str]] = {}
-    for _, case in cases:
+    for case in cases:
         family = scenario_key(case.scenario_type)
         schemas = families.setdefault(family, [])
         names = seen.setdefault(family, set())
@@ -286,7 +285,7 @@ def _summary(
 
 
 def _by_scenario_type(
-    cases: Sequence[tuple[Mapping[str, Any], PromptCase]],
+    cases: Sequence[PromptCase],
     reports: Sequence[EvaluationReport | None],
     *,
     mode: str,
@@ -299,11 +298,11 @@ def _by_scenario_type(
 
     grouped: dict[str, dict[str, Any]] = {}
     for scenario_type in sorted(
-        {str(case.scenario_type or "unknown") for _, case in cases}
+        {str(case.scenario_type or "unknown") for case in cases}
     ):
         indexes = [
             index
-            for index, (_, case) in enumerate(cases)
+            for index, case in enumerate(cases)
             if str(case.scenario_type or "unknown") == scenario_type
         ]
         summary = _summary(
@@ -356,7 +355,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
             progress = tqdm(
                 cases, total=len(cases), desc="Preparing evaluation", unit="case"
             )
-            for _, case in progress:
+            for case in progress:
                 write_rollout(_dry_run_item(case))
                 record_count += 1
                 reports.append(None)
@@ -364,7 +363,8 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
         else:
             runner = _build_runner(args, cases)
             progress = tqdm(cases, total=len(cases), desc="Evaluating", unit="case")
-            for source, case in progress:
+            for case in progress:
+                source = case.source_record
                 config = RolloutConfig(
                     max_turns=args.max_turns,
                     max_new_tokens=args.max_new_tokens,
@@ -419,7 +419,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     return summary
 
 
-def _build_runner(args: Any, cases: Sequence[tuple[Mapping[str, Any], PromptCase]]):
+def _build_runner(args: Any, cases: Sequence[PromptCase]):
     """Load the model once and return a per-case runner selector.
 
     MS-SWIFT, PEFT, and torch are imported here rather than at module import so

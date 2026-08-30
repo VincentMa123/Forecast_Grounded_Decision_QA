@@ -37,4 +37,3 @@ pipeclaw/student_distillation/data/manifests/*.tmp
 pipeclaw/student_distillation/outputs/*
 !pipeclaw/student_distillation/outputs/.gitkeep
 pipeclaw/student_distillation/tests/test_scaffold_contract.py
-pipeclaw/student_distillation/tests/test_scaffold_contract.py
