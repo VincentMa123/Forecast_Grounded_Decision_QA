@@ -115,5 +115,6 @@ Useful component guides:
 
 The public runtime contains mock data and released task artifacts, not the original private operational flow base. Do not use the mock fixture as evidence for production decisions or physical-model validation.
 
-For the teacher trace dataset and the student's Lora Adapter could be downloaded in this link: **Need a huggingface link**
+The student's LoRA adapter are available on Hugging Face:  
+[MacDonalds123/qwen3.8-sft-pipeclaw](https://huggingface.co/MacDonalds123/qwen3.8-sft-pipeclaw)
 
