@@ -34,6 +34,5 @@ pipeclaw/student_distillation/data/answer_only/*.tmp
 pipeclaw/student_distillation/data/trace_level/*.tmp
 pipeclaw/student_distillation/data/constraint_multitask/*.tmp
 pipeclaw/student_distillation/data/manifests/*.tmp
-pipeclaw/student_distillation/outputs/*
 !pipeclaw/student_distillation/outputs/.gitkeep
 pipeclaw/student_distillation/tests/test_scaffold_contract.py

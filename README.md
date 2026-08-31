@@ -20,8 +20,7 @@ artifacts rather than unsupported text.
 Prerequisites: Python 3.10+, Node.js 18+, and npm 9+.
 
 From the repository root, install the backend and create
-`pipeclaw/backend/.env` with a model provider. Never commit that file or an API
-key.
+`pipeclaw/backend/.env` with a model provider.
 
 ```env
 LLM_PROVIDER=openai
@@ -90,25 +89,6 @@ Then choose a reviewed configuration under
 The student-distillation documentation explains token profiling, local smoke
 tests, remote training, autonomous evaluation, and GRPO.
 
-## How the pieces fit
-
-```mermaid
-flowchart LR
-    U[User request] --> UI[PipeClaw React UI]
-    UI --> API[PipeClaw FastAPI backend]
-    API --> T[Grounded tools and workspace]
-    T --> D[Mock or private pipeline data]
-    T --> F[PipeFormer forecast runtime]
-    API --> E[Shared evaluator]
-    F --> M[PipeFormer model and topology data]
-    E --> R[Trace and score artifacts]
-```
-
-PipeClaw keeps execution, evidence, and evaluation separate. PipeFormer owns
-the forecasting model and preprocessing stack. Student distillation converts
-finalized teacher traces into training projections and evaluates student
-rollouts with the same backend evaluator.
-
 ## Repository map
 
 - `pipeFormer/` — model, graph construction, tokenization, caching, training,
@@ -133,19 +113,7 @@ Useful component guides:
 
 ## Data and research notes
 
-The public runtime contains mock data and released task artifacts, not the
-original private operational flow base. Do not use the mock fixture as evidence
-for production decisions or physical-model validation.
+The public runtime contains mock data and released task artifacts, not the original private operational flow base. Do not use the mock fixture as evidence for production decisions or physical-model validation.
 
-The repository also includes the project papers as local PDFs:
+For the teacher trace dataset and the student's Lora Adapter could be downloaded in this link: **Need a huggingface link**
 
-- [Forecast-Grounded Decision QA for Gas Pipeline Transient Operation](Forecast-Grounded_Decision_QA_for_Gas_Pipeline_Transient_Operation_EN.pdf)
-- [PipeFormer/PipeClaw schedule](PipeFormer_PipeClaw_Schedule.pdf)
-
-The source tree is the supported consumption mode; no package-registry or
-binary release is assumed.
-
-## License status
-
-This repository does not currently include a `LICENSE` file. Add and verify a
-license before distributing the code outside your organization.
