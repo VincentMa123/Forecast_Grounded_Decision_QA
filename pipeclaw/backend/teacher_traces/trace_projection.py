@@ -23,7 +23,10 @@ from pipeclaw.backend.pipeline.forecast.result import (
     COMPACT_COMPARABLE_METRIC_KEYS,
     ForecastResult,
 )
-from pipeclaw.backend.teacher_traces.trace_history import compact_tool_call_arguments
+from pipeclaw.backend.teacher_traces.trace_history import (
+    SFT_TRUNCATION_MARKER,
+    compact_tool_call_arguments,
+)
 
 
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
@@ -235,7 +238,7 @@ class TeacherTraceProjector:
         if isinstance(value, list):
             return [self.compact_sft_output(item) for item in value]
         if isinstance(value, str) and len(value) > self.max_tool_text_chars:
-            return value[: self.max_tool_text_chars] + "... [truncated for SFT]"
+            return value[: self.max_tool_text_chars] + SFT_TRUNCATION_MARKER
         return value
 
     def select_sft_trajectory(
@@ -248,6 +251,32 @@ class TeacherTraceProjector:
         minimal_generic_computation_path: bool = False,
     ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """Keep the smallest evidence-bearing tool trajectory for SFT."""
+        selected, multiple_pipeformer = self._select_trajectory_pairs(
+            tool_calls,
+            tool_outputs,
+            answer,
+            minimal_generic_computation_path=minimal_generic_computation_path,
+        )
+        return self._compact_trajectory_pairs(
+            selected,
+            answer,
+            multiple_pipeformer=multiple_pipeformer,
+            max_pipeformer_variables=max_pipeformer_variables,
+        )
+
+    def _select_trajectory_pairs(
+        self,
+        tool_calls: List[Dict[str, Any]],
+        tool_outputs: List[Dict[str, Any]],
+        answer: str,
+        *,
+        minimal_generic_computation_path: bool = False,
+    ) -> tuple[
+        List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        bool,
+    ]:
+        """Select evidence-bearing call/output pairs before SFT compaction."""
+
         outputs_by_id = {
             str(item.get("tool_call_id") or ""): item for item in tool_outputs
         }
@@ -331,6 +360,18 @@ class TeacherTraceProjector:
         else:
             multiple_pipeformer = False
             selected = pairs[-1:]
+
+        return selected, multiple_pipeformer
+
+    def _compact_trajectory_pairs(
+        self,
+        selected: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        answer: str,
+        *,
+        multiple_pipeformer: bool,
+        max_pipeformer_variables: Optional[int] = None,
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Compact selected trajectory pairs while preserving their order."""
 
         compact_calls = []
         compact_outputs = []

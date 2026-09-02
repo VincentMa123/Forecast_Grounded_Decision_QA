@@ -16,6 +16,7 @@ from pipeclaw.student_distillation.release_artifacts import (
     atomic_jsonl_writer,
     atomic_write_text,
     read_jsonl_domain,
+    stable_json,
 )
 
 from .models import PromptCase, RolloutConfig
@@ -63,12 +64,11 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
 def sample_keys(record: Mapping[str, Any]) -> set[str]:
     """Return every identifier a record may be joined on across files."""
 
-    keys = set()
-    for key in ("sample_id", "example_id", "source_sample_id", "source_id"):
-        value = record.get(key)
-        if value is not None:
-            keys.add(str(value))
-    return keys
+    return {
+        str(record[key])
+        for key in ("sample_id", "example_id", "source_sample_id", "source_id")
+        if record.get(key) is not None
+    }
 
 
 def tool_schema_index(
@@ -79,8 +79,17 @@ def tool_schema_index(
     index: dict[str, list[dict[str, Any]]] = {}
     for record in records:
         normalised = parse_tool_schemas(record.get("tools"))
+        candidate_authoritative = _authoritative_schema_set(normalised)
         for key in sample_keys(record):
-            index[key] = normalised
+            existing = index.get(key)
+            existing_authoritative = _authoritative_schema_set(existing)
+            if existing is None or (
+                candidate_authoritative and not existing_authoritative
+            ) or (
+                candidate_authoritative == existing_authoritative
+                and stable_json(normalised) < stable_json(existing)
+            ):
+                index[key] = normalised
     return index
 
 
@@ -88,15 +97,14 @@ def generic_schemas(source: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Fallback schemas for dry-runs when a projection file is unavailable."""
 
     tool_calls = source.get("tool_calls")
-    items = (
-        tool_calls
-        if isinstance(tool_calls, Sequence) and not isinstance(tool_calls, (str, bytes))
-        else []
-    )
-    names: set[str] = set()
-    for item in items:
-        if isinstance(item, Mapping) and item.get("name"):
-            names.add(str(item["name"]))
+    items = tool_calls if isinstance(tool_calls, Sequence) and not isinstance(
+        tool_calls, (str, bytes)
+    ) else ()
+    names = {
+        str(item["name"])
+        for item in items
+        if isinstance(item, Mapping) and item.get("name")
+    }
     return [
         {
             "type": "function",
@@ -114,21 +122,38 @@ def generic_schemas(source: Mapping[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def _scenario_matches(source: Mapping[str, Any], requested: str) -> bool:
-    """Compare a record's scenario type with the requested one, alias-aware."""
+_MISSING_SCHEMA_POLICIES = {"error", "generic", "none"}
 
-    if not requested:
-        return True
-    requested_key = (
-        "openclaw" if is_openclaw_scenario(requested) else str(requested).casefold()
+
+def lookup_tool_schemas(
+    source: Mapping[str, Any],
+    schemas_by_key: Mapping[str, Sequence[Mapping[str, Any]]],
+    *,
+    missing_policy: str = "error",
+) -> list[dict[str, Any]] | None:
+    """Select deterministic authoritative schemas with an explicit miss policy."""
+
+    if missing_policy not in _MISSING_SCHEMA_POLICIES:
+        raise ValueError(
+            f"missing_policy must be one of {sorted(_MISSING_SCHEMA_POLICIES)}"
+        )
+    keys = sorted(sample_keys(source))
+    matched = next(
+        (
+            candidate
+            for key in keys
+            if _authoritative_schema_set(candidate := schemas_by_key.get(key))
+        ),
+        None,
     )
-    source_type = source.get("scenario_type")
-    source_key = (
-        "openclaw"
-        if is_openclaw_scenario(source_type)
-        else str(source_type or "").casefold()
-    )
-    return source_key == requested_key
+    if matched is not None:
+        return [dict(schema) for schema in matched or []]
+    if missing_policy == "generic":
+        return generic_schemas(source)
+    if missing_policy == "none":
+        return None
+    identifier = keys[0] if keys else "record without a sample identifier"
+    raise ValueError(f"no authoritative tool schema for {identifier}")
 
 
 def _authoritative_schema_set(
@@ -136,40 +161,14 @@ def _authoritative_schema_set(
 ) -> bool:
     """Return whether schemas carry an explicit OpenAI function contract."""
 
-    if not schemas:
-        return False
-    for schema in schemas:
-        if not isinstance(schema, Mapping) or schema.get("type") != "function":
-            return False
-        function = schema.get("function")
-        if not isinstance(function, Mapping):
-            return False
-        name = function.get("name")
-        if not isinstance(name, str) or not name.strip():
-            return False
-    return True
-
-
-def _schemas_for_source(
-    source: Mapping[str, Any],
-    schemas_by_key: Mapping[str, Sequence[Mapping[str, Any]]],
-    *,
-    allow_generic_schemas: bool,
-) -> list[dict[str, Any]]:
-    """Select a record's schemas, failing closed outside explicit dry runs."""
-
-    keys = sample_keys(source)
-    matched = next(
-        (schemas_by_key[key] for key in sorted(keys) if key in schemas_by_key),
-        None,
+    return bool(schemas) and all(
+        isinstance(schema, Mapping)
+        and schema.get("type") == "function"
+        and isinstance((function := schema.get("function")), Mapping)
+        and isinstance((name := function.get("name")), str)
+        and bool(name.strip())
+        for schema in schemas
     )
-    if _authoritative_schema_set(matched):
-        return [dict(schema) for schema in matched or []]
-    if allow_generic_schemas:
-        return generic_schemas(source)
-
-    identifier = next(iter(sorted(keys)), "record without a sample identifier")
-    raise ValueError(f"no authoritative tool schema for {identifier}")
 
 
 def build_cases(
@@ -187,21 +186,33 @@ def build_cases(
     """
 
     requested = str(scenario_type or "")
+    requested_key = (
+        "openclaw" if is_openclaw_scenario(requested) else requested.casefold()
+    )
     cases: list[PromptCase] = []
     for source in source_records:
-        if not _scenario_matches(source, requested):
+        source_type = source.get("scenario_type")
+        source_key = (
+            "openclaw"
+            if is_openclaw_scenario(source_type)
+            else str(source_type or "").casefold()
+        )
+        if requested and source_key != requested_key:
             continue
-        schemas = _schemas_for_source(
+        schemas = lookup_tool_schemas(
             source,
             schemas_by_key,
-            allow_generic_schemas=allow_generic_schemas,
+            missing_policy="generic" if allow_generic_schemas else "error",
         )
-        case = build_prompt_case(
-            source,
-            workspace_root=workspace_for(output_dir, evaluation_workspace_key(source)),
-            tool_schemas=schemas,
+        cases.append(
+            build_prompt_case(
+                source,
+                workspace_root=workspace_for(
+                    output_dir, evaluation_workspace_key(source)
+                ),
+                tool_schemas=schemas,
+            )
         )
-        cases.append(case)
         if limit is not None and len(cases) >= limit:
             break
     return cases
@@ -235,22 +246,11 @@ def attach_report(rollout: dict[str, Any], report: EvaluationReport) -> dict[str
     """
 
     payload = report.to_dict()
-    rollout["evaluation_schema_version"] = payload["schema_version"]
-    for field in _REPORT_ROOT_FIELDS:
-        rollout[field] = payload[field]
+    rollout.update(
+        {"evaluation_schema_version": payload["schema_version"]}
+        | {field: payload[field] for field in _REPORT_ROOT_FIELDS}
+    )
     return rollout
-
-
-def _dry_run_item(case: PromptCase) -> dict[str, Any]:
-    return {
-        "sample_id": case.sample_id,
-        "scenario_id": case.scenario_id,
-        "scenario_type": case.scenario_type,
-        "prompt_messages": case.messages,
-        "tools": case.tools,
-        "teacher_future_hidden": True,
-        "status": "dry_run",
-    }
 
 
 def _set_postfix(progress: Any, **fields: Any) -> None:
@@ -278,10 +278,7 @@ def _summary(
 ) -> dict[str, Any]:
     """Build one schema-v3 summary, including for dry runs with no reports."""
 
-    summary = summarize(reports)
-    summary["mode"] = mode
-    summary["record_count"] = record_count
-    return summary
+    return dict(summarize(reports), mode=mode, record_count=record_count)
 
 
 def _by_scenario_type(
@@ -296,15 +293,12 @@ def _by_scenario_type(
     family's denominator, so the combined score alone can hide a regression.
     """
 
+    indexes_by_type: dict[str, list[int]] = {}
+    for index, case in enumerate(cases):
+        indexes_by_type.setdefault(str(case.scenario_type or "unknown"), []).append(index)
     grouped: dict[str, dict[str, Any]] = {}
-    for scenario_type in sorted(
-        {str(case.scenario_type or "unknown") for case in cases}
-    ):
-        indexes = [
-            index
-            for index, case in enumerate(cases)
-            if str(case.scenario_type or "unknown") == scenario_type
-        ]
+    for scenario_type in sorted(indexes_by_type):
+        indexes = indexes_by_type[scenario_type]
         summary = _summary(
             [
                 reports[index]
@@ -348,34 +342,40 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
     rollouts_path = output_dir / "rollouts.jsonl"
     reports: list[EvaluationReport | None] = []
     latencies: list[float] = []
-    record_count = 0
+    record_count = len(cases)
     mode = "dry_run" if dry_run else "autonomous"
+    config = None if dry_run else RolloutConfig(
+        max_turns=args.max_turns,
+        max_new_tokens=args.max_new_tokens,
+        temperature=args.temperature,
+        capture_raw_responses=bool(getattr(args, "save_raw_responses", False)),
+        capture_raw_tool_outputs=bool(getattr(args, "save_raw_tool_outputs", False)),
+    )
+    runner = None if dry_run else _build_runner(args, cases)
     with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
-        if dry_run:
-            progress = tqdm(
-                cases, total=len(cases), desc="Preparing evaluation", unit="case"
-            )
-            for case in progress:
-                write_rollout(_dry_run_item(case))
-                record_count += 1
-                reports.append(None)
-                _set_postfix(progress, scenario=case.scenario_type, status="dry_run")
-        else:
-            runner = _build_runner(args, cases)
-            progress = tqdm(cases, total=len(cases), desc="Evaluating", unit="case")
-            for case in progress:
-                source = case.source_record
-                config = RolloutConfig(
-                    max_turns=args.max_turns,
-                    max_new_tokens=args.max_new_tokens,
-                    temperature=args.temperature,
-                    capture_raw_responses=bool(
-                        getattr(args, "save_raw_responses", False)
-                    ),
-                    capture_raw_tool_outputs=bool(
-                        getattr(args, "save_raw_tool_outputs", False)
-                    ),
+        progress = tqdm(
+            cases,
+            total=len(cases),
+            desc="Preparing evaluation" if dry_run else "Evaluating",
+            unit="case",
+        )
+        for case in progress:
+            report = None
+            if dry_run:
+                write_rollout(
+                    {
+                        "sample_id": case.sample_id,
+                        "scenario_id": case.scenario_id,
+                        "scenario_type": case.scenario_type,
+                        "prompt_messages": case.messages,
+                        "tools": case.tools,
+                        "teacher_future_hidden": True,
+                        "status": "dry_run",
+                    }
                 )
+                status = "dry_run"
+            else:
+                source = case.source_record
                 started = perf_counter()
                 rollout = runner(case).run(case, config).to_dict()
                 latency = perf_counter() - started
@@ -388,14 +388,10 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                 )
                 attach_report(rollout, report)
                 write_rollout(rollout)
-                record_count += 1
-                reports.append(report)
-                _set_postfix(
-                    progress,
-                    scenario=case.scenario_type,
-                    status=rollout.get("trace_status", "unknown"),
-                )
+                status = rollout.get("trace_status", "unknown")
                 release_cuda_cache()
+            reports.append(report)
+            _set_postfix(progress, scenario=case.scenario_type, status=status)
 
     summary = _summary(
         [report for report in reports if report is not None],
@@ -450,13 +446,11 @@ def _build_runner(args: Any, cases: Sequence[PromptCase]):
     )
     repo_root = Path(getattr(args, "repo_root", "."))
     policy = ScenarioPolicy()
-    dispatchers: dict[str, ToolDispatcher] = {
-        family: build_dispatcher(family, schemas, repo_root)
-        for family, schemas in schemas_by_scenario_family(cases).items()
-    }
     runners = {
-        family: RolloutRunner(generator, dispatcher, policy=policy)
-        for family, dispatcher in dispatchers.items()
+        family: RolloutRunner(
+            generator, build_dispatcher(family, schemas, repo_root), policy=policy
+        )
+        for family, schemas in schemas_by_scenario_family(cases).items()
     }
 
     def select(case: PromptCase) -> RolloutRunner:

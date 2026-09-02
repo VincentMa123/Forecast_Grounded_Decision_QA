@@ -24,6 +24,8 @@ DEFAULT_MAPPING_CSV = (
 DEFAULT_SPLIT_SEED = "pipeclaw-lifecycle-v1"
 
 from pipeclaw.backend.grounding.decision_trace_state import (
+    DEFAULT_RECENT_TURNS_MAX_CHARS,
+    DEFAULT_STATE_MAX_CHARS,
     VerifiedDecisionState,
     bounded_recent_turns,
     serialize_verified_decision_state,
@@ -36,7 +38,7 @@ from pipeclaw.backend.grounding.contract import (
 )
 from pipeclaw.backend.evaluator.answer_quality import (
     answer_quality_issues,
-    evaluate_answer_quality,
+    evaluate_quality_context,
 )
 from pipeclaw.backend.evaluator.numeric_grounding import (
     numeric_claims_are_grounded,
@@ -55,10 +57,9 @@ from pipeclaw.backend.evaluator.scorer import (
     NativeTraceEvaluator,
     apply_quality_aliases,
 )
+from pipeclaw.backend.evaluator.quality_context import build_quality_context
 from pipeclaw.backend.pipeline.scenario_preflight import validate_scenario_sources
-from pipeclaw.backend.pipeline.teacher_trace_store import (
-    TeacherTraceStore,
-)
+from pipeclaw.backend.teacher_traces.teacher_trace_store import TeacherTraceStore
 from pipeclaw.backend.teacher_traces.trace_history import build_history_turn
 from pipeclaw.backend.teacher_traces.trace_projection import (
     export_trace_tools,
@@ -209,8 +210,7 @@ def _project_forecast_fields(
 
     tool_calls, tool_outputs, pipeformer_results = export_trace_tools(trace)
     pipeformer_call_count = sum(
-        item.get("tool_name") == "run_pipeformer_forecast"
-        for item in trace.get("tool_calls", [])
+        item.get("name") == "run_pipeformer_forecast" for item in tool_calls
     )
     grounded_tool_outputs = attach_tool_arguments(tool_outputs, tool_calls)
     history_state = VerifiedDecisionState.from_history(conversation_context or [])
@@ -226,12 +226,7 @@ def _project_forecast_fields(
     grounding_contract = build_grounding_contract(
         question,
         grounded_tool_outputs,
-        prior_candidate_results=history_state.candidate_results,
-        prior_decision_policy=history_state.decision_policy,
-        prior_decision_policy_source_question=(
-            history_state.decision_policy_source_question
-        ),
-        prior_applied_disturbances=history_state.applied_disturbances,
+        prior_state=history_state,
         require_decision_policy=True,
     )
     candidate_ids = {
@@ -354,17 +349,26 @@ def _evaluate_and_repair_answer(
     fallback_applied = False
 
     def score_answer(answer_text: str) -> tuple[Any, list[Any]]:
-        return evaluate_answer_quality(
+        context = build_quality_context(
             answer=answer_text,
             question=question,
             pipeformer=forecast["pipeformer"],
-            trace_status=trace.get("status"),
-            pipeformer_call_count=forecast["pipeformer_call_count"],
-            pipeformer_outputs=forecast["pipeformer_outputs"],
             conversation_context=conversation_context,
             tool_outputs=forecast["grounded_tool_outputs"],
             record_evidence=evidence,
-            grounding_contract=grounding_contract,
+        )
+        forecasts_pass = (
+            forecast["pipeformer_call_count"] == 0
+            or bool(forecast["pipeformer_outputs"])
+        ) and all(
+            output.get("quality_flag") == "pass"
+            for output in forecast["pipeformer_outputs"]
+        )
+        return evaluate_quality_context(
+            context,
+            grounding_contract,
+            trace_status=trace.get("status"),
+            forecasts_pass=forecasts_pass,
         )
 
     answer_quality_flag, quality_issues = score_answer(answer)
@@ -505,8 +509,12 @@ def build_teacher_record(
         question,
         trace,
         conversation_context,
-        verified_state_max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
-        recent_turns_max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+        verified_state_max_chars=int(
+            os.getenv("VERIFIED_STATE_MAX_CHARS", DEFAULT_STATE_MAX_CHARS)
+        ),
+        recent_turns_max_chars=int(
+            os.getenv("RECENT_TURNS_MAX_CHARS", DEFAULT_RECENT_TURNS_MAX_CHARS)
+        ),
     )
     answer = _evaluate_and_repair_answer(
         scenario,
@@ -542,6 +550,53 @@ def _turn_trace(
         "status": full_trace.get("status"),
         "messages": list(full_trace.get("messages") or [])[message_start:],
         "tool_calls": list(full_trace.get("tool_calls") or [])[tool_start:],
+    }
+
+
+def _build_session_record(
+    scenario: Dict[str, Any],
+    source_session: Dict[str, Any],
+    source_session_id: str,
+    records: List[Dict[str, Any]],
+    errors: List[Dict[str, Any]],
+    raw_trace_paths: Dict[int, str],
+    split: str = "train",
+) -> Dict[str, Any]:
+    """Finalize one source session from completed turn records."""
+
+    dataset_source = str(scenario.get("dataset_source") or "unknown_source")
+    scenario_id = str(scenario.get("scenario_id") or "unknown_scenario")
+    return {
+        "session_record_id": f"{dataset_source}:{source_session_id}",
+        "dataset_source": dataset_source,
+        "source_scenario_id": scenario_id,
+        "scenario_id": scenario_id,
+        "split_group_id": scenario_id,
+        "session_id": source_session_id,
+        "scenario_type": scenario.get("scenario_type"),
+        "offset_hours": source_session.get("offset_hours"),
+        "split": split,
+        "turns": [
+            {
+                "turn_id": record["turn_id"],
+                "user_input": record["user_input"],
+                "expected_answer": record["final_answer"],
+                "state_before": record.get("state_before"),
+                "recent_turns": record.get("recent_turns"),
+                "tool_calls": record["tool_calls"],
+                "tool_outputs": record["tool_outputs"],
+                "quality_flag": record["quality_flag"],
+                "quality_score": record["quality_score"],
+                "quality_profile": record["quality_profile"],
+                "quality_failed_checks": record["quality_failed_checks"],
+                "quality_issues": record["quality_issues"],
+                "raw_trace_path": raw_trace_paths.get(record["turn_id"]),
+            }
+            for record in records
+        ],
+        "complete": not errors
+        and len(records) == len(source_session.get("dialogue") or []),
+        "errors": errors,
     }
 
 
@@ -909,12 +964,7 @@ class TeacherTraceGenerator:
                         question,
                         completed_calls,
                         require_decision_policy=True,
-                        prior_candidate_results=history_state.candidate_results,
-                        prior_decision_policy=history_state.decision_policy,
-                        prior_decision_policy_source_question=(
-                            history_state.decision_policy_source_question
-                        ),
-                        prior_applied_disturbances=history_state.applied_disturbances,
+                        prior_state=history_state,
                     )
                     issues.extend(comparison_answer_issues(answer, contract))
                     return list(dict.fromkeys(issues))
@@ -972,38 +1022,15 @@ class TeacherTraceGenerator:
                 )
                 break
 
-        session_record = {
-            "session_record_id": f"{dataset_source}:{source_session_id}",
-            "dataset_source": dataset_source,
-            "source_scenario_id": scenario_id,
-            "scenario_id": scenario_id,
-            "split_group_id": scenario_id,
-            "session_id": source_session_id,
-            "scenario_type": scenario.get("scenario_type"),
-            "offset_hours": source_session.get("offset_hours"),
-            "split": split,
-            "turns": [
-                {
-                    "turn_id": record["turn_id"],
-                    "user_input": record["user_input"],
-                    "expected_answer": record["final_answer"],
-                    "state_before": record.get("state_before"),
-                    "recent_turns": record.get("recent_turns"),
-                    "tool_calls": record["tool_calls"],
-                    "tool_outputs": record["tool_outputs"],
-                    "quality_flag": record["quality_flag"],
-                    "quality_score": record["quality_score"],
-                    "quality_profile": record["quality_profile"],
-                    "quality_failed_checks": record["quality_failed_checks"],
-                    "quality_issues": record["quality_issues"],
-                    "raw_trace_path": raw_trace_paths.get(record["turn_id"]),
-                }
-                for record in records
-            ],
-            "complete": not errors
-            and len(records) == len(source_session.get("dialogue") or []),
-            "errors": errors,
-        }
+        session_record = _build_session_record(
+            scenario,
+            source_session,
+            source_session_id,
+            records,
+            errors,
+            raw_trace_paths,
+            split,
+        )
         return records, session_record
 
     def _execute_sessions(
@@ -1174,7 +1201,6 @@ class TeacherTraceGenerator:
         sft_record_count = write_split_records(
             self.args.split_output_dir,
             merged.records,
-            force=True,
         )
         failed_sessions = execution.failed_session_count
         total_failed_sessions = sum(

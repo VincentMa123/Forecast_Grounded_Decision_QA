@@ -12,7 +12,6 @@ from pipeclaw.backend.grounding.answer_limits import (
 )
 from pipeclaw.backend.grounding.contract import (
     answer_without_machine_disclosure,
-    build_grounding_contract,
     comparison_answer_issues,
     provisional_assumption_disclosed,
     record_grounding_contract,
@@ -234,7 +233,7 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
     is_forecast_comparison = comparison_candidate_count > 1
     budgeted_answer = answer_without_machine_disclosure(answer)
     has_chinese = any(
-        "\u4e00" <= character <= "\u9fff" for character in budgeted_answer
+        "一" <= character <= "鿿" for character in budgeted_answer
     )
     if has_forecast_result or successful_forecast_count:
         if has_chinese and len(budgeted_answer) > (
@@ -270,39 +269,16 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
     return issues
 
 
-def evaluate_answer_quality(
+def evaluate_quality_context(
+    context: QualityContext,
+    contract: Dict[str, Any],
     *,
-    answer: str,
-    question: str,
-    pipeformer: Optional[Dict[str, Any]],
     trace_status: Optional[str],
-    pipeformer_call_count: int,
-    pipeformer_outputs: List[Dict[str, Any]],
-    conversation_context: Optional[List[Dict[str, Any]]] = None,
-    tool_outputs: Optional[List[Dict[str, Any]]] = None,
-    record_evidence: Optional[Dict[str, Any]] = None,
-    grounding_contract: Optional[Dict[str, Any]] = None,
+    forecasts_pass: bool,
 ) -> tuple[str, List[str]]:
-    """Evaluate generation inputs using the live trust boundary."""
+    """Evaluate one normalized quality context against its contract."""
 
-    outputs = tool_outputs or []
-    context = build_quality_context(
-        answer=answer,
-        question=question,
-        pipeformer=pipeformer,
-        conversation_context=conversation_context,
-        tool_outputs=outputs,
-        record_evidence=record_evidence,
-    )
-    contract = (
-        dict(grounding_contract)
-        if grounding_contract is not None
-        else build_grounding_contract(question, outputs)
-    )
-    issues = _answer_quality_core(context, contract)
-    forecasts_pass = (pipeformer_call_count == 0 or bool(pipeformer_outputs)) and all(
-        output.get("quality_flag") == "pass" for output in pipeformer_outputs
-    )
+    issues = _answer_quality_core(context, dict(contract))
     quality_flag = (
         "pass"
         if trace_status == "completed" and forecasts_pass and not issues
@@ -409,7 +385,7 @@ def record_answer_quality_issues(record: Dict[str, Any]) -> List[str]:
         tool_outputs=tool_outputs,
         record_evidence=record_evidence,
     )
-    return _answer_quality_core(context, contract)
+    return _answer_quality_core(context, dict(contract))
 
 
 def _absolute_assertion_is_grounded(answer: str, evidence: Any) -> bool:

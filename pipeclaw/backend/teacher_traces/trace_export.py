@@ -14,6 +14,8 @@ from pipeclaw.backend.evaluator.numeric_grounding import (
 )
 from pipeclaw.backend.evaluator.quality_references import variable_references
 from pipeclaw.backend.grounding.decision_trace_state import (
+    DEFAULT_RECENT_TURNS_MAX_CHARS,
+    DEFAULT_STATE_MAX_CHARS,
     VerifiedDecisionState,
     bounded_recent_turns,
     serialize_verified_decision_state,
@@ -125,7 +127,11 @@ def _project_sft_record(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
     rebuilt = serialize_verified_decision_state(
         VerifiedDecisionState.from_history(item.get("conversation_context") or []),
-        max_chars=int(os.getenv("VERIFIED_STATE_MAX_CHARS", "16000")),
+        max_chars=int(
+            os.getenv(
+                "VERIFIED_STATE_MAX_CHARS", DEFAULT_STATE_MAX_CHARS
+            )
+        ),
     )
     state_before = dict(projected.get("state_before") or {})
     for key, value in rebuilt.items():
@@ -136,7 +142,9 @@ def _project_sft_record(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         projected["recent_turns"] = bounded_recent_turns(
             item.get("conversation_context") or [],
             max_turns=2,
-            max_chars=int(os.getenv("RECENT_TURNS_MAX_CHARS", "4000")),
+            max_chars=int(
+                os.getenv("RECENT_TURNS_MAX_CHARS", DEFAULT_RECENT_TURNS_MAX_CHARS)
+            ),
         )
     prior_tool_calls = prior_tool_call_provenance(
         item.get("conversation_context") or []
@@ -239,7 +247,6 @@ def _project_sft_record(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 def write_split_records(
     output_dir: Path,
     records: List[Dict[str, Any]],
-    force: bool,
 ) -> int:
     """Write only compact, quality-passing records that remain evidence-grounded."""
     split_records = {split: [] for split in ("train", "valid", "test")}
@@ -253,7 +260,7 @@ def write_split_records(
         write_jsonl(
             output_dir / f"teacher_trace_{split}.jsonl",
             split_records[split],
-            force=force,
+            force=True,
         )
         written_count += len(split_records[split])
     return written_count

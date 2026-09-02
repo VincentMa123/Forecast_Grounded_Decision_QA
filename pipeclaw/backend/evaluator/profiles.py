@@ -23,10 +23,8 @@ class ProfilePolicy:
     minimum_score: float | None
     metrics: Mapping[str, MetricPolicy]
     critical_metrics: frozenset[str] = frozenset()
-    diagnostic_metrics: frozenset[str] = frozenset()
     equal_weight_deliverables: bool = False
     metric_order: tuple[str, ...] = ()
-    diagnostic_order: tuple[str, ...] = ()
     legacy_aliases: Mapping[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
@@ -38,21 +36,21 @@ class ProfilePolicy:
         )
         object.__setattr__(
             self,
-            "diagnostic_order",
-            tuple(
-                self.diagnostic_order
-                or (name for name in self.metric_order if name in self.diagnostic_metrics)
-            ),
-        )
-        object.__setattr__(
-            self,
             "legacy_aliases",
             MappingProxyType(dict(self.legacy_aliases)),
         )
 
+    @property
+    def diagnostic_order(self) -> tuple[str, ...]:
+        """Return diagnostics in the order declared by canonical policies."""
+
+        return tuple(
+            name
+            for name, policy in self.metrics.items()
+            if not policy.weight and not policy.critical and not policy.included_in_score
+        )
+
     def metric(self, name: str) -> MetricPolicy:
-        if name in self.diagnostic_metrics:
-            return MetricPolicy(0.0, False, False)
         if (
             name == "trace_completed"
             and "answer_completeness" in self.metrics
@@ -98,13 +96,6 @@ AUTONOMOUS_METRIC_ORDER = TEACHER_METRIC_ORDER + (
     "answer_claim_support",
     "claim_alignment",
     "question_anchor",
-    "hallucination",
-)
-AUTONOMOUS_DIAGNOSTIC_ORDER = (
-    "tool_recovery",
-    "portability",
-    "raw_capture_metadata",
-    "model_loading_metadata",
     "hallucination",
 )
 
@@ -179,21 +170,16 @@ AUTONOMOUS_CRITICAL_METRICS = frozenset(
         "answer_claim_support",
     }
 )
-AUTONOMOUS_DIAGNOSTIC_METRICS = frozenset(
-    AUTONOMOUS_DIAGNOSTIC_ORDER
-)
 
 
 def _metric_map(
     weights: Mapping[str, float],
     critical: frozenset[str],
-) -> Mapping[str, MetricPolicy]:
-    return MappingProxyType(
-        {
-            name: MetricPolicy(weight, name in critical, True)
-            for name, weight in weights.items()
-        }
-    )
+) -> dict[str, MetricPolicy]:
+    return {
+        name: MetricPolicy(weight, name in critical, True)
+        for name, weight in weights.items()
+    }
 
 
 _TEACHER_PIPEFORMER_POLICY = ProfilePolicy(
@@ -212,12 +198,19 @@ _TEACHER_GENERIC_POLICY = ProfilePolicy(
 )
 _AUTONOMOUS_POLICY = ProfilePolicy(
     minimum_score=None,
-    metrics=MappingProxyType({}),
+    metrics={
+        name: MetricPolicy(0.0, False, False)
+        for name in (
+            "tool_recovery",
+            "portability",
+            "raw_capture_metadata",
+            "model_loading_metadata",
+            "hallucination",
+        )
+    },
     critical_metrics=AUTONOMOUS_CRITICAL_METRICS,
-    diagnostic_metrics=AUTONOMOUS_DIAGNOSTIC_METRICS,
     equal_weight_deliverables=True,
     metric_order=AUTONOMOUS_METRIC_ORDER,
-    diagnostic_order=AUTONOMOUS_DIAGNOSTIC_ORDER,
 )
 
 EVALUATOR_METRIC_REGISTRY: Mapping[

@@ -38,6 +38,19 @@ PIPEFORMER_ALLOWED_TOOLS = {
     "read_file",
 }
 
+_TOPOLOGY_FILE_RULES = (
+    (
+        "node_file",
+        r"\d{8}_node\.csv",
+        "analyze_pipeline_topology node_file must be a daily YYYYMMDD_node.csv filename",
+    ),
+    (
+        "pipeline_file",
+        r"\d{8}_pipeline\.csv",
+        "analyze_pipeline_topology pipeline_file must be a daily YYYYMMDD_pipeline.csv filename",
+    ),
+)
+
 
 def is_openclaw_scenario(scenario_type: Any) -> bool:
     """Accept the dataset's ``openclaw`` label and the user-facing alias."""
@@ -80,17 +93,6 @@ def evaluation_workspace_key(source: Mapping[str, Any]) -> str:
     return f"openclaw-{scenario_scope}"
 
 
-_OPENCLAW_PASSTHROUGH_KEYS = (
-    "parsed_json",
-    "truncated",
-    "start_line",
-    "end_line",
-    "bytes_written",
-    "overwritten",
-    "replaced_count",
-)
-
-
 def compact_openclaw_tool_result(
     value: Mapping[str, Any],
     *,
@@ -98,10 +100,11 @@ def compact_openclaw_tool_result(
 ) -> dict[str, Any]:
     """Project workspace results into logical, bounded model-visible fields."""
 
-    compact: dict[str, Any] = {}
-    for key in ("success", "error_code", "exit_code"):
-        if key in value:
-            compact[key] = value[key]
+    compact: dict[str, Any] = {
+        key: value[key]
+        for key in ("success", "error_code", "exit_code")
+        if key in value
+    }
     if "error" in value and value.get("error"):
         compact["error"] = redact_host_paths(value.get("error"))
     for key in ("stdout", "stderr"):
@@ -115,7 +118,10 @@ def compact_openclaw_tool_result(
         compact["path"] = value["path"].replace("\\", "/")
     if "content" in value and value.get("content") is not None:
         compact["content"] = str(value["content"])[:12_000]
-    for key in _OPENCLAW_PASSTHROUGH_KEYS:
+    for key in (
+        "parsed_json", "truncated", "start_line", "end_line",
+        "bytes_written", "overwritten", "replaced_count",
+    ):
         if key in value:
             compact[key] = value[key]
     if "cmd" in value and isinstance(value.get("cmd"), list):
@@ -128,21 +134,20 @@ def compact_openclaw_tool_result(
     cwd = value.get("cwd")
     if isinstance(cwd, str) and not is_host_absolute_path(cwd):
         compact["cwd"] = cwd.replace("\\", "/")
-    output_files = []
-    for item in value.get("output_files") or []:
-        name = item.get("name") if isinstance(item, Mapping) else item
-        if isinstance(name, str) and not is_host_absolute_path(name):
-            output_files.append({"name": name.replace("\\", "/")})
+    output_files = [
+        {"name": name.replace("\\", "/")}
+        for item in value.get("output_files") or []
+        for name in [item.get("name") if isinstance(item, Mapping) else item]
+        if isinstance(name, str) and not is_host_absolute_path(name)
+    ]
     if output_files:
         compact["output_files"] = output_files
     if value.get("warnings"):
-        compact["warnings"] = [
-            redact_host_paths(str(item)) for item in value["warnings"]
-        ]
+        compact["warnings"] = [redact_host_paths(str(item)) for item in value["warnings"]]
     if portability:
-        for key in ("cwd_rebased", "portable_path_normalization"):
-            if portability.get(key):
-                compact[key] = True
+        compact.update(
+            {key: True for key in ("cwd_rebased", "portable_path_normalization") if portability.get(key)}
+        )
     return compact
 
 
@@ -160,8 +165,9 @@ def openclaw_portability_metadata(call: ToolCall) -> dict[str, Any]:
             "portable_path_normalization": True,
             "original_cwd": str(cwd),
         }
-    normalized = str(cwd).replace("\\", "/")
-    return {"portable_path_normalization": normalized != str(cwd)}
+    return {
+        "portable_path_normalization": str(cwd).replace("\\", "/") != str(cwd)
+    }
 
 
 def compact_model_tool_result(
@@ -182,9 +188,7 @@ def compact_model_tool_result(
         return value
     if tool_name in OPENCLAW_WORKSPACE_TOOLS:
         return compact_openclaw_tool_result(value, portability=portability)
-    if value.get("success") is False:
-        return value
-    if tool_name != "run_pipeformer_forecast":
+    if tool_name != "run_pipeformer_forecast" or value.get("success") is False:
         return value
 
     if {"task_resolution", "prediction", "verification", "provenance"} & value.keys():
@@ -254,11 +258,7 @@ def safe_openclaw_path(
         # A Windows drive/UNC path must never be interpreted as a POSIX
         # relative path such as ``<workspace>/C:/...``.
         return False
-    target = (
-        raw_path.resolve()
-        if raw_path.is_absolute()
-        else (workspace_root / raw_path).resolve()
-    )
+    target = raw_path.resolve() if raw_path.is_absolute() else (workspace_root / raw_path).resolve()
     return path_within(workspace_root, target)
 
 
@@ -280,20 +280,12 @@ def openclaw_policy_error(
 
     arguments = dict(call.arguments)
     if call.name == "analyze_pipeline_topology":
-        node_file = arguments.get("node_file")
-        pipeline_file = arguments.get("pipeline_file")
-        if not isinstance(node_file, str) or not re.fullmatch(
-            r"\d{8}_node\.csv", node_file, re.IGNORECASE
-        ):
-            return sandbox_error(
-                "analyze_pipeline_topology node_file must be a daily YYYYMMDD_node.csv filename"
-            )
-        if not isinstance(pipeline_file, str) or not re.fullmatch(
-            r"\d{8}_pipeline\.csv", pipeline_file, re.IGNORECASE
-        ):
-            return sandbox_error(
-                "analyze_pipeline_topology pipeline_file must be a daily YYYYMMDD_pipeline.csv filename"
-            )
+        for key, pattern, message in _TOPOLOGY_FILE_RULES:
+            value = arguments.get(key)
+            if not isinstance(value, str) or not re.fullmatch(
+                pattern, value, re.IGNORECASE
+            ):
+                return sandbox_error(message)
         scope = arguments.get("pipeline_scope")
         if scope is not None and (
             not isinstance(scope, list)
@@ -315,63 +307,47 @@ def openclaw_policy_error(
                 "search_pipeformer_registry offset must be a non-negative integer"
             )
         return None
-    if call.name == "read_file":
+    if call.name in {"read_file", "write_file", "edit_file"}:
+        allow_pipeline_data = call.name == "read_file"
         if not safe_openclaw_path(
-            arguments.get("path"), workspace_root, allow_pipeline_data=True
+            arguments.get("path"), workspace_root, allow_pipeline_data=allow_pipeline_data
         ):
             return sandbox_error(
                 "read_file path is outside the evaluation workspace or allowed pipeline_data root"
-            )
-        return None
-    if call.name in {"write_file", "edit_file"}:
-        if not safe_openclaw_path(
-            arguments.get("path"), workspace_root, allow_pipeline_data=False
-        ):
-            return sandbox_error(
-                f"{call.name} path is outside the evaluation workspace"
+                if allow_pipeline_data
+                else f"{call.name} path is outside the evaluation workspace"
             )
         return None
     if call.name == "run_command":
-        return _run_command_policy_error(arguments, workspace_root)
-    return None
-
-
-def _run_command_policy_error(
-    arguments: Mapping[str, Any], workspace_root: Path
-) -> Mapping[str, Any] | None:
-    command = arguments.get("cmd")
-    if not isinstance(command, list) or not command:
-        return sandbox_error("run_command requires a non-empty command array")
-    executable = str(command[0]).casefold()
-    if executable not in OPENCLAW_PYTHON_COMMANDS:
-        return sandbox_error(
-            "only Python workspace scripts are allowed during OpenClaw evaluation"
-        )
-    if len(command) < 2 or str(command[1]).startswith("-"):
-        return sandbox_error(
-            "run_command must execute a workspace-relative Python script"
-        )
-    if not safe_openclaw_path(command[1], workspace_root, allow_pipeline_data=False):
-        return sandbox_error("run_command script is outside the evaluation workspace")
-    if any(str(item) in {"-c", "-m"} for item in command[1:]):
-        return sandbox_error(
-            "inline and module Python execution are disabled during evaluation"
-        )
-    timeout = arguments.get("timeout_s", 30)
-    if not isinstance(timeout, int) or not 1 <= timeout <= 60:
-        return sandbox_error(
-            "run_command timeout_s must be an integer from 1 through 60"
-        )
-    cwd = arguments.get("cwd")
-    if cwd is not None and is_host_absolute_path(cwd):
-        # Legacy teacher/student traces may contain a host cwd.  It is rebased by
-        # the execution transform to the active workspace and reported separately
-        # as cwd_rebased.
-        return None
-    if cwd is not None and not safe_openclaw_path(
-        cwd, workspace_root, allow_pipeline_data=False
-    ):
-        return sandbox_error("run_command cwd is outside the evaluation workspace")
+        command = arguments.get("cmd")
+        if not isinstance(command, list) or not command:
+            return sandbox_error("run_command requires a non-empty command array")
+        if str(command[0]).casefold() not in OPENCLAW_PYTHON_COMMANDS:
+            return sandbox_error(
+                "only Python workspace scripts are allowed during OpenClaw evaluation"
+            )
+        if len(command) < 2 or str(command[1]).startswith("-"):
+            return sandbox_error(
+                "run_command must execute a workspace-relative Python script"
+            )
+        if not safe_openclaw_path(
+            command[1], workspace_root, allow_pipeline_data=False
+        ):
+            return sandbox_error("run_command script is outside the evaluation workspace")
+        if any(str(item) in {"-c", "-m"} for item in command[1:]):
+            return sandbox_error(
+                "inline and module Python execution are disabled during evaluation"
+            )
+        timeout = arguments.get("timeout_s", 30)
+        if not isinstance(timeout, int) or not 1 <= timeout <= 60:
+            return sandbox_error(
+                "run_command timeout_s must be an integer from 1 through 60"
+            )
+        cwd = arguments.get("cwd")
+        if cwd is not None and not is_host_absolute_path(cwd) and not safe_openclaw_path(
+            cwd, workspace_root, allow_pipeline_data=False
+        ):
+            return sandbox_error("run_command cwd is outside the evaluation workspace")
     return None
 
 
@@ -392,97 +368,91 @@ def normalize_openclaw_execution_arguments(
     return arguments
 
 
-def _schema_names(schemas: Sequence[Mapping[str, Any]]) -> set[str]:
-    return {
-        str(schema.get("function", {}).get("name"))
-        for schema in schemas
-        if isinstance(schema, Mapping) and isinstance(schema.get("function"), Mapping)
-    }
-
-
-def _apply_workspace_root(workspace_runner: Any, workspace_root: Path) -> None:
-    """Point the shared workspace runner at one isolated evaluation workspace."""
-
-    root = Path(workspace_root)
-    agent_name = root.name
-    if agent_name.startswith("workspace-"):
-        agent_name = agent_name[len("workspace-") :]
-    workspace_runner.set_workspace_root(root.parent)
-    workspace_runner.set_active_agent(agent_name or "autonomous-evaluation")
-
-
-_EXECUTION_CONTEXT = {
-    "session_id": "autonomous-evaluation",
-    "agent_id": "autonomous-evaluation",
-}
-
-
-def build_pipeformer_dispatcher(
-    schemas: Sequence[Mapping[str, Any]], repo_root: Path
+def _build_dispatcher(
+    family: str, schemas: Sequence[Mapping[str, Any]], repo_root: Path
 ) -> ToolDispatcher:
-    """Build the read-only forecast dispatcher used by PipeFormer rollouts."""
+    """Build one family dispatcher while sharing registry/workspace plumbing."""
 
+    openclaw = family == "openclaw"
     backend_root = Path(repo_root).resolve() / "pipeclaw" / "backend"
     from pipeclaw.backend.agent.tools.registry import tool_registry
     from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
 
     register_pipeformer_tools(backend_root)
-    workspace_ready = True
+    schema_names = {
+        str(function.get("name"))
+        for schema in schemas
+        if isinstance(schema, Mapping)
+        and isinstance(function := schema.get("function"), Mapping)
+    }
     workspace_runner = None
-    if "read_file" in _schema_names(schemas):
+    if openclaw or "read_file" in schema_names:
         try:
             from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools
 
             workspace_runner = WorkspaceTools(session_id="autonomous-evaluation").runner
         except Exception:
-            # Read-only forecast evaluation remains usable if the workspace runner
-            # is unavailable; the unavailable tool is removed from the allowlist.
-            workspace_ready = False
-    allowed = set(PIPEFORMER_ALLOWED_TOOLS)
-    if not workspace_ready:
+            if openclaw:
+                raise
+    allowed = set(OPENCLAW_ALLOWED_TOOLS if openclaw else PIPEFORMER_ALLOWED_TOOLS)
+    if workspace_runner is None:
         allowed.discard("read_file")
-    dispatcher_ref: dict[str, ToolDispatcher] = {}
+    allowed &= schema_names
+    workspace_state: dict[str, Path | None] = {"root": None}
+    dispatcher: ToolDispatcher | None = None
 
     def setup_workspace(workspace_root: Path) -> None:
         if workspace_runner is None:
             return
-        _apply_workspace_root(workspace_runner, workspace_root)
+        root = Path(workspace_root).resolve() if openclaw else Path(workspace_root)
+        if openclaw:
+            workspace_state["root"] = root
+        workspace_runner.set_workspace_root(root.parent)
+        workspace_runner.set_active_agent(
+            root.name.removeprefix("workspace-") or "autonomous-evaluation"
+        )
 
     def authorize(
         call: ToolCall, completed: Sequence[Mapping[str, Any]]
     ) -> Mapping[str, Any] | None:
-        dispatcher = dispatcher_ref.get("dispatcher")
-        current_request = dispatcher.current_user_request if dispatcher else ""
-        if call.name in ("run_pipeformer_forecast", "set_decision_policy"):
-            # Share the orchestrator's full pre-execution guard chain:
-            # decision-metric misuse, registry preconditions, duplicate-
-            # equivalent forecast — not just the registry subset.
-            from pipeclaw.backend.agent.orchestrator import (
-                forecast_preexecution_failure,
+        if openclaw:
+            del completed
+            root = workspace_state["root"]
+            return (
+                sandbox_error("OpenClaw workspace has not been initialized")
+                if root is None
+                else openclaw_policy_error(call, root)
             )
+        if call.name not in ("run_pipeformer_forecast", "set_decision_policy"):
+            return None
+        from pipeclaw.backend.agent.orchestrator import forecast_preexecution_failure
 
-            return forecast_preexecution_failure(
-                call.name,
-                dict(call.arguments),
-                list(completed),
-                current_user_request=current_request,
-            )
-        return None
+        return forecast_preexecution_failure(
+            call.name,
+            dict(call.arguments),
+            list(completed),
+            current_user_request=dispatcher.current_user_request if dispatcher else "",
+        )
+
+    def transform(call: ToolCall) -> Mapping[str, Any]:
+        root = workspace_state["root"]
+        if root is None:
+            raise RuntimeError("OpenClaw workspace has not been initialized")
+        return normalize_openclaw_execution_arguments(call, root)
 
     dispatcher = ToolDispatcher(
         tool_registry,
         schemas=schemas,
-        allowed_names=allowed & _schema_names(schemas),
+        allowed_names=allowed,
         authorization_callback=authorize,
-        execution_context=dict(_EXECUTION_CONTEXT),
+        execution_arguments_callback=transform if openclaw else None,
+        execution_context={
+            "session_id": "autonomous-evaluation",
+            "agent_id": "autonomous-evaluation",
+        },
         workspace_setup=setup_workspace if workspace_runner is not None else None,
     )
-    dispatcher_ref["dispatcher"] = dispatcher
     return dispatcher
-
-
-# ``decision_policy_source_not_in_current_user_request`` is produced via the
-# shared ``forecast_preexecution_failure`` chain (orchestrator).
 
 
 def build_openclaw_dispatcher(
@@ -490,44 +460,7 @@ def build_openclaw_dispatcher(
 ) -> ToolDispatcher:
     """Build the sandboxed workspace dispatcher used by OpenClaw rollouts."""
 
-    backend_root = Path(repo_root).resolve() / "pipeclaw" / "backend"
-    from pipeclaw.backend.agent.tools.registry import tool_registry
-    from pipeclaw.backend.agent.tools.pipeformer_tools import register_pipeformer_tools
-    from pipeclaw.backend.agent.tools.workspace_tools import WorkspaceTools
-
-    register_pipeformer_tools(backend_root)
-    workspace_runner = WorkspaceTools(session_id="autonomous-evaluation").runner
-    workspace_state: dict[str, Path | None] = {"root": None}
-
-    def setup_workspace(workspace_root: Path) -> None:
-        root = Path(workspace_root).resolve()
-        workspace_state["root"] = root
-        _apply_workspace_root(workspace_runner, root)
-
-    def authorize(
-        call: ToolCall, completed: Sequence[Mapping[str, Any]]
-    ) -> Mapping[str, Any] | None:
-        del completed
-        root = workspace_state.get("root")
-        if root is None:
-            return sandbox_error("OpenClaw workspace has not been initialized")
-        return openclaw_policy_error(call, root)
-
-    def transform(call: ToolCall) -> Mapping[str, Any]:
-        root = workspace_state.get("root")
-        if root is None:
-            raise RuntimeError("OpenClaw workspace has not been initialized")
-        return normalize_openclaw_execution_arguments(call, root)
-
-    return ToolDispatcher(
-        tool_registry,
-        schemas=schemas,
-        allowed_names=OPENCLAW_ALLOWED_TOOLS & _schema_names(schemas),
-        authorization_callback=authorize,
-        execution_arguments_callback=transform,
-        execution_context=dict(_EXECUTION_CONTEXT),
-        workspace_setup=setup_workspace,
-    )
+    return _build_dispatcher("openclaw", schemas, repo_root)
 
 
 def build_dispatcher(
@@ -537,6 +470,4 @@ def build_dispatcher(
 ) -> ToolDispatcher:
     """Build the dispatcher for one scenario family."""
 
-    if is_openclaw_scenario(scenario_type):
-        return build_openclaw_dispatcher(schemas, repo_root)
-    return build_pipeformer_dispatcher(schemas, repo_root)
+    return _build_dispatcher(scenario_key(scenario_type), schemas, repo_root)

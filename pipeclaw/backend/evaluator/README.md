@@ -32,6 +32,10 @@ summary = summarize([report])
 The autonomous profile requires the held-out teacher record as `reference`.
 Teacher scoring uses `EvaluationProfile.TEACHER_TRACE`.
 
+Answer-quality checks consume a normalized `QualityContext` and grounding
+contract through `evaluate_quality_context(context, contract, ...)`. Generation
+and persisted records use the same core checks.
+
 ## Schema-v3 result semantics
 
 Reports use `EVALUATION_SCHEMA_VERSION == "pipeclaw_evaluation_v3"`.
@@ -50,7 +54,8 @@ The main modules are:
 
 - `engine.py` — `evaluate()` and the critical gate.
 - `models.py` — report, metric, profile, and input types.
-- `profiles.py` — metric weights and critical sets.
+- `profiles.py` — canonical metric policies, weights, critical sets, and
+  diagnostic ordering.
 - `adapters.py` and `oracle.py` — normalize records and extract teacher targets.
 - `checks/` — shared metric implementations.
 - `aggregation.py` — denominator-aware dataset summaries.

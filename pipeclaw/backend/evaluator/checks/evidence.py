@@ -24,7 +24,7 @@ _ROW_CLAUSE_SEPARATOR = re.compile(r"(?:\r?\n|[；;。，])")
 _LEADING_THINK = re.compile(r"^\s*<think>.*?</think>\s*", re.DOTALL)
 _BARE_DATE = re.compile(r"\d{8}|\d{4}-\d{2}-\d{2}")
 _IDENTIFIER_TOKEN = re.compile(
-    r"[\w.\u4e00-\u9fa5-]+\.(?:csv|xlsx?|json|txt)|[A-Z]_[A-Za-z0-9]+[::][A-Za-z0-9_:-]+|[\u4e00-\u9fa5]{1,7}?站"
+    r"[\w.一-龥-]+\.(?:csv|xlsx?|json|txt)|[A-Z]_[A-Za-z0-9]+[::][A-Za-z0-9_:-]+|[一-龥]{1,7}?站"
 )
 
 

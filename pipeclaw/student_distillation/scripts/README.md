@@ -26,10 +26,16 @@ call/response pairs, loss flags, structured targets, checksums, and required
 answer-generation coverage. The generators do not modify the teacher-trace source
 files.
 
+`validate_dataset.py` owns the release paths, split counts, projection names, and
+registered tool-schema lookup. `prepare_dataset.py` imports that contract when it
+writes projections, avoiding a second source of truth.
+
 ## Token profiling
 
-`profile_tokens.py` renders train and valid records through the MS-SWIFT/Qwen3.5
-training template without loading model weights or silently truncating input:
+`profile_tokens.py` keeps encoding, measurement, summaries, provenance checks,
+and report publication together in execution order. It renders train and valid
+records through the MS-SWIFT/Qwen3.5 training template without loading model
+weights or silently truncating input:
 
 ```bash
 python -m pipeclaw.student_distillation.scripts.profile_tokens \
@@ -38,7 +44,8 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
 
 Only `train` and `valid` are accepted for profiling. The script writes a
 reviewable summary JSON and, optionally, a per-record JSONL audit. Choose a
-configuration `max_length` only after checking the reported maximum.
+configuration `max_length` only after checking the reported maximum; the full
+release configuration uses `max_length: 18432`.
 
 ## Autonomous evaluation
 

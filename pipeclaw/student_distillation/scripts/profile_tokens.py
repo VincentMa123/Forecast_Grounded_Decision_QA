@@ -1,3 +1,9 @@
+"""Measure released dataset tokens with the exact MS-SWIFT training template.
+
+The complete workflow stays together because encoding, summarization, provenance
+validation, and report publication form one sequential release command.
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -5,6 +11,7 @@ import importlib
 import json
 import math
 import tempfile
+from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import partial
@@ -21,16 +28,17 @@ from pipeclaw.student_distillation.release_artifacts import (
     stable_json as _stable_json,
     utc_now as _utc_now,
 )
+from pipeclaw.student_distillation.scripts.validate_dataset import (
+    CORRECTION_SPLITS as PROFILE_SPLITS,
+    DEFAULT_MANIFEST_PATH,
+    DEFAULT_OUTPUT_ROOT as DEFAULT_DATA_ROOT,
+    PROJECTIONS as PROFILE_PROJECTIONS,
+    REPO_ROOT,
+)
 
 
 DEFAULT_THRESHOLDS = (1024, 2048, 4096, 8192, 16384)
-PROFILE_PROJECTIONS = (
-    "answer_only",
-    "trace_level",
-    "constraint_multitask",
-)
 PROFILE_PROJECTION_CHOICES = (*PROFILE_PROJECTIONS, "python_correction")
-PROFILE_SPLITS = ("train", "valid")
 FIELD_ROLES = {
     "system": "system_prompt",
     "user": "user_messages",
@@ -47,9 +55,6 @@ FIELD_NAMES = (
     "assistant_targets",
 )
 DEFAULT_LOSS_SCALE = "default+ignore_empty_think"
-REPO_ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_DATA_ROOT = REPO_ROOT / "pipeclaw" / "student_distillation" / "data"
-DEFAULT_MANIFEST_PATH = DEFAULT_DATA_ROOT / "manifests" / "task2_dataset_manifest.json"
 DEFAULT_SUMMARY_PATH = (
     DEFAULT_DATA_ROOT / "token_profiles" / "qwen35_08b_token_profile.json"
 )
@@ -63,6 +68,11 @@ class TokenProfileError(ValueError):
     """Raised when a token profile cannot be produced safely."""
 
 
+def _require(condition: Any, message: str) -> None:
+    if not condition:
+        raise TokenProfileError(message)
+
+
 _required_text = partial(required_text, error_factory=TokenProfileError)
 
 
@@ -70,6 +80,7 @@ def _read_jsonl(path: Path) -> list[dict[str, Any]]:
     return read_jsonl_domain(path, error_factory=TokenProfileError)
 
 
+# === Token measurement =====================================================
 @dataclass(frozen=True)
 class EncodedRecord:
     """Token counts returned by a complete, untruncated template encoding."""
@@ -90,40 +101,23 @@ class ProfileInput:
 
 
 class RecordEncoder(Protocol):
-    """Boundary implemented by the exact MS-SWIFT template adapter."""
-
-    def encode_record(self, record: dict[str, Any]) -> EncodedRecord:
-        """Encode one complete record without a maximum length."""
+    def encode_record(self, record: dict[str, Any]) -> EncodedRecord: ...
 
 
 class TextTokenCounter(Protocol):
-    """Boundary for counting raw field content with the selected processor."""
-
-    def count_text(self, text: str) -> int:
-        """Return the number of tokenizer tokens in one text value."""
+    def count_text(self, text: str) -> int: ...
 
 
 class SwiftTemplateEncoder:
     """Processor-only MS-SWIFT adapter for exact training-template encoding."""
 
-    def __init__(
-        self,
-        model_id: str,
-        *,
-        loss_scale: str = DEFAULT_LOSS_SCALE,
-    ) -> None:
+    def __init__(self, model_id: str, *, loss_scale: str = DEFAULT_LOSS_SCALE) -> None:
         swift_module = load_swift_api()
         processor = swift_module.get_processor(model_id)
-        template = swift_module.get_template(
-            processor,
-            loss_scale=loss_scale,
-        )
+        template = swift_module.get_template(processor, loss_scale=loss_scale)
         self._initialize(
-            model_id=model_id,
-            processor=processor,
-            template=template,
-            loss_scale=loss_scale,
-            swift_version=str(getattr(swift_module, "__version__", "unknown")),
+            model_id, processor, template, loss_scale,
+            str(getattr(swift_module, "__version__", "unknown")),
         )
 
     @classmethod
@@ -139,65 +133,53 @@ class SwiftTemplateEncoder:
         """Construct an adapter around already-loaded processor components."""
 
         instance = cls.__new__(cls)
-        instance._initialize(
-            model_id=model_id,
-            processor=processor,
-            template=template,
-            loss_scale=loss_scale,
-            swift_version=swift_version,
-        )
+        instance._initialize(model_id, processor, template, loss_scale, swift_version)
         return instance
 
     def _initialize(
         self,
-        *,
         model_id: str,
         processor: Any,
         template: Any,
         loss_scale: str,
         swift_version: str,
     ) -> None:
-        if not model_id.strip():
-            raise TokenProfileError("model_id must be nonempty text")
-        if not hasattr(template, "set_mode") or not hasattr(template, "encode"):
-            raise TokenProfileError("MS-SWIFT template lacks the required API")
+        _require(model_id.strip(), "model_id must be nonempty text")
+        _require(
+            hasattr(template, "set_mode") and hasattr(template, "encode"),
+            "MS-SWIFT template lacks the required API",
+        )
         template.set_mode("train")
-        self.model_id = model_id
-        self.loss_scale = loss_scale
-        self.processor = processor
-        self.template = template
-        self.swift_version = swift_version
+        self.model_id, self.processor, self.template = model_id, processor, template
+        self.loss_scale, self.swift_version = loss_scale, swift_version
 
     def encode_record(self, record: dict[str, Any]) -> EncodedRecord:
         encoded = self.template.encode(record)
-        if not isinstance(encoded, dict):
-            raise TokenProfileError("MS-SWIFT template returned a non-object encoding")
-        if encoded.get("truncated") is True or encoded.get("is_truncated") is True:
-            raise TokenProfileError("MS-SWIFT reported a truncated encoding")
+        _require(isinstance(encoded, dict), "MS-SWIFT template returned a non-object encoding")
+        _require(
+            encoded.get("truncated") is not True and encoded.get("is_truncated") is not True,
+            "MS-SWIFT reported a truncated encoding",
+        )
         input_ids = _flat_vector(encoded.get("input_ids"), "input_ids")
         labels = _flat_vector(encoded.get("labels"), "labels")
-        if len(input_ids) != len(labels):
-            raise TokenProfileError("input_ids and labels length mismatch")
+        _require(len(input_ids) == len(labels), "input_ids and labels length mismatch")
         loss_scale = encoded.get("loss_scale")
         scales: list[Any] | None = None
         if loss_scale is not None:
             scales = _flat_vector(loss_scale, "loss_scale")
-            if len(scales) != len(labels):
-                raise TokenProfileError("labels and loss_scale length mismatch")
-        supervised = sum(
-            label != -100 and (scales is None or float(scales[index]) > 0)
-            for index, label in enumerate(labels)
-        )
+            _require(len(scales) == len(labels), "labels and loss_scale length mismatch")
         return EncodedRecord(
-            total_tokens=len(input_ids),
-            supervised_tokens=supervised,
+            len(input_ids),
+            sum(
+                label != -100 and (scales is None or float(scales[index]) > 0)
+                for index, label in enumerate(labels)
+            ),
         )
 
     def count_text(self, text: str) -> int:
         tokenizer = getattr(self.processor, "tokenizer", self.processor)
         encode = getattr(tokenizer, "encode", None)
-        if not callable(encode):
-            raise TokenProfileError("Qwen3.5 processor lacks tokenizer.encode")
+        _require(callable(encode), "Qwen3.5 processor lacks tokenizer.encode")
         token_ids = encode(text, add_special_tokens=False)
         return len(_flat_vector(token_ids, "text token ids"))
 
@@ -225,20 +207,20 @@ def load_swift_api(
         raise TokenProfileError(
             "MS-SWIFT is required in the dedicated Task 2 environment"
         ) from exc
-    if not callable(getattr(swift_module, "get_processor", None)) or not callable(
-        getattr(swift_module, "get_template", None)
-    ):
-        raise TokenProfileError("installed MS-SWIFT lacks get_processor/get_template")
+    _require(
+        callable(getattr(swift_module, "get_processor", None))
+        and callable(getattr(swift_module, "get_template", None)),
+        "installed MS-SWIFT lacks get_processor/get_template",
+    )
     return swift_module
 
 
+# === Profile summaries =====================================================
 def nearest_rank(values: Sequence[int], percentile: float) -> int:
     """Return a deterministic nearest-rank percentile."""
 
-    if not values:
-        raise TokenProfileError("at least one token length is required")
-    if not 0 < percentile <= 1:
-        raise TokenProfileError("percentile must be greater than 0 and at most 1")
+    _require(values, "at least one token length is required")
+    _require(0 < percentile <= 1, "percentile must be greater than 0 and at most 1")
     ordered = sorted(values)
     rank = max(1, math.ceil(percentile * len(ordered)))
     return int(ordered[rank - 1])
@@ -251,22 +233,22 @@ def summarize_lengths(
 ) -> dict[str, Any]:
     """Summarize one nonempty collection of exact record lengths."""
 
-    if not values:
-        raise TokenProfileError("at least one token length is required")
-    if any(not isinstance(value, int) or value <= 0 for value in values):
-        raise TokenProfileError("token lengths must be positive integers")
-    if any(not isinstance(limit, int) or limit <= 0 for limit in thresholds):
-        raise TokenProfileError("coverage thresholds must be positive integers")
+    _require(values, "at least one token length is required")
+    _require(
+        all(isinstance(value, int) and value > 0 for value in values),
+        "token lengths must be positive integers",
+    )
+    _require(
+        all(isinstance(limit, int) and limit > 0 for limit in thresholds),
+        "coverage thresholds must be positive integers",
+    )
 
-    ordered = sorted(values)
-    count = len(ordered)
-    coverage: dict[str, dict[str, int | float]] = {}
-    for limit in thresholds:
+    ordered, count = sorted(values), len(values)
+
+    def coverage(limit: int) -> dict[str, int | float]:
         fitting = sum(value <= limit for value in ordered)
-        coverage[str(limit)] = {
-            "count": fitting,
-            "percent": round(100.0 * fitting / count, 6),
-        }
+        return {"count": fitting, "percent": round(100.0 * fitting / count, 6)}
+
     return {
         "count": count,
         "minimum": ordered[0],
@@ -274,7 +256,7 @@ def summarize_lengths(
         "p95": nearest_rank(ordered, 0.95),
         "p99": nearest_rank(ordered, 0.99),
         "maximum": ordered[-1],
-        "coverage": coverage,
+        "coverage": {str(limit): coverage(limit) for limit in thresholds},
     }
 
 
@@ -287,29 +269,21 @@ def profile_records(
 ) -> list[dict[str, Any]]:
     """Encode records exactly and retain the identity needed for auditing."""
 
-    if split == "test":
-        raise TokenProfileError(
-            "the test split cannot be used for sequence-length selection"
-        )
-    if split not in {"train", "valid"}:
-        raise TokenProfileError(f"unsupported profile split {split!r}")
+    _require(split != "test", "the test split cannot be used for sequence-length selection")
+    _require(split in {"train", "valid"}, f"unsupported profile split {split!r}")
 
     rows: list[dict[str, Any]] = []
     for index, record in enumerate(records, start=1):
-        example_id = _required_text(
-            record, "example_id", f"{projection}/{split}:{index}"
-        )
+        example_id = _required_text(record, "example_id", f"{projection}/{split}:{index}")
         source_sample_id = _required_text(record, "source_sample_id", example_id)
         scenario_type = _required_text(record, "scenario_type", example_id)
         measured = encoder.encode_record(record)
-        if measured.total_tokens <= 0:
-            raise TokenProfileError(f"{example_id}: encoding produced no tokens")
-        if measured.supervised_tokens <= 0:
-            raise TokenProfileError(f"{example_id}: encoding has no supervised tokens")
-        if measured.supervised_tokens > measured.total_tokens:
-            raise TokenProfileError(
-                f"{example_id}: supervised tokens exceed total tokens"
-            )
+        _require(measured.total_tokens > 0, f"{example_id}: encoding produced no tokens")
+        _require(measured.supervised_tokens > 0, f"{example_id}: encoding has no supervised tokens")
+        _require(
+            measured.supervised_tokens <= measured.total_tokens,
+            f"{example_id}: supervised tokens exceed total tokens",
+        )
         rows.append(
             {
                 "example_id": example_id,
@@ -322,8 +296,7 @@ def profile_records(
                 "supervised_tokens": measured.supervised_tokens,
             }
         )
-    if not rows:
-        raise TokenProfileError(f"{projection}/{split}: no records to profile")
+    _require(rows, f"{projection}/{split}: no records to profile")
     return rows
 
 
@@ -334,50 +307,36 @@ def summarize_profile_rows(
 ) -> dict[str, Any]:
     """Build overall and categorical summaries from per-record measurements."""
 
-    if not rows:
-        raise TokenProfileError("at least one profile row is required")
+    _require(rows, "at least one profile row is required")
 
-    def summarize_group(group_rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    def summarize_group(group: Sequence[dict[str, Any]]) -> dict[str, Any]:
         summary = summarize_lengths(
-            [int(row["total_tokens"]) for row in group_rows],
-            thresholds=thresholds,
+            [int(row["total_tokens"]) for row in group], thresholds=thresholds
         )
         summary["supervised_tokens"] = summarize_lengths(
-            [int(row["supervised_tokens"]) for row in group_rows],
-            thresholds=thresholds,
+            [int(row["supervised_tokens"]) for row in group], thresholds=thresholds
         )
         return summary
 
-    def group_by(field: str) -> dict[str, dict[str, Any]]:
+    def grouped(field: str) -> dict[str, dict[str, Any]]:
         groups: dict[str, list[dict[str, Any]]] = {}
         for row in rows:
-            raw_value = row.get(field)
-            value = "none" if raw_value is None else str(raw_value)
+            value = "none" if row.get(field) is None else str(row[field])
             groups.setdefault(value, []).append(row)
         return {
-            value: summarize_group(group_rows)
-            for value, group_rows in sorted(groups.items())
+            value: summarize_group(group) for value, group in sorted(groups.items())
         }
 
     longest_fields = (
-        "example_id",
-        "projection",
-        "split",
-        "scenario_type",
-        "task_type",
-        "total_tokens",
-        "supervised_tokens",
+        "example_id", "projection", "split", "scenario_type", "task_type",
+        "total_tokens", "supervised_tokens",
     )
-    longest = sorted(
-        rows,
-        key=lambda row: (-int(row["total_tokens"]), str(row["example_id"])),
-    )[:20]
+    longest = sorted(rows, key=lambda row: (
+        -int(row["total_tokens"]), str(row["example_id"])))[:20]
     return {
         "overall": summarize_group(rows),
-        "by_projection": group_by("projection"),
-        "by_split": group_by("split"),
-        "by_scenario_type": group_by("scenario_type"),
-        "by_task_type": group_by("task_type"),
+        **{f"by_{field}": grouped(field) for field in (
+            "projection", "split", "scenario_type", "task_type")},
         "longest_examples": [
             {field: row.get(field) for field in longest_fields} for row in longest
         ],
@@ -390,8 +349,7 @@ def profile_inputs(
 ) -> list[dict[str, Any]]:
     """Profile all manifest-verified files and attach raw field token counts."""
 
-    if not inputs:
-        raise TokenProfileError("at least one profile input is required")
+    _require(inputs, "at least one profile input is required")
     rows: list[dict[str, Any]] = []
     for profile_input in inputs:
         file_rows = profile_records(
@@ -404,6 +362,22 @@ def profile_inputs(
             row["field_content_tokens"] = measure_field_content(record, encoder)
         rows.extend(file_rows)
     return rows
+
+
+# === Release provenance ====================================================
+def _input_provenance(
+    inputs: Sequence[ProfileInput], data_root: Path
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "projection": item.projection,
+            "split": item.split,
+            "file": _relative_report_path(item.path, data_root),
+            "record_count": len(item.records),
+            "sha256": item.sha256,
+        }
+        for item in inputs
+    ]
 
 
 def build_profile_report(
@@ -419,32 +393,28 @@ def build_profile_report(
 ) -> dict[str, Any]:
     """Build the reviewable Phase 5 summary from exact per-record rows."""
 
-    if not rows:
-        raise TokenProfileError("at least one profile row is required")
-    field_totals = {field: 0 for field in FIELD_NAMES}
+    _require(rows, "at least one profile row is required")
+    field_totals = dict.fromkeys(FIELD_NAMES, 0)
     for row in rows:
         fields = row.get("field_content_tokens")
-        if not isinstance(fields, dict):
-            raise TokenProfileError(
-                f"{row.get('example_id')}: field token counts are missing"
-            )
+        _require(
+            isinstance(fields, dict),
+            f"{row.get('example_id')}: field token counts are missing",
+        )
         for field in FIELD_NAMES:
             value = fields.get(field)
-            if not isinstance(value, int) or value < 0:
-                raise TokenProfileError(
-                    f"{row.get('example_id')}: invalid field count for {field}"
-                )
+            _require(
+                isinstance(value, int) and value >= 0,
+                f"{row.get('example_id')}: invalid field count for {field}",
+            )
             field_totals[field] += value
 
-    field_order = {field: index for index, field in enumerate(FIELD_NAMES)}
     summary = summarize_profile_rows(rows, thresholds=thresholds)
     summary["field_content_totals"] = field_totals
     summary["field_content_ranking"] = [
         {"field": field, "tokens": tokens}
-        for field, tokens in sorted(
-            field_totals.items(),
-            key=lambda item: (-item[1], field_order[item[0]]),
-        )
+        for field, tokens in sorted(field_totals.items(), key=lambda item: (
+            -item[1], FIELD_NAMES.index(item[0])))
     ]
     return {
         "schema_version": "task2_token_profile_v1",
@@ -457,16 +427,7 @@ def build_profile_report(
         "projections": sorted({profile_input.projection for profile_input in inputs}),
         "splits": sorted({profile_input.split for profile_input in inputs}),
         "thresholds": list(thresholds),
-        "input_files": [
-            {
-                "projection": profile_input.projection,
-                "split": profile_input.split,
-                "file": _relative_report_path(profile_input.path, data_root),
-                "record_count": len(profile_input.records),
-                "sha256": profile_input.sha256,
-            }
-            for profile_input in inputs
-        ],
+        "input_files": _input_provenance(inputs, data_root),
         "field_attribution": (
             "Exact record totals use the MS-SWIFT training template. Field totals "
             "count raw content with the same Qwen3.5 processor and exclude chat "
@@ -485,8 +446,10 @@ def write_profile_reports(
 ) -> None:
     """Atomically write the summary JSON and per-record JSONL report."""
 
-    if summary_path.resolve() == records_path.resolve():
-        raise TokenProfileError("summary and records destinations must differ")
+    _require(
+        summary_path.resolve() != records_path.resolve(),
+        "summary and records destinations must differ",
+    )
     summary_text = _stable_json(report) + "\n"
     records_text = _records_text(rows)
     _atomic_write_text(summary_path, summary_text)
@@ -514,6 +477,13 @@ def _commit_profile_reports(
     )
 
 
+def _profile_digest(path: Path, subject: str) -> str:
+    try:
+        return _sha256_file(path)
+    except OSError as exc:
+        raise TokenProfileError(f"{subject} is unreadable: {path}") from exc
+
+
 def validate_profile_provenance(
     profile: Mapping[str, Any] | Path | str,
     *,
@@ -530,54 +500,53 @@ def validate_profile_provenance(
         if isinstance(profile, (Path, str))
         else profile
     )
-    if not isinstance(profile_data, Mapping):
-        raise TokenProfileError("profile must be a JSON object")
-    if profile_data.get("schema_version") != "task2_token_profile_v1":
-        raise TokenProfileError("unsupported token profile schema")
+    _require(isinstance(profile_data, Mapping), "profile must be a JSON object")
+    _require(
+        profile_data.get("schema_version") == "task2_token_profile_v1",
+        "unsupported token profile schema",
+    )
 
     profile_projections = _selection(
         profile_data.get("projections"), "profile projections"
     )
     profile_splits = _selection(profile_data.get("splits"), "profile splits")
-    selected_projections = (
-        _selection(projections, "projection selection")
-        if projections is not None
-        else profile_projections
-    )
-    selected_splits = (
-        _selection(splits, "split selection") if splits is not None else profile_splits
-    )
-    if set(selected_projections) != set(profile_projections):
-        raise TokenProfileError(
-            "profile projection selection does not match the requested selection"
+    selections = []
+    for requested, profiled, name in (
+        (projections, profile_projections, "projection"),
+        (splits, profile_splits, "split"),
+    ):
+        selected = (
+            _selection(requested, f"{name} selection")
+            if requested is not None
+            else profiled
         )
-    if set(selected_splits) != set(profile_splits):
-        raise TokenProfileError(
-            "profile split selection does not match the requested selection"
+        _require(
+            set(selected) == set(profiled),
+            f"profile {name} selection does not match the requested selection",
         )
+        selections.append(selected)
+    selected_projections, selected_splits = selections
 
     manifest_path = manifest_path.resolve()
     data_root = data_root.resolve()
     recorded_manifest = profile_data.get("dataset_manifest")
-    if not isinstance(recorded_manifest, Mapping):
-        raise TokenProfileError("profile dataset manifest provenance is missing")
+    _require(
+        isinstance(recorded_manifest, Mapping),
+        "profile dataset manifest provenance is missing",
+    )
     expected_manifest_file = _relative_report_path(manifest_path, data_root)
-    if recorded_manifest.get("file") != expected_manifest_file:
-        raise TokenProfileError(
-            "profile manifest path does not match the selected dataset manifest"
-        )
-    try:
-        current_manifest_sha256 = _sha256_file(manifest_path)
-    except OSError as exc:
-        raise TokenProfileError(
-            f"selected dataset manifest is unreadable: {manifest_path}"
-        ) from exc
-    if recorded_manifest.get("sha256") != current_manifest_sha256:
-        raise TokenProfileError(
-            "profile manifest checksum mismatch: "
-            f"recorded {recorded_manifest.get('sha256')!r}, "
-            f"current {current_manifest_sha256!r}"
-        )
+    _require(
+        recorded_manifest.get("file") == expected_manifest_file,
+        "profile manifest path does not match the selected dataset manifest",
+    )
+    current_manifest_sha256 = _profile_digest(
+        manifest_path, "selected dataset manifest"
+    )
+    _require(
+        recorded_manifest.get("sha256") == current_manifest_sha256,
+        "profile manifest checksum mismatch: "
+        f"recorded {recorded_manifest.get('sha256')!r}, current {current_manifest_sha256!r}",
+    )
 
     inputs = load_profile_inputs(
         data_root=data_root,
@@ -586,51 +555,28 @@ def validate_profile_provenance(
         splits=selected_splits,
     )
     recorded_inputs = profile_data.get("input_files")
-    if not isinstance(recorded_inputs, list) or not all(
-        isinstance(item, Mapping) for item in recorded_inputs
-    ):
-        raise TokenProfileError("profile input provenance is missing")
-    expected_inputs = [
-        {
-            "projection": item.projection,
-            "split": item.split,
-            "file": _relative_report_path(item.path, data_root),
-            "record_count": len(item.records),
-            "sha256": item.sha256,
-        }
-        for item in inputs
-    ]
-    actual_inputs = sorted(
-        recorded_inputs,
-        key=lambda item: (
-            str(item.get("projection")),
-            str(item.get("split")),
-        ),
+    _require(
+        isinstance(recorded_inputs, list)
+        and all(isinstance(item, Mapping) for item in recorded_inputs),
+        "profile input provenance is missing",
     )
-    if actual_inputs != sorted(
-        expected_inputs,
-        key=lambda item: (item["projection"], item["split"]),
-    ):
-        raise TokenProfileError("profile input provenance mismatch")
+    expected_inputs = _input_provenance(inputs, data_root)
+    input_key = lambda item: (str(item.get("projection")), str(item.get("split")))
+    _require(
+        sorted(recorded_inputs, key=input_key) == sorted(expected_inputs, key=input_key),
+        "profile input provenance mismatch",
+    )
     recorded_records_sha256 = profile_data.get("records_sha256")
-    if not isinstance(recorded_records_sha256, str):
-        raise TokenProfileError("profile records checksum is missing")
-    if records_path is None:
-        raise TokenProfileError("profile records path is required")
+    _require(isinstance(recorded_records_sha256, str), "profile records checksum is missing")
+    _require(records_path is not None, "profile records path is required")
     records_path = records_path.resolve()
     _read_profile_rows(records_path)
-    try:
-        current_records_sha256 = _sha256_file(records_path)
-    except OSError as exc:
-        raise TokenProfileError(
-            f"profile records are unreadable: {records_path}"
-        ) from exc
-    if recorded_records_sha256 != current_records_sha256:
-        raise TokenProfileError(
-            "profile records checksum mismatch: "
-            f"recorded {recorded_records_sha256!r}, "
-            f"current {current_records_sha256!r}"
-        )
+    current_records_sha256 = _profile_digest(records_path, "profile records")
+    _require(
+        recorded_records_sha256 == current_records_sha256,
+        "profile records checksum mismatch: "
+        f"recorded {recorded_records_sha256!r}, current {current_records_sha256!r}",
+    )
 
 
 def measure_field_content(
@@ -639,38 +585,22 @@ def measure_field_content(
 ) -> dict[str, int]:
     """Count raw content by semantic field with the selected tokenizer."""
 
-    measured = {
-        "system_prompt": 0,
-        "user_messages": 0,
-        "tool_schemas": 0,
-        "tool_calls": 0,
-        "tool_responses": 0,
-        "assistant_targets": 0,
-    }
+    measured = dict.fromkeys(FIELD_NAMES, 0)
     if "tools" in record:
         tools = record["tools"]
-        if not isinstance(tools, str):
-            raise TokenProfileError("tools content must be text")
+        _require(isinstance(tools, str), "tools content must be text")
         measured["tool_schemas"] = _count_text(encoder, tools, "tools")
 
     messages = record.get("messages")
-    if not isinstance(messages, list) or not messages:
-        raise TokenProfileError("messages must be a nonempty list")
+    _require(isinstance(messages, list) and messages, "messages must be a nonempty list")
     for index, message in enumerate(messages):
-        if not isinstance(message, dict):
-            raise TokenProfileError(f"message {index} must be an object")
+        _require(isinstance(message, dict), f"message {index} must be an object")
         role = message.get("role")
         field = FIELD_ROLES.get(str(role))
-        if field is None:
-            raise TokenProfileError(f"message {index} has unsupported role {role!r}")
+        _require(field is not None, f"message {index} has unsupported role {role!r}")
         content = message.get("content")
-        if not isinstance(content, str):
-            raise TokenProfileError(f"message {index} content must be text")
-        measured[field] += _count_text(
-            encoder,
-            content,
-            f"message {index} content",
-        )
+        _require(isinstance(content, str), f"message {index} content must be text")
+        measured[field] += _count_text(encoder, content, f"message {index} content")
     return measured
 
 
@@ -683,85 +613,74 @@ def load_profile_inputs(
 ) -> list[ProfileInput]:
     """Load only train/valid files whose counts and hashes match the manifest."""
 
-    if any(split == "test" for split in splits):
-        raise TokenProfileError(
-            "the test split cannot be used for sequence-length selection"
-        )
-    unsupported_splits = set(splits) - set(PROFILE_SPLITS)
-    if unsupported_splits:
-        raise TokenProfileError(
-            f"unsupported profile splits {sorted(unsupported_splits)}"
-        )
-    unsupported_projections = set(projections) - set(PROFILE_PROJECTION_CHOICES)
-    if unsupported_projections:
-        raise TokenProfileError(
-            f"unsupported projections {sorted(unsupported_projections)}"
-        )
-    if not projections or not splits:
-        raise TokenProfileError("at least one projection and split are required")
+    _require(
+        all(split != "test" for split in splits),
+        "the test split cannot be used for sequence-length selection",
+    )
+    for values, allowed, label in (
+        (splits, PROFILE_SPLITS, "profile splits"),
+        (projections, PROFILE_PROJECTION_CHOICES, "projections"),
+    ):
+        unsupported = set(values) - set(allowed)
+        _require(not unsupported, f"unsupported {label} {sorted(unsupported)}")
+    _require(projections and splits, "at least one projection and split are required")
 
     try:
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise TokenProfileError(
-            f"{manifest_path}: invalid or unreadable manifest"
-        ) from exc
-    if (
-        not isinstance(manifest, dict)
-        or manifest.get("schema_version") != "task2_ms_swift_manifest_v1"
-    ):
-        raise TokenProfileError("unsupported dataset manifest schema")
+        raise TokenProfileError(f"{manifest_path}: invalid or unreadable manifest") from exc
+    _require(
+        isinstance(manifest, dict)
+        and manifest.get("schema_version") == "task2_ms_swift_manifest_v1",
+        "unsupported dataset manifest schema",
+    )
 
     data_root = data_root.resolve()
+    projection_entries = manifest.get("projections") or {}
+    correction_entries = manifest.get("corrective_datasets") or {}
     inputs: list[ProfileInput] = []
     for projection in projections:
         projection_manifest = (
-            (manifest.get("corrective_datasets") or {}).get("python_script")
+            correction_entries.get("python_script")
             if projection == "python_correction"
-            else (manifest.get("projections") or {}).get(projection)
+            else projection_entries.get(projection)
         )
-        if not isinstance(projection_manifest, dict):
-            raise TokenProfileError(f"{projection}: manifest entry is missing")
+        _require(
+            isinstance(projection_manifest, dict),
+            f"{projection}: manifest entry is missing",
+        )
         for split in splits:
             details = projection_manifest.get(split)
-            if not isinstance(details, dict):
-                raise TokenProfileError(
-                    f"{projection}/{split}: manifest entry is missing"
-                )
-            expected_relative = f"{projection}/{split}.jsonl"
-            if details.get("file") != expected_relative:
-                raise TokenProfileError(
-                    f"{projection}/{split}: unexpected dataset path"
-                )
+            _require(
+                isinstance(details, dict),
+                f"{projection}/{split}: manifest entry is missing",
+            )
+            relative = f"{projection}/{split}.jsonl"
+            _require(
+                details.get("file") == relative,
+                f"{projection}/{split}: unexpected dataset path",
+            )
             path = data_root / projection / f"{split}.jsonl"
             records = _read_jsonl(path)
-            if details.get("record_count") != len(records):
-                raise TokenProfileError(
-                    f"{projection}/{split}: record count does not match manifest"
-                )
-            digest = _sha256_file(path)
-            if details.get("sha256") != digest:
-                raise TokenProfileError(
-                    f"{projection}/{split}: checksum does not match manifest"
-                )
-            inputs.append(
-                ProfileInput(
-                    projection=projection,
-                    split=split,
-                    path=path,
-                    records=records,
-                    sha256=digest,
-                )
+            _require(
+                details.get("record_count") == len(records),
+                f"{projection}/{split}: record count does not match manifest",
             )
+            digest = _sha256_file(path)
+            _require(
+                details.get("sha256") == digest,
+                f"{projection}/{split}: checksum does not match manifest",
+            )
+            inputs.append(ProfileInput(projection, split, path, records, digest))
     return inputs
 
 
 def _count_text(encoder: TextTokenCounter, text: str, location: str) -> int:
     count = encoder.count_text(text)
-    if not isinstance(count, int) or count < 0:
-        raise TokenProfileError(
-            f"{location}: tokenizer returned an invalid token count"
-        )
+    _require(
+        isinstance(count, int) and count >= 0,
+        f"{location}: tokenizer returned an invalid token count",
+    )
     return count
 
 
@@ -770,8 +689,7 @@ def _read_profile_json(path: Path) -> dict[str, Any]:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         raise TokenProfileError(f"profile JSON is unreadable: {path}") from exc
-    if not isinstance(value, dict):
-        raise TokenProfileError(f"profile JSON must contain an object: {path}")
+    _require(isinstance(value, dict), f"profile JSON must contain an object: {path}")
     return value
 
 
@@ -780,8 +698,7 @@ def _read_profile_rows(path: Path) -> list[dict[str, Any]]:
         rows = _read_jsonl(path)
     except (OSError, ValueError) as exc:
         raise TokenProfileError(f"profile records are unreadable: {path}") from exc
-    if not rows:
-        raise TokenProfileError(f"profile records are empty: {path}")
+    _require(rows, f"profile records are empty: {path}")
     return rows
 
 
@@ -790,39 +707,44 @@ def _validate_staged_profile(
     rows: Sequence[Mapping[str, Any]],
     inputs: Sequence[ProfileInput],
 ) -> None:
-    if report.get("schema_version") != "task2_token_profile_v1":
-        raise TokenProfileError("staged profile has an unsupported schema")
+    _require(
+        report.get("schema_version") == "task2_token_profile_v1",
+        "staged profile has an unsupported schema",
+    )
     summary = report.get("summary")
     overall = summary.get("overall") if isinstance(summary, Mapping) else None
     count = overall.get("count") if isinstance(overall, Mapping) else None
     expected_count = sum(len(item.records) for item in inputs)
-    if not isinstance(count, int) or count != len(rows) or count != expected_count:
-        raise TokenProfileError(
+    _require(
+        isinstance(count, int) and count == len(rows) == expected_count,
+        (
             "staged profile record count mismatch: "
             f"summary={count!r}, records={len(rows)}, inputs={expected_count}"
-        )
+        ),
+    )
     expected_pairs = {(item.projection, item.split) for item in inputs}
-    row_counts: dict[tuple[str, str], int] = {}
-    for row in rows:
-        key = (str(row.get("projection")), str(row.get("split")))
-        row_counts[key] = row_counts.get(key, 0) + 1
-    if set(row_counts) != expected_pairs:
-        raise TokenProfileError("staged profile projection/split selection mismatch")
+    row_counts = Counter(
+        (str(row.get("projection")), str(row.get("split"))) for row in rows
+    )
+    _require(
+        set(row_counts) == expected_pairs,
+        "staged profile projection/split selection mismatch",
+    )
     for item in inputs:
-        if row_counts.get((item.projection, item.split)) != len(item.records):
-            raise TokenProfileError(
-                f"staged profile record count mismatch for {item.projection}/{item.split}"
-            )
+        _require(
+            row_counts.get((item.projection, item.split)) == len(item.records),
+            f"staged profile record count mismatch for {item.projection}/{item.split}",
+        )
 
 
 def _selection(value: Any, label: str) -> tuple[str, ...]:
-    if isinstance(value, (str, bytes)) or not isinstance(value, Sequence):
-        raise TokenProfileError(f"{label} must be a nonempty list")
+    _require(
+        not isinstance(value, (str, bytes)) and isinstance(value, Sequence),
+        f"{label} must be a nonempty list",
+    )
     values = tuple(str(item) for item in value)
-    if not values or any(not item for item in values):
-        raise TokenProfileError(f"{label} must be a nonempty list")
-    if len(set(values)) != len(values):
-        raise TokenProfileError(f"{label} contains duplicates")
+    _require(values and all(values), f"{label} must be a nonempty list")
+    _require(len(set(values)) == len(values), f"{label} contains duplicates")
     return values
 
 
@@ -840,14 +762,14 @@ def _flat_vector(value: Any, location: str) -> list[Any]:
         value = value.tolist()
     if isinstance(value, tuple):
         value = list(value)
-    if not isinstance(value, list):
-        raise TokenProfileError(f"{location} must be a token sequence")
+    _require(isinstance(value, list), f"{location} must be a token sequence")
     if len(value) == 1 and isinstance(value[0], (list, tuple)):
         value = list(value[0])
-    if any(isinstance(item, (list, tuple)) for item in value):
-        raise TokenProfileError(f"{location} must describe exactly one record")
-    if not value:
-        raise TokenProfileError(f"{location} must not be empty")
+    _require(
+        not any(isinstance(item, (list, tuple)) for item in value),
+        f"{location} must describe exactly one record",
+    )
+    _require(value, f"{location} must not be empty")
     return value
 
 
@@ -855,91 +777,55 @@ def _records_text(rows: Sequence[dict[str, Any]]) -> str:
     return "".join(_stable_json(row) + "\n" for row in rows)
 
 
+# === Command-line entrypoint ===============================================
 def main(
     argv: Sequence[str] | None = None,
     *,
     encoder_factory: Callable[..., SwiftTemplateEncoder] = SwiftTemplateEncoder,
 ) -> int:
-    parser = argparse.ArgumentParser(
-        description=(
-            "Profile exact MS-SWIFT/Qwen3.5 train and validation token lengths "
-            "without loading model weights or truncating records."
-        )
-    )
-    parser.add_argument("--data-root", type=Path, default=DEFAULT_DATA_ROOT)
-    parser.add_argument(
-        "--manifest-path",
-        type=Path,
-        default=DEFAULT_MANIFEST_PATH,
-    )
-    parser.add_argument(
-        "--summary-output",
-        type=Path,
-        default=DEFAULT_SUMMARY_PATH,
-    )
-    parser.add_argument(
-        "--records-output",
-        type=Path,
-        default=DEFAULT_RECORDS_PATH,
-    )
-    parser.add_argument("--model-id", default=DEFAULT_MODEL_ID)
-    parser.add_argument("--loss-scale", default=DEFAULT_LOSS_SCALE)
-    parser.add_argument(
-        "--projections",
-        nargs="+",
-        choices=PROFILE_PROJECTION_CHOICES,
-        default=list(PROFILE_PROJECTIONS),
-    )
-    parser.add_argument(
-        "--splits",
-        nargs="+",
-        choices=PROFILE_SPLITS,
-        default=list(PROFILE_SPLITS),
-        help="Only train/valid are accepted; test cannot select configuration.",
-    )
-    parser.add_argument(
-        "--created-at",
-        default=None,
-        help="Optional fixed UTC timestamp for reproducible report tests.",
-    )
-    parser.add_argument(
-        "--validate-profile",
-        action="store_true",
-        help=(
-            "Validate the existing summary provenance and exit before loading "
-            "MS-SWIFT or a tokenizer."
-        ),
-    )
+    parser = argparse.ArgumentParser(description=
+        "Profile exact MS-SWIFT/Qwen3.5 train and validation token lengths "
+        "without loading model weights or truncating records.")
+    for flag, options in (
+        ("--data-root", {"type": Path, "default": DEFAULT_DATA_ROOT}),
+        ("--manifest-path", {"type": Path, "default": DEFAULT_MANIFEST_PATH}),
+        ("--summary-output", {"type": Path, "default": DEFAULT_SUMMARY_PATH}),
+        ("--records-output", {"type": Path, "default": DEFAULT_RECORDS_PATH}),
+        ("--model-id", {"default": DEFAULT_MODEL_ID}),
+        ("--loss-scale", {"default": DEFAULT_LOSS_SCALE}),
+        ("--projections", {"nargs": "+", "choices": PROFILE_PROJECTION_CHOICES,
+                           "default": list(PROFILE_PROJECTIONS)}),
+        ("--splits", {
+            "nargs": "+", "choices": PROFILE_SPLITS, "default": list(PROFILE_SPLITS),
+            "help": "Only train/valid are accepted; test cannot select configuration.",
+        }),
+        ("--created-at", {"default": None,
+                          "help": "Optional fixed UTC timestamp for reproducible report tests."}),
+        ("--validate-profile", {
+            "action": "store_true",
+            "help": "Validate the existing summary provenance and exit before loading "
+                    "MS-SWIFT or a tokenizer.",
+        }),
+    ):
+        parser.add_argument(flag, **options)
     args = parser.parse_args(argv)
-    if args.summary_output.resolve() == args.records_output.resolve():
-        raise TokenProfileError("summary and records destinations must differ")
+    _require(args.summary_output.resolve() != args.records_output.resolve(),
+             "summary and records destinations must differ")
 
+    selection = {
+        "data_root": args.data_root,
+        "manifest_path": args.manifest_path,
+        "projections": args.projections,
+        "splits": args.splits,
+    }
     if args.validate_profile:
-        validate_profile_provenance(
-            args.summary_output,
-            data_root=args.data_root,
-            manifest_path=args.manifest_path,
-            projections=args.projections,
-            splits=args.splits,
-            records_path=args.records_output,
-        )
-        print(
-            _stable_json(
-                {"validated_profile": args.summary_output.resolve().as_posix()}
-            )
-        )
+        validate_profile_provenance(args.summary_output,
+                                    records_path=args.records_output, **selection)
+        print(_stable_json({"validated_profile": args.summary_output.resolve().as_posix()}))
         return 0
 
-    inputs = load_profile_inputs(
-        data_root=args.data_root,
-        manifest_path=args.manifest_path,
-        projections=args.projections,
-        splits=args.splits,
-    )
-    encoder = encoder_factory(
-        args.model_id,
-        loss_scale=args.loss_scale,
-    )
+    inputs = load_profile_inputs(**selection)
+    encoder = encoder_factory(args.model_id, loss_scale=args.loss_scale)
     rows = profile_inputs(inputs, encoder)
     report = build_profile_report(
         rows=rows,
@@ -950,45 +836,27 @@ def main(
         manifest_sha256=_sha256_file(args.manifest_path),
         created_at=args.created_at,
     )
-    report = {
-        **report,
-        "records_sha256": sha256_bytes(_records_text(rows).encode("utf-8")),
-    }
+    report = {**report, "records_sha256": sha256_bytes(
+        _records_text(rows).encode("utf-8"))}
     with tempfile.TemporaryDirectory(prefix="task2-token-profile-") as scratch:
         staged_summary_path = Path(scratch) / "candidate_profile.json"
         staged_records_path = Path(scratch) / "candidate_records.jsonl"
-        write_profile_reports(
-            summary_path=staged_summary_path,
-            records_path=staged_records_path,
-            report=report,
-            rows=rows,
-        )
+        write_profile_reports(summary_path=staged_summary_path,
+                              records_path=staged_records_path, report=report, rows=rows)
         staged_report = _read_profile_json(staged_summary_path)
         staged_rows = _read_profile_rows(staged_records_path)
-        validate_profile_provenance(
-            staged_report,
-            data_root=args.data_root,
-            manifest_path=args.manifest_path,
-            projections=args.projections,
-            splits=args.splits,
-            records_path=staged_records_path,
-        )
+        validate_profile_provenance(staged_report,
+                                    records_path=staged_records_path, **selection)
         _validate_staged_profile(staged_report, staged_rows, inputs)
-        _commit_profile_reports(
-            summary_path=args.summary_output,
-            records_path=args.records_output,
-            staged_summary_path=staged_summary_path,
-            staged_records_path=staged_records_path,
-        )
-    print(
-        _stable_json(
-            {
-                "profiled_records": len(rows),
-                "summary_output": args.summary_output.resolve().as_posix(),
-                "records_output": args.records_output.resolve().as_posix(),
-            }
-        )
-    )
+        _commit_profile_reports(summary_path=args.summary_output,
+                                records_path=args.records_output,
+                                staged_summary_path=staged_summary_path,
+                                staged_records_path=staged_records_path)
+    print(_stable_json({
+        "profiled_records": len(rows),
+        "summary_output": args.summary_output.resolve().as_posix(),
+        "records_output": args.records_output.resolve().as_posix(),
+    }))
     return 0
 
 

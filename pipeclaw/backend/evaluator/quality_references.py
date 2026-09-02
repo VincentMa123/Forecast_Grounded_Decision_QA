@@ -9,9 +9,9 @@ from pipeclaw.backend.grounding.evidence.tool import DATA_FILE_REFERENCE
 
 NUMERIC_SIGN_TRANSLATION = str.maketrans(
     {
-        "\u2212": "-",
-        "\ufe63": "-",
-        "\uff0d": "-",
+        "−": "-",
+        "﹣": "-",
+        "－": "-",
     }
 )
 NUMERIC_SPAN = re.compile(

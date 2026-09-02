@@ -9,7 +9,7 @@ from .models import (
     RolloutConfig,
     RolloutResult,
 )
-from .episode import dispatch_and_record, execution_success, schema_valid
+from .episode import dispatch_and_record
 from .tools import ToolDispatcher
 from pipeclaw.protocols.tool_calls import ToolCall, jsonable, parse_tool_calls
 
@@ -83,11 +83,9 @@ class RolloutRunner:
             scenario_id=case.scenario_id,
             scenario_type=case.scenario_type,
             messages=messages,
+            raw_responses=[] if config.capture_raw_responses else None,
+            raw_tool_outputs=[] if config.capture_raw_tool_outputs else None,
         )
-        if config.capture_raw_responses:
-            result.raw_responses = []
-        if config.capture_raw_tool_outputs:
-            result.raw_tool_outputs = []
 
         for turn in range(max(0, config.max_turns)):
             result.turns = turn + 1
@@ -109,7 +107,7 @@ class RolloutRunner:
             result.json_errors.extend(errors)
 
             if calls:
-                self._dispatch_calls(case, result, messages, calls, text)
+                self._dispatch_calls(case, result, calls, text)
                 continue
 
             if text:
@@ -157,17 +155,13 @@ class RolloutRunner:
         self,
         case: PromptCase,
         result: RolloutResult,
-        messages: list[dict[str, Any]],
         calls: list[ToolCall],
         text: str,
     ) -> None:
         dispatch_and_record(
             calls,
             dispatcher=self.dispatcher,
-            messages=messages,
-            tool_calls=result.tool_calls,
-            tool_outputs=result.tool_outputs,
-            raw_tool_outputs=result.raw_tool_outputs,
+            result=result,
             portability_metadata=lambda call: self.policy.portability_metadata(
                 call, case
             ),

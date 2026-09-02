@@ -18,45 +18,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--tool-schema-source",
         help="Projection JSONL containing OpenAI tool schemas",
     )
+    parser.add_argument("--adapters", help="Optional LoRA adapter directory")
+    parser.add_argument("--model", help="Base model name/path when no --adapters")
     parser.add_argument(
         "--execution-mode",
         choices=("raw-student", "production-agent"),
         default="raw-student",
-        help="Use the direct student loop or the same AgentOrchestrator as the app",
+        help="Use the direct student loop or the deployed AgentOrchestrator",
     )
-    parser.add_argument("--adapters", help="Optional LoRA adapter directory")
-    parser.add_argument(
-        "--model",
-        help=(
-            "Base model name/path; inferred from adapter metadata when --adapters "
-            "is used, otherwise required"
-        ),
-    )
-    parser.add_argument(
-        "--output-dir",
-        required=True,
-        help="Directory for rollouts.jsonl and summary.json",
-    )
-    parser.add_argument(
-        "--repo-root", default=".", help="Repository root used to import PipeClaw tools"
-    )
-    parser.add_argument(
-        "--scenario-type",
-        help=(
-            "Evaluate one scenario type: pipeformer, openclaw (or the pipeclaw "
-            "alias); omit for both"
-        ),
-    )
-    parser.add_argument("--limit", type=int, help="Limit the number of cases")
     parser.add_argument("--max-turns", type=int)
     parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--temperature", type=float, default=0.0)
-    parser.add_argument(
-        "--enable-thinking",
-        action="store_true",
-        help="Enable the model's reasoning mode; disabled by default for benchmark parity",
-    )
+    parser.add_argument("--enable-thinking", action="store_true")
     parser.add_argument("--device", help="CUDA_VISIBLE_DEVICES value")
+    parser.add_argument(
+        "--repo-root", default=".", help="Repository root used to import PipeClaw tools"
+    )
     quantization = parser.add_mutually_exclusive_group()
     quantization.add_argument(
         "--quant-bits",
@@ -72,6 +49,19 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ignore saved quantization metadata and load the base model unquantized",
     )
+    parser.add_argument(
+        "--output-dir",
+        required=True,
+        help="Directory for rollouts.jsonl and summary.json",
+    )
+    parser.add_argument(
+        "--scenario-type",
+        help=(
+            "Evaluate one scenario type: pipeformer, openclaw (or the pipeclaw "
+            "alias); omit for both"
+        ),
+    )
+    parser.add_argument("--limit", type=int, help="Limit the number of cases")
     parser.add_argument(
         "--save-raw-responses",
         action="store_true",

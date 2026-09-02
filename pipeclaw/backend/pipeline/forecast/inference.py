@@ -386,7 +386,7 @@ def candidate_case_dirs(data_dir: Path, parsed_task: Dict[str, Any]) -> Iterable
             "current_operating_condition_number must be a positive integer."
         )
     case_name = f"case_{condition_number:03d}"
-    cn_name = f"\u7b2c{condition_number:03d}\u4e2a\u7b97\u4f8b"
+    cn_name = f"第{condition_number:03d}个算例"
     dataset_dir = data_dir / "dataset"
     yield dataset_dir / "train" / case_name
     yield dataset_dir / "train" / cn_name

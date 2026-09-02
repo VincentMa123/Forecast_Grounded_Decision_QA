@@ -373,7 +373,6 @@ class ForecastResult(BaseModel):
 
 __all__ = [
     "COMPACT_COMPARABLE_METRIC_KEYS",
-    "COMPACT_OUTPUT_SUMMARY_KEYS",
     "ForecastResult",
     "compact_forecast_window",
     "compact_parsed_task",

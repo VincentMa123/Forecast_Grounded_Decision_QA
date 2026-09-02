@@ -6,6 +6,7 @@ from typing import Any, Callable, Mapping, Sequence
 
 from pipeclaw.protocols.tool_calls import ToolCall, jsonable
 
+from .models import RolloutResult
 from .tools import ToolDispatcher, append_tool_exchange
 
 __all__ = [
@@ -44,25 +45,20 @@ def dispatch_and_record(
     calls: Sequence[ToolCall],
     *,
     dispatcher: ToolDispatcher,
-    messages: list[dict[str, Any]],
-    tool_calls: list[dict[str, Any]],
-    tool_outputs: list[dict[str, Any]],
+    result: RolloutResult,
     record_arguments: Callable[[ToolCall], Mapping[str, Any]],
     compact_result: Callable[[ToolCall, Any, Mapping[str, Any]], Any],
     normalize_call: Callable[[ToolCall], ToolCall] | None = None,
     portability_metadata: Callable[[ToolCall], Mapping[str, Any]] | None = None,
-    raw_tool_outputs: list[dict[str, Any]] | None = None,
     assistant_content: str = "",
     dispatch: Callable[[ToolCall], Mapping[str, Any]] | None = None,
-    on_result: Callable[[ToolCall, Mapping[str, Any]], None] | None = None,
 ) -> None:
     """Dispatch calls and append their records/messages without replacing lists.
 
     Rollout loops own parsing, turn limits, and terminal decisions.  This
     operation owns only the semantic call exchange shared by those lifecycles.
-    Callers may supply a dispatch wrapper (for example, Swift's lock) and a
-    result hook for lifecycle-specific diagnostics while list mutation remains
-    in-place for snapshot consumers.
+    Callers may supply a dispatch wrapper (for example, Swift's lock) while
+    list mutation remains in-place for snapshot consumers.
     """
 
     normalize = normalize_call or dispatcher.schema_normalized_call
@@ -74,8 +70,6 @@ def dispatch_and_record(
         tool_result = execute(normalized)
         if not isinstance(tool_result, Mapping):
             tool_result = {"success": True, "result": tool_result}
-        if on_result is not None:
-            on_result(normalized, tool_result)
 
         call_record: dict[str, Any] = {
             "tool_call_id": call.call_id,
@@ -91,16 +85,16 @@ def dispatch_and_record(
                 if portability.get(key)
             }
         )
-        tool_calls.append(call_record)
+        result.tool_calls.append(call_record)
 
         # Policy projections consume the schema-normalized call.  This keeps
         # Swift's callback contract aligned with the pre-refactor scheduler;
         # the original call is still used for transcript serialization below.
         compact = compact_result(normalized, tool_result, portability)
-        tool_outputs.append(
+        result.tool_outputs.append(
             {"tool_call_id": call.call_id, "name": call.name, "output": compact}
         )
-        if raw_tool_outputs is not None:
+        if result.raw_tool_outputs is not None:
             raw_entry: dict[str, Any] = {
                 "tool_call_id": call.call_id,
                 "name": call.name,
@@ -108,9 +102,9 @@ def dispatch_and_record(
             }
             if portability:
                 raw_entry["diagnostics"] = dict(portability)
-            raw_tool_outputs.append(raw_entry)
+            result.raw_tool_outputs.append(raw_entry)
         append_tool_exchange(
-            messages,
+            result.messages,
             call,
             compact,
             assistant_content=assistant_content if index == 0 else "",

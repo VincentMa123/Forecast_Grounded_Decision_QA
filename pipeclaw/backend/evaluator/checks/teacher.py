@@ -110,13 +110,12 @@ def _pipeformer_outputs(
         if item.get("name") == PIPEFORMER_TOOL
         or str(item.get("tool_call_id") or "") in forecast_call_ids
     ]
-    by_id = {
-        str(item.get("tool_call_id") or ""): mapping(item.get("output"))
-        for item in wrappers
-    }
-    if referenced_call_ids:
-        return [by_id[call_id] for call_id in referenced_call_ids if call_id in by_id]
-    return [mapping(item.get("output")) for item in wrappers]
+    by_id = {str(item.get("tool_call_id") or ""): mapping(item.get("output")) for item in wrappers}
+    return (
+        [by_id[call_id] for call_id in referenced_call_ids if call_id in by_id]
+        if referenced_call_ids
+        else [mapping(item.get("output")) for item in wrappers]
+    )
 
 
 def _task_is_complete(task: Mapping[str, Any]) -> bool:
@@ -148,13 +147,7 @@ def _record_contract(
     maximum_chars: int,
 ) -> MetricResult:
     missing = [name for name in REQUIRED_RECORD_FIELDS if name not in context.record]
-    size = len(
-        json.dumps(
-            dict(context.record),
-            ensure_ascii=False,
-            separators=(",", ":"),
-        )
-    )
+    size = len(json.dumps(dict(context.record), ensure_ascii=False, separators=(",", ":")))
     return metric(
         context,
         "record_contract",
@@ -169,8 +162,9 @@ def _record_contract(
     )
 
 
-def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Return Task 1 compatibility diagnostics from the canonical evaluator."""
+def _schema_diagnostics(record: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the teacher record shape for compatibility diagnostics."""
+
     missing = [name for name in TEACHER_TRACE_REQUIRED_FIELDS if name not in record]
     invalid_types = [
         name
@@ -190,12 +184,26 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
     )
     schema_issues = [f"missing:{name}" for name in missing]
     schema_issues.extend(f"invalid_type:{name}" for name in invalid_types)
+    return {
+        "status": "pass" if not schema_issues else "fail",
+        "issues": schema_issues,
+    }
+
+
+def _constraint_diagnostics(
+    record: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Evaluate rule and dispatch consistency from one constraint projection."""
 
     answer = str(record.get("final_answer") or "")
     constraint = dict(record.get("constraint_check") or {})
     category_status = dict(constraint.get("category_status") or {})
     rule_status = dict(constraint.get("rule_status") or {})
     rule_issues: list[str] = []
+    dispatch_issues: list[str] = []
+    pressure_rule_fail = False
+    pressure_fail = False
+    compressor_overload = False
     if constraint:
         if constraint.get("risk_level") is not None and record.get(
             "risk_level"
@@ -210,23 +218,20 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
         ) or any(value in {"warning", "fail"} for value in rule_status.values())
         if nonpass and ENTIRELY_SAFE_CLAIM.search(answer):
             rule_issues.append("final_answer_claims_entirely_safe_despite_nonpass_rule")
-        pressure_fail = category_status.get("pressure") == "fail" or any(
+        pressure_rule_fail = category_status.get("pressure") == "fail" or any(
             str(flag).startswith("pressure_violation")
             for flag in constraint.get("triggered_flags") or []
         )
-        if pressure_fail and record.get("risk_level") == "low":
+        if pressure_rule_fail and record.get("risk_level") == "low":
             rule_issues.append("pressure_violation_cannot_have_low_risk")
         if (
-            pressure_fail
+            pressure_rule_fail
             and record.get("manual_intervention_label") == "no_intervention"
         ):
             rule_issues.append("pressure_violation_cannot_require_no_intervention")
-
-    dispatch_issues: list[str] = []
-    if constraint:
         flags = {str(value) for value in constraint.get("triggered_flags") or []}
         pressure_fail = (
-            category_status.get("pressure") == "fail"
+            pressure_rule_fail
             or any(value.startswith("pressure_violation") for value in flags)
             or rule_status.get("node_pressure_operating_window") == "fail"
         )
@@ -256,35 +261,35 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
             dispatch_issues.append(
                 "dispatch_recommendation_disagrees_with_constraint_check"
             )
+    if not constraint:
+        return {"status": "not_applicable", "issues": []}, {"status": "not_applicable", "issues": []}
+    return (
+        {
+            "status": "pass" if not rule_issues else "fail",
+            "issues": rule_issues,
+            "overall_constraint_status": constraint.get("overall_status"),
+        },
+        {
+            "status": "pass" if not dispatch_issues else "fail",
+            "issues": dispatch_issues,
+            "pressure_failure_present": pressure_fail,
+            "compressor_overload_present": compressor_overload,
+        },
+    )
+
+
+def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
+    """Return Task 1 compatibility diagnostics from the canonical evaluator."""
+
+    answer = str(record.get("final_answer") or "")
     grounded = numeric_claims_are_grounded(
         answer,
         str(record.get("user_input") or ""),
         numeric_grounding_evidence(dict(record)),
     )
-    rule_check = (
-        {"status": "not_applicable", "issues": []}
-        if not constraint
-        else {
-            "status": "pass" if not rule_issues else "fail",
-            "issues": rule_issues,
-            "overall_constraint_status": constraint.get("overall_status"),
-        }
-    )
-    dispatch_check = (
-        {"status": "not_applicable", "issues": []}
-        if not constraint
-        else {
-            "status": "pass" if not dispatch_issues else "fail",
-            "issues": dispatch_issues,
-            "pressure_failure_present": pressure_fail,
-            "compressor_overload_present": compressor_overload,
-        }
-    )
+    rule_check, dispatch_check = _constraint_diagnostics(record)
     return {
-        "schema": {
-            "status": "pass" if not schema_issues else "fail",
-            "issues": schema_issues,
-        },
+        "schema": _schema_diagnostics(record),
         "numerical_consistency": {
             "status": "pass" if grounded else "fail",
             "claimed_numeric_value_count": len(numeric_claim_values(answer)),
@@ -293,6 +298,52 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
         "rule_consistency": rule_check,
         "dispatch_consistency": dispatch_check,
     }
+
+
+def _teacher_metrics(
+    context: EvaluationContext,
+    specifications: Sequence[tuple[str, bool, Mapping[str, Any] | None]],
+    *,
+    teacher_variant: str,
+) -> list[MetricResult]:
+    return [
+        metric(
+            context,
+            name,
+            applicable=True,
+            passed=passed,
+            details=details,
+            teacher_variant=teacher_variant,
+        )
+        for name, passed, details in specifications
+    ]
+
+
+def _finalize_teacher_metrics(
+    context: EvaluationContext,
+    metrics: Sequence[MetricResult],
+    issues: Sequence[str],
+    *,
+    teacher_variant: str,
+    maximum_chars: int,
+) -> list[MetricResult]:
+    return ordered_canonical_metrics(
+        context,
+        [
+            *metrics,
+            evidence_consistency(
+                context,
+                issues=issues,
+                teacher_variant=teacher_variant,
+            ),
+            _record_contract(
+                context,
+                teacher_variant=teacher_variant,
+                maximum_chars=maximum_chars,
+            ),
+        ],
+        teacher_variant=teacher_variant,
+    )
 
 
 def _pipeformer_checks(
@@ -318,77 +369,72 @@ def _pipeformer_checks(
         for item in output_wrappers(record)
     }
     registry_pass, unauthorized = forecast_registry_order(tool_calls, outputs_by_id)
-    metrics = [
-        metric(
-            context,
-            "task_parsing",
-            applicable=True,
-            passed=bool(tasks) and all(_task_is_complete(task) for task in tasks),
-            details={"task_count": len(tasks)},
-        ),
-        metric(
-            context,
-            "tool_call",
-            applicable=True,
-            passed=successful,
-            details={
-                "successful_output_count": len(outputs),
-                "trace_status": trace_status,
-            },
-        ),
-        metric(
-            context,
-            "checkpoint_inference",
-            applicable=True,
-            passed=successful
-            and all(checkpoint_inference_used(output) for output in outputs),
-        ),
-        metric(
-            context,
-            "disturbance_application",
-            applicable=True,
-            passed=successful
-            and all(
-                disturbance_was_applied(output, task)
-                for output, task in zip(outputs, tasks)
+    metrics = _teacher_metrics(
+        context,
+        (
+            (
+                "task_parsing",
+                bool(tasks) and all(_task_is_complete(task) for task in tasks),
+                {"task_count": len(tasks)},
+            ),
+            (
+                "tool_call",
+                successful,
+                {
+                    "successful_output_count": len(outputs),
+                    "trace_status": trace_status,
+                },
+            ),
+            (
+                "checkpoint_inference",
+                successful
+                and all(checkpoint_inference_used(output) for output in outputs),
+                None,
+            ),
+            (
+                "disturbance_application",
+                successful
+                and all(
+                    disturbance_was_applied(output, task)
+                    for output, task in zip(outputs, tasks)
+                ),
+                None,
+            ),
+            (
+                "forecast_horizon",
+                successful
+                and all(horizon_is_consistent(output) for output in outputs),
+                None,
+            ),
+            (
+                "constraint_execution",
+                bool(outputs)
+                and all(
+                    requested_constraints_executed(output) for output in outputs
+                ),
+                None,
+            ),
+            (
+                "verification_completeness",
+                bool(outputs)
+                and all(verification_is_complete(output) for output in outputs),
+                None,
+            ),
+            (
+                "registry_ordering",
+                registry_pass,
+                {"unauthorized_forecast_call_ids": unauthorized},
             ),
         ),
-        metric(
-            context,
-            "forecast_horizon",
-            applicable=True,
-            passed=successful
-            and all(horizon_is_consistent(output) for output in outputs),
-        ),
-        metric(
-            context,
-            "constraint_execution",
-            applicable=True,
-            passed=bool(outputs)
-            and all(requested_constraints_executed(output) for output in outputs),
-        ),
-        metric(
-            context,
-            "verification_completeness",
-            applicable=True,
-            passed=bool(outputs)
-            and all(verification_is_complete(output) for output in outputs),
-        ),
-        metric(
-            context,
-            "registry_ordering",
-            applicable=True,
-            passed=registry_pass,
-            details={"unauthorized_forecast_call_ids": unauthorized},
-        ),
-        evidence_consistency(context, issues=issues),
-        _record_contract(
-            context,
-            teacher_variant="pipeformer",
-            maximum_chars=maximum_chars,
-        ),
-    ]
-    return ordered_canonical_metrics(context, metrics)
+        teacher_variant="pipeformer",
+    )
+    return _finalize_teacher_metrics(
+        context,
+        metrics,
+        issues,
+        teacher_variant="pipeformer",
+        maximum_chars=maximum_chars,
+    )
 
 
 def _generic_checks(
@@ -411,52 +457,29 @@ def _generic_checks(
     requested_ok = "requested_evidence_not_retrieved" not in issues
     unresolved = bool(failed_count and not successful_count) or not requested_ok
     completed = record.get("trace_status") in (None, "completed")
-    metrics = [
-        metric(
-            context,
-            "task_parsing",
-            applicable=True,
-            passed=completed,
-            details={"trace_status": record.get("trace_status")},
-            teacher_variant="generic",
+    tool_details = {
+        "failed_tool_count": failed_count,
+        "successful_tool_count": successful_count,
+        "requested_artifacts": list(requested),
+        "evidence_states": [item.state.value for item in assessments],
+        "evidence_reasons": [item.reason for item in assessments],
+        "recovered": bool(failed_count) and not unresolved,
+    }
+    metrics = _teacher_metrics(
+        context,
+        (
+            ("task_parsing", completed, {"trace_status": record.get("trace_status")}),
+            ("answer_completeness", bool(str(record.get("final_answer") or "").strip()), None),
+            ("tool_call", not unresolved, tool_details),
         ),
-        metric(
-            context,
-            "answer_completeness",
-            applicable=True,
-            passed=bool(str(record.get("final_answer") or "").strip()),
-            teacher_variant="generic",
-        ),
-        metric(
-            context,
-            "tool_call",
-            applicable=True,
-            passed=not unresolved,
-            details={
-                "failed_tool_count": failed_count,
-                "successful_tool_count": successful_count,
-                "requested_artifacts": list(requested),
-                "evidence_states": [item.state.value for item in assessments],
-                "evidence_reasons": [item.reason for item in assessments],
-                "recovered": bool(failed_count) and not unresolved,
-            },
-            teacher_variant="generic",
-        ),
-        evidence_consistency(
-            context,
-            issues=issues,
-            teacher_variant="generic",
-        ),
-        _record_contract(
-            context,
-            teacher_variant="generic",
-            maximum_chars=maximum_chars,
-        ),
-    ]
-    return ordered_canonical_metrics(
+        teacher_variant="generic",
+    )
+    return _finalize_teacher_metrics(
         context,
         metrics,
+        issues,
         teacher_variant="generic",
+        maximum_chars=maximum_chars,
     )
 
 
@@ -475,25 +498,14 @@ def evaluate_teacher_checks(
         issues = tuple(record_answer_quality_issues(dict(context.record)))
     else:
         issues = tuple(context.hard_issues)
-    has_pipeformer = any(
-        call.get("name") == PIPEFORMER_TOOL for call in calls(context.record)
+    variant = (
+        "pipeformer"
+        if any(call.get("name") == PIPEFORMER_TOOL for call in calls(context.record))
+        else "generic"
     )
-    if has_pipeformer:
-        metrics = _pipeformer_checks(
-            context,
-            issues,
-            maximum_chars=maximum_chars,
-        )
-        variant = "pipeformer"
-    else:
-        metrics = _generic_checks(
-            context,
-            issues,
-            maximum_chars=maximum_chars,
-        )
-        variant = "generic"
+    checks = _pipeformer_checks if variant == "pipeformer" else _generic_checks
     return (
-        metrics,
+        checks(context, issues, maximum_chars=maximum_chars),
         issues,
         {
             "teacher_variant": variant,

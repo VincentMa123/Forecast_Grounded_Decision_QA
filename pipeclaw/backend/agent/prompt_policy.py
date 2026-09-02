@@ -9,6 +9,7 @@ from pipeclaw.backend.grounding.contract import (
     applied_disturbance_disclosure,
     build_grounding_contract,
 )
+from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
 
 
 def _section(*lines: str) -> str:
@@ -80,6 +81,7 @@ def candidate_contract_message(
     tool_results: Iterable[Dict[str, Any]],
     *,
     decision_policy: Optional[Dict[str, Any]] = None,
+    prior_state: Optional[VerifiedDecisionState] = None,
     prior_candidate_results: Optional[Iterable[Dict[str, Any]]] = None,
     prior_decision_policy: Optional[Dict[str, Any]] = None,
     prior_decision_policy_source_question: Optional[str] = None,
@@ -92,11 +94,10 @@ def candidate_contract_message(
         results,
         decision_policy=decision_policy,
         require_decision_policy=True,
+        prior_state=prior_state,
         prior_candidate_results=prior_candidate_results,
         prior_decision_policy=prior_decision_policy,
-        prior_decision_policy_source_question=(
-            prior_decision_policy_source_question
-        ),
+        prior_decision_policy_source_question=prior_decision_policy_source_question,
         prior_applied_disturbances=prior_applied_disturbances,
     )
     if contract.get("answer_mode") == "single_forecast":

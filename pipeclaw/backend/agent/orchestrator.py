@@ -67,12 +67,7 @@ def finalize_runtime_answer(
         question,
         completed_tool_calls,
         require_decision_policy=True,
-        prior_candidate_results=state.candidates,
-        prior_decision_policy=state.decision_policy,
-        prior_decision_policy_source_question=(
-            state.decision_policy_source_question
-        ),
-        prior_applied_disturbances=state.applied_disturbances,
+        prior_state=state,
     )
     if not contract.get("applied_disturbances") and state.applied_disturbances:
         contract["applied_disturbances"] = state.applied_disturbances
@@ -425,18 +420,7 @@ class AgentOrchestrator:
                 contract_message = candidate_contract_message(
                     user_context,
                     completed_tool_calls,
-                    prior_candidate_results=(
-                        active_state.candidates
-                    ),
-                    prior_decision_policy=(
-                        active_state.decision_policy
-                    ),
-                    prior_decision_policy_source_question=(
-                        active_state.decision_policy_source_question
-                    ),
-                    prior_applied_disturbances=(
-                        active_state.applied_disturbances
-                    ),
+                    prior_state=active_state,
                 )
                 request_messages = list(messages)
                 if contract_message:

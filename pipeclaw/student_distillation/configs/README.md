@@ -33,7 +33,7 @@ state.
 
 Both use the trace-level projection, `Qwen/Qwen3.5-9B`, 4-bit NF4 QLoRA (rank 32,
 alpha 64), Flash Attention, and DeepSpeed ZeRO-2 across four processes by
-default. The checked-in `max_length` is 16,384 and the configs use
+default. The checked-in `max_length: 18432` is the full-release ceiling and the configs use
 `truncation_strategy: delete`; run the token profiler before a new run and
 confirm that the selected records fit that limit.
 
@@ -60,17 +60,6 @@ validated:
 
 ```bash
 swift rlhf pipeclaw/student_distillation/configs/qwen35_9b_grpo.yaml --rlhf_type grpo
-```
-
-## Corrective continuation
-
-`qwen35_9b_python_correction.yaml` is for a generated `data/python_correction/`
-dataset. Regenerate and profile that dataset first, then resume from the
-reviewed adapter with its explicit 24,576-token ceiling:
-
-```bash
-swift sft pipeclaw/student_distillation/configs/qwen35_9b_python_correction.yaml \
-  --resume_from_checkpoint path/to/reviewed/checkpoint
 ```
 
 Do not treat a configuration as a dataset generator. Prepare and validate the

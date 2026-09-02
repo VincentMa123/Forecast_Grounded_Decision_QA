@@ -66,7 +66,7 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
 
 The checked-in profile covers 5,166 train/validation records and reports a
 maximum of 18,127 rendered tokens. The remote SFT configuration currently uses
-`max_length: 16384` with `truncation_strategy: delete`; re-profile any changed
+`max_length: 18432` with `truncation_strategy: delete`; re-profile any changed
 dataset and confirm that this behavior is acceptable before a training run.
 
 ## Train a student
@@ -139,6 +139,9 @@ For repeated episodes or a deployed OpenAI-compatible student, use
 
 ## Boundaries and safety
 
+`scripts/validate_dataset.py` owns the dataset release contract and registered
+tool schemas; `prepare_dataset.py` owns projections, while `profile_tokens.py`
+keeps its sequential profiling workflow together in one sectioned command.
 Rollout modules do not import the evaluator; `rollout/suite.py` is the single
 execution-to-scoring seam. PipeFormer scenarios allow only read-only topology,
 registry, and forecast tools. OpenClaw file operations and Python commands are

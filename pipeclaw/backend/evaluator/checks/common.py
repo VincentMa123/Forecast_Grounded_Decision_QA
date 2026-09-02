@@ -11,6 +11,8 @@ from pipeclaw.backend.pipeline.forecast.registry_contract import (
     authorize_forecast_registry,
 )
 from .assumptions import (
+    APPLIED_VALUE_ABS_TOL,
+    APPLIED_VALUE_REL_TOL,
     expected_applied_disturbance,
     inferred_task_fields,
     prediction_view,
@@ -165,8 +167,8 @@ def numbers_match(actual: Any, expected: Any) -> bool:
     return math.isclose(
         actual_value,
         expected_value,
-        rel_tol=1e-6,
-        abs_tol=1e-6,
+        rel_tol=APPLIED_VALUE_REL_TOL,
+        abs_tol=APPLIED_VALUE_ABS_TOL,
     )
 
 

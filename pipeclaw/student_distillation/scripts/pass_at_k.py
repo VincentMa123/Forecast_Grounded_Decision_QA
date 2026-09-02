@@ -13,15 +13,18 @@ from pipeclaw.student_distillation.release_artifacts import (
 )
 from pipeclaw.student_distillation.reward import composite_reward, episode_stats
 from pipeclaw.student_distillation.rollout.models import RolloutConfig
-from pipeclaw.student_distillation.rollout.prompting import build_prompt_case
+from pipeclaw.student_distillation.rollout.prompting import (
+    build_prompt_case,
+    trace_system_content,
+)
 from pipeclaw.student_distillation.rollout.scenarios import (
     evaluation_workspace_key,
     workspace_for,
 )
 from pipeclaw.student_distillation.rollout.suite import (
+    lookup_tool_schemas,
     read_jsonl,
     release_cuda_cache,
-    sample_keys,
     tool_schema_index,
 )
 
@@ -63,16 +66,14 @@ def first_user_message(record: Mapping[str, Any]) -> str:
 
 
 def training_system_prompt(record: Mapping[str, Any]) -> str:
-    """Rebuild the SFT system prompt from the CURRENT policy (prepare_dataset.py:542).
+    """Rebuild the SFT system prompt from the current rollout prompting policy.
 
     NOTE: prompt_policy.py drifted after the released train.jsonl was frozen
     (7,322 -> 8,249 chars), so this does NOT byte-match released SFT prompts;
     use frozen_system_prompt() with the released trace_level data when the
     model must see the exact SFT prompt distribution.
     """
-    from pipeclaw.student_distillation.scripts.prepare_dataset import trace_system_content
-
-    return trace_system_content(dict(record))
+    return trace_system_content(record)
 
 
 def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
@@ -81,26 +82,12 @@ def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
     The released records ARE the SFT prompt distribution; copying their system
     message beats regenerating from the drifted live prompt_policy source.
     """
-    frozen: dict[str, str] = {}
-    for record in read_jsonl(schema_source):
-        for message in record.get("messages") or []:
-            if message.get("role") == "system":
-                frozen[
-                    str(record.get("sample_id") or record.get("example_id") or "")
-                ] = str(message["content"])
-    return frozen
-
-
-def _schemas_for(
-    record: Mapping[str, Any],
-    schemas_by_key: Mapping[str, Any],
-) -> list[dict[str, Any]] | None:
-    """Match a record's schemas via its identifiers; None when the index misses."""
-    for key in sample_keys(record):
-        matched = schemas_by_key.get(key)
-        if matched:
-            return list(matched)
-    return None
+    return {
+        _record_key(record): str(message["content"])
+        for record in read_jsonl(schema_source)
+        for message in record.get("messages") or []
+        if message.get("role") == "system"
+    }
 
 
 def _record_key(record: Mapping[str, Any]) -> str:
@@ -108,10 +95,11 @@ def _record_key(record: Mapping[str, Any]) -> str:
 
 
 def _frozen_prompt(frozen: Mapping[str, str], record: Mapping[str, Any]) -> str:
-    prompt = frozen.get(_record_key(record))
+    key = _record_key(record)
+    prompt = frozen.get(key)
     if prompt is None:
         raise ValueError(
-            f"record {_record_key(record)} misses the frozen system prompt; "
+            f"record {key} misses the frozen system prompt; "
             "refusing the drifted live fallback"
         )
     return prompt
@@ -123,13 +111,7 @@ def emit_grpo_prompts(
     schemas_by_key: Mapping[str, Any] | None = None,
     frozen: Mapping[str, str] | None = None,
 ) -> int:
-    """Write the prompt-only rows the GRPO stage consumes (no model needed).
-
-    Stacked dataset vintages collide on (scenario_id, session_id, turn_id):
-    keep only the newest vintage prefix per key — double-counted scenarios get
-    double GRPO sampling weight. Toolless records carry no executable behavior
-    to ground an episode on, so they are skipped as well.
-    """
+    """Write deduplicated, executable prompt rows for the GRPO stage."""
 
     def _vintage(sample_id: str) -> tuple[int, str]:
         # released ids use hyphen markers: Pipeline_Full_Life_Cycle_Test_Dataset-v4:/-v7:
@@ -139,40 +121,28 @@ def emit_grpo_prompts(
         return 5, sample_id
 
     by_key = {
-        (
-            str(r.get("scenario_id") or ""),
-            str(r.get("session_id") or ""),
-            int(r.get("turn_id") or 1),
-        ): r
-        for r in sorted(
-            selected,
-            key=lambda r: _vintage(str(r.get("sample_id") or "")),
-        )
+        (str(r.get("scenario_id") or ""), str(r.get("session_id") or ""),
+         int(r.get("turn_id") or 1)): r
+        for r in sorted(selected, key=lambda r: _vintage(str(r.get("sample_id") or "")))
         if r.get("tool_calls") or r.get("tool_outputs")
     }
     path.parent.mkdir(parents=True, exist_ok=True)
     with atomic_jsonl_writer(path, default=str) as write:
         for record in by_key.values():
             tools = record.get("tools")
-            if tools is None and schemas_by_key is not None:
-                matched = _schemas_for(record, schemas_by_key)
-                if matched:
-                    tools = json.dumps(matched, ensure_ascii=False)
-                else:
-                    tools = None
+            if tools is None:
+                matched = (lookup_tool_schemas(record, schemas_by_key, missing_policy="none")
+                           if schemas_by_key is not None else None)
+                tools = json.dumps(matched, ensure_ascii=False) if matched else None
             if tools is None:
                 raise ValueError(
                     f"record {_record_key(record)} has no tools; pass --tool-schema-source"
                 )
-            system = (
-                _frozen_prompt(frozen, record)
-                if frozen is not None
-                else training_system_prompt(record)
-            )
             write(
                 {
                     "messages": [
-                        {"role": "system", "content": system},
+                        {"role": "system", "content": _frozen_prompt(frozen, record)
+                         if frozen is not None else training_system_prompt(record)},
                         {"role": "user", "content": first_user_message(record)},
                     ],
                     "tools": tools,
@@ -189,24 +159,22 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     def rate(values: Sequence[bool]) -> float:
         return sum(values) / len(values) if values else 0.0
 
-    # GRPO's reward group is (prompt row, temperature), so the share metric is
-    # keyed the same way. (Using scenario_id lumps unrelated prompt groups into
-    # one flat group, losing the count.)
-    scenario_groups: dict[tuple[str, Any], list[Mapping[str, Any]]] = {}
+    def mean(field: str) -> float:
+        return statistics.fmean(float(row.get(field) or 0.0) for row in rows) if rows else 0.0
+
+    # Match GRPO reward groups: one prompt row at one temperature.
+    groups: dict[tuple[str, Any], list[Mapping[str, Any]]] = {}
     for row in rows:
-        scenario_groups.setdefault(
-            (str(row.get("sample_id")), row.get("temperature")), []
-        ).append(row)
+        groups.setdefault((str(row.get("sample_id")), row.get("temperature")), []).append(row)
     zero_variance_share = (
         sum(
             1
-            for env_rows in scenario_groups.values()
-            if len(env_rows) > 1
-            and statistics.pstdev([float(row.get("reward", 0.0)) for row in env_rows])
-            == 0
+            for group in groups.values()
+            if len(group) > 1
+            and statistics.pstdev([float(row.get("reward", 0.0)) for row in group]) == 0
         )
-        / len(scenario_groups)
-        if scenario_groups
+        / len(groups)
+        if groups
         else 0.0
     )
     return {
@@ -215,28 +183,20 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "first_try_exit0_rate": rate([r["first_run_exit0"] for r in rows]),
         "recovered_after_error_rate": rate(
             [
-                r["passed"]
-                and (
-                    r["thrash_count"] > 0
-                    or any(r["error_counts"].values())
-                    or r.get("failed_call_count", 0) > 0
-                )
-                for r in rows
+                row["passed"] and (
+                    row["thrash_count"] > 0
+                    or any(row["error_counts"].values())
+                    or row.get("failed_call_count", 0) > 0
+                ) for row in rows
             ]
         ),
-        "thrash_rate": rate([r["thrash_count"] > 0 for r in rows]),
-        "mean_overall_score": statistics.fmean(
-            [float(r.get("overall_score") or 0.0) for r in rows]
-        )
-        if rows
-        else 0.0,
-        "passed_rate": rate([r["passed"] for r in rows]),
-        "mean_reward": statistics.fmean([float(r.get("reward", 0.0)) for r in rows])
-        if rows
-        else 0.0,
+        "thrash_rate": rate([row["thrash_count"] > 0 for row in rows]),
+        "mean_overall_score": mean("overall_score"),
+        "passed_rate": rate([row["passed"] for row in rows]),
+        "mean_reward": mean("reward"),
         "zero_variance_share": zero_variance_share,
         "syntax_error_share": rate(
-            [r["error_counts"]["python_syntax_error"] > 0 for r in rows]
+            [row["error_counts"]["python_syntax_error"] > 0 for row in rows]
         ),
     }
 
@@ -244,9 +204,7 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     records = read_jsonl(Path(args.source))
     if getattr(args, "all_scenarios", False):
-        sources = [
-            dict(r) for r in records if r.get("tool_calls") or r.get("tool_outputs")
-        ]
+        sources = [dict(r) for r in records if r.get("tool_calls") or r.get("tool_outputs")]
     elif getattr(args, "pipeformer", False):
         sources = [
             dict(r)
@@ -255,9 +213,8 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             and int(r.get("turn_id") or 1) == 1
         ]
     else:
-        sources = select_python_scenarios(
-            records, include_topology=bool(getattr(args, "include_topology", False))
-        )
+        sources = select_python_scenarios(records, include_topology=bool(
+            getattr(args, "include_topology", False)))
     if args.limit:
         sources = sources[: args.limit]
     if not sources:
@@ -285,28 +242,18 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
 
     from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
 
-    all_schemas = _union_schemas(sources, schemas_by_key)
-    runner = _build_runner(args, all_schemas)
+    runner = _build_runner(args, _union_schemas(sources, schemas_by_key))
     rows: list[dict[str, Any]] = []
-    rollouts_path = output_dir / "episodes.jsonl"
-    trajectories_path = output_dir / "trajectories.jsonl"
-    progress = tqdm(
-        total=len(sources) * len(args.temps) * args.episodes,
-        desc="pass_at_k",
-        unit="episode",
-    )
+    progress = tqdm(total=len(sources) * len(args.temps) * args.episodes,
+                    desc="pass_at_k", unit="episode")
     with (
-        atomic_jsonl_writer(rollouts_path, default=str) as write_rollout,
-        atomic_jsonl_writer(trajectories_path, default=str) as write_trajectory,
+        atomic_jsonl_writer(output_dir / "episodes.jsonl", default=str) as write_rollout,
+        atomic_jsonl_writer(output_dir / "trajectories.jsonl", default=str) as write_trajectory,
     ):
         for source in sources:
-            case_schemas = (
-                _schemas_for(source, schemas_by_key)
-                or build_prompt_case(
-                    source,
-                    workspace_root=workspace_for(output_dir, "schema-probe"),
-                ).tools
-            )
+            case_schemas = (lookup_tool_schemas(source, schemas_by_key, missing_policy="none")
+                            or build_prompt_case(source, workspace_root=workspace_for(
+                                output_dir, "schema-probe")).tools)
             frozen_prompt = (
                 _frozen_prompt(frozen_prompts, source)
                 if args.execution_mode == "raw-student"
@@ -322,30 +269,19 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                         tool_schemas=case_schemas,
                     )
                     if frozen_prompt is not None:
-                        case.messages[0] = {
-                            "role": "system",
-                            "content": frozen_prompt,
-                        }
-                    result = runner.run(
-                        case,
-                        RolloutConfig(
-                            max_turns=args.max_turns,
-                            max_new_tokens=args.max_new_tokens,
-                            temperature=temp,
-                        ),
-                    )
+                        case.messages[0] = {"role": "system", "content": frozen_prompt}
+                    result = runner.run(case, RolloutConfig(
+                        max_turns=args.max_turns, max_new_tokens=args.max_new_tokens,
+                        temperature=temp))
                     rollout = result.to_dict()
-                    write_trajectory(
-                        {
-                            "scenario_id": source.get("scenario_id") or "",
-                            "sample_id": source.get("sample_id")
-                            or source.get("example_id"),
-                            "temperature": temp,
-                            "episode": k,
-                            "execution_mode": args.execution_mode,
-                            "rollout": rollout,
-                        }
-                    )
+                    identity = {
+                        "scenario_id": source.get("scenario_id") or "",
+                        "sample_id": source.get("sample_id") or source.get("example_id"),
+                        "temperature": temp,
+                        "episode": k,
+                        "execution_mode": args.execution_mode,
+                    }
+                    write_trajectory({**identity, "rollout": rollout})
                     stats = episode_stats(rollout)
                     report_fields = evaluate(
                         rollout,
@@ -353,17 +289,11 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                         reference=source,
                     ).to_dict()
                     row = {
-                        "scenario_id": source.get("scenario_id") or "",
-                        "sample_id": source.get("sample_id")
-                        or source.get("example_id"),
-                        "temperature": temp,
-                        "episode": k,
-                        "execution_mode": args.execution_mode,
+                        **identity,
                         **stats,
                         "overall_score": report_fields.get("overall_score"),
                         "hard_gate_passed": report_fields.get("hard_gate_passed"),
-                        "critical_failures": report_fields.get("critical_failures")
-                        or (),
+                        "critical_failures": report_fields.get("critical_failures") or (),
                         "failed_checks": report_fields.get("failed_checks") or (),
                         "passed": bool(report_fields.get("passed")),
                         "reward": composite_reward(stats, report_fields),
@@ -382,10 +312,8 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                     release_cuda_cache()
     progress.close()
     summary = _aggregate(rows)
-    atomic_write_text(
-        output_dir / "summary.json",
-        json.dumps(summary, ensure_ascii=False, indent=2, default=str),
-    )
+    atomic_write_text(output_dir / "summary.json",
+                      json.dumps(summary, ensure_ascii=False, indent=2, default=str))
     return summary
 
 
@@ -401,7 +329,9 @@ def _union_schemas(
     seen: set[str] = set()
     schemas: list[dict[str, Any]] = []
     for record in sources:
-        for schema in _schemas_for(record, schemas_by_key) or []:
+        for schema in (
+            lookup_tool_schemas(record, schemas_by_key, missing_policy="none") or []
+        ):
             name = str((schema.get("function") or {}).get("name") or "")
             if name and name not in seen:
                 seen.add(name)
@@ -446,59 +376,49 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", required=True, help="teacher_trace_*.jsonl")
     parser.add_argument("--tool-schema-source", help="trace_level/*.jsonl for schemas")
-    parser.add_argument("--adapters", help="LoRA adapter checkpoint directory")
+    parser.add_argument("--adapters", help="Optional LoRA adapter checkpoint directory")
     parser.add_argument("--model", help="Base model id/path when no --adapters")
     parser.add_argument(
-        "--output-dir", default="pipeclaw/student_distillation/outputs/evaluation/pass_at_k"
+        "--execution-mode",
+        choices=("raw-student", "production-agent"),
+        default="raw-student",
+        help="Use the direct student loop or the deployed AgentOrchestrator",
     )
+    parser.add_argument("--max-turns", type=int)
+    parser.add_argument("--max-new-tokens", type=int, default=2048)
+    parser.add_argument("--enable-thinking", action="store_true")
+    parser.add_argument("--device", help="CUDA_VISIBLE_DEVICES value")
+    parser.add_argument(
+        "--model-type",
+        help="Explicit ms-swift model_type when auto-matching is ambiguous "
+        "(for example, qwen3_5 for Qwen3.8-27B)",
+    )
+    parser.add_argument("--repo-root", default=".", help="Repository root used to import PipeClaw tools")
+    parser.add_argument("--quant-bits", type=int)
+    parser.add_argument("--no-quantization", action="store_true")
+    parser.add_argument("--output-dir", default="pipeclaw/student_distillation/outputs/evaluation/pass_at_k")
     parser.add_argument("--episodes", type=int, default=8)
     parser.add_argument("--temps", type=float, nargs="+", default=[0.7, 1.0])
-    parser.add_argument(
-        "--max-turns",
-        type=int,
-        help="default: 8 for raw-student, 30 for production-agent",
-    )
-    parser.add_argument("--max-new-tokens", type=int, default=2048)
     parser.add_argument("--limit", type=int)
-    parser.add_argument(
-        "--execution-mode",
-        choices=["raw-student", "production-agent"],
-        default="raw-student",
-        help=(
-            "raw-student loads the model directly; production-agent uses the "
-            "deployed OpenAI-compatible model through AgentOrchestrator"
-        ),
-    )
-    parser.add_argument(
-        "--system-prompt-mode", choices=["training", "production"], default="training"
-    )
-    parser.add_argument(
-        "--emit-grpo-prompts", help="write the GRPO prompt dataset and exit"
-    )
+    parser.add_argument("--system-prompt-mode", choices=["training", "production"], default="training")
+    parser.add_argument("--emit-grpo-prompts", help="write the GRPO prompt dataset and exit")
     parser.add_argument(
         "--pipeformer",
         action="store_true",
-        help="select scenario_type=pipeformer records instead of python (run_command) scenarios",
+        help="select scenario_type=pipeformer records instead of python "
+        "(run_command) scenarios",
     )
     parser.add_argument(
         "--include-topology",
         action="store_true",
         help="also include records whose teacher trace uses analyze_pipeline_topology",
     )
-    parser.add_argument("--device")
-    parser.add_argument("--quant-bits", type=int)
-    parser.add_argument("--no-quantization", action="store_true")
-    parser.add_argument("--enable-thinking", action="store_true")
-    parser.add_argument(
-        "--model-type",
-        help="explicit ms-swift model_type when auto-matching is ambiguous (e.g., qwen3_5 for Qwen3.8-27B)",
-    )
     parser.add_argument(
         "--all-scenarios",
         action="store_true",
-        help="evaluate every record with tool activity (including OpenClaw, topology, and PipeFormer traces), not only Python/run_command scenarios",
+        help="evaluate every record with tool activity (including OpenClaw, "
+        "topology, and PipeFormer traces), not only Python/run_command scenarios",
     )
-    parser.add_argument("--repo-root", default=".")
     return parser
 
 

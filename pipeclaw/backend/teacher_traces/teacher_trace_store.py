@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .io_utils import load_records, write_json, write_jsonl
+from pipeclaw.backend.pipeline.io_utils import load_records, write_json, write_jsonl
 
 
 @dataclass(frozen=True)

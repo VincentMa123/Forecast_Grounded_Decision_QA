@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Iterable, List, Optional
 
 from .common import (
     CATEGORY_ORDER,
@@ -43,6 +43,34 @@ CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "dispatch_priority": run_dispatch_priority_checks,
 }
 
+# Rule ids referenced by the evidence projection.  Each name must match a
+# ``rule_id`` in the library JSON files; the drift test in
+# test_engineering_constraints.py keeps this set and the JSON specs in sync.
+PRIMARY_EVIDENCE_RULES = (
+    "node_pressure_operating_window",
+    "flow_ramp_check",
+    "flow_capacity_check",
+    "supply_demand_balance",
+    "linepack_decline_and_recovery",
+    "linepack_change_rate",
+    "linepack_peak_shaving_reserve",
+    "compressor_load_limit",
+    "compressor_ratio_boundary",
+    "compressor_rotational_speed_limit",
+    "compressor_power_change",
+)
+ABNORMALITY_EVIDENCE_RULES = (
+    "abnormal_pressure_drop",
+    "sudden_flow_change",
+    "potential_leak_signal",
+    "equipment_anomaly",
+)
+EQUIPMENT_EVIDENCE_RULES = {
+    "valve_opening_range": "valve_opening_status",
+    "pressure_regulator_range": "pressure_regulator_status",
+    "boundary_control_adjustment_magnitude": "boundary_adjustment_status",
+}
+
 
 def run_engineering_constraint_checks(
     summaries: Dict[str, Dict[str, Any]],
@@ -59,11 +87,12 @@ def run_engineering_constraint_checks(
     )
     selected = set(selected_categories)
 
-    checks: List[Dict[str, Any]] = []
-    for category in CATEGORY_ORDER:
-        runner = CATEGORY_RUNNERS.get(category)
-        if runner is not None and category in selected:
-            checks.extend(runner(summaries, parsed_task))
+    checks = [
+        check
+        for category in CATEGORY_ORDER
+        if category in selected and (runner := CATEGORY_RUNNERS.get(category))
+        for check in runner(summaries, parsed_task)
+    ]
 
     overall = max_status(check["status"] for check in checks)
     not_evaluated_rules = [
@@ -107,19 +136,12 @@ def run_engineering_constraint_checks(
     safety_checks = [
         check
         for check in checks
-        if check.get("category")
-        in {"pressure", "flow", "linepack", "abnormality_warning"}
+        if check.get("category") in {"pressure", "flow", "linepack", "abnormality_warning"}
     ]
-    energy_checks = [
-        check for check in checks if check.get("name") == "energy_consumption_cost"
-    ]
-    comparison_complete = (
-        bool(safety_checks)
-        and bool(energy_checks)
-        and all(
-            check.get("status") != "not_evaluated"
-            for check in safety_checks + energy_checks
-        )
+    energy_checks = [check for check in checks if check.get("name") == "energy_consumption_cost"]
+    comparison_checks = safety_checks + energy_checks
+    comparison_complete = bool(safety_checks and energy_checks) and all(
+        check.get("status") != "not_evaluated" for check in comparison_checks
     )
     safety_status = max_status(
         check.get("status", "not_evaluated") for check in safety_checks
@@ -168,17 +190,11 @@ def run_engineering_constraint_checks(
 def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Build one compact category-level evidence object from rule checks."""
     by_name = {check.get("name"): check for check in checks}
-    pressure = by_name.get("node_pressure_operating_window", {})
-    flow = by_name.get("flow_ramp_check", {})
-    capacity = by_name.get("flow_capacity_check", {})
-    balance = by_name.get("supply_demand_balance", {})
-    linepack = by_name.get("linepack_decline_and_recovery", {})
-    linepack_rate = by_name.get("linepack_change_rate", {})
-    reserve = by_name.get("linepack_peak_shaving_reserve", {})
-    compressor = by_name.get("compressor_load_limit", {})
-    compressor_ratio = by_name.get("compressor_ratio_boundary", {})
-    compressor_speed = by_name.get("compressor_rotational_speed_limit", {})
-    compressor_power = by_name.get("compressor_power_change", {})
+    (
+        pressure, flow, capacity, balance,
+        linepack, linepack_rate, reserve,
+        compressor, compressor_ratio, compressor_speed, compressor_power,
+    ) = (by_name.get(name, {}) for name in PRIMARY_EVIDENCE_RULES)
 
     pressure_nodes = list(
         dict.fromkeys(
@@ -206,12 +222,7 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
     }
     abnormality_checks = [
         by_name[name]
-        for name in (
-            "abnormal_pressure_drop",
-            "sudden_flow_change",
-            "potential_leak_signal",
-            "equipment_anomaly",
-        )
+        for name in ABNORMALITY_EVIDENCE_RULES
         if by_name.get(name, {}).get("status") in {"warning", "fail"}
     ]
 
@@ -304,15 +315,8 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
             }
         ),
         "equipment_regulation": {
-            "valve_opening_status": by_name.get("valve_opening_range", {}).get(
-                "status", "not_evaluated"
-            ),
-            "pressure_regulator_status": by_name.get(
-                "pressure_regulator_range", {}
-            ).get("status", "not_evaluated"),
-            "boundary_adjustment_status": by_name.get(
-                "boundary_control_adjustment_magnitude", {}
-            ).get("status", "not_evaluated"),
+            key: by_name.get(name, {}).get("status", "not_evaluated")
+            for name, key in EQUIPMENT_EVIDENCE_RULES.items()
         },
         "abnormality_warning": {
             "triggered_rule_count": len(abnormality_checks),
@@ -329,85 +333,71 @@ def build_engineering_evidence(checks: List[Dict[str, Any]]) -> Dict[str, Any]:
 def _minimum_pressure_margin(
     margins: Dict[str, Dict[str, Any]], metric: str
 ) -> Optional[Dict[str, Any]]:
-    candidates = [
-        (str(variable), float(values[metric]))
-        for variable, values in margins.items()
-        if values.get(metric) is not None
-    ]
-    if not candidates:
-        return None
-    variable, value = min(candidates, key=lambda item: item[1])
-    return {"variable": variable, "value": round(value, 6)}
+    return _extreme(
+        ((variable, values.get(metric)) for variable, values in margins.items()),
+        minimum=True,
+    )
 
 
 def _minimum_operating_window_margin(
     margins: Dict[str, Dict[str, Any]],
 ) -> Optional[Dict[str, Any]]:
-    candidates = [
+    return _extreme(
         (
-            str(variable),
-            min(float(values["fail_lower_margin"]), float(values["fail_upper_margin"])),
-        )
-        for variable, values in margins.items()
-        if values.get("fail_lower_margin") is not None
-        and values.get("fail_upper_margin") is not None
-    ]
-    if not candidates:
-        return None
-    variable, value = min(candidates, key=lambda item: item[1])
-    return {"variable": variable, "value": round(value, 6)}
+            (
+                variable,
+                min(float(values["fail_lower_margin"]), float(values["fail_upper_margin"])),
+            )
+            for variable, values in margins.items()
+            if values.get("fail_lower_margin") is not None
+            and values.get("fail_upper_margin") is not None
+        ),
+        minimum=True,
+    )
 
 
 def _maximum_recovery_value(recovery: Any, metric: str) -> Optional[Dict[str, Any]]:
-    candidates = [
-        (str(variable), float(values[metric]))
-        for variable, values in dict(recovery or {}).items()
-        if values.get(metric) is not None
-    ]
-    if not candidates:
-        return None
-    variable, value = max(candidates, key=lambda item: item[1])
-    return {"variable": variable, "value": round(value, 6)}
+    return _extreme(
+        ((variable, values.get(metric)) for variable, values in dict(recovery or {}).items())
+    )
 
 
 def _maximum_mapping_value(values: Any) -> Optional[Dict[str, Any]]:
-    candidates = [
-        (str(variable), float(value))
-        for variable, value in dict(values or {}).items()
-        if value is not None
-    ]
-    if not candidates:
-        return None
-    variable, value = max(candidates, key=lambda item: abs(item[1]))
-    return {"variable": variable, "value": round(value, 6)}
+    return _extreme(dict(values or {}).items(), absolute=True)
 
 
 def _maximum_evaluated_value(check: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    candidates = []
-    for item in check.get("evaluated_values") or []:
-        value = item.get("value")
-        if value is None:
-            value = item.get("max_prediction")
-        if value is not None:
-            candidates.append((dict(item), float(value)))
-    if not candidates:
-        return None
-    item, value = max(candidates, key=lambda candidate: abs(candidate[1]))
-    return {"variable": item.get("variable"), "value": round(value, 6)}
+    return _extreme(
+        (
+            (item, item.get("value") if item.get("value") is not None else item.get("max_prediction"))
+            for item in check.get("evaluated_values") or []
+        ),
+        absolute=True,
+    )
 
 
 def _minimum_evaluated_value(
     check: Dict[str, Any], metric: str
 ) -> Optional[Dict[str, Any]]:
-    candidates = [
-        (dict(item), float(item[metric]))
-        for item in check.get("evaluated_values") or []
-        if item.get(metric) is not None
-    ]
-    if not candidates:
+    return _extreme(
+        ((item, item.get(metric)) for item in check.get("evaluated_values") or []),
+        minimum=True,
+    )
+
+
+def _extreme(
+    candidates: Iterable[tuple[Any, Any]],
+    *,
+    minimum: bool = False,
+    absolute: bool = False,
+) -> Optional[Dict[str, Any]]:
+    values = [(item, float(value)) for item, value in candidates if value is not None]
+    if not values:
         return None
-    item, value = min(candidates, key=lambda candidate: candidate[1])
-    return {"variable": item.get("variable"), "value": round(value, 6)}
+    select = min if minimum else max
+    item, value = select(values, key=lambda pair: abs(pair[1]) if absolute else pair[1])
+    variable = item.get("variable") if isinstance(item, dict) else str(item)
+    return {"variable": variable, "value": round(value, 6)}
 
 
 def _risk_escalations(checks: List[Dict[str, Any]]) -> List[str]:

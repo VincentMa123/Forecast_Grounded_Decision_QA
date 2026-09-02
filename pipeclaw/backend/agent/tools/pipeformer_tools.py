@@ -88,7 +88,7 @@ def register_pipeformer_tools(
         scope = " ".join(str(value).strip() for value in pipeline_scope or [] if str(value).strip())
         request_text = (
             f"Use {node_file} and {pipeline_file}. {scope} "
-            f"\u53cd\u5411\u8ffd\u5230 {str(target_station).strip()} \u7684\u53ef\u8fbe\u6c14\u6e90\u548c\u6700\u77ed\u8def\u5f84\u3002"
+            f"反向追到 {str(target_station).strip()} 的可达气源和最短路径。"
         )
         summary, failure = build_topology_evidence_result(
             request_text,

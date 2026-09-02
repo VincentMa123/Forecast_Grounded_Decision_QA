@@ -203,7 +203,9 @@ class TeacherTraceEvaluationRunner:
     ) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
         args = self.args
         all_records = self.evaluator.load(args.teacher_trace.resolve())
-        resolved_records, native_results = self._resolve_legacy_grounding(all_records)
+        resolved_records, native_results = self._resolve_repair_and_evaluate_records(
+            all_records
+        )
         records = [
             record
             for record in resolved_records
@@ -256,7 +258,6 @@ class TeacherTraceEvaluationRunner:
                     if str(record.get("sample_id") or "")
                     in report_inputs.quality_sample_ids
                 ],
-                force=True,
             )
             compact_split_counts = self._split_counts(args.compact_split_dir)
             audit_split_counts = self.report_writer.write_audit_splits(
@@ -364,7 +365,7 @@ class TeacherTraceEvaluationRunner:
             "reviewer_annotation_export": annotation_export,
         }
 
-    def _resolve_legacy_grounding(
+    def _resolve_repair_and_evaluate_records(
         self, records: list[dict[str, object]]
     ) -> tuple[list[dict[str, object]], dict[str, dict[str, object]]]:
         provenance: dict[tuple[str, str, str], dict[str, object]] = {}

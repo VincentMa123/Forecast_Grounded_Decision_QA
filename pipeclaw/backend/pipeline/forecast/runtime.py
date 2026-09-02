@@ -24,7 +24,7 @@ from .result import (
     compact_forecast_window,
     source_name,
 )
-from .request import ForecastRequest
+from ..schemas import ForecastRequest
 from .inference import (
     PipeFormerInferenceConfig,
     PipeFormerInferenceEngine,
@@ -78,6 +78,20 @@ REGISTRY_GROUP_RULES = {
     "boundary_control_adjustment": {"roles": {"input"}, "controllable": True},
     "dispatch_priority_audit": {"roles": {"output"}},
 }
+_TASK_REQUEST_FIELDS = (
+    "question", "candidate_id", "case_id", "forecast_horizon_minutes",
+    "current_operating_condition_number", "boundary_conditions",
+    "disturbance_variable", "disturbance_setpoint", "disturbance_direction",
+    "disturbance_magnitude_percent", "disturbance_assumption", "disturbance_source",
+    "attention_targets", "output_state_variables", "vocabulary_normalizations",
+    "constraint_verification_types",
+)
+_PREDICTION_TASK_FIELDS = (
+    "case_id", "current_operating_condition_number", "forecast_horizon_minutes",
+    "disturbance_variable", "disturbance_direction", "disturbance_magnitude_percent",
+    "disturbance_assumption", "disturbance_source", "attention_targets",
+    "output_state_variables", "constraint_verification_types",
+)
 logger = logging.getLogger(__name__)
 
 
@@ -145,28 +159,17 @@ def _integrated_energy_metrics(
         }
 
     factor = float(time_step_minutes) / 60.0
-    total = (
-        sum(
-            sum(float(value) for value in summaries[variable]["predicted_values"])
+
+    def total_for(values: Dict[str, Dict[str, Any]]) -> Optional[float]:
+        if not all((values.get(variable) or {}).get("predicted_values") for variable in usable):
+            return None
+        return sum(
+            sum(float(value) for value in values[variable]["predicted_values"])
             for variable in usable
-        )
-        * factor
-    )
-    baseline_total = None
-    if baseline_summaries is not None and all(
-        (baseline_summaries.get(variable) or {}).get("predicted_values")
-        for variable in usable
-    ):
-        baseline_total = (
-            sum(
-                sum(
-                    float(value)
-                    for value in baseline_summaries[variable]["predicted_values"]
-                )
-                for variable in usable
-            )
-            * factor
-        )
+        ) * factor
+
+    total = total_for(summaries)
+    baseline_total = total_for(baseline_summaries) if baseline_summaries is not None else None
     return {
         "energy_consumption": round(total, 6),
         "energy_consumption_delta": (
@@ -181,31 +184,24 @@ def _integrated_energy_metrics(
 def _forecast_window_summary(forecast_context: Dict[str, Any]) -> Dict[str, Any]:
     real_rows = forecast_context.get("real_rows") or []
     predict_rows = forecast_context.get("predict_rows") or []
-    labels = list(forecast_context.get("forecast_time_labels") or [])
-    if not labels:
-        labels = [
-            str(getattr(row, "label", row))
-            .removesuffix("_real")
-            .removesuffix("_predict")
-            for row in predict_rows or real_rows
-        ]
-    return compact_forecast_window(
-        {
-            "forecast_time_labels": labels,
-            "time_step_minutes": forecast_context.get("time_step_minutes"),
-            "real_rows": real_rows,
-            "predict_rows": predict_rows,
-        }
-    )
+    labels = list(forecast_context.get("forecast_time_labels") or []) or [
+        str(getattr(row, "label", row)).removesuffix("_real").removesuffix("_predict")
+        for row in predict_rows or real_rows
+    ]
+    return compact_forecast_window({
+        "forecast_time_labels": labels,
+        "time_step_minutes": forecast_context.get("time_step_minutes"),
+        "real_rows": real_rows,
+        "predict_rows": predict_rows,
+    })
 
 
 def _clean_checks(requested_categories: Optional[List[str]]) -> List[str]:
     allowed = set(DEFAULT_CONSTRAINT_VERIFICATION_TYPES)
-    checks = []
-    for item in requested_categories or []:
-        check = str(item).strip()
-        if check and check in allowed and check not in checks:
-            checks.append(check)
+    checks = list(dict.fromkeys(
+        check for item in requested_categories or []
+        if (check := str(item).strip()) and check in allowed
+    ))
     return checks or DEFAULT_CONSTRAINT_VERIFICATION_TYPES.copy()
 
 
@@ -303,20 +299,23 @@ def _resolve_task_vocabulary(
     variable_names: List[str],
     registry_entries: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    resolved_attention, unresolved_attention = _resolve_requested_variables(
-        parsed_task.get("attention_targets") or [],
-        variable_names,
-        registry_entries,
-    )
-    resolved_outputs, unresolved_outputs = _resolve_requested_variables(
-        parsed_task.get("output_state_variables") or [],
-        variable_names,
-        registry_entries,
-    )
-    parsed_task["resolved_attention_variables"] = resolved_attention
-    parsed_task["resolved_output_variables"] = resolved_outputs
-    parsed_task["unresolved_attention_targets"] = unresolved_attention
-    parsed_task["unresolved_output_state_variables"] = unresolved_outputs
+    resolutions = {
+        name: _resolve_requested_variables(
+            parsed_task.get(field) or [], variable_names, registry_entries
+        )
+        for name, field in (
+            ("attention", "attention_targets"),
+            ("output", "output_state_variables"),
+        )
+    }
+    resolved_attention, unresolved_attention = resolutions["attention"]
+    resolved_outputs, unresolved_outputs = resolutions["output"]
+    parsed_task.update({
+        "resolved_attention_variables": resolved_attention,
+        "resolved_output_variables": resolved_outputs,
+        "unresolved_attention_targets": unresolved_attention,
+        "unresolved_output_state_variables": unresolved_outputs,
+    })
     normalizations = []
     invalid_variables: List[str] = []
     for item in parsed_task.get("vocabulary_normalizations") or []:
@@ -366,16 +365,10 @@ def _counterfactual_comparison(
 ) -> Dict[str, Any]:
     comparisons = []
     for variable in output_variables:
-        baseline = [
-            float(row.values[variable])
-            for row in baseline_rows
-            if variable in row.values
-        ]
-        disturbed = [
-            float(row.values[variable])
-            for row in disturbed_rows
-            if variable in row.values
-        ]
+        baseline, disturbed = (
+            [float(row.values[variable]) for row in rows if variable in row.values]
+            for rows in (baseline_rows, disturbed_rows)
+        )
         compared_steps = min(len(baseline), len(disturbed))
         if not compared_steps:
             continue
@@ -389,11 +382,10 @@ def _counterfactual_comparison(
                 "final_delta": round(deltas[-1], 6),
                 "max_abs_delta": round(abs(deltas[peak_index]), 6),
                 "max_abs_delta_step_index": peak_index,
-                "direction": "increase"
-                if mean_delta > 0
-                else "decrease"
-                if mean_delta < 0
-                else "unchanged",
+                "direction": (
+                    "increase" if mean_delta > 0 else
+                    "decrease" if mean_delta < 0 else "unchanged"
+                ),
             }
         )
     comparisons.sort(key=lambda item: item["max_abs_delta"], reverse=True)
@@ -445,15 +437,15 @@ def _normalize_pipeformer_task(parsed: Dict[str, Any]) -> Dict[str, Any]:
     checks = _clean_checks(parsed.get("constraint_verification_types"))
     parsed["constraint_verification_types"] = checks
 
-    parsed.setdefault("case_id", None)
-    parsed.setdefault(
-        "current_operating_condition_number",
-        _condition_number_from_case_id(parsed.get("case_id")),
-    )
-    parsed.setdefault("forecast_horizon_minutes", None)
+    for key, default in (
+        ("case_id", None),
+        ("current_operating_condition_number", _condition_number_from_case_id(parsed.get("case_id"))),
+        ("forecast_horizon_minutes", None),
+        ("disturbance_direction", "unknown"),
+        ("disturbance_magnitude_percent", None),
+    ):
+        parsed.setdefault(key, default)
     _validate_forecast_horizon(parsed.get("forecast_horizon_minutes"))
-    parsed.setdefault("disturbance_direction", "unknown")
-    parsed.setdefault("disturbance_magnitude_percent", None)
     parsed.setdefault(
         "attention_targets", targets_for_checks(checks, CATEGORY_ATTENTION_TARGETS)
     )
@@ -464,17 +456,9 @@ def _normalize_pipeformer_task(parsed: Dict[str, Any]) -> Dict[str, Any]:
 
     boundary_conditions = dict(parsed.get("boundary_conditions") or {})
     boundary_conditions.setdefault("keep_other_boundary_controls", True)
-    boundary_conditions.setdefault(
-        "disturbance_variable", parsed.get("disturbance_variable")
-    )
-    boundary_conditions.setdefault(
-        "disturbance_direction", parsed.get("disturbance_direction")
-    )
-    boundary_conditions.setdefault(
-        "disturbance_magnitude_percent", parsed.get("disturbance_magnitude_percent")
-    )
+    for key in ("disturbance_variable", "disturbance_direction", "disturbance_magnitude_percent"):
+        boundary_conditions.setdefault(key, parsed.get(key))
     parsed["boundary_conditions"] = boundary_conditions
-
     parsed.setdefault("task_type", "prediction_and_verification")
     parsed.setdefault("parse_schema_version", PIPEFORMER_TASK_SCHEMA_VERSION)
     return parsed
@@ -611,9 +595,7 @@ def build_pipeformer_task(
     if case_id is not None:
         parsed["case_id"] = case_id
     if current_operating_condition_number is not None:
-        parsed["current_operating_condition_number"] = int(
-            current_operating_condition_number
-        )
+        parsed["current_operating_condition_number"] = int(current_operating_condition_number)
     if boundary_conditions is not None:
         parsed["boundary_conditions"] = _merge_boundary_conditions(
             dict(parsed.get("boundary_conditions") or {}),
@@ -667,21 +649,20 @@ def build_pipeformer_task(
     if forecast_horizon_minutes is not None:
         _validate_forecast_horizon(forecast_horizon_minutes)
         parsed["forecast_horizon_minutes"] = forecast_horizon_minutes
-    if attention_targets is not None:
-        parsed["attention_targets"] = list(attention_targets)
-    if output_state_variables is not None:
-        parsed["output_state_variables"] = list(output_state_variables)
+    for key, values in (
+        ("attention_targets", attention_targets),
+        ("output_state_variables", output_state_variables),
+    ):
+        if values is not None:
+            parsed[key] = list(values)
     if constraint_verification_types is not None:
         parsed["constraint_verification_types"] = _clean_checks(
             constraint_verification_types
         )
 
     parsed_boundary = dict(parsed.get("boundary_conditions") or {})
-    parsed_boundary["disturbance_variable"] = parsed.get("disturbance_variable")
-    parsed_boundary["disturbance_direction"] = parsed.get("disturbance_direction")
-    parsed_boundary["disturbance_magnitude_percent"] = parsed.get(
-        "disturbance_magnitude_percent"
-    )
+    for key in ("disturbance_variable", "disturbance_direction", "disturbance_magnitude_percent"):
+        parsed_boundary[key] = parsed.get(key)
     parsed["boundary_conditions"] = parsed_boundary
 
     source = str(disturbance_source or "").strip().casefold()
@@ -767,105 +748,29 @@ class PipeFormerForecastService:
         )
 
 
-def run_pipeformer_forecast_analysis(
-    *,
-    question: str,
-    backend_root: Path,
-    candidate_id: Optional[str] = None,
-    candidate_role: str = "candidate",
-    case_id: Optional[str] = None,
-    forecast_horizon_minutes: Optional[int] = None,
-    current_operating_condition_number: Optional[int] = None,
-    boundary_conditions: Optional[Dict[str, Any]] = None,
-    disturbance_variable: Optional[str] = None,
-    disturbance_setpoint: Optional[int] = None,
-    disturbance_direction: Optional[str] = None,
-    disturbance_magnitude_percent: Optional[float] = None,
-    disturbance_assumption: Optional[str] = None,
-    disturbance_source: Optional[str] = None,
-    attention_targets: Optional[List[str]] = None,
-    output_state_variables: Optional[List[str]] = None,
-    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
-    constraint_verification_types: Optional[List[str]] = None,
-    include_baseline_comparison: Optional[bool] = None,
-    baseline_cache: Optional[BaselineForecastCache] = None,
-    pipeformer_root: Optional[str] = None,
-    checkpoint_dir: Optional[str] = None,
-    data_dir: Optional[str] = None,
-    static_dir: Optional[str] = None,
-    mapping_csv: Optional[str] = None,
-    device: Optional[str] = None,
-) -> Dict[str, Any]:
-    """Compatibility entry point; new callers should use PipeFormerForecastService."""
-    request = locals().copy()
-    service = PipeFormerForecastService(
-        request.pop("backend_root"),
-        baseline_cache=request.pop("baseline_cache"),
-    )
-    return service.analyze(**request)
-
-
 def _analyze_pipeformer_forecast(
     request: ForecastRequest,
     *,
     backend_root: Path,
     baseline_cache: BaselineForecastCache,
 ) -> Dict[str, Any]:
-    question = request.question
     candidate_id = request.candidate_id
-    candidate_role = request.candidate_role
-    case_id = request.case_id
-    forecast_horizon_minutes = request.forecast_horizon_minutes
-    current_operating_condition_number = request.current_operating_condition_number
-    boundary_conditions = request.boundary_conditions
-    disturbance_variable = request.disturbance_variable
-    disturbance_setpoint = request.disturbance_setpoint
-    disturbance_direction = request.disturbance_direction
-    disturbance_magnitude_percent = request.disturbance_magnitude_percent
-    disturbance_assumption = request.disturbance_assumption
-    disturbance_source = request.disturbance_source
-    attention_targets = request.attention_targets
-    output_state_variables = request.output_state_variables
-    vocabulary_normalizations = request.vocabulary_normalizations
-    constraint_verification_types = request.constraint_verification_types
-    include_baseline_comparison = request.include_baseline_comparison
-    pipeformer_root = request.pipeformer_root
-    checkpoint_dir = request.checkpoint_dir
-    data_dir = request.data_dir
-    static_dir = request.static_dir
-    mapping_csv = request.mapping_csv
-    device = request.device
     logger.info("PipeFormer forecast tool started")
-    candidate_role = str(candidate_role or "candidate").casefold()
+    candidate_role = str(request.candidate_role or "candidate").casefold()
     if candidate_role not in {"candidate", "baseline"}:
         raise ValueError("candidate_role must be 'candidate' or 'baseline'.")
     inference_config = PipeFormerInferenceConfig(
         backend_root=backend_root,
-        checkpoint_dir=checkpoint_dir,
-        pipeformer_root=pipeformer_root,
-        data_dir=data_dir,
-        static_dir=static_dir,
-        mapping_path=mapping_csv,
-        device=device,
+        checkpoint_dir=request.checkpoint_dir,
+        pipeformer_root=request.pipeformer_root,
+        data_dir=request.data_dir,
+        static_dir=request.static_dir,
+        mapping_path=request.mapping_csv,
+        device=request.device,
     )
-    parsed_task = build_pipeformer_task(
-        question=question,
-        candidate_id=candidate_id,
-        case_id=case_id,
-        forecast_horizon_minutes=forecast_horizon_minutes,
-        current_operating_condition_number=current_operating_condition_number,
-        boundary_conditions=boundary_conditions,
-        disturbance_variable=disturbance_variable,
-        disturbance_setpoint=disturbance_setpoint,
-        disturbance_direction=disturbance_direction,
-        disturbance_magnitude_percent=disturbance_magnitude_percent,
-        disturbance_assumption=disturbance_assumption,
-        disturbance_source=disturbance_source,
-        attention_targets=attention_targets,
-        output_state_variables=output_state_variables,
-        vocabulary_normalizations=vocabulary_normalizations,
-        constraint_verification_types=constraint_verification_types,
-    )
+    parsed_task = build_pipeformer_task(**{
+        field: getattr(request, field) for field in _TASK_REQUEST_FIELDS
+    })
     parsed_boundary = dict(parsed_task.get("boundary_conditions") or {})
     disturbance_magnitude = parsed_task.get("disturbance_magnitude_percent")
     has_disturbance = (
@@ -942,8 +847,8 @@ def _analyze_pipeformer_forecast(
     automatic_baseline = bool(candidate_id) and candidate_role == "candidate"
     baseline_enabled = (
         automatic_baseline
-        if include_baseline_comparison is None
-        else bool(include_baseline_comparison)
+        if request.include_baseline_comparison is None
+        else bool(request.include_baseline_comparison)
     )
     baseline_summaries = None
     baseline_reference = None
@@ -1008,36 +913,29 @@ def _analyze_pipeformer_forecast(
         "PipeFormer constraint checks finished: overall_status=%s",
         verification.get("overall_status"),
     )
-    priority_evidence_variables = []
-    for finding in verification.get("priority_findings", []):
-        for value in list(finding.get("offending_values") or []) + list(
-            finding.get("evaluated_values") or []
-        ):
-            variable = value.get("variable")
-            if variable and variable not in priority_evidence_variables:
-                priority_evidence_variables.append(variable)
+    priority_evidence_variables = list(dict.fromkeys(
+        value.get("variable")
+        for finding in verification.get("priority_findings", [])
+        for value in (list(finding.get("offending_values") or [])
+                      + list(finding.get("evaluated_values") or []))
+        if value.get("variable")
+    ))
     disturbance_variable = parsed_task.get("disturbance_variable")
     output_variable_set = set(resolved_outputs)
     evidence_candidate_names = output_variable_set | set(priority_evidence_variables)
     if disturbance_variable:
         evidence_candidate_names.add(disturbance_variable)
-    evidence_summaries = {
-        variable: summary
-        for variable, summary in variable_summaries.items()
-        if variable in evidence_candidate_names
-    }
+    def summaries_for(names: set[str]) -> Dict[str, Dict[str, Any]]:
+        return {name: summary for name, summary in variable_summaries.items() if name in names}
+
     evidence_variables = top_variables(
-        evidence_summaries,
+        summaries_for(evidence_candidate_names),
         limit=3,
         preferred_variables=resolved_outputs,
         priority_variables=priority_evidence_variables,
     )
     observation_variables = top_variables(
-        {
-            variable: summary
-            for variable, summary in variable_summaries.items()
-            if variable in output_variable_set
-        },
+        summaries_for(output_variable_set),
         limit=2,
         preferred_variables=resolved_attention,
         priority_variables=[
@@ -1054,19 +952,7 @@ def _analyze_pipeformer_forecast(
 
     prediction_summary = {
         "forecast_mode": forecast_context["mode"],
-        "case_id": parsed_task.get("case_id"),
-        "current_operating_condition_number": parsed_task.get(
-            "current_operating_condition_number"
-        ),
-        "forecast_horizon_minutes": parsed_task.get("forecast_horizon_minutes"),
-        "disturbance_variable": parsed_task["disturbance_variable"],
-        "disturbance_direction": parsed_task["disturbance_direction"],
-        "disturbance_magnitude_percent": parsed_task["disturbance_magnitude_percent"],
-        "disturbance_assumption": parsed_task.get("disturbance_assumption"),
-        "disturbance_source": parsed_task.get("disturbance_source"),
-        "attention_targets": parsed_task["attention_targets"],
-        "output_state_variables": parsed_task["output_state_variables"],
-        "constraint_verification_types": parsed_task["constraint_verification_types"],
+        **{field: parsed_task.get(field) for field in _PREDICTION_TASK_FIELDS},
         "resolved_attention_variables": resolved_attention,
         "resolved_output_variables": resolved_outputs,
         # ForecastResult owns the public field and variable selection. These

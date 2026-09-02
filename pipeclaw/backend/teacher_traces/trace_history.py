@@ -23,6 +23,10 @@ from pipeclaw.backend.pipeline.forecast.result import (
 OMITTED_CALL_ARGUMENT_KEYS = frozenset({"cwd"})
 MAX_HISTORY_SUMMARY_CHARS = 1_900
 
+# Marker appended to every value the SFT projection truncates.  The marker is
+# persisted, so all compaction paths must emit byte-identical text.
+SFT_TRUNCATION_MARKER = "... [truncated for SFT]"
+
 
 def _host_absolute_path(value: Any) -> bool:
     if not isinstance(value, str) or not value.strip():
@@ -51,7 +55,7 @@ def compact_tool_call_arguments(value: Any) -> Any:
     if isinstance(value, list):
         return [compact_tool_call_arguments(item) for item in value]
     if isinstance(value, str) and len(value) > 2_000:
-        return value[:2_000] + "... [truncated for SFT]"
+        return value[:2_000] + SFT_TRUNCATION_MARKER
     return value
 
 

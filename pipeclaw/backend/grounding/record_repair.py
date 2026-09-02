@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping
 
 from .answer_limits import (
     CHINESE_SINGLE_FORECAST_MAX_CHARS,
@@ -89,12 +89,18 @@ def _watch_summary(output: Dict[str, Any]) -> List[str]:
     return [value for value in result if value]
 
 
-def _single_forecast_answer(question: str, tool_result: Dict[str, Any]) -> str:
+def _single_forecast_answer(
+    question: str,
+    tool_result: Dict[str, Any],
+    contract: Mapping[str, Any] | None = None,
+) -> str:
     output = dict(tool_result.get("output") or {})
     prediction, verification = forecast_views(output)
     chinese = is_chinese(question)
-    contract = build_grounding_contract(question, [tool_result])
-    lines: List[str] = canonical_applied_disturbance_lines(contract)
+    grounding_contract = (
+        contract if contract is not None else build_grounding_contract(question, [tool_result])
+    )
+    lines: List[str] = canonical_applied_disturbance_lines(grounding_contract)
     comparison = dict(prediction.get("counterfactual_comparison") or {})
     impact_count = comparison.get("nonzero_impacted_variable_count")
     linepack = dict(
@@ -249,7 +255,7 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
     )
     if answer_mode != "dispatch_comparison" and should_render_single:
         repaired["final_answer"] = _single_forecast_answer(
-            question, pipeformer_results[0]
+            question, pipeformer_results[0], contract=contract
         )
         output = dict(pipeformer_results[0].get("output") or {})
         _, verification = forecast_views(output)

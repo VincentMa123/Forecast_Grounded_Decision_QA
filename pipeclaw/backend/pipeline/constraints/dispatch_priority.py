@@ -2,11 +2,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from .rule_library import load_constraint_specs, load_rule_document
-from .common import CATEGORY_DETAILS, run_specs
+from .rule_library import load_constraint_specs
+from .common import CATEGORY_DETAILS, DISPATCH_RULES, run_specs
 
 
-DISPATCH_RULES = load_rule_document("dispatch_priority")
 DISPATCH_PRIORITY_SPECS = load_constraint_specs("dispatch_priority")
 
 

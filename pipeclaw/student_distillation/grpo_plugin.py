@@ -5,6 +5,7 @@ import shutil
 import sys
 import threading
 import uuid
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Sequence
 
@@ -16,13 +17,36 @@ from pipeclaw.student_distillation.path_contract import canonicalize_recorded_to
 from pipeclaw.student_distillation.rollout.episode import dispatch_and_record
 from pipeclaw.student_distillation.rollout.models import RolloutResult
 from pipeclaw.student_distillation.rollout.scenarios import ScenarioPolicy, build_dispatcher
-from pipeclaw.protocols.tool_calls import parse_tool_calls
+from pipeclaw.student_distillation.rollout.tools import ToolDispatcher
+from pipeclaw.protocols.tool_calls import ToolCall, parse_tool_calls
 from pipeclaw.student_distillation.reward import composite_reward, episode_stats
 
 from swift.rewards import ORM, orms
 from swift.rollout.multi_turn import MultiTurnScheduler, multi_turns
 
 _GRPO_WORKSPACES = _ROOT / "pipeclaw/student_distillation/outputs/grpo/workspaces"
+
+
+@dataclass(frozen=True)
+class _LastParse:
+    """Parsed response fields shared by the scheduler lifecycle callbacks."""
+
+    response_id: int | None
+    text: str
+    calls: list[ToolCall]
+    errors: list[str]
+
+
+@dataclass
+class _SchedulerState:
+    """Typed mutable state for one Swift episode."""
+
+    result: RolloutResult
+    dispatcher: ToolDispatcher
+    workspace: Path
+    last_parse: _LastParse = field(
+        default_factory=lambda: _LastParse(None, "", [], [])
+    )
 
 
 class PythonScenarioScheduler(MultiTurnScheduler):
@@ -33,7 +57,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         self._policy = ScenarioPolicy()
         self._lock = threading.Lock()
         self._schemas: list[dict[str, Any]] | None = None
-        self._states: dict[int, dict[str, Any]] = {}
+        self._states: dict[int, _SchedulerState] = {}
 
     def _tool_schemas(self) -> list[dict[str, Any]]:
         with self._lock:
@@ -60,7 +84,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
             scenario_type or "openclaw", self._tool_schemas(), _ROOT
         )
 
-    def _state(self, infer_request: Any) -> dict[str, Any]:
+    def _state(self, infer_request: Any) -> _SchedulerState:
         state = self._states.get(id(infer_request))
         if state is None:
             raise RuntimeError(
@@ -74,17 +98,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
             data = getattr(request, "data_dict", {}) or {}
             # Fresh state per episode: ids are object addresses and CPython
             # reuses them after swift frees the last generation's request.
-            state = self._states[id(request)] = {
-                "tool_calls": [],
-                "tool_outputs": [],
-                "json_errors": [],
-                "final_answer": "",
-                "trace_status": "",
-                "scenario_type": data.get("scenario_type") or "openclaw",
-                # seeded empty so a check_finished that fires before the first
-                # on_turn_end (lifecycle-mismatched harnesses) doesn't KeyError.
-                "_last_parse": ("", [], []),
-            }
+            scenario_type = data.get("scenario_type") or "openclaw"
             scenario = re.sub(
                 r"[^A-Za-z0-9_.-]+",
                 "_",
@@ -96,7 +110,6 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                 / "workspace-grpo"
             )
             workspace.mkdir(parents=True, exist_ok=True)
-            state["workspace"] = workspace
             user_message = next(
                 (
                     str(message.get("content") or "")
@@ -105,10 +118,21 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                 ),
                 "",
             )
-            dispatcher = self._new_dispatcher(state["scenario_type"])
+            dispatcher = self._new_dispatcher(scenario_type)
             dispatcher.set_current_user_request(user_message)
             dispatcher.set_case_workspace(workspace)
-            state["dispatcher"] = dispatcher
+            result = RolloutResult(
+                sample_id=str(data.get("sample_id") or data.get("scenario_id") or ""),
+                scenario_id=str(data.get("scenario_id") or ""),
+                scenario_type=str(scenario_type),
+                # Keep Swift's live message list as the canonical transcript.
+                messages=request.messages,
+            )
+            self._states[id(request)] = _SchedulerState(
+                result=result,
+                dispatcher=dispatcher,
+                workspace=workspace,
+            )
 
     def step(
         self, infer_request: Any, response_choice: Any, current_turn: int
@@ -117,7 +141,7 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         text, calls, errors = parse_tool_calls(
             getattr(response_choice, "message", response_choice)
         )
-        state["_last_parse"] = (id(response_choice), text, calls, errors)
+        state.last_parse = _LastParse(id(response_choice), text, calls, errors)
         # ms-swift already appended this response as a raw assistant message;
         # replace it with its parsed text so history matches the offline runner.
         if (
@@ -125,40 +149,22 @@ class PythonScenarioScheduler(MultiTurnScheduler):
             and infer_request.messages[-1].get("role") == "assistant"
         ):
             infer_request.messages[-1]["content"] = text
-        self._dispatch_calls(state, infer_request, calls)
+        self._dispatch_calls(state, calls)
         return {"infer_request": infer_request}
 
     def _dispatch_calls(
-        self, state: dict, infer_request: Any, calls: Sequence[Any]
+        self, state: _SchedulerState, calls: Sequence[Any]
     ) -> None:
-        dispatcher = state["dispatcher"]
+        dispatcher = state.dispatcher
 
         def dispatch_locked(call: Any) -> Mapping[str, Any]:
             with self._lock:
                 return dispatcher.dispatch(call)
 
-        def report_unknown(call: Any, tool_result: Mapping[str, Any]) -> None:
-            if (
-                tool_result.get("error_code") == "unknown_tool"
-                and not state.get("_unknown_reported")
-            ):
-                state["_unknown_reported"] = True
-                state["unknown_tool_reports"] = [
-                    {
-                        "call": call.name,
-                        "plugin": __file__,
-                        "scenario_type": state.get("scenario_type"),
-                        "schemas": sorted(dispatcher.schemas),
-                        "allowed": sorted(dispatcher.allowed_names),
-                    }
-                ]
-
         dispatch_and_record(
             calls,
             dispatcher=dispatcher,
-            messages=infer_request.messages,
-            tool_calls=state["tool_calls"],
-            tool_outputs=state["tool_outputs"],
+            result=state.result,
             record_arguments=lambda call: canonicalize_recorded_tool_arguments(
                 call.name, call.arguments
             ),
@@ -166,21 +172,20 @@ class PythonScenarioScheduler(MultiTurnScheduler):
                 call, tool_result, portability=portability
             ),
             dispatch=dispatch_locked,
-            on_result=report_unknown,
         )
 
     @staticmethod
-    def _cleanup_workspace(state: Mapping[str, Any]) -> None:
+    def _cleanup_workspace(state: _SchedulerState) -> None:
         # Scoring reads only the recorded rollout_infos, never the workspace.
-        shutil.rmtree(Path(state["workspace"]).parent, ignore_errors=True)
+        shutil.rmtree(state.workspace.parent, ignore_errors=True)
 
     def check_finished(
         self, infer_request: Any, response_choice: Any, current_turn: int
     ) -> bool:
         state = self._state(infer_request)
         if super().check_finished(infer_request, response_choice, current_turn):
-            state["trace_status"] = "max_turns_exceeded"
-        elif state["_last_parse"][2]:
+            state.result.trace_status = "max_turns_exceeded"
+        elif state.last_parse.calls:
             return False
         self._cleanup_workspace(state)
         # swift snapshots rollout_infos before the finished branch runs; the
@@ -195,49 +200,49 @@ class PythonScenarioScheduler(MultiTurnScheduler):
         state = self._state(infer_request)
         # Single parse point per response: reuse step()'s parse, re-parsing only
         # when swift skipped step() (the capped turn).
-        last = state.get("_last_parse")
-        if last is not None and last[0] == id(response_choice):
-            text, calls, errors = last[1:]
+        last = state.last_parse
+        if last.response_id == id(response_choice):
+            text, calls, errors = last.text, last.calls, last.errors
         else:
             text, calls, errors = parse_tool_calls(
                 getattr(response_choice, "message", None) or response_choice
             )
-        state["_last_parse"] = (id(response_choice), text, calls, errors)
+        state.last_parse = _LastParse(id(response_choice), text, calls, errors)
         # dispatch the capped turn's calls BEFORE building the snapshot: swift
         # skips step() on the capped turn, but the frame merges AFTER this hook.
         capped = getattr(self, "max_turns", None) is not None and int(
             current_turn
         ) >= int(self.max_turns)
         if calls and capped:
-            self._dispatch_calls(state, infer_request, calls)
-        state["json_errors"].extend(errors)
+            self._dispatch_calls(state, calls)
+        state.result.json_errors.extend(errors)
         finish_reason = getattr(response_choice, "finish_reason", None)
         if not calls:
             # the answer arrived inside the turn budget: classify content first,
             # only the call-side aborts wear the cap labels.
             if finish_reason not in (None, "stop", "tool_calls"):
-                state["trace_status"] = "max_completion_length"
+                state.result.trace_status = "max_completion_length"
             elif errors and not (text or "").strip():
-                state["trace_status"] = "malformed_tool_json"
+                state.result.trace_status = "malformed_tool_json"
             else:
-                state["final_answer"] = text or ""
+                state.result.final_answer = text or ""
                 # an immediate-EOS completion (no text at all) is an abort, not a
                 # completed answer — same label the Phase-0 harness assigns.
-                state["trace_status"] = (
+                state.result.trace_status = (
                     "empty_response" if not (text or "").strip() else "completed"
                 )
         elif finish_reason not in (None, "stop", "tool_calls") or capped:
-            state["trace_status"] = "max_turns_exceeded"
+            state.result.trace_status = "max_turns_exceeded"
         return {
             "rollout_infos": {
                 "sample_id": data.get("sample_id") or data.get("scenario_id") or "",
                 "scenario_id": data.get("scenario_id") or "",
-                "scenario_type": state["scenario_type"],
-                "tool_calls": state["tool_calls"],
-                "tool_outputs": state["tool_outputs"],
-                "json_errors": state["json_errors"],
-                "trace_status": state["trace_status"],
-                "final_answer": state["final_answer"],
+                "scenario_type": state.result.scenario_type,
+                "tool_calls": state.result.tool_calls,
+                "tool_outputs": state.result.tool_outputs,
+                "json_errors": state.result.json_errors,
+                "trace_status": state.result.trace_status,
+                "final_answer": state.result.final_answer,
             }
         }
 
@@ -266,11 +271,11 @@ class PythonEpisodeReward(ORM):
                     f"empty or missing reference for episode {index}; "
                     "stop training and fix dataset integrity"
                 )
-            rewards.append(_score_episode(infos[index], reference, completion))
+            rewards.append(_score_episode(infos[index], reference))
         return rewards
 
 
-def _score_episode(info: Mapping[str, Any], reference: Any, completion: str) -> float:
+def _score_episode(info: Mapping[str, Any], reference: Any) -> float:
     from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
 
     rollout = RolloutResult(

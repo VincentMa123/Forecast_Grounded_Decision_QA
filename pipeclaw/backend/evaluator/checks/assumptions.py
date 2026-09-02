@@ -4,6 +4,13 @@ import math
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+# Tolerance for "did the executed forecast actually apply the value we asked
+# for" comparisons.  Shared by this module and ``common.numbers_match``; it is
+# deliberately tighter than the 1e-5 used for task-field and CSV-row matching,
+# which encode different semantics.
+APPLIED_VALUE_REL_TOL = 1e-6
+APPLIED_VALUE_ABS_TOL = 1e-6
+
 
 _ASSUMED_FIELD_ALIASES = {
     "direction": "disturbance_direction",
@@ -145,8 +152,8 @@ def _applied_disturbance_matches(
         if math.isfinite(applied_value) and math.isclose(
             applied_value,
             expected,
-            rel_tol=1e-6,
-            abs_tol=1e-6,
+            rel_tol=APPLIED_VALUE_REL_TOL,
+            abs_tol=APPLIED_VALUE_ABS_TOL,
         ):
             return True
     return False
@@ -199,8 +206,8 @@ def assumption_consistency(
                 if not math.isfinite(predicted_numeric) or not math.isclose(
                     numeric_value,
                     predicted_numeric,
-                    rel_tol=1e-6,
-                    abs_tol=1e-6,
+                    rel_tol=APPLIED_VALUE_REL_TOL,
+                    abs_tol=APPLIED_VALUE_ABS_TOL,
                 ):
                     mismatches.append(field)
     if not mismatches and not _applied_disturbance_matches(

@@ -1,7 +1,7 @@
 # Remote server main experiment: Qwen3.5-9B, trace-level projection, 4-bit QLoRA,
-# lossless 16,384-token context, multi-GPU with DeepSpeed ZeRO-2.
+# lossless 18,432-token context, multi-GPU with DeepSpeed ZeRO-2.
 #
-#   swift sft pipeclaw/student_distillation/configs/qwen35_9b_remote_trace_level.yaml
+#   swift sft pipeclaw/student_distillation/configs/qwen35_9b.yaml
 #
 # Run qwen35_9b_remote_benchmark_step20.yaml first: it is the same configuration
 # capped at 20 steps and tells you peak VRAM and tokens/sec, which is what the
