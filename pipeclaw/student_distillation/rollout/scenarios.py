@@ -7,7 +7,7 @@ from typing import Any, Mapping, Sequence
 
 from pipeclaw.backend.pipeline.forecast.result import ForecastResult
 
-from ..path_contract import (
+from pipeclaw.protocols.path_contract import (
     canonicalize_recorded_tool_arguments,
     is_host_absolute_path,
     redact_host_paths,

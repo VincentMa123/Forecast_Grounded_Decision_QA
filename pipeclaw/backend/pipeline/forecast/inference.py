@@ -1172,7 +1172,6 @@ def _run_checkpoint_inference(
         time.perf_counter() - started_at,
     )
     data_provenance = {
-        "registry_schema_version": variable_registry.get("schema_version"),
         "synthetic": bool(variable_registry.get("synthetic")),
         "physical_validation_status": variable_registry.get(
             "physical_validation_status"

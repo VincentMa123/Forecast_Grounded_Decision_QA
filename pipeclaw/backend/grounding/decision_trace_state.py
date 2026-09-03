@@ -11,7 +11,6 @@ from .decision_policy import llm_policy_excerpts
 from .evidence.tool import tool_execution_failed
 
 
-VERIFIED_DECISION_STATE_SCHEMA_VERSION = "verified_decision_state_v1"
 DEFAULT_STATE_MAX_CHARS = 16_000
 DEFAULT_RECENT_TURNS_MAX_CHARS = 4_000
 DEFAULT_RECENT_TURN_COUNT = 2
@@ -120,6 +119,9 @@ def _normalized_disturbance(value: Any) -> Dict[str, Any]:
         try:
             number = Decimal(str(requested))
         except InvalidOperation:
+            # A non-numeric requested_value is not worth failing history over:
+            # leave the raw text in place so the record still shows what the
+            # model claimed, and downstream validation can flag it.
             pass
         else:
             direction = str(result.get("direction") or "").casefold()
@@ -714,7 +716,6 @@ def transition_forecast_scope(
 class VerifiedDecisionState:
     """Bounded, verified cross-turn state shared by runtime and SFT export."""
 
-    schema_version: str = VERIFIED_DECISION_STATE_SCHEMA_VERSION
     scope: Dict[str, Any] = field(default_factory=dict)
     verified_evidence: Dict[str, Any] = field(default_factory=dict)
     registry_variables: List[Dict[str, Any]] = field(default_factory=list)
@@ -737,7 +738,6 @@ class VerifiedDecisionState:
 
     def to_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
-            "schema_version": VERIFIED_DECISION_STATE_SCHEMA_VERSION,
             "scope": deepcopy(self.scope),
             "verified_evidence": deepcopy(self.verified_evidence),
             "registry_variables": _registry_state_projection(self.registry_variables),
@@ -777,17 +777,9 @@ class VerifiedDecisionState:
 
     @classmethod
     def from_dict(cls, value: Dict[str, Any]) -> "VerifiedDecisionState":
-        schema_version = str(
-            value.get("schema_version") or VERIFIED_DECISION_STATE_SCHEMA_VERSION
-        )
-        if schema_version != VERIFIED_DECISION_STATE_SCHEMA_VERSION:
-            raise ValueError(
-                f"Unsupported verified decision state schema: {schema_version}"
-            )
         scope = dict(value.get("scope") or {})
         scope.pop("fingerprint", None)
         return cls(
-            schema_version=schema_version,
             scope=deepcopy(scope),
             verified_evidence=deepcopy(dict(value.get("verified_evidence") or {})),
             registry_variables=_registry_state_items(value.get("registry_variables")),

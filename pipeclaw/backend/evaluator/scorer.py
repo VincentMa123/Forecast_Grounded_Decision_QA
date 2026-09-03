@@ -169,7 +169,7 @@ def evaluate_native_record(
     minimum_score: float = DEFAULT_MINIMUM_SCORE,
     max_record_chars: int = DEFAULT_MAX_RECORD_CHARS,
 ) -> Dict[str, Any]:
-    """Return schema-v3 data plus stable native compatibility aliases."""
+    """Return evaluation data plus stable native compatibility aliases."""
 
     report = evaluate(
         _record_with_trace_status(record, trace_status),

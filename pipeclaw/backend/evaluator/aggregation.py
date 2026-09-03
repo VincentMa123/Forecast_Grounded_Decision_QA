@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .models import EVALUATION_SCHEMA_VERSION, EvaluationReport
+from .models import EvaluationReport
 
 
 def _payload(report: EvaluationReport | Mapping[str, Any]) -> Mapping[str, Any]:
@@ -127,7 +127,6 @@ def summarize(
         )
     }
     return {
-        "schema_version": EVALUATION_SCHEMA_VERSION,
         "mode": mode,
         "record_count": record_count,
         "overall": {

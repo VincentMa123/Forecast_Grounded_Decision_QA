@@ -339,7 +339,6 @@ def _registry_report(
         )
     return {
         "registry_json": path.name,
-        "registry_schema_version": document.get("schema_version"),
         "variable_count": len(entries),
         "missing_variables": missing_variables,
         "extra_variables": sorted(registry_variables - required),
@@ -357,7 +356,6 @@ def _missing_registry_report(path: Path) -> Dict[str, Any]:
 def _invalid_registry_report(path: Path, error: str) -> Dict[str, Any]:
     return {
         "registry_json": path.name,
-        "registry_schema_version": None,
         "variable_count": 0,
         "missing_variables": [],
         "extra_variables": [],

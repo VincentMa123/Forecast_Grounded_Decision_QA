@@ -944,7 +944,6 @@ class AgentOrchestrator:
             {
                 "control_files": [item["name"] for item in memory_payload.get("control_files", [])],
                 "assets": [item["path"] for item in memory_payload.get("assets", [])],
-                "verified_state_schema": state_payload.get("schema_version"),
                 "verified_state_snapshot": (
                     self.verified_state_manager.snapshot_path(
                         self.session_id

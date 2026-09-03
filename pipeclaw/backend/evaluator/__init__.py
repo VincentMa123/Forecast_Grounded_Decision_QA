@@ -5,7 +5,6 @@ from .aggregation import summarize
 from .checks import assumption_consistency, inferred_task_fields
 from .engine import build_report, evaluate
 from .models import (
-    EVALUATION_SCHEMA_VERSION,
     EvaluationContext,
     EvaluationInputError,
     EvaluationProfile,
@@ -17,7 +16,6 @@ from .oracle import build_teacher_oracle
 __all__ = [
     "build_evaluation_context",
     "build_report",
-    "EVALUATION_SCHEMA_VERSION",
     "EvaluationContext",
     "EvaluationInputError",
     "EvaluationProfile",

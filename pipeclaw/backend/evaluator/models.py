@@ -9,9 +9,6 @@ from types import MappingProxyType
 from typing import Any
 
 
-EVALUATION_SCHEMA_VERSION = "pipeclaw_evaluation_v3"
-
-
 class EvaluationInputError(ValueError):
     """Raised when an evaluation request cannot be normalized safely."""
 
@@ -78,7 +75,6 @@ class MetricResult:
 
 @dataclass(frozen=True)
 class EvaluationReport:
-    schema_version: str
     profile: EvaluationProfile
     overall_score: float | None
     hard_gate_passed: bool
@@ -97,7 +93,6 @@ class EvaluationReport:
     def to_dict(self) -> dict[str, Any]:
         metrics = {str(name): metric.to_dict() for name, metric in self.metrics.items()}
         return {
-            "schema_version": str(self.schema_version),
             "profile": self.profile.value,
             "overall_score": _json_compatible(self.overall_score),
             "hard_gate_passed": bool(self.hard_gate_passed),

@@ -33,7 +33,6 @@ from pipeclaw.student_distillation.scripts.validate_dataset import (
     DEFAULT_MANIFEST_PATH,
     DEFAULT_OUTPUT_ROOT as DEFAULT_DATA_ROOT,
     PROJECTIONS as PROFILE_PROJECTIONS,
-    REPO_ROOT,
 )
 
 
@@ -501,10 +500,7 @@ def validate_profile_provenance(
         else profile
     )
     _require(isinstance(profile_data, Mapping), "profile must be a JSON object")
-    _require(
-        profile_data.get("schema_version") == "task2_token_profile_v1",
-        "unsupported token profile schema",
-    )
+    _require("projections" in profile_data, "unsupported token profile schema")
 
     profile_projections = _selection(
         profile_data.get("projections"), "profile projections"
@@ -630,8 +626,7 @@ def load_profile_inputs(
     except (OSError, json.JSONDecodeError) as exc:
         raise TokenProfileError(f"{manifest_path}: invalid or unreadable manifest") from exc
     _require(
-        isinstance(manifest, dict)
-        and manifest.get("schema_version") == "task2_ms_swift_manifest_v1",
+        isinstance(manifest, dict) and "projections" in manifest,
         "unsupported dataset manifest schema",
     )
 
@@ -707,10 +702,7 @@ def _validate_staged_profile(
     rows: Sequence[Mapping[str, Any]],
     inputs: Sequence[ProfileInput],
 ) -> None:
-    _require(
-        report.get("schema_version") == "task2_token_profile_v1",
-        "staged profile has an unsupported schema",
-    )
+    _require("summary" in report, "staged profile has an unsupported schema")
     summary = report.get("summary")
     overall = summary.get("overall") if isinstance(summary, Mapping) else None
     count = overall.get("count") if isinstance(overall, Mapping) else None

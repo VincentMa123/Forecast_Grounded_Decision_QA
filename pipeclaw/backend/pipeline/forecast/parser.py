@@ -4,9 +4,6 @@ import re
 from typing import Any, Dict, Iterable, List, Optional
 
 
-PIPEFORMER_TASK_SCHEMA_VERSION = "pipeformer_task"
-
-
 CATEGORY_MARKERS: Dict[str, List[str]] = {
     "pressure": ["压力", "pressure"],
     "flow": ["流量", "flow"],
@@ -160,7 +157,6 @@ def parse_condition(question: str) -> Dict[str, Any]:
         ),
         "constraint_verification_types": constraint_verification_types,
         "task_type": _parse_task_type(question),
-        "parse_schema_version": PIPEFORMER_TASK_SCHEMA_VERSION,
     }
     return task
 

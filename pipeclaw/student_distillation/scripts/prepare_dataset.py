@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from pipeclaw.backend.agent.prompt_policy import static_forecast_policy
-from pipeclaw.student_distillation.path_contract import (
+from pipeclaw.protocols.path_contract import (
     canonicalize_recorded_tool_arguments,
     redact_host_paths,
 )

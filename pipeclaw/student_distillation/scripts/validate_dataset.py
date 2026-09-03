@@ -5,13 +5,13 @@ import ast
 import json
 from functools import partial
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any, Callable, Iterable, Mapping, Sequence
 
 from pipeclaw.backend.grounding.evidence.tool import (
     command_python_scripts,
     normalized_tool_path,
 )
-from pipeclaw.student_distillation.path_contract import (
+from pipeclaw.protocols.path_contract import (
     is_host_absolute_path,
     redact_host_paths,
 )
@@ -201,10 +201,7 @@ def validate_release(
         raise DatasetValidationError(
             f"{manifest_path}: invalid or unreadable manifest"
         ) from exc
-    if (
-        not isinstance(manifest, dict)
-        or manifest.get("schema_version") != "task2_ms_swift_manifest_v1"
-    ):
+    if not isinstance(manifest, dict) or "projections" not in manifest:
         raise DatasetValidationError("unsupported dataset manifest schema")
 
     source_by_split: dict[str, dict[str, dict[str, Any]]] = {}
@@ -701,6 +698,66 @@ def _parse_json(value: str, location: str) -> Any:
         raise DatasetValidationError(f"{location}: invalid JSON") from exc
 
 
+_Record = Mapping[str, Any]
+_Messages = Sequence[Mapping[str, Any]]
+_TargetCheck = Callable[[_Record, _Record, _Messages], None]
+
+
+def _require_unchanged_final_answer(
+    record: _Record,
+    source: _Record,
+    messages: _Messages,
+) -> None:
+    if messages[-1].get("content") != source.get("final_answer"):
+        raise DatasetValidationError(f"{record['example_id']}: final answer changed")
+
+
+def _require_unchanged_condition_target(
+    record: _Record,
+    source: _Record,
+    messages: _Messages,
+) -> None:
+    target = _parse_json(
+        messages[-1]["content"], f"{record['example_id']}: condition target"
+    )
+    if target != source.get("parsed_task"):
+        raise DatasetValidationError(f"{record['example_id']}: parsed task changed")
+
+
+def _require_unchanged_evidence_target(
+    record: _Record,
+    source: _Record,
+    messages: _Messages,
+) -> None:
+    target = _parse_json(
+        messages[-1]["content"], f"{record['example_id']}: evidence target"
+    )
+    if target != source.get("evidence"):
+        raise DatasetValidationError(f"{record['example_id']}: evidence target changed")
+
+
+def _require_unchanged_user_input(
+    record: _Record,
+    source: _Record,
+    messages: _Messages,
+) -> None:
+    """answer_only/trace_level records must keep both the prompt and the answer."""
+
+    user_messages = [message for message in messages if message.get("role") == "user"]
+    if not user_messages or user_messages[0].get("content") != source.get("user_input"):
+        raise DatasetValidationError(f"{record['example_id']}: user input changed")
+    _require_unchanged_final_answer(record, source, messages)
+
+
+# Unknown task types validate nothing, matching the previous if/elif chain.
+_TASK_TARGET_CHECKS: dict[str, _TargetCheck] = {
+    "answer_generation": _require_unchanged_final_answer,
+    "condition_parsing": _require_unchanged_condition_target,
+    "evidence_extraction": _require_unchanged_evidence_target,
+}
+_SOURCE_COVERAGE_PROJECTIONS = frozenset({"answer_only", "trace_level"})
+
+
 def _validate_derived_identities(
     records: Sequence[dict[str, Any]],
     *,
@@ -724,44 +781,22 @@ def _validate_derived_identities(
                     f"{record['example_id']}: source identity field {field} changed"
                 )
         messages = record["messages"]
-        if projection in {"answer_only", "trace_level"}:
-            user_messages = [
-                message for message in messages if message.get("role") == "user"
-            ]
-            if not user_messages or user_messages[0].get("content") != source.get(
-                "user_input"
-            ):
-                raise DatasetValidationError(f"{record['example_id']}: user input changed")
-            if messages[-1].get("content") != source.get("final_answer"):
-                raise DatasetValidationError(f"{record['example_id']}: final answer changed")
+        if projection in _SOURCE_COVERAGE_PROJECTIONS:
+            _require_unchanged_user_input(record, source, messages)
         if projection == "constraint_multitask":
             task_type = str(record["task_type"])
             key = (source_sample_id, task_type)
             if key in seen_source_task_pairs:
                 raise DatasetValidationError(f"{projection}/{split}: duplicate source task {key}")
             seen_source_task_pairs.add(key)
-            if task_type == "answer_generation":
-                if messages[-1].get("content") != source.get("final_answer"):
-                    raise DatasetValidationError(f"{record['example_id']}: final answer changed")
-            elif task_type == "condition_parsing":
-                target = _parse_json(
-                    messages[-1]["content"],
-                    f"{record['example_id']}: condition target",
-                )
-                if target != source.get("parsed_task"):
-                    raise DatasetValidationError(f"{record['example_id']}: parsed task changed")
-            elif task_type == "evidence_extraction":
-                target = _parse_json(
-                    messages[-1]["content"],
-                    f"{record['example_id']}: evidence target",
-                )
-                if target != source.get("evidence"):
-                    raise DatasetValidationError(f"{record['example_id']}: evidence target changed")
+            task_check = _TASK_TARGET_CHECKS.get(task_type)
+            if task_check is not None:
+                task_check(record, source, messages)
         else:
             if source_sample_id in seen_source_ids:
                 raise DatasetValidationError(f"{projection}/{split}: duplicate source_sample_id {source_sample_id}")
             seen_source_ids.add(source_sample_id)
-    if projection in {"answer_only", "trace_level"}:
+    if projection in _SOURCE_COVERAGE_PROJECTIONS:
         if seen_source_ids != sources.keys():
             raise DatasetValidationError(f"{projection}/{split}: source coverage mismatch")
     else:

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import json
-import ntpath
 from copy import deepcopy
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
 from typing import Any, Dict, List, Mapping, Tuple
 
 from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
@@ -18,6 +16,7 @@ from pipeclaw.backend.pipeline.forecast.result import (
     compact_parsed_task,
     without_none_values,
 )
+from pipeclaw.protocols.path_contract import is_host_absolute_path
 
 
 OMITTED_CALL_ARGUMENT_KEYS = frozenset({"cwd"})
@@ -28,25 +27,13 @@ MAX_HISTORY_SUMMARY_CHARS = 1_900
 SFT_TRUNCATION_MARKER = "... [truncated for SFT]"
 
 
-def _host_absolute_path(value: Any) -> bool:
-    if not isinstance(value, str) or not value.strip():
-        return False
-    raw = value.strip()
-    normalized = raw.replace("\\", "/")
-    return bool(
-        Path(normalized).is_absolute()
-        or PureWindowsPath(raw).is_absolute()
-        or ntpath.splitdrive(raw)[0]
-    )
-
-
 def compact_tool_call_arguments(value: Any) -> Any:
     """Keep actionable prior-call arguments without host-specific paths."""
     if isinstance(value, Mapping):
         compacted: Dict[str, Any] = {}
         for key, item in value.items():
             if key in OMITTED_CALL_ARGUMENT_KEYS:
-                if item is None or _host_absolute_path(item):
+                if item is None or is_host_absolute_path(item):
                     continue
                 if isinstance(item, str):
                     item = item.replace("\\", "/")

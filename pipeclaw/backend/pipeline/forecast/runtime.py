@@ -6,13 +6,12 @@ import logging
 from collections import OrderedDict
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from .parser import (
     CATEGORY_ATTENTION_TARGETS,
     CATEGORY_OUTPUT_STATE_VARIABLES,
     DEFAULT_CONSTRAINT_VERIFICATION_TYPES,
-    PIPEFORMER_TASK_SCHEMA_VERSION,
     parse_condition,
     targets_for_checks,
 )
@@ -460,7 +459,6 @@ def _normalize_pipeformer_task(parsed: Dict[str, Any]) -> Dict[str, Any]:
         boundary_conditions.setdefault(key, parsed.get(key))
     parsed["boundary_conditions"] = boundary_conditions
     parsed.setdefault("task_type", "prediction_and_verification")
-    parsed.setdefault("parse_schema_version", PIPEFORMER_TASK_SCHEMA_VERSION)
     return parsed
 
 
@@ -561,25 +559,11 @@ def _validate_binary_state_controls(parsed: Dict[str, Any]) -> None:
             )
 
 
-def build_pipeformer_task(
-    *,
+def _parse_question_condition(
     question: str,
-    candidate_id: Optional[str] = None,
-    case_id: Optional[str] = None,
-    forecast_horizon_minutes: Optional[int] = None,
-    current_operating_condition_number: Optional[int] = None,
-    boundary_conditions: Optional[Dict[str, Any]] = None,
-    disturbance_variable: Optional[str] = None,
-    disturbance_setpoint: Optional[int] = None,
-    disturbance_direction: Optional[str] = None,
-    disturbance_magnitude_percent: Optional[float] = None,
-    disturbance_assumption: Optional[str] = None,
-    disturbance_source: Optional[str] = None,
-    attention_targets: Optional[List[str]] = None,
-    output_state_variables: Optional[List[str]] = None,
-    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
-    constraint_verification_types: Optional[List[str]] = None,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], Optional[str]]:
+    """Parse the free-text question, tolerating (and recording) failures."""
+
     parsed: Dict[str, Any] = {}
     parse_error: Optional[str] = None
     if question:
@@ -587,68 +571,49 @@ def build_pipeformer_task(
             parsed = parse_condition(question)
         except Exception as exc:
             parse_error = str(exc)
+    return parsed, parse_error
 
-    parsed_direction = parsed.get("disturbance_direction")
-    parsed_magnitude = parsed.get("disturbance_magnitude_percent")
-    assumed_fields: List[str] = []
 
-    if case_id is not None:
-        parsed["case_id"] = case_id
-    if current_operating_condition_number is not None:
-        parsed["current_operating_condition_number"] = int(current_operating_condition_number)
-    if boundary_conditions is not None:
-        parsed["boundary_conditions"] = _merge_boundary_conditions(
-            dict(parsed.get("boundary_conditions") or {}),
-            dict(boundary_conditions),
-        )
-    if candidate_id is not None:
-        parsed["candidate_id"] = str(candidate_id)
-    if disturbance_variable is not None:
-        parsed["disturbance_variable"] = disturbance_variable
-    resolved_disturbance_variable = str(parsed.get("disturbance_variable") or "")
-    if resolved_disturbance_variable.endswith(":ST"):
-        if disturbance_setpoint is None:
+def _apply_binary_setpoint(parsed: Dict[str, Any], setpoint: Optional[int]) -> None:
+    """Validate and record the setpoint for a binary (``:ST``) disturbance."""
+
+    variable = str(parsed.get("disturbance_variable") or "")
+    if not variable.endswith(":ST"):
+        if setpoint is not None:
             raise ValueError(
-                f"Binary status disturbance {resolved_disturbance_variable} requires explicit "
-                "disturbance_setpoint=0 or 1. Omit disturbance_magnitude_percent and retry."
+                "disturbance_setpoint is only valid for binary variables ending in :ST."
             )
-        if isinstance(disturbance_setpoint, bool):
-            raise ValueError("disturbance_setpoint must be exactly 0 or 1.")
-        setpoint_value = float(disturbance_setpoint)
-        if setpoint_value not in {0.0, 1.0}:
-            raise ValueError("disturbance_setpoint must be exactly 0 or 1.")
-        parsed_boundary = dict(parsed.get("boundary_conditions") or {})
-        setpoints = dict(parsed_boundary.get("setpoints") or {})
-        existing_setpoint = setpoints.get(resolved_disturbance_variable)
-        if existing_setpoint is not None and float(existing_setpoint) != setpoint_value:
-            raise ValueError(
-                f"disturbance_setpoint={int(setpoint_value)} conflicts with "
-                f"boundary_conditions.setpoints[{resolved_disturbance_variable!r}]="
-                f"{existing_setpoint}."
-            )
-        setpoints[resolved_disturbance_variable] = setpoint_value
-        parsed_boundary["setpoints"] = setpoints
-        parsed["boundary_conditions"] = parsed_boundary
-        parsed["disturbance_setpoint"] = int(setpoint_value)
-    elif disturbance_setpoint is not None:
+        return
+    if setpoint is None:
         raise ValueError(
-            "disturbance_setpoint is only valid for binary variables ending in :ST."
+            f"Binary status disturbance {variable} requires explicit "
+            "disturbance_setpoint=0 or 1. Omit disturbance_magnitude_percent and retry."
         )
-    if disturbance_direction is not None:
-        parsed["disturbance_direction"] = disturbance_direction
-        if parsed_direction not in {"up", "down"}:
-            assumed_fields.append("direction")
-    if disturbance_magnitude_percent is not None:
-        parsed["disturbance_magnitude_percent"] = float(disturbance_magnitude_percent)
-        if parsed_magnitude is None:
-            assumed_fields.append("magnitude_percent")
-    elif str(parsed.get("disturbance_variable") or "").endswith(":ST"):
-        # A percentage elsewhere in the question belongs to a candidate
-        # action, not to the binary disturbance.
-        parsed["disturbance_magnitude_percent"] = None
-    if forecast_horizon_minutes is not None:
-        _validate_forecast_horizon(forecast_horizon_minutes)
-        parsed["forecast_horizon_minutes"] = forecast_horizon_minutes
+    if isinstance(setpoint, bool):
+        raise ValueError("disturbance_setpoint must be exactly 0 or 1.")
+    value = float(setpoint)
+    if value not in {0.0, 1.0}:
+        raise ValueError("disturbance_setpoint must be exactly 0 or 1.")
+    boundary = dict(parsed.get("boundary_conditions") or {})
+    setpoints = dict(boundary.get("setpoints") or {})
+    existing = setpoints.get(variable)
+    if existing is not None and float(existing) != value:
+        raise ValueError(
+            f"disturbance_setpoint={int(value)} conflicts with "
+            f"boundary_conditions.setpoints[{variable!r}]={existing}."
+        )
+    setpoints[variable] = value
+    boundary["setpoints"] = setpoints
+    parsed["boundary_conditions"] = boundary
+    parsed["disturbance_setpoint"] = int(value)
+
+
+def _apply_optional_collections(
+    parsed: Dict[str, Any],
+    attention_targets: Optional[List[str]],
+    output_state_variables: Optional[List[str]],
+    constraint_verification_types: Optional[List[str]],
+) -> None:
     for key, values in (
         ("attention_targets", attention_targets),
         ("output_state_variables", output_state_variables),
@@ -660,28 +625,51 @@ def build_pipeformer_task(
             constraint_verification_types
         )
 
-    parsed_boundary = dict(parsed.get("boundary_conditions") or {})
-    for key in ("disturbance_variable", "disturbance_direction", "disturbance_magnitude_percent"):
-        parsed_boundary[key] = parsed.get(key)
-    parsed["boundary_conditions"] = parsed_boundary
 
+def _sync_boundary_conditions(parsed: Dict[str, Any]) -> None:
+    """Mirror the disturbance fields into boundary_conditions for downstream."""
+
+    boundary = dict(parsed.get("boundary_conditions") or {})
+    for key in (
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+    ):
+        boundary[key] = parsed.get(key)
+    parsed["boundary_conditions"] = boundary
+
+
+def _resolve_disturbance_source(
+    parsed: Dict[str, Any],
+    disturbance_source: Optional[str],
+    disturbance_assumption: Optional[str],
+    candidate_id: Optional[str],
+) -> str:
     source = str(disturbance_source or "").strip().casefold()
     if source and source not in {"external_condition", "operator_action"}:
         raise ValueError(
             "disturbance_source must be 'external_condition' or 'operator_action'."
         )
-    candidate_boundary = dict(parsed.get("boundary_conditions") or {})
+    boundary = dict(parsed.get("boundary_conditions") or {})
     has_candidate_action = bool(
-        candidate_boundary.get("percentage_changes")
-        or candidate_boundary.get("setpoints")
+        boundary.get("percentage_changes") or boundary.get("setpoints")
     )
-    parsed["disturbance_source"] = source or (
+    resolved = source or (
         "external_condition"
         if disturbance_assumption or (candidate_id and has_candidate_action)
         else "operator_action"
     )
+    parsed["disturbance_source"] = resolved
+    return resolved
 
-    if assumed_fields and parsed["disturbance_source"] != "operator_action":
+
+def _apply_provisional_assumption(
+    parsed: Dict[str, Any],
+    assumed_fields: List[str],
+    source: str,
+    disturbance_assumption: Optional[str],
+) -> None:
+    if assumed_fields and source != "operator_action":
         statement = str(disturbance_assumption or "").strip()
         if not statement:
             direction = parsed.get("disturbance_direction")
@@ -696,9 +684,15 @@ def build_pipeformer_task(
             "assumed_fields": assumed_fields,
             "statement": statement,
         }
-    elif parsed["disturbance_source"] == "operator_action":
+    elif source == "operator_action":
         parsed.pop("disturbance_assumption", None)
 
+
+def _finalize_pipeformer_task(
+    parsed: Dict[str, Any],
+    parse_error: Optional[str],
+    vocabulary_normalizations: Optional[List[Dict[str, Any]]],
+) -> Dict[str, Any]:
     parsed = _normalize_pipeformer_task(parsed)
     parsed["vocabulary_normalizations"] = _normalize_vocabulary_provenance(
         vocabulary_normalizations,
@@ -718,6 +712,81 @@ def build_pipeformer_task(
     _validate_disturbance_boundary_consistency(parsed)
     _validate_binary_state_controls(parsed)
     return parsed
+
+
+def build_pipeformer_task(
+    *,
+    question: str,
+    candidate_id: Optional[str] = None,
+    case_id: Optional[str] = None,
+    forecast_horizon_minutes: Optional[int] = None,
+    current_operating_condition_number: Optional[int] = None,
+    boundary_conditions: Optional[Dict[str, Any]] = None,
+    disturbance_variable: Optional[str] = None,
+    disturbance_setpoint: Optional[int] = None,
+    disturbance_direction: Optional[str] = None,
+    disturbance_magnitude_percent: Optional[float] = None,
+    disturbance_assumption: Optional[str] = None,
+    disturbance_source: Optional[str] = None,
+    attention_targets: Optional[List[str]] = None,
+    output_state_variables: Optional[List[str]] = None,
+    vocabulary_normalizations: Optional[List[Dict[str, Any]]] = None,
+    constraint_verification_types: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """Build the PipeFormer task dict from a question plus explicit overrides.
+
+    The keyword names are a contract: ``_TASK_REQUEST_FIELDS`` maps request
+    attributes onto them by name, so this signature must not change.
+    """
+
+    parsed, parse_error = _parse_question_condition(question)
+    parsed_direction = parsed.get("disturbance_direction")
+    parsed_magnitude = parsed.get("disturbance_magnitude_percent")
+    assumed_fields: List[str] = []
+
+    if case_id is not None:
+        parsed["case_id"] = case_id
+    if current_operating_condition_number is not None:
+        parsed["current_operating_condition_number"] = int(current_operating_condition_number)
+    if boundary_conditions is not None:
+        parsed["boundary_conditions"] = _merge_boundary_conditions(
+            dict(parsed.get("boundary_conditions") or {}),
+            dict(boundary_conditions),
+        )
+    if candidate_id is not None:
+        parsed["candidate_id"] = str(candidate_id)
+    if disturbance_variable is not None:
+        parsed["disturbance_variable"] = disturbance_variable
+
+    _apply_binary_setpoint(parsed, disturbance_setpoint)
+
+    if disturbance_direction is not None:
+        parsed["disturbance_direction"] = disturbance_direction
+        if parsed_direction not in {"up", "down"}:
+            assumed_fields.append("direction")
+    if disturbance_magnitude_percent is not None:
+        parsed["disturbance_magnitude_percent"] = float(disturbance_magnitude_percent)
+        if parsed_magnitude is None:
+            assumed_fields.append("magnitude_percent")
+    elif str(parsed.get("disturbance_variable") or "").endswith(":ST"):
+        # A percentage elsewhere in the question belongs to a candidate
+        # action, not to the binary disturbance.
+        parsed["disturbance_magnitude_percent"] = None
+    if forecast_horizon_minutes is not None:
+        _validate_forecast_horizon(forecast_horizon_minutes)
+        parsed["forecast_horizon_minutes"] = forecast_horizon_minutes
+
+    _apply_optional_collections(
+        parsed, attention_targets, output_state_variables, constraint_verification_types
+    )
+    _sync_boundary_conditions(parsed)
+
+    source = _resolve_disturbance_source(
+        parsed, disturbance_source, disturbance_assumption, candidate_id
+    )
+    _apply_provisional_assumption(parsed, assumed_fields, source, disturbance_assumption)
+
+    return _finalize_pipeformer_task(parsed, parse_error, vocabulary_normalizations)
 
 
 class PipeFormerForecastService:

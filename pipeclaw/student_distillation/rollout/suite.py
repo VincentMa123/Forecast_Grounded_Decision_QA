@@ -30,7 +30,6 @@ from .scenarios import (
     scenario_key,
     workspace_for,
 )
-from .tools import ToolDispatcher
 
 try:
     from tqdm.auto import tqdm
@@ -40,10 +39,6 @@ except ImportError:  # pragma: no cover - MS-SWIFT normally installs tqdm
         del args, kwargs
         return iterable if iterable is not None else []
 
-
-# The canonical schema-v3 fields copied from the report onto every rollout
-# record.  ``schema_version`` is renamed so the rollout keeps one unambiguous
-# evaluation-schema field alongside its trajectory fields.
 _REPORT_ROOT_FIELDS = (
     "overall_score",
     "hard_gate_passed",
@@ -239,17 +234,14 @@ def schemas_by_scenario_family(
 
 
 def attach_report(rollout: dict[str, Any], report: EvaluationReport) -> dict[str, Any]:
-    """Copy the canonical schema-v3 root fields onto one rollout record.
+    """Copy the canonical evaluation root fields onto one rollout record.
 
     The report is flattened rather than nested so a rollout carries exactly one
     score, one metric mapping, and one set of diagnostics.
     """
 
     payload = report.to_dict()
-    rollout.update(
-        {"evaluation_schema_version": payload["schema_version"]}
-        | {field: payload[field] for field in _REPORT_ROOT_FIELDS}
-    )
+    rollout.update({field: payload[field] for field in _REPORT_ROOT_FIELDS})
     return rollout
 
 
@@ -276,7 +268,7 @@ def _summary(
     mode: str,
     record_count: int,
 ) -> dict[str, Any]:
-    """Build one schema-v3 summary, including for dry runs with no reports."""
+    """Build one evaluation summary, including for dry runs with no reports."""
 
     return dict(summarize(reports), mode=mode, record_count=record_count)
 

@@ -6,7 +6,6 @@ from typing import Any
 from .adapters import build_evaluation_context
 from .checks import evaluate_context
 from .models import (
-    EVALUATION_SCHEMA_VERSION,
     EvaluationInputError,
     EvaluationProfile,
     EvaluationReport,
@@ -23,7 +22,7 @@ def build_report(
     diagnostics: Mapping[str, Any] | None = None,
     minimum_score: float | None = None,
 ) -> EvaluationReport:
-    """Build one schema-v3 report using the canonical score formula."""
+    """Build one evaluation report using the canonical score formula."""
 
     profile = EvaluationProfile(profile)
     metric_values = list(metrics)
@@ -75,7 +74,6 @@ def build_report(
         diagnostic_values["hard_issues"] = issue_values
 
     return EvaluationReport(
-        schema_version=EVALUATION_SCHEMA_VERSION,
         profile=profile,
         overall_score=overall_score,
         hard_gate_passed=hard_gate_passed,

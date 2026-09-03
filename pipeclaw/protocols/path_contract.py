@@ -1,3 +1,7 @@
+"""
+This module is stdlib-only, so importing it can never create a package cycle.
+"""
+
 from __future__ import annotations
 
 import ntpath

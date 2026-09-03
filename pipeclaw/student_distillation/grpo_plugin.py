@@ -13,7 +13,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
-from pipeclaw.student_distillation.path_contract import canonicalize_recorded_tool_arguments
+from pipeclaw.protocols.path_contract import canonicalize_recorded_tool_arguments
 from pipeclaw.student_distillation.rollout.episode import dispatch_and_record
 from pipeclaw.student_distillation.rollout.models import RolloutResult
 from pipeclaw.student_distillation.rollout.scenarios import ScenarioPolicy, build_dispatcher

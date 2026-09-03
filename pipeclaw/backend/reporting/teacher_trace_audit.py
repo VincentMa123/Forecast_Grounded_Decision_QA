@@ -141,11 +141,8 @@ class TeacherTraceQualityAuditor:
                 "scenario_type": {"type": "string", "minLength": 1},
                 "state_before": {
                     "type": "object",
-                    "required": ["schema_version", "scope", "provenance"],
+                    "required": ["scope", "provenance"],
                     "properties": {
-                        "schema_version": {
-                            "const": "verified_decision_state_v1"
-                        },
                         "scope": {"type": "object"},
                         "verified_evidence": {"type": "object"},
                         "registry_variables": {
