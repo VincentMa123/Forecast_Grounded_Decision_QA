@@ -3,6 +3,15 @@
 Source-first research and application code for grounded, auditable decisions on
 natural-gas pipeline transient operations.
 
+Demo Video:
+
+
+https://github.com/user-attachments/assets/c54fddd5-0bf8-4269-9a11-b5862c7dec9e
+
+
+
+
+
 The repository has two cooperating components:
 
 | Component | Purpose | Start here |
