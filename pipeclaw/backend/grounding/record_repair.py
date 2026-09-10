@@ -16,6 +16,7 @@ from .contract import (
     grounded_fallback_answer,
     is_chinese,
     normalize_not_evaluated_wording,
+    record_grounding_contract,
     successful_pipeformer_results,
 )
 from .evidence.tool import attach_tool_arguments
@@ -218,11 +219,7 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
     tool_results = attach_tool_arguments(
         repaired.get("tool_outputs") or [], repaired.get("tool_calls") or []
     )
-    contract = build_grounding_contract(
-        question,
-        tool_results,
-        decision_policy=dict(repaired.get("decision_policy") or {}) or None,
-    )
+    contract = record_grounding_contract(repaired, tool_results)
     answer_mode = contract.get("answer_mode")
     repaired["answer_mode"] = answer_mode
     repaired["grounding_contract"] = contract

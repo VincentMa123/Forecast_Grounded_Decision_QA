@@ -130,6 +130,10 @@ def compact_forecast_window(metadata: Mapping[str, Any]) -> Dict[str, Any]:
     stored = metadata.get("forecast_window")
     if isinstance(stored, Mapping):
         return dict(stored)
+    if all(metadata.get(key) is None for key in (
+        "real_rows", "predict_rows", "forecast_time_labels", "time_step_minutes",
+    )):
+        return {}
 
     real_rows = metadata.get("real_rows")
     predict_rows = metadata.get("predict_rows")

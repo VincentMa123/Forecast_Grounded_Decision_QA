@@ -209,6 +209,21 @@ def discover_base_model(adapter_dir: Path) -> str:
     )
 
 
+def load_evaluation_generator(args: Any, **model_options: Any) -> SwiftGenerator:
+    """Resolve a command's model and loading options without importing CUDA early."""
+    adapters = getattr(args, "adapters", None)
+    model = getattr(args, "model", None) or discover_base_model(Path(adapters))
+    return SwiftGenerator.from_args(
+        model=model,
+        adapters=adapters,
+        device=getattr(args, "device", None),
+        quant_bits=getattr(args, "quant_bits", None),
+        no_quantization=bool(getattr(args, "no_quantization", False)),
+        enable_thinking=bool(getattr(args, "enable_thinking", False)),
+        **model_options,
+    )
+
+
 class SwiftGenerator:
     """Small adapter around MS-SWIFT's TransformersEngine."""
 

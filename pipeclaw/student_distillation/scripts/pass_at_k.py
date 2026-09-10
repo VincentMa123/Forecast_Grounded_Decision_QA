@@ -22,6 +22,7 @@ from pipeclaw.student_distillation.rollout.scenarios import (
     workspace_for,
 )
 from pipeclaw.student_distillation.rollout.suite import (
+    build_runner_selector,
     lookup_tool_schemas,
     read_jsonl,
     release_cuda_cache,
@@ -242,7 +243,17 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
 
     from pipeclaw.backend.evaluator import EvaluationProfile, evaluate
 
-    runner = _build_runner(args, _union_schemas(sources, schemas_by_key))
+    source_cases: list[tuple[Mapping[str, Any], list[dict[str, Any]]]] = []
+    for source in sources:
+        case_schemas = lookup_tool_schemas(source, schemas_by_key, missing_policy="none")
+        if not case_schemas:
+            case_schemas = build_prompt_case(
+                source,
+                workspace_root=workspace_for(output_dir, "schema-probe"),
+            ).tools
+        source_cases.append((source, case_schemas))
+
+    select_runner = _build_runner(args, source_cases)
     rows: list[dict[str, Any]] = []
     progress = tqdm(total=len(sources) * len(args.temps) * args.episodes,
                     desc="pass_at_k", unit="episode")
@@ -250,10 +261,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
         atomic_jsonl_writer(output_dir / "episodes.jsonl", default=str) as write_rollout,
         atomic_jsonl_writer(output_dir / "trajectories.jsonl", default=str) as write_trajectory,
     ):
-        for source in sources:
-            case_schemas = (lookup_tool_schemas(source, schemas_by_key, missing_policy="none")
-                            or build_prompt_case(source, workspace_root=workspace_for(
-                                output_dir, "schema-probe")).tools)
+        for source, case_schemas in source_cases:
             frozen_prompt = (
                 _frozen_prompt(frozen_prompts, source)
                 if args.execution_mode == "raw-student"
@@ -270,7 +278,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     if frozen_prompt is not None:
                         case.messages[0] = {"role": "system", "content": frozen_prompt}
-                    result = runner.run(case, RolloutConfig(
+                    result = select_runner(source).run(case, RolloutConfig(
                         max_turns=args.max_turns, max_new_tokens=args.max_new_tokens,
                         temperature=temp))
                     rollout = result.to_dict()
@@ -317,59 +325,17 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
-def _union_schemas(
-    sources: Sequence[Mapping[str, Any]],
-    schemas_by_key: Mapping[str, Any],
-) -> list[dict[str, Any]]:
-    """Union every selected scenario's schemas, deduplicated by function name.
-
-    The dispatcher must allow-list what any case in the run may call; an empty
-    schema set allow-lists nothing (tools.py:372,386,395).
-    """
-    seen: set[str] = set()
-    schemas: list[dict[str, Any]] = []
-    for record in sources:
-        for schema in (
-            lookup_tool_schemas(record, schemas_by_key, missing_policy="none") or []
-        ):
-            name = str((schema.get("function") or {}).get("name") or "")
-            if name and name not in seen:
-                seen.add(name)
-                schemas.append(dict(schema))
-    return schemas
-
-
-def _build_runner(args: argparse.Namespace, schemas: Sequence[Mapping[str, Any]]):
-    if getattr(args, "execution_mode", "raw-student") == "production-agent":
-        from pipeclaw.student_distillation.rollout.production_agent import (
-            ProductionAgentRunner,
-        )
-
-        return ProductionAgentRunner()
-
-    from pipeclaw.student_distillation.rollout.runner import RolloutRunner
-    from pipeclaw.student_distillation.rollout.scenarios import (
-        ScenarioPolicy,
-        build_openclaw_dispatcher,
-    )
-    from pipeclaw.student_distillation.rollout.swift_generator import (
-        SwiftGenerator,
-        discover_base_model,
-    )
-
-    model = args.model or discover_base_model(Path(args.adapters))
-    generator = SwiftGenerator.from_args(
-        model=model,
-        adapters=args.adapters,
-        device=getattr(args, "device", None),
-        quant_bits=getattr(args, "quant_bits", None),
-        no_quantization=bool(getattr(args, "no_quantization", False)),
-        enable_thinking=bool(getattr(args, "enable_thinking", False)),
+def _build_runner(
+    args: argparse.Namespace,
+    cases: Sequence[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
+):
+    select = build_runner_selector(
+        args,
+        ((source.get("scenario_type"), schemas) for source, schemas in cases),
+        copy_schemas=True,
         model_type=getattr(args, "model_type", None),
     )
-    dispatcher = build_openclaw_dispatcher(list(schemas), Path(args.repo_root))
-    runner = RolloutRunner(generator, dispatcher, policy=ScenarioPolicy())
-    return runner
+    return lambda source: select(source.get("scenario_type"))
 
 
 def build_parser() -> argparse.ArgumentParser:

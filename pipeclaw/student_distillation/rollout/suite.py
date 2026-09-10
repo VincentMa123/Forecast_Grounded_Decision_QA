@@ -4,7 +4,7 @@ import gc
 import json
 from pathlib import Path
 from time import perf_counter
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from pipeclaw.backend.evaluator import (
     EvaluationProfile,
@@ -218,19 +218,24 @@ def schemas_by_scenario_family(
 ) -> dict[str, list[Mapping[str, Any]]]:
     """Union each family's tool schemas, deduplicated by function name."""
 
-    families: dict[str, list[Mapping[str, Any]]] = {}
-    seen: dict[str, set[str]] = {}
-    for case in cases:
-        family = scenario_key(case.scenario_type)
-        schemas = families.setdefault(family, [])
-        names = seen.setdefault(family, set())
-        for schema in case.tools:
+    return _group_scenario_schemas((case.scenario_type, case.tools) for case in cases)
+
+
+def _group_scenario_schemas(
+    cases: Iterable[tuple[Any, Sequence[Mapping[str, Any]]]],
+    *,
+    copy_schemas: bool = False,
+) -> dict[str, list[Mapping[str, Any]]]:
+    families: dict[str, dict[str, Mapping[str, Any]]] = {}
+    for scenario_type, tools in cases:
+        family = scenario_key(scenario_type)
+        schemas = families.setdefault(family, {})
+        for schema in tools:
             function = schema.get("function") if isinstance(schema, Mapping) else None
             name = function.get("name") if isinstance(function, Mapping) else None
-            if name and str(name) not in names:
-                schemas.append(schema)
-                names.add(str(name))
-    return families
+            if name:
+                schemas.setdefault(str(name), dict(schema) if copy_schemas else schema)
+    return {family: list(schemas.values()) for family, schemas in families.items()}
 
 
 def attach_report(rollout: dict[str, Any], report: EvaluationReport) -> dict[str, Any]:
@@ -243,11 +248,6 @@ def attach_report(rollout: dict[str, Any], report: EvaluationReport) -> dict[str
     payload = report.to_dict()
     rollout.update({field: payload[field] for field in _REPORT_ROOT_FIELDS})
     return rollout
-
-
-def _set_postfix(progress: Any, **fields: Any) -> None:
-    if hasattr(progress, "set_postfix"):
-        progress.set_postfix(refresh=False, **fields)
 
 
 def release_cuda_cache() -> None:
@@ -383,7 +383,8 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
                 status = rollout.get("trace_status", "unknown")
                 release_cuda_cache()
             reports.append(report)
-            _set_postfix(progress, scenario=case.scenario_type, status=status)
+            if hasattr(progress, "set_postfix"):
+                progress.set_postfix(refresh=False, scenario=case.scenario_type, status=status)
 
     summary = _summary(
         [report for report in reports if report is not None],
@@ -408,44 +409,46 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
 
 
 def _build_runner(args: Any, cases: Sequence[PromptCase]):
-    """Load the model once and return a per-case runner selector.
+    if (
+        getattr(args, "execution_mode", "raw-student") != "production-agent"
+        and not getattr(args, "adapters", None)
+        and not getattr(args, "model", None)
+    ):
+        raise ValueError("--model or --adapters is required unless --dry-run is used")
+    select = build_runner_selector(args, ((case.scenario_type, case.tools) for case in cases))
+    return lambda case: select(case.scenario_type)
 
-    MS-SWIFT, PEFT, and torch are imported here rather than at module import so
-    the dry-run path and the test suite never touch model weights or CUDA.
+
+def build_runner_selector(
+    args: Any,
+    cases: Iterable[tuple[Any, Sequence[Mapping[str, Any]]]],
+    *,
+    copy_schemas: bool = False,
+    **model_options: Any,
+):
+    """Load once and select a runner by scenario type for either evaluation command.
+
+    Production-agent mode does not consume schemas or load local model weights.
     """
 
     if getattr(args, "execution_mode", "raw-student") == "production-agent":
         from .production_agent import ProductionAgentRunner
 
         runner = ProductionAgentRunner()
-        return lambda _case: runner
+        return lambda _scenario_type: runner
+    from .swift_generator import load_evaluation_generator
 
-    adapters = getattr(args, "adapters", None)
-    model = getattr(args, "model", None)
-    if not adapters and not model:
-        raise ValueError("--model or --adapters is required unless --dry-run is used")
-    from .swift_generator import SwiftGenerator, discover_base_model
-
-    if not model:
-        model = discover_base_model(Path(adapters))
-    generator = SwiftGenerator.from_args(
-        model=model,
-        adapters=adapters,
-        device=getattr(args, "device", None),
-        quant_bits=getattr(args, "quant_bits", None),
-        no_quantization=bool(getattr(args, "no_quantization", False)),
-        enable_thinking=bool(getattr(args, "enable_thinking", False)),
-    )
+    generator = load_evaluation_generator(args, **model_options)
     repo_root = Path(getattr(args, "repo_root", "."))
     policy = ScenarioPolicy()
     runners = {
         family: RolloutRunner(
             generator, build_dispatcher(family, schemas, repo_root), policy=policy
         )
-        for family, schemas in schemas_by_scenario_family(cases).items()
+        for family, schemas in _group_scenario_schemas(cases, copy_schemas=copy_schemas).items()
     }
 
-    def select(case: PromptCase) -> RolloutRunner:
-        return runners[scenario_key(case.scenario_type)]
+    def select(scenario_type: Any) -> RolloutRunner:
+        return runners[scenario_key(scenario_type)]
 
     return select

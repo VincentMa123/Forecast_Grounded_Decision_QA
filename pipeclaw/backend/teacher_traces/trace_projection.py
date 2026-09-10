@@ -492,10 +492,15 @@ class TeacherTraceProjector:
         while available and len(selected) < SFT_MAX_GENERIC_TOOL_PAIRS:
             ranked = []
             for pair in available:
-                covered_count, covered = self._evidence_coverage(pair[2], remaining)
+                normalized = _evidence_blob(pair[2]).replace(",", "")
+                covered = {
+                    value
+                    for value in remaining
+                    if value.casefold().replace(",", "") in normalized
+                }
                 ranked.append(
                     (
-                        covered_count,
+                        len(covered),
                         self._evidence_score(pair[2], answer),
                         -pair[0],
                         pair,
@@ -755,19 +760,6 @@ class TeacherTraceProjector:
         if '"stdout"' in blob or '"content"' in blob:
             score += 1
         return score
-
-    @staticmethod
-    def _evidence_coverage(
-        output: Optional[Dict[str, Any]],
-        remaining: set[str],
-    ) -> tuple[int, set[str]]:
-        normalized = _evidence_blob(output).replace(",", "")
-        covered = {
-            value
-            for value in remaining
-            if value.casefold().replace(",", "") in normalized
-        }
-        return len(covered), covered
 
     def _select_forecast_evidence_for_sft(
         self,

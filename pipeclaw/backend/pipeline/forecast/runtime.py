@@ -926,6 +926,9 @@ def _analyze_pipeformer_forecast(
         baseline_task = _build_unchanged_baseline_task(parsed_task)
         baseline_key = (
             str(environment.checkpoint_dir),
+            str(environment.data_dir),
+            str(environment.static_dir),
+            str(environment.mapping_path),
             str(parsed_task.get("case_id") or ""),
             parsed_task.get("current_operating_condition_number"),
             parsed_task.get("forecast_horizon_minutes"),

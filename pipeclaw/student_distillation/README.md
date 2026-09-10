@@ -142,8 +142,9 @@ For repeated episodes or a deployed OpenAI-compatible student, use
 `scripts/validate_dataset.py` owns the dataset release contract and registered
 tool schemas; `prepare_dataset.py` owns projections, while `profile_tokens.py`
 keeps its sequential profiling workflow together in one sectioned command.
-Rollout modules do not import the evaluator; `rollout/suite.py` is the single
-execution-to-scoring seam. PipeFormer scenarios allow only read-only topology,
+The rollout execution modules do not score episodes. `rollout/suite.py` and
+`scripts/pass_at_k.py` pass completed rollouts to the evaluator and own their
+respective reports. PipeFormer scenarios allow only read-only topology,
 registry, and forecast tools. OpenClaw file operations and Python commands are
 workspace-bounded. Failed calls and malformed JSON remain in the episode record
 for diagnosis instead of being silently discarded.

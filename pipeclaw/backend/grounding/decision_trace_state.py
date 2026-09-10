@@ -320,7 +320,6 @@ def _compact_registry_state_item(
 def _registry_state_projection(
     items: Iterable[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    search_call_ids: List[str] = []
     search_positions: Dict[str, int] = {}
     returned_ids: List[Dict[str, Any]] = []
     for item in items:
@@ -330,14 +329,11 @@ def _registry_state_projection(
         call_id = str(dict(item.get("provenance") or {}).get("tool_call_id") or "")
         entry: Dict[str, Any] = {"variable": variable}
         if call_id:
-            index = search_positions.setdefault(call_id, len(search_call_ids))
-            if index == len(search_call_ids):
-                search_call_ids.append(call_id)
-            entry["search"] = index
+            entry["search"] = search_positions.setdefault(call_id, len(search_positions))
         returned_ids.append(entry)
     return {
         "context_only": True,
-        "search_call_ids": search_call_ids,
+        "search_call_ids": list(search_positions),
         "returned_ids": returned_ids,
     }
 
@@ -911,11 +907,6 @@ def _delta_from_verified_tool_results(
         if isinstance(variable, dict) and variable.get("variable")
     ]
 
-    candidates = [
-        deepcopy(dict(candidate))
-        for candidate in contract.get("candidate_results") or []
-        if isinstance(candidate, dict)
-    ]
     current_by_id = {}
     for call in current_forecasts:
         candidate_id = str(
@@ -925,6 +916,26 @@ def _delta_from_verified_tool_results(
         )
         if candidate_id:
             current_by_id[candidate_id.casefold()] = call
+    if current_by_id and any(
+        not (_call_mapping(call, "arguments").get("candidate_id")
+             or _call_mapping(call, "output").get("candidate_id"))
+        for call in current_forecasts
+    ):
+        # Unnamed forecasts can synthesize IDs that collide with explicit candidates.
+        contract = build_grounding_contract(
+            question,
+            [call for call in successful
+             if call.get("name") != "run_pipeformer_forecast"
+             or call in current_by_id.values()],
+            require_decision_policy=True,
+            prior_state=current,
+        )
+    candidates = [
+        deepcopy(dict(candidate))
+        for candidate in contract.get("candidate_results") or []
+        if isinstance(candidate, dict)
+        and str(candidate.get("candidate_id") or "").casefold() in current_by_id
+    ]
     for candidate in candidates:
         call = current_by_id.get(str(candidate.get("candidate_id") or "").casefold())
         if call:
@@ -956,11 +967,6 @@ def _delta_from_verified_tool_results(
         unresolved.extend(str(value) for value in values or [] if str(value))
 
     turn_key = f"{session_id}::turn_{int(turn_id):03d}"
-    candidate_forecasts = [
-        call
-        for call in current_forecasts
-        if _call_mapping(call, "arguments").get("candidate_id")
-    ]
     snapshot = (
         _compact_single_forecast_snapshot(
             current_forecasts[0],
@@ -968,7 +974,7 @@ def _delta_from_verified_tool_results(
             applied_disturbances=list(applied),
             source_turn_id=turn_key,
         )
-        if len(current_forecasts) == 1 and not candidate_forecasts
+        if len(current_forecasts) == 1 and not current_by_id
         else None
     )
 
@@ -982,7 +988,7 @@ def _delta_from_verified_tool_results(
         applied_disturbances=applied,
         verified_evidence=evidence,
         single_forecast_snapshot=snapshot,
-        clear_single_forecast_snapshot=bool(candidate_forecasts),
+        clear_single_forecast_snapshot=bool(current_by_id),
         unresolved_inputs=tuple(unresolved),
         turn_ids=(turn_key,),
         tool_call_ids=_tool_call_ids(successful),

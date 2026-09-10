@@ -93,10 +93,11 @@ plain inference endpoint.
 
 ## Execution/evaluation boundary
 
-The modules under `pipeclaw/student_distillation/rollout/` only construct prompts,
-dispatch allow-listed tools, manage isolated workspaces, and record episodes.
-They do not import the evaluator. `rollout/suite.py` is the single seam that
-passes a completed rollout to `evaluate()` and `summarize()`.
+The rollout execution modules construct prompts, dispatch allow-listed tools,
+manage isolated workspaces, and record episodes. `rollout/suite.py` passes
+completed rollouts to `evaluate()` and `summarize()` for dataset evaluation.
+`scripts/pass_at_k.py` also calls `evaluate()` directly and produces pass@k
+statistics and reports. Both commands score completed model/tool episodes.
 
 For PipeFormer scenarios, only read-only/topology/registry/forecast tools are
 allowed. OpenClaw workspaces bound `read_file`, `write_file`, `edit_file`, and
