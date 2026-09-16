@@ -29,11 +29,12 @@ state.
 
 - `qwen35_9b_remote_benchmark_step20.yaml` — 20-step benchmark for measuring
   memory and throughput.
-- `qwen35_9b.yaml` — full trace-level SFT run.
+- `qwen35_9b.yaml` — full trace-level SFT run for five epochs.
 
 Both use the trace-level projection, `Qwen/Qwen3.5-9B`, 4-bit NF4 QLoRA (rank 32,
 alpha 64), Flash Attention, and DeepSpeed ZeRO-2 across four processes by
-default. The checked-in `max_length: 18432` is the full-release ceiling and the configs use
+default. The checked-in `max_length: 18432` setting (compactly,
+`max_length=18432`) is the full-release ceiling, and the configs use
 `truncation_strategy: delete`; run the token profiler before a new run and
 confirm that the selected records fit that limit.
 

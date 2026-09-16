@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 # Tolerance for "did the executed forecast actually apply the value we asked
-# for" comparisons.  Shared by this module and ``common.numbers_match``; it is
+# for" comparisons. Shared by this module and ``common.numbers_match``; it is
 # deliberately tighter than the 1e-5 used for task-field and CSV-row matching,
 # which encode different semantics.
 APPLIED_VALUE_REL_TOL = 1e-6

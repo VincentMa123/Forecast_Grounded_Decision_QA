@@ -67,8 +67,8 @@ loss_scale: default+ignore_empty_think
 add_non_thinking_prefix: true
 packing: true
 
-# 4 ranks x 1 x 8 = effective batch size 32. 902 train records x 3 epochs is
-# roughly 84 optimizer steps.
+# 4 ranks x 1 x 8 = effective batch size 32. 902 train records x 5 epochs is
+# roughly 141 optimizer steps.
 per_device_train_batch_size: 1
 per_device_eval_batch_size: 1
 gradient_accumulation_steps: 8 # set 32 if using single GPU

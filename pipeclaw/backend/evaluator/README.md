@@ -96,6 +96,9 @@ scenario-type breakdowns. Use the `pipeformer` filter for PipeFormer cases and
 
 ## Repair and regenerate
 
+Repair stored teacher traces with
+`python -m pipeclaw.backend.scripts.repair_teacher_trace`.
+
 Regenerate evaluation deliverables with the deterministic grounded-record
 repair enabled:
 

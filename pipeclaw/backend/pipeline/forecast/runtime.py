@@ -608,24 +608,6 @@ def _apply_binary_setpoint(parsed: Dict[str, Any], setpoint: Optional[int]) -> N
     parsed["disturbance_setpoint"] = int(value)
 
 
-def _apply_optional_collections(
-    parsed: Dict[str, Any],
-    attention_targets: Optional[List[str]],
-    output_state_variables: Optional[List[str]],
-    constraint_verification_types: Optional[List[str]],
-) -> None:
-    for key, values in (
-        ("attention_targets", attention_targets),
-        ("output_state_variables", output_state_variables),
-    ):
-        if values is not None:
-            parsed[key] = list(values)
-    if constraint_verification_types is not None:
-        parsed["constraint_verification_types"] = _clean_checks(
-            constraint_verification_types
-        )
-
-
 def _sync_boundary_conditions(parsed: Dict[str, Any]) -> None:
     """Mirror the disturbance fields into boundary_conditions for downstream."""
 
@@ -776,9 +758,14 @@ def build_pipeformer_task(
         _validate_forecast_horizon(forecast_horizon_minutes)
         parsed["forecast_horizon_minutes"] = forecast_horizon_minutes
 
-    _apply_optional_collections(
-        parsed, attention_targets, output_state_variables, constraint_verification_types
-    )
+    if attention_targets is not None:
+        parsed["attention_targets"] = list(attention_targets)
+    if output_state_variables is not None:
+        parsed["output_state_variables"] = list(output_state_variables)
+    if constraint_verification_types is not None:
+        parsed["constraint_verification_types"] = _clean_checks(
+            constraint_verification_types
+        )
     _sync_boundary_conditions(parsed)
 
     source = _resolve_disturbance_source(
@@ -1098,6 +1085,4 @@ def _analyze_pipeformer_forecast(
         ),
         "forecast_metadata": forecast_metadata,
     }
-    if counterfactual_comparison is not None:
-        result["counterfactual_comparison"] = counterfactual_comparison
     return result

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from .answer_limits import (
     ENGLISH_COMPARISON_MAX_CHARS,
@@ -93,26 +93,6 @@ def _candidate_line(candidate: Dict[str, Any], chinese: bool) -> str:
         f"W{candidate.get('warning_count', 0)}；{metric_text}；"
         f"规则{failed_rules if failed_rules != 'none' else warning_rules}。"
     )
-
-
-def _finalize_comparison_answer(
-    lines: List[str],
-    selected_candidate_id: str,
-    contract: Dict[str, Any],
-    *,
-    maximum_chars: int = 500,
-    maximum_words: Optional[int] = None,
-) -> str:
-    answer = "\n".join(str(line).strip() for line in lines if str(line).strip())
-    answer += f"\nselected_candidate_id: {selected_candidate_id or 'none'}"
-    over_budget = len(answer) > maximum_chars or (
-        maximum_words is not None and len(answer.split()) > maximum_words
-    )
-    if over_budget:
-        contract["answer_render_status"] = "answer_budget_insufficient"
-    else:
-        contract.pop("answer_render_status", None)
-    return answer
 
 
 def _shared_outcome_line(candidate: Dict[str, Any], chinese: bool) -> str:
@@ -228,13 +208,20 @@ def _comparison_prefix(contract: Dict[str, Any], chinese: bool) -> List[str]:
 def _finalize_for_locale(
     lines: List[str], selected_id: str, contract: Dict[str, Any], chinese: bool, count: int
 ) -> str:
-    return _finalize_comparison_answer(
-        lines,
-        selected_id,
-        contract,
-        maximum_chars=chinese_comparison_max_chars(count) if chinese else ENGLISH_COMPARISON_MAX_CHARS,
-        maximum_words=None if chinese else ENGLISH_MAX_WORDS,
+    maximum_chars = (
+        chinese_comparison_max_chars(count) if chinese else ENGLISH_COMPARISON_MAX_CHARS
     )
+    maximum_words = None if chinese else ENGLISH_MAX_WORDS
+    answer = "\n".join(str(line).strip() for line in lines if str(line).strip())
+    answer += f"\nselected_candidate_id: {selected_id or 'none'}"
+    over_budget = len(answer) > maximum_chars or (
+        maximum_words is not None and len(answer.split()) > maximum_words
+    )
+    if over_budget:
+        contract["answer_render_status"] = "answer_budget_insufficient"
+    else:
+        contract.pop("answer_render_status", None)
+    return answer
 
 
 def _policy_line(objectives: List[Dict[str, Any]], chinese: bool) -> str:

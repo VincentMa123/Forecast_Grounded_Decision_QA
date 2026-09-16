@@ -293,7 +293,7 @@ def validate_variable_registry(
 ) -> Dict[str, Any]:
     path = Path(path)
     if not path.is_file():
-        return _missing_registry_report(path)
+        return _invalid_registry_report(path, f"Variable registry does not exist: {path}")
     try:
         registry = VariableRegistry.read(path)
     except ValueError as exc:
@@ -347,10 +347,6 @@ def _registry_report(
         "errors": errors,
         "supported": not errors,
     }
-
-
-def _missing_registry_report(path: Path) -> Dict[str, Any]:
-    return _invalid_registry_report(path, f"Variable registry does not exist: {path}")
 
 
 def _invalid_registry_report(path: Path, error: str) -> Dict[str, Any]:

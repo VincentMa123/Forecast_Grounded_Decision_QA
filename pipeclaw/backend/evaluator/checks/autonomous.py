@@ -5,9 +5,6 @@ import json
 import re
 from collections import Counter
 from collections.abc import Mapping
-from dataclasses import dataclass
-from functools import partial
-from types import MappingProxyType
 from typing import Any, NamedTuple
 
 from pipeclaw.backend.grounding.evidence.tool import (
@@ -83,32 +80,6 @@ def _resolve_forecast_arguments(
     }
 
 
-def _resolved_actual_call(
-    actual_call: Mapping[str, Any],
-    forecast_index: _ForecastIndex,
-    actual_arguments: Mapping[str, Any] | None,
-) -> Mapping[str, Any]:
-    if actual_arguments is not None:
-        return {**actual_call, "arguments": actual_arguments}
-    call_id = str(actual_call.get("tool_call_id") or "")
-    entry = next(
-        (
-            entry
-            for entry in forecast_index.successful
-            if str(entry.call.get("tool_call_id") or "") == call_id
-        ),
-        None,
-    )
-    return {
-        **actual_call,
-        "arguments": (
-            _resolve_forecast_arguments(actual_call, entry.output)
-            if entry is not None
-            else mapping(actual_call.get("arguments"))
-        ),
-    }
-
-
 def _resolved_forecast_index(record: Mapping[str, Any]) -> _ForecastIndex:
     """Resolve one episode's forecast calls once for all matching checks."""
 
@@ -180,39 +151,26 @@ def _same_forecast_action(
     )
 
 
-def _reference_match(
-    context: EvaluationContext,
-    actual_call: Mapping[str, Any],
-    *,
-    contract: bool,
-    forecast_index: _ForecastIndex | None = None,
-    reference_index: _ForecastIndex | None = None,
-    actual_arguments: Mapping[str, Any] | None = None,
-) -> Mapping[str, Any] | bool | None:
-    forecast_index = forecast_index or _resolved_forecast_index(context.record)
-    reference_index = reference_index or _resolved_forecast_index(
-        context.reference or {}
-    )
-    resolved_call = _resolved_actual_call(
-        actual_call,
-        forecast_index,
-        actual_arguments,
-    )
-    entries = reference_index.successful
-    if contract:
-        return any(
-            task_field_comparison(entry.arguments, resolved_call["arguments"])[0]
-            for entry in entries
-        )
-    for entry in entries:
+def _matching_reference_output(
+    actual: _ResolvedForecast,
+    reference_index: _ForecastIndex,
+) -> Mapping[str, Any] | None:
+    resolved_call = {**actual.call, "arguments": actual.arguments}
+    for entry in reference_index.successful:
         expected_call = {**entry.call, "arguments": entry.arguments}
         if _same_forecast_action(expected_call, resolved_call):
             return entry.output
     return None
 
 
-_matching_reference_output = partial(_reference_match, contract=False)
-_matches_reference_contract = partial(_reference_match, contract=True)
+def _matches_reference_contract(
+    actual: _ResolvedForecast,
+    reference_index: _ForecastIndex,
+) -> bool:
+    return any(
+        task_field_comparison(entry.arguments, actual.arguments)[0]
+        for entry in reference_index.successful
+    )
 
 
 def _oracle_tasks(context: EvaluationContext) -> list[Mapping[str, Any]]:
@@ -284,22 +242,6 @@ def _task_parsing(
     )
 
 
-@dataclass(frozen=True)
-class _ToolCallAnalysis:
-    """Immutable facts shared by the tool-call and recovery metrics."""
-
-    tool_calls: tuple[Mapping[str, Any], ...]
-    teacher_names: frozenset[str]
-    required: frozenset[str]
-    valid_calls: tuple[Mapping[str, Any], ...]
-    failed_calls: tuple[Mapping[str, Any], ...]
-    emitted_valid: frozenset[str]
-    recovery_targets: frozenset[str]
-    last_required: Mapping[str, Mapping[str, Any]]
-    repeated_failure_signatures: int
-    duplicate_successes: int
-
-
 def _tool_capabilities(names: set[str], *, is_openclaw: bool) -> set[str]:
     if not is_openclaw:
         return set(names)
@@ -322,8 +264,8 @@ def _call_signature_counts(
     )
 
 
-def _analyze_tool_calls(context: EvaluationContext) -> _ToolCallAnalysis:
-    """Normalize tool-call success and recovery facts once per episode."""
+def _tool_metrics(context: EvaluationContext) -> tuple[MetricResult, MetricResult]:
+    """Build correctness and recovery metrics from one episode's tool calls."""
 
     tool_calls = tuple(calls(context.record))
     teacher_names = {
@@ -381,76 +323,58 @@ def _analyze_tool_calls(context: EvaluationContext) -> _ToolCallAnalysis:
     duplicate_successes = sum(
         count - 1 for count in success_signatures.values() if count > 1
     )
-    return _ToolCallAnalysis(
-        tool_calls=tool_calls,
-        teacher_names=frozenset(teacher_names),
-        required=frozenset(required),
-        valid_calls=valid_calls,
-        failed_calls=failed_calls,
-        emitted_valid=frozenset(emitted_valid),
-        recovery_targets=frozenset(recovery_targets),
-        last_required=MappingProxyType(dict(last_required)),
-        repeated_failure_signatures=sum(
-            count > 1 for count in failure_signatures.values()
-        ),
-        duplicate_successes=duplicate_successes,
-    )
-
-
-def _tool_metrics(
-    context: EvaluationContext,
-    analysis: _ToolCallAnalysis,
-) -> tuple[MetricResult, MetricResult]:
-    applicable = bool(analysis.required or analysis.tool_calls)
+    applicable = bool(required or tool_calls)
     tool_call = metric(
         context,
         "tool_call",
         applicable=applicable,
         passed=(
             applicable
-            and analysis.required <= analysis.emitted_valid
-            and not analysis.failed_calls
-            and not analysis.duplicate_successes
+            and required <= emitted_valid
+            and not failed_calls
+            and not duplicate_successes
         ),
         details={
-            "expected_tool_names": sorted(analysis.teacher_names),
-            "required_tool_names": sorted(analysis.required),
+            "expected_tool_names": sorted(teacher_names),
+            "required_tool_names": sorted(required),
             "emitted_tool_names": [
                 str(call.get("name"))
-                for call in analysis.tool_calls
+                for call in tool_calls
                 if call.get("name")
             ],
-            "failed_call_count": len(analysis.failed_calls),
-            "repeated_failure_signatures": analysis.repeated_failure_signatures,
-            "successful_call_count": len(analysis.valid_calls),
-            "total_call_count": len(analysis.tool_calls),
+            "failed_call_count": len(failed_calls),
+            "repeated_failure_signatures": sum(
+                count > 1 for count in failure_signatures.values()
+            ),
+            "successful_call_count": len(valid_calls),
+            "total_call_count": len(tool_calls),
             "call_success_rate": (
-                len(analysis.valid_calls) / len(analysis.tool_calls)
-                if analysis.tool_calls
+                len(valid_calls) / len(tool_calls)
+                if tool_calls
                 else None
             ),
-            "duplicate_successful_call_count": analysis.duplicate_successes,
+            "duplicate_successful_call_count": duplicate_successes,
         },
     )
     recovered = (
-        bool(analysis.failed_calls)
-        and analysis.recovery_targets <= set(analysis.last_required)
+        bool(failed_calls)
+        and recovery_targets <= set(last_required)
         and all(
             call.get("schema_valid") is not False
             and call.get("execution_success") is not False
-            for call in analysis.last_required.values()
+            for call in last_required.values()
         )
     )
     return tool_call, metric(
         context,
         "tool_recovery",
-        applicable=applicable and bool(analysis.failed_calls),
+        applicable=applicable and bool(failed_calls),
         passed=recovered,
         details={
-            "failed_call_count": len(analysis.failed_calls),
+            "failed_call_count": len(failed_calls),
             "recovered_tool_names": sorted(
                 name
-                for name, call in analysis.last_required.items()
+                for name, call in last_required.items()
                 if call.get("schema_valid") is not False
                 and call.get("execution_success") is not False
             ),
@@ -516,15 +440,7 @@ def _pipeformer_metrics(
     matched_statuses = [
         (actual, mapping(verification_view(reference).get("category_status")))
         for entry, actual in zip(pairs, actual_statuses)
-        if (
-            reference := _matching_reference_output(
-                context,
-                entry.call,
-                forecast_index=forecast_index,
-                reference_index=reference_index,
-                actual_arguments=entry.arguments,
-            )
-        ) is not None
+        if (reference := _matching_reference_output(entry, reference_index)) is not None
     ]
     judgment_applicable = applicable and bool(expected_constraints or matched_statuses)
     judgment_pass = bool(actual_statuses) and all(
@@ -834,22 +750,10 @@ def _label_metric(
     matched: list[tuple[Mapping[str, Any], Mapping[str, Any]]] = []
     student_evidence: list[Mapping[str, Any]] = []
     for entry in forecast_index.successful:
-        reference = _matching_reference_output(
-            context,
-            entry.call,
-            forecast_index=forecast_index,
-            reference_index=reference_index,
-            actual_arguments=entry.arguments,
-        )
+        reference = _matching_reference_output(entry, reference_index)
         if reference is not None:
             matched.append((reference, entry.output))
-        elif _matches_reference_contract(
-            context,
-            entry.call,
-            forecast_index=forecast_index,
-            reference_index=reference_index,
-            actual_arguments=entry.arguments,
-        ):
+        elif _matches_reference_contract(entry, reference_index):
             student_evidence.append(entry.output)
 
     def value(output: Mapping[str, Any]) -> Any:
@@ -1095,8 +999,7 @@ def evaluate_autonomous_checks(
 
     forecast_index = _resolved_forecast_index(context.record)
     reference_index = _resolved_forecast_index(context.reference or {})
-    tool_analysis = _analyze_tool_calls(context)
-    tool_call, tool_recovery = _tool_metrics(context, tool_analysis)
+    tool_call, tool_recovery = _tool_metrics(context)
     claim_support = _claim_support_metric(context)
     evidence = evidence_consistency(context)
     claim_alignment = _claim_alignment_metric(context)

@@ -241,8 +241,8 @@ def validate_scenario_sources(
     all_missing_data_files = set()
     all_missing_target_mappings = set()
     scenario_occurrences: Dict[str, List[Dict[str, Any]]] = {}
-    session_occurrences: Dict[str, List[str]] = {}
-    sample_occurrences: Dict[str, List[str]] = {}
+    session_counts: Dict[str, int] = {}
+    sample_counts: Dict[str, int] = {}
     scenario_count = 0
     for source in sources:
         source_name = str(source["dataset_source"])
@@ -277,13 +277,13 @@ def validate_scenario_sources(
             for session in scenario.get("sessions") or []:
                 session_id = str(session.get("session_id") or "")
                 session_key = f"{scenario_id}::{session_id}"
-                session_occurrences.setdefault(session_key, []).append(source_name)
+                session_counts[session_key] = session_counts.get(session_key, 0) + 1
                 for fallback_turn, turn in enumerate(
                     session.get("dialogue") or [], start=1
                 ):
                     turn_id = int(turn.get("turn_id") or fallback_turn)
                     sample_key = f"{scenario_id}::{session_id}::turn_{turn_id:03d}"
-                    sample_occurrences.setdefault(sample_key, []).append(source_name)
+                    sample_counts[sample_key] = sample_counts.get(sample_key, 0) + 1
 
     scenario_collisions = []
     for scenario_id, occurrences in sorted(scenario_occurrences.items()):
@@ -327,10 +327,10 @@ def validate_scenario_sources(
         "id_collisions": {
             "scenario_id": scenario_collisions,
             "session_id_count": sum(
-                len(values) > 1 for values in session_occurrences.values()
+                count > 1 for count in session_counts.values()
             ),
             "sample_id_count": sum(
-                len(values) > 1 for values in sample_occurrences.values()
+                count > 1 for count in sample_counts.values()
             ),
             "namespacing_required": bool(scenario_collisions),
         },

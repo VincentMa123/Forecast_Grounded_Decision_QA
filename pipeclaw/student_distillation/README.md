@@ -64,8 +64,8 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
   --projections answer_only trace_level constraint_multitask
 ```
 
-The checked-in profile covers 5,166 train/validation records and reports a
-maximum of 18,127 rendered tokens. The remote SFT configuration currently uses
+The checked-in profile covers 5,166 train/validation records; the
+trace-level maximum is 18,127 tokens. The remote SFT configuration currently uses
 `max_length: 18432` with `truncation_strategy: delete`; re-profile any changed
 dataset and confirm that this behavior is acceptable before a training run.
 

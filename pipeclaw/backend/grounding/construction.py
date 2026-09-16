@@ -310,14 +310,10 @@ def _pipeformer_contract(
     return contract
 
 def _latest_by_key(items: Iterable[Dict[str, Any]], key) -> List[Dict[str, Any]]:
-    order: List[str] = []
     latest: Dict[str, Dict[str, Any]] = {}
     for index, item in enumerate(items, 1):
-        identity = key(item, index)
-        if identity not in latest:
-            order.append(identity)
-        latest[identity] = item
-    return [latest[identity] for identity in order]
+        latest[key(item, index)] = item
+    return list(latest.values())
 
 
 def _deduplicate_candidate_results(
@@ -412,7 +408,6 @@ def _applied_disturbances(
     results: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     disturbances: Dict[tuple[str, str], Dict[str, Any]] = {}
-    order: List[tuple[str, str]] = []
     for item in results:
         if item.get("name") != "run_pipeformer_forecast":
             continue
@@ -475,10 +470,8 @@ def _applied_disturbances(
             "no_op": no_op,
         }
         key = (variable.casefold(), mode.casefold())
-        if key not in disturbances:
-            order.append(key)
         disturbances[key] = value
-    return [disturbances[key] for key in order]
+    return list(disturbances.values())
 
 def _candidate(index: int, item: Dict[str, Any]) -> Dict[str, Any]:
     output = dict(item.get("output") or {})

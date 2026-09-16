@@ -18,17 +18,12 @@ MAX_EVALUATED_VALUES = 50
 
 
 def select_requested_categories(values: Optional[Iterable[str]]) -> List[str]:
-    requested = []
-    seen = set()
+    requested = set()
     for raw in values or []:
         category = str(raw).strip()
-        if not category or category not in CATEGORY_ORDER or category in seen:
-            continue
-        seen.add(category)
-        requested.append(category)
-
-    categories = set(requested or CATEGORY_ORDER)
-    categories.update(ALWAYS_RUN_CATEGORIES)
+        if category and category in CATEGORY_ORDER:
+            requested.add(category)
+    categories = (requested or set(CATEGORY_ORDER)) | ALWAYS_RUN_CATEGORIES
     return [category for category in CATEGORY_ORDER if category in categories]
 
 

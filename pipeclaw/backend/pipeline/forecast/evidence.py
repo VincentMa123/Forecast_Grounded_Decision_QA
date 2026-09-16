@@ -19,13 +19,9 @@ def summarize_variables(
             predicted[index] - predicted[index - 1]
             for index in range(1, len(predicted))
         ]
-        minimum = min(predicted) if predicted else None
-        maximum = max(predicted) if predicted else None
-        peak_index = (
-            max(range(len(predicted)), key=lambda index: abs(predicted[index]))
-            if predicted
-            else None
-        )
+        minimum = min(predicted)
+        maximum = max(predicted)
+        peak_index = max(range(len(predicted)), key=lambda index: abs(predicted[index]))
         change_peak_index = (
             max(range(len(step_changes)), key=lambda index: abs(step_changes[index]))
             + 1
@@ -44,27 +40,15 @@ def summarize_variables(
             "predicted_values": [round(value, 6) for value in predicted],
             "prediction_labels": [row.label for row in predicted_rows],
             "observed_values": [round(value, 6) for value in observed],
-            "mean_prediction": round(sum(predicted) / len(predicted), 6)
-            if predicted
-            else None,
-            "max_abs_prediction": round(
-                max((abs(value) for value in predicted), default=0.0), 6
-            ),
-            "minimum_prediction": round(minimum, 6) if minimum is not None else None,
-            "minimum_step_index": predicted.index(minimum)
-            if minimum is not None
-            else None,
-            "maximum_prediction": round(maximum, 6) if maximum is not None else None,
-            "maximum_step_index": predicted.index(maximum)
-            if maximum is not None
-            else None,
-            "peak_value": round(predicted[peak_index], 6)
-            if peak_index is not None
-            else None,
+            "mean_prediction": round(sum(predicted) / len(predicted), 6),
+            "max_abs_prediction": round(max(abs(value) for value in predicted), 6),
+            "minimum_prediction": round(minimum, 6),
+            "minimum_step_index": predicted.index(minimum),
+            "maximum_prediction": round(maximum, 6),
+            "maximum_step_index": predicted.index(maximum),
+            "peak_value": round(predicted[peak_index], 6),
             "peak_step_index": peak_index,
-            "prediction_change": round(predicted[-1] - predicted[0], 6)
-            if predicted
-            else None,
+            "prediction_change": round(predicted[-1] - predicted[0], 6),
             "max_abs_step_change": round(
                 max((abs(value) for value in step_changes), default=0.0), 6
             ),
@@ -73,12 +57,8 @@ def summarize_variables(
                 max((max(0.0, -value) for value in step_changes), default=0.0), 6
             ),
             "max_step_decline_index": decline_peak_index,
-            "max_decline_from_start": round(max(0.0, predicted[0] - minimum), 6)
-            if predicted
-            else None,
-            "recovery_from_minimum": round(predicted[-1] - minimum, 6)
-            if predicted
-            else None,
+            "max_decline_from_start": round(max(0.0, predicted[0] - minimum), 6),
+            "recovery_from_minimum": round(predicted[-1] - minimum, 6),
             "mean_delta_vs_observed": round(sum(deltas) / len(deltas), 6)
             if deltas
             else None,

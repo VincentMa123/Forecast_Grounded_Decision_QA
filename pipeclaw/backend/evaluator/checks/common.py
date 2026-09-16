@@ -72,15 +72,13 @@ def ordered_canonical_metrics(
         context.profile,
         teacher_variant=teacher_variant,
     ).metric_order
-    present = {item.name for item in metrics}
-    metrics = list(metrics)
-    metrics.extend(
-        metric(context, name, applicable=False, teacher_variant=teacher_variant)
-        for name in order
-        if name not in present
-    )
     by_name = {item.name: item for item in metrics}
-    return [by_name[name] for name in order]
+    return [
+        by_name[name]
+        if name in by_name
+        else metric(context, name, applicable=False, teacher_variant=teacher_variant)
+        for name in order
+    ]
 
 
 def metric(

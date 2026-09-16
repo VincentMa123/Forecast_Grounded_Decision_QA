@@ -66,26 +66,18 @@ def summarize(
             for name in metrics
         }
     )
-    diagnostic_names: set[str] = set()
+    metrics: dict[str, dict[str, Any]] = {}
+    diagnostics: dict[str, dict[str, Any]] = {}
     for name in metric_names:
+        is_diagnostic = False
         for report in payloads:
-            metrics = report.get("metrics")
-            metric = metrics.get(name) if isinstance(metrics, Mapping) else None
-            if isinstance(metric, Mapping) and not metric.get(
-                "included_in_score", True
-            ):
-                diagnostic_names.add(name)
+            report_metrics = report.get("metrics")
+            metric = report_metrics.get(name) if isinstance(report_metrics, Mapping) else None
+            if isinstance(metric, Mapping) and not metric.get("included_in_score", True):
+                is_diagnostic = True
                 break
-    metrics = {
-        name: _metric_summary(payloads, name)
-        for name in metric_names
-        if name not in diagnostic_names
-    }
-    diagnostics = {
-        name: _metric_summary(payloads, name)
-        for name in metric_names
-        if name in diagnostic_names
-    }
+        target = diagnostics if is_diagnostic else metrics
+        target[name] = _metric_summary(payloads, name)
     pass_count = sum(bool(report.get("passed")) for report in payloads)
     record_count = len(payloads)
     hallucination_summary = diagnostics.get("hallucination", {})

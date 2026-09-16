@@ -223,19 +223,16 @@ def find_default_checkpoint_dir(repo_root: Path) -> Path:
                 f"PipeFormer active manifest checkpoint directory not found: {candidate}"
             )
         return candidate
-    output_dirs = [
-        outputs_root / "mock_decoder",
-    ]
-    for output_dir in output_dirs:
-        checkpoints = sorted(
-            [path for path in output_dir.glob("checkpoint-*") if path.is_dir()],
-            key=lambda item: item.stat().st_mtime,
-            reverse=True,
-        )
-        if checkpoints:
-            return checkpoints[0]
+    output_dir = outputs_root / "mock_decoder"
+    checkpoints = sorted(
+        [path for path in output_dir.glob("checkpoint-*") if path.is_dir()],
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    if checkpoints:
+        return checkpoints[0]
     raise FileNotFoundError(
-        f"No PipeFormer checkpoint directory found under: {output_dirs}"
+        f"No PipeFormer checkpoint directory found under: {[output_dir]}"
     )
 
 

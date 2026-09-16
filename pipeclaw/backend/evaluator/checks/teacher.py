@@ -300,13 +300,15 @@ def teacher_trace_diagnostics(record: Mapping[str, Any]) -> dict[str, dict[str, 
     }
 
 
-def _teacher_metrics(
+def _finalize_teacher_metrics(
     context: EvaluationContext,
     specifications: Sequence[tuple[str, bool, Mapping[str, Any] | None]],
+    issues: Sequence[str],
     *,
     teacher_variant: str,
+    maximum_chars: int,
 ) -> list[MetricResult]:
-    return [
+    metrics = [
         metric(
             context,
             name,
@@ -317,16 +319,6 @@ def _teacher_metrics(
         )
         for name, passed, details in specifications
     ]
-
-
-def _finalize_teacher_metrics(
-    context: EvaluationContext,
-    metrics: Sequence[MetricResult],
-    issues: Sequence[str],
-    *,
-    teacher_variant: str,
-    maximum_chars: int,
-) -> list[MetricResult]:
     return ordered_canonical_metrics(
         context,
         [
@@ -369,7 +361,7 @@ def _pipeformer_checks(
         for item in output_wrappers(record)
     }
     registry_pass, unauthorized = forecast_registry_order(tool_calls, outputs_by_id)
-    metrics = _teacher_metrics(
+    return _finalize_teacher_metrics(
         context,
         (
             (
@@ -426,11 +418,6 @@ def _pipeformer_checks(
                 {"unauthorized_forecast_call_ids": unauthorized},
             ),
         ),
-        teacher_variant="pipeformer",
-    )
-    return _finalize_teacher_metrics(
-        context,
-        metrics,
         issues,
         teacher_variant="pipeformer",
         maximum_chars=maximum_chars,
@@ -465,18 +452,13 @@ def _generic_checks(
         "evidence_reasons": [item.reason for item in assessments],
         "recovered": bool(failed_count) and not unresolved,
     }
-    metrics = _teacher_metrics(
+    return _finalize_teacher_metrics(
         context,
         (
             ("task_parsing", completed, {"trace_status": record.get("trace_status")}),
             ("answer_completeness", bool(str(record.get("final_answer") or "").strip()), None),
             ("tool_call", not unresolved, tool_details),
         ),
-        teacher_variant="generic",
-    )
-    return _finalize_teacher_metrics(
-        context,
-        metrics,
         issues,
         teacher_variant="generic",
         maximum_chars=maximum_chars,
