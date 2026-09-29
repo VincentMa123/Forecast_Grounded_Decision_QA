@@ -73,9 +73,16 @@ def grounded_numeric_claim_values(
 ) -> List[float]:
     """Return final-answer numbers supported by direct or derived evidence."""
 
+    def leaf(text: str) -> List[float]:
+        values = numeric_claim_values(text)
+        values.extend(
+            float(match.group(1)) for match in CASE_IDENTIFIER_NUMBER.finditer(text)
+        )
+        return values
+
     claimed = numeric_claim_values(answer)
     supported = numeric_claim_values(question)
-    supported.extend(_numbers_in_value(evidence))
+    supported.extend(walk_numeric_values(evidence, leaf))
     supported.extend(derived_numeric_values(evidence))
     claimed_times = time_values_in_minutes(answer)
     supported_times = [
@@ -296,14 +303,3 @@ def _number_is_deterministically_derived(value: float, supported: List[float]) -
                 if abs(value - ratio) <= max(0.005, abs(ratio) * 0.005):
                     return True
     return False
-
-
-def _numbers_in_value(value: Any) -> List[float]:
-    def leaf(text: str) -> List[float]:
-        values = numeric_claim_values(text)
-        values.extend(
-            float(match.group(1)) for match in CASE_IDENTIFIER_NUMBER.finditer(text)
-        )
-        return values
-
-    return walk_numeric_values(value, leaf)

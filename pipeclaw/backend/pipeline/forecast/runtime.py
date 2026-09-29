@@ -298,23 +298,19 @@ def _resolve_task_vocabulary(
     variable_names: List[str],
     registry_entries: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    resolutions = {
-        name: _resolve_requested_variables(
-            parsed_task.get(field) or [], variable_names, registry_entries
-        )
-        for name, field in (
-            ("attention", "attention_targets"),
-            ("output", "output_state_variables"),
-        )
-    }
-    resolved_attention, unresolved_attention = resolutions["attention"]
-    resolved_outputs, unresolved_outputs = resolutions["output"]
-    parsed_task.update({
+    resolved_attention, unresolved_attention = _resolve_requested_variables(
+        parsed_task.get("attention_targets") or [], variable_names, registry_entries
+    )
+    resolved_outputs, unresolved_outputs = _resolve_requested_variables(
+        parsed_task.get("output_state_variables") or [], variable_names, registry_entries
+    )
+    resolution = {
         "resolved_attention_variables": resolved_attention,
         "resolved_output_variables": resolved_outputs,
         "unresolved_attention_targets": unresolved_attention,
         "unresolved_output_state_variables": unresolved_outputs,
-    })
+    }
+    parsed_task.update(resolution)
     normalizations = []
     invalid_variables: List[str] = []
     for item in parsed_task.get("vocabulary_normalizations") or []:
@@ -346,15 +342,8 @@ def _resolve_task_vocabulary(
         normalizations.append(entry)
     if normalizations:
         parsed_task["vocabulary_normalizations"] = normalizations
-    invalid_normalized_variables = list(dict.fromkeys(invalid_variables))
-    parsed_task["invalid_normalized_variables"] = invalid_normalized_variables
-    return {
-        "resolved_attention_variables": resolved_attention,
-        "resolved_output_variables": resolved_outputs,
-        "unresolved_attention_targets": unresolved_attention,
-        "unresolved_output_state_variables": unresolved_outputs,
-        "invalid_normalized_variables": invalid_normalized_variables,
-    }
+    parsed_task["invalid_normalized_variables"] = invalid_variables
+    return {**resolution, "invalid_normalized_variables": invalid_variables}
 
 
 def _counterfactual_comparison(
