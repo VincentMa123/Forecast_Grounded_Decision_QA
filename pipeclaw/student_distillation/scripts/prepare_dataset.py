@@ -198,13 +198,8 @@ def extract_constraint_judgments(source: dict[str, Any]) -> list[dict[str, Any]]
     """Extract typed judgment labels from successful PipeFormer verification."""
 
     judgments: list[dict[str, Any]] = []
-    for output in source.get("tool_outputs") or []:
-        if output.get("name") != "run_pipeformer_forecast":
-            continue
-        payload = output.get("output")
-        if not isinstance(payload, dict) or payload.get("success") is not True:
-            continue
-        verification = payload.get("verification")
+    for output in _forecast_outputs(source):
+        verification = output["output"].get("verification")
         if not isinstance(verification, dict):
             continue
         judgment = {

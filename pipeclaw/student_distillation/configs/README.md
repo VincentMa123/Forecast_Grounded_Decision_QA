@@ -52,17 +52,6 @@ with the 4-bit quantized model path.
 To compare another projection, change `dataset`, `val_dataset`, and
 `output_dir` together and leave the other training settings unchanged.
 
-## GRPO
-
-`qwen35_9b_grpo.yaml` uses the generated `data/grpo/rl_train.jsonl`, the
-`python_scenario_scheduler`, and the deterministic `python_episode_reward`
-plugin. Launch it only after the SFT checkpoint and GRPO data have been
-validated:
-
-```bash
-swift rlhf pipeclaw/student_distillation/configs/qwen35_9b_grpo.yaml --rlhf_type grpo
-```
-
 Do not treat a configuration as a dataset generator. Prepare and validate the
 JSONL projections with the scripts documented in
 [`../scripts/README.md`](../scripts/README.md).

@@ -11,9 +11,9 @@ and session metadata, and train/valid/test assignments.
 | `answer_only/` | Original request → grounded final answer. | 1073 / 147 / 139 |
 | `trace_level/` | Bounded context, tool schemas, successful tool calls, and answer. | 1073 / 147 / 139 |
 | `constraint_multitask/` | Condition parsing, tool planning, constraint judgment, evidence extraction, and answer generation. | 2388 / 338 / 314 |
-| `grpo/` | Prompt data for the GRPO scheduler/reward plugin. | generated separately |
+| `grpo/` | Historical prompts from retired GRPO training; retained as artifacts. | 146 archived training rows |
 
-Every projection has `train.jsonl`, `valid.jsonl`, and `test.jsonl`. The test
+The three active projections each have `train.jsonl`, `valid.jsonl`, and `test.jsonl`. The test
 split is reserved for final evaluation.
 
 Trace-level records supervise successful assistant tool calls and answers;

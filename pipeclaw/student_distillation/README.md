@@ -15,7 +15,7 @@ Teacher-trace source splits
         │
         └─ validate_dataset.py
                                        │
-                               MS-SWIFT SFT/GRPO
+                               MS-SWIFT SFT
                                        │
                          autonomous rollout + evaluator
 ```
@@ -94,13 +94,8 @@ remove `NPROC_PER_NODE` and `deepspeed`, then increase gradient accumulation to
 preserve the effective batch size. Do not upload checkpoints or generated
 outputs to the repository.
 
-GRPO is a separate stage using the reviewed scheduler and reward plugin:
-
-```bash
-swift rlhf pipeclaw/student_distillation/configs/qwen35_9b_grpo.yaml --rlhf_type grpo
-```
-
-Run it only after validating the SFT checkpoint and `data/grpo/rl_train.jsonl`.
+GRPO training and prompt export have been retired. Existing GRPO datasets and
+outputs remain historical artifacts; SFT and pass@k evaluation are supported.
 
 ## Evaluate autonomous behavior
 
@@ -128,8 +123,8 @@ For repeated episodes or a deployed OpenAI-compatible student, use
 
 ## Directory guide
 
-- `configs/` — reviewed MS-SWIFT SFT and GRPO YAML files.
-- `data/` — derived projections, manifests, token profiles, and GRPO prompts.
+- `configs/` — reviewed MS-SWIFT SFT YAML files.
+- `data/` — derived projections, manifests, token profiles, and historical GRPO prompts.
 - `rollout/` — prompt construction, allow-listed tool dispatch, bounded loops,
   isolated workspaces, and model generation.
 - `scripts/` — preparation, validation, profiling, rollout evaluation, and

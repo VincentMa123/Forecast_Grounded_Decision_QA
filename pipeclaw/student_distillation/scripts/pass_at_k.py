@@ -13,10 +13,7 @@ from pipeclaw.student_distillation.release_artifacts import (
 )
 from pipeclaw.student_distillation.reward import composite_reward, episode_stats
 from pipeclaw.student_distillation.rollout.models import RolloutConfig
-from pipeclaw.student_distillation.rollout.prompting import (
-    build_prompt_case,
-    trace_system_content,
-)
+from pipeclaw.student_distillation.rollout.prompting import build_prompt_case
 from pipeclaw.student_distillation.rollout.scenarios import (
     evaluation_workspace_key,
     workspace_for,
@@ -55,28 +52,6 @@ def select_python_scenarios(
     ]
 
 
-def first_user_message(record: Mapping[str, Any]) -> str:
-    """Return the user request exactly as the teacher trace recorded it."""
-    user_input = record.get("user_input")
-    if isinstance(user_input, str) and user_input.strip():
-        return user_input
-    for message in reversed(record.get("messages") or []):
-        if isinstance(message, Mapping) and message.get("role") == "user":
-            return str(message.get("content") or "")
-    raise ValueError(f"record {record.get('sample_id')} has no user message")
-
-
-def training_system_prompt(record: Mapping[str, Any]) -> str:
-    """Rebuild the SFT system prompt from the current rollout prompting policy.
-
-    NOTE: prompt_policy.py drifted after the released train.jsonl was frozen
-    (7,322 -> 8,249 chars), so this does NOT byte-match released SFT prompts;
-    use frozen_system_prompt() with the released trace_level data when the
-    model must see the exact SFT prompt distribution.
-    """
-    return trace_system_content(record)
-
-
 def frozen_system_prompts(schema_source: Path) -> dict[str, str]:
     """Map example_id -> the system prompt frozen in the released SFT data.
 
@@ -106,56 +81,6 @@ def _frozen_prompt(frozen: Mapping[str, str], record: Mapping[str, Any]) -> str:
     return prompt
 
 
-def emit_grpo_prompts(
-    selected: Sequence[Mapping[str, Any]],
-    path: Path,
-    schemas_by_key: Mapping[str, Any] | None = None,
-    frozen: Mapping[str, str] | None = None,
-) -> int:
-    """Write deduplicated, executable prompt rows for the GRPO stage."""
-
-    def _vintage(sample_id: str) -> tuple[int, str]:
-        # released ids use hyphen markers: Pipeline_Full_Life_Cycle_Test_Dataset-v4:/-v7:
-        for marker, rank in (("-v7:", 7), ("-v4:", 6)):
-            if marker in sample_id:
-                return rank, sample_id
-        return 5, sample_id
-
-    by_key = {
-        (str(r.get("scenario_id") or ""), str(r.get("session_id") or ""),
-         int(r.get("turn_id") or 1)): r
-        for r in sorted(selected, key=lambda r: _vintage(str(r.get("sample_id") or "")))
-        if r.get("tool_calls") or r.get("tool_outputs")
-    }
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with atomic_jsonl_writer(path, default=str) as write:
-        for record in by_key.values():
-            tools = record.get("tools")
-            if tools is None:
-                matched = (lookup_tool_schemas(record, schemas_by_key, missing_policy="none")
-                           if schemas_by_key is not None else None)
-                tools = json.dumps(matched, ensure_ascii=False) if matched else None
-            if tools is None:
-                raise ValueError(
-                    f"record {_record_key(record)} has no tools; pass --tool-schema-source"
-                )
-            write(
-                {
-                    "messages": [
-                        {"role": "system", "content": _frozen_prompt(frozen, record)
-                         if frozen is not None else training_system_prompt(record)},
-                        {"role": "user", "content": first_user_message(record)},
-                    ],
-                    "tools": tools,
-                    "reference": record,
-                    "scenario_id": record.get("scenario_id") or "",
-                    "scenario_type": record.get("scenario_type") or "openclaw",
-                    "sample_id": _record_key(record),
-                }
-            )
-    return len(by_key)
-
-
 def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     def rate(values: Sequence[bool]) -> float:
         return sum(values) / len(values) if values else 0.0
@@ -163,7 +88,7 @@ def _aggregate(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     def mean(field: str) -> float:
         return statistics.fmean(float(row.get(field) or 0.0) for row in rows) if rows else 0.0
 
-    # Match GRPO reward groups: one prompt row at one temperature.
+    # Group repeated evaluations of one prompt at one temperature.
     groups: dict[tuple[str, Any], list[Mapping[str, Any]]] = {}
     for row in rows:
         groups.setdefault((str(row.get("sample_id")), row.get("temperature")), []).append(row)
@@ -232,12 +157,6 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
         else {}
     )
 
-    if args.emit_grpo_prompts:
-        written = emit_grpo_prompts(
-            sources, Path(args.emit_grpo_prompts), schemas_by_key, frozen_prompts
-        )
-        return {"emitted_grpo_prompts": written, "scenarios": len(sources)}
-
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -253,7 +172,12 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             ).tools
         source_cases.append((source, case_schemas))
 
-    select_runner = _build_runner(args, source_cases)
+    select_runner = build_runner_selector(
+        args,
+        ((source.get("scenario_type"), schemas) for source, schemas in source_cases),
+        copy_schemas=True,
+        model_type=getattr(args, "model_type", None),
+    )
     rows: list[dict[str, Any]] = []
     progress = tqdm(total=len(sources) * len(args.temps) * args.episodes,
                     desc="pass_at_k", unit="episode")
@@ -270,7 +194,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
             )
             for temp in args.temps:
                 for k in range(args.episodes):
-                    env_key = f"{evaluation_workspace_key(source)}__k{k}__t{temp:.2f}"
+                    env_key = f"{evaluation_workspace_key(source)}__k{k}__t{temp!r}"
                     case = build_prompt_case(
                         source,
                         workspace_root=workspace_for(output_dir, env_key),
@@ -278,7 +202,7 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
                     )
                     if frozen_prompt is not None:
                         case.messages[0] = {"role": "system", "content": frozen_prompt}
-                    result = select_runner(source).run(case, RolloutConfig(
+                    result = select_runner(source.get("scenario_type")).run(case, RolloutConfig(
                         max_turns=args.max_turns, max_new_tokens=args.max_new_tokens,
                         temperature=temp))
                     rollout = result.to_dict()
@@ -325,19 +249,6 @@ def run_episodes(args: argparse.Namespace) -> dict[str, Any]:
     return summary
 
 
-def _build_runner(
-    args: argparse.Namespace,
-    cases: Sequence[tuple[Mapping[str, Any], Sequence[Mapping[str, Any]]]],
-):
-    select = build_runner_selector(
-        args,
-        ((source.get("scenario_type"), schemas) for source, schemas in cases),
-        copy_schemas=True,
-        model_type=getattr(args, "model_type", None),
-    )
-    return lambda source: select(source.get("scenario_type"))
-
-
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", required=True, help="teacher_trace_*.jsonl")
@@ -367,7 +278,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--temps", type=float, nargs="+", default=[0.7, 1.0])
     parser.add_argument("--limit", type=int)
     parser.add_argument("--system-prompt-mode", choices=["training", "production"], default="training")
-    parser.add_argument("--emit-grpo-prompts", help="write the GRPO prompt dataset and exit")
     parser.add_argument(
         "--pipeformer",
         action="store_true",
@@ -393,14 +303,11 @@ def validate_args(parser: argparse.ArgumentParser, args: argparse.Namespace) -> 
         args.max_turns = 30 if args.execution_mode == "production-agent" else 8
     if (
         args.execution_mode == "raw-student"
-        and not args.emit_grpo_prompts
         and not args.adapters
         and not args.model
     ):
-        parser.error("--adapters or --model is required unless --emit-grpo-prompts")
+        parser.error("--adapters or --model is required")
     if not args.tool_schema_source:
-        # emit-mode needs it too: frozen prompts keyed from the same source;
-        # without it the emit dies at the first record in one cold raise.
         parser.error("--tool-schema-source is required")
 
 

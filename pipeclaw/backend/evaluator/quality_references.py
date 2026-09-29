@@ -76,9 +76,6 @@ VARIABLE_REFERENCE = re.compile(
 )
 SFT_FILE_REFERENCE = re.compile(r"(?i)\b[\w.-]+\.(?:csv|jsonl?|xlsx?|parquet)\b")
 
-# Tool-output parsing treats serialized rows as evidence.  It intentionally
-# accepts leading-decimal values while final-answer parsing retains its stricter
-# historical contract.
 _OBSERVED_DATE_SPAN = re.compile(r"\d{4}\s*[-/年]\s*\d{1,2}\s*[-/月]\s*\d{1,2}\s*日?")
 _OBSERVED_NUMERIC_SPAN = re.compile(
     r"(?<![A-Za-z0-9_])[+\-−]?"
@@ -112,31 +109,21 @@ def numeric_claim_values(text: str) -> list[float]:
 
     normalized = text.translate(NUMERIC_SIGN_TRANSLATION)
     ignored_spans = [
-        match.span() for match in DATE_RANGE_REFERENCE.finditer(normalized)
+        match.span()
+        for pattern in (
+            DATE_RANGE_REFERENCE,
+            DATE_REFERENCE,
+            COMPACT_DATE_REFERENCE,
+            DATA_FILE_REFERENCE,
+            YEAR_REFERENCE,
+            CANDIDATE_IDENTIFIER,
+            CHINESE_ORDINAL_REFERENCE,
+            ENGLISH_ORDINAL_REFERENCE,
+            ENGLISH_RANK_REFERENCE,
+            NEGATED_NUMERIC_REFERENCE,
+        )
+        for match in pattern.finditer(normalized)
     ]
-    ignored_spans.extend(match.span() for match in DATE_REFERENCE.finditer(normalized))
-    ignored_spans.extend(
-        match.span() for match in COMPACT_DATE_REFERENCE.finditer(normalized)
-    )
-    ignored_spans.extend(
-        match.span() for match in DATA_FILE_REFERENCE.finditer(normalized)
-    )
-    ignored_spans.extend(match.span() for match in YEAR_REFERENCE.finditer(normalized))
-    ignored_spans.extend(
-        match.span() for match in CANDIDATE_IDENTIFIER.finditer(normalized)
-    )
-    ignored_spans.extend(
-        match.span() for match in CHINESE_ORDINAL_REFERENCE.finditer(normalized)
-    )
-    ignored_spans.extend(
-        match.span() for match in ENGLISH_ORDINAL_REFERENCE.finditer(normalized)
-    )
-    ignored_spans.extend(
-        match.span() for match in ENGLISH_RANK_REFERENCE.finditer(normalized)
-    )
-    ignored_spans.extend(
-        match.span() for match in NEGATED_NUMERIC_REFERENCE.finditer(normalized)
-    )
     values = []
     for match in NUMERIC_SPAN.finditer(normalized):
         raw_value = match.group(0)

@@ -14,31 +14,6 @@ def _payload(report: EvaluationReport | Mapping[str, Any]) -> Mapping[str, Any]:
     raise TypeError("Evaluation summaries require reports or report mappings.")
 
 
-def _metric_summary(
-    reports: Sequence[Mapping[str, Any]],
-    name: str,
-) -> dict[str, Any]:
-    numerator = 0
-    denominator = 0
-    for report in reports:
-        metrics = report.get("metrics")
-        metric = metrics.get(name) if isinstance(metrics, Mapping) else None
-        if not isinstance(metric, Mapping) or not metric.get("applicable", False):
-            continue
-        denominator += 1
-        if metric.get("passed", False):
-            numerator += 1
-    return {
-        "numerator": numerator,
-        "denominator": denominator,
-        "pass_rate": numerator / denominator if denominator else None,
-        "failure_rate": (denominator - numerator) / denominator
-        if denominator
-        else None,
-        "status": "ok" if denominator else "not_applicable",
-    }
-
-
 def summarize(
     reports: Sequence[EvaluationReport | Mapping[str, Any]],
 ) -> dict[str, Any]:
@@ -57,40 +32,47 @@ def summarize(
         for report in payloads
         if report.get("overall_score") is not None
     ]
-    metric_names = sorted(
-        {
-            str(name)
-            for report in payloads
-            for metrics in [report.get("metrics")]
-            if isinstance(metrics, Mapping)
-            for name in metrics
-        }
-    )
+    report_metrics = []
+    for report in payloads:
+        metrics_for_report = report.get("metrics")
+        report_metrics.append(
+            metrics_for_report if isinstance(metrics_for_report, Mapping) else {}
+        )
+    metric_names = sorted({str(name) for metrics in report_metrics for name in metrics})
     metrics: dict[str, dict[str, Any]] = {}
     diagnostics: dict[str, dict[str, Any]] = {}
     for name in metric_names:
+        numerator = 0
+        denominator = 0
         is_diagnostic = False
-        for report in payloads:
-            report_metrics = report.get("metrics")
-            metric = report_metrics.get(name) if isinstance(report_metrics, Mapping) else None
-            if isinstance(metric, Mapping) and not metric.get("included_in_score", True):
+        for metrics_for_report in report_metrics:
+            metric = metrics_for_report.get(name)
+            if not isinstance(metric, Mapping):
+                continue
+            if not metric.get("included_in_score", True):
                 is_diagnostic = True
-                break
+            if not metric.get("applicable", False):
+                continue
+            denominator += 1
+            numerator += bool(metric.get("passed", False))
         target = diagnostics if is_diagnostic else metrics
-        target[name] = _metric_summary(payloads, name)
+        target[name] = {
+            "numerator": numerator,
+            "denominator": denominator,
+            "pass_rate": numerator / denominator if denominator else None,
+            "failure_rate": (denominator - numerator) / denominator
+            if denominator
+            else None,
+            "status": "ok" if denominator else "not_applicable",
+        }
     pass_count = sum(bool(report.get("passed")) for report in payloads)
     record_count = len(payloads)
     hallucination_summary = diagnostics.get("hallucination", {})
     tool_successes = 0
     tool_calls = 0
     duplicate_successes = 0
-    for report in payloads:
-        report_metrics = report.get("metrics")
-        tool_metric = (
-            report_metrics.get("tool_call")
-            if isinstance(report_metrics, Mapping)
-            else None
-        )
+    for metrics_for_report in report_metrics:
+        tool_metric = metrics_for_report.get("tool_call")
         details = (
             tool_metric.get("details") if isinstance(tool_metric, Mapping) else None
         )

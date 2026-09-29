@@ -85,14 +85,12 @@ def build_csv_evidence(
     scoped_dates = _expanded_scope_dates(scope_text)
     candidates: List[tuple[int, int, str, Dict[str, Any]]] = []
     scoped_rows: List[tuple[str, Dict[str, Any]]] = []
-    source_files: List[str] = []
-    seen_source_files = set()
+    source_files: Dict[str, None] = {}
     seen_rows = set()
 
     def remember_source(filename: str) -> None:
-        if filename and filename not in seen_source_files:
-            seen_source_files.add(filename)
-            source_files.append(filename)
+        if filename:
+            source_files.setdefault(filename, None)
 
     for name, item, output in usable_outputs:
         if name != "read_file":
@@ -136,8 +134,8 @@ def build_csv_evidence(
     selected = sorted((item for item in candidates if item[0] >= minimum_score),
                       key=lambda item: (-item[0], item[1]))[:MAX_EVIDENCE_ROWS]
     evidence: Dict[str, Any] = {
-        "source_files": source_files,
-        "source_file_count": len(seen_source_files),
+        "source_files": list(source_files),
+        "source_file_count": len(source_files),
     }
     if computed_results:
         evidence["computed_results"] = computed_results

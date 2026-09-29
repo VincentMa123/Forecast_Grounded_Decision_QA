@@ -381,6 +381,7 @@ def build_history_turn(
     if policy_outputs and not verified_evidence_summary.get("pipeformer"):
         policy = dict(policy_outputs[-1].get("decision_policy") or {})
         if policy.get("source") == "llm_tool":
+            comparison_state = {"decision_policy": deepcopy(policy)}
             verified_evidence_summary["pipeformer"] = {
                 "decision_policy": _policy_memory_summary(policy)
             }

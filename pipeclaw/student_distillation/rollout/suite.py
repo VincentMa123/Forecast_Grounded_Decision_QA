@@ -262,17 +262,6 @@ def release_cuda_cache() -> None:
         torch.cuda.empty_cache()
 
 
-def _summary(
-    reports: Sequence[EvaluationReport],
-    *,
-    mode: str,
-    record_count: int,
-) -> dict[str, Any]:
-    """Build one evaluation summary, including for dry runs with no reports."""
-
-    return dict(summarize(reports), mode=mode, record_count=record_count)
-
-
 def _by_scenario_type(
     cases: Sequence[PromptCase],
     reports: Sequence[EvaluationReport | None],
@@ -285,24 +274,19 @@ def _by_scenario_type(
     family's denominator, so the combined score alone can hide a regression.
     """
 
-    indexes_by_type: dict[str, list[int]] = {}
+    reports_by_type: dict[str, list[EvaluationReport | None]] = {}
     for index, case in enumerate(cases):
-        indexes_by_type.setdefault(str(case.scenario_type or "unknown"), []).append(index)
-    grouped: dict[str, dict[str, Any]] = {}
-    for scenario_type in sorted(indexes_by_type):
-        indexes = indexes_by_type[scenario_type]
-        summary = _summary(
-            [
-                reports[index]
-                for index in indexes
-                if index < len(reports) and reports[index] is not None
-            ],
-            mode=mode,
-            record_count=len(indexes),
+        reports_by_type.setdefault(str(case.scenario_type or "unknown"), []).append(
+            reports[index] if index < len(reports) else None
         )
-        summary.pop("by_scenario_type", None)
-        grouped[scenario_type] = summary
-    return grouped
+    return {
+        scenario_type: dict(
+            summarize([report for report in group if report is not None]),
+            mode=mode,
+            record_count=len(group),
+        )
+        for scenario_type, group in sorted(reports_by_type.items())
+    }
 
 
 def evaluate_dataset(args: Any) -> dict[str, Any]:
@@ -343,7 +327,18 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
         capture_raw_responses=bool(getattr(args, "save_raw_responses", False)),
         capture_raw_tool_outputs=bool(getattr(args, "save_raw_tool_outputs", False)),
     )
-    runner = None if dry_run else _build_runner(args, cases)
+    if dry_run:
+        runner = None
+    else:
+        if (
+            getattr(args, "execution_mode", "raw-student") != "production-agent"
+            and not getattr(args, "adapters", None)
+            and not getattr(args, "model", None)
+        ):
+            raise ValueError("--model or --adapters is required unless --dry-run is used")
+        runner = build_runner_selector(
+            args, ((case.scenario_type, case.tools) for case in cases)
+        )
     with atomic_jsonl_writer(rollouts_path, default=str) as write_rollout:
         progress = tqdm(
             cases,
@@ -369,7 +364,7 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
             else:
                 source = case.source_record
                 started = perf_counter()
-                rollout = runner(case).run(case, config).to_dict()
+                rollout = runner(case.scenario_type).run(case, config).to_dict()
                 latency = perf_counter() - started
                 rollout["latency_seconds"] = round(latency, 6)
                 latencies.append(latency)
@@ -386,8 +381,8 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
             if hasattr(progress, "set_postfix"):
                 progress.set_postfix(refresh=False, scenario=case.scenario_type, status=status)
 
-    summary = _summary(
-        [report for report in reports if report is not None],
+    summary = dict(
+        summarize([report for report in reports if report is not None]),
         mode=mode,
         record_count=record_count,
     )
@@ -406,17 +401,6 @@ def evaluate_dataset(args: Any) -> dict[str, Any]:
         json.dumps(summary, ensure_ascii=False, indent=2, default=str),
     )
     return summary
-
-
-def _build_runner(args: Any, cases: Sequence[PromptCase]):
-    if (
-        getattr(args, "execution_mode", "raw-student") != "production-agent"
-        and not getattr(args, "adapters", None)
-        and not getattr(args, "model", None)
-    ):
-        raise ValueError("--model or --adapters is required unless --dry-run is used")
-    select = build_runner_selector(args, ((case.scenario_type, case.tools) for case in cases))
-    return lambda case: select(case.scenario_type)
 
 
 def build_runner_selector(

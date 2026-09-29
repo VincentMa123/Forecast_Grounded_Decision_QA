@@ -71,7 +71,7 @@ receives `rollouts.jsonl` and `summary.json` with schema version
 `--execution-mode production-agent` evaluates through the deployed backend
 `AgentOrchestrator`; the default `raw-student` mode loads a checkpoint directly.
 
-## Pass@k and GRPO support
+## Pass@k evaluation
 
 `pass_at_k.py` runs repeated episodes for a checkpoint or a deployed
 OpenAI-compatible student:
@@ -86,10 +86,7 @@ python -m pipeclaw.student_distillation.scripts.pass_at_k \
 ```
 
 Use `--execution-mode production-agent` when the deployed model must be tested
-through the same backend orchestration and guards as the application. GRPO
-uses `grpo_plugin.py`, `data/grpo/rl_train.jsonl`, and the reviewed
-`qwen35_9b_grpo.yaml`; it needs a trainable MS-SWIFT/vLLM setup rather than a
-plain inference endpoint.
+through the same backend orchestration and guards as the application.
 
 ## Execution/evaluation boundary
 

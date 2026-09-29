@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from .rule_library import load_pipeline_constraints, load_rule_document
@@ -154,6 +155,8 @@ def max_status(statuses: Iterable[str]) -> str:
 def status_from_threshold(
     value: float, warning: Optional[float], fail: Optional[float]
 ) -> str:
+    if not math.isfinite(value):
+        return "fail"
     magnitude = abs(value)
     if fail is not None and magnitude >= fail:
         return "fail"
@@ -570,7 +573,11 @@ def total_episode_minutes(episodes: Sequence[Dict[str, Any]]) -> float:
 
 
 def _outside_range(value: float, low: Optional[float], high: Optional[float]) -> bool:
-    return (low is not None and value < low) or (high is not None and value > high)
+    return (
+        not math.isfinite(value)
+        or (low is not None and value < low)
+        or (high is not None and value > high)
+    )
 
 
 def _absolute_limit(low: Any, high: Any) -> Optional[float]:

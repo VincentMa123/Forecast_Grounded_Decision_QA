@@ -13,7 +13,7 @@ metric definitions, profiles, and report schema.
 | Metrics, weights, gates, and aggregation for a finished record | `pipeclaw/backend/evaluator/` |
 
 Student-distillation imports this package only at its scoring entry points:
-`rollout/suite.py`, `grpo_plugin.py`, and `scripts/pass_at_k.py`. A rollout is
+`rollout/suite.py` and `scripts/pass_at_k.py`. A rollout is
 generated first and scored afterward.
 
 ## Python API

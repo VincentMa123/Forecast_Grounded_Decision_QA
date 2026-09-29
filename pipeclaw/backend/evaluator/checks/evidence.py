@@ -198,11 +198,6 @@ def _ranking_row_issues(
 
 def _prior_turn_evidence(source: Mapping[str, Any]) -> list[float]:
     """Numbers a previous turn in this session already established.
-
-    ``rollout/prompting.py`` renders ``recent_turns`` into the student's system
-    prompt, so a later turn can legitimately restate those values without
-    calling a tool again.  Treating them as ungrounded scores correct recall as
-    hallucination.
     """
 
     numbers: list[float] = []

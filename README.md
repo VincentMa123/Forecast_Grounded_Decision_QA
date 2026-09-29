@@ -96,7 +96,7 @@ python -m pipeclaw.student_distillation.scripts.validate_dataset
 Then choose a reviewed configuration under
 [pipeclaw/student_distillation/configs/](pipeclaw/student_distillation/configs/README.md).
 The student-distillation documentation explains token profiling, local smoke
-tests, remote training, autonomous evaluation, and GRPO.
+tests, remote training, autonomous evaluation, and pass@k.
 
 ## Repository map
 

@@ -859,7 +859,11 @@ def _delta_from_verified_tool_results(
     tool_results: Iterable[Dict[str, Any]],
     current: "VerifiedDecisionState",
 ) -> _VerifiedStateDelta:
-    from .construction import build_grounding_contract, latest_decision_policy
+    from .construction import (
+        _applied_disturbances,
+        build_grounding_contract,
+        latest_decision_policy,
+    )
 
     observed = [deepcopy(dict(item)) for item in tool_results if isinstance(item, dict)]
     forecasts = [item for item in observed if item.get("name") == "run_pipeformer_forecast"]
@@ -884,9 +888,10 @@ def _delta_from_verified_tool_results(
         require_decision_policy=True,
         prior_state=current,
     )
+    # The reducer merges prior disturbances only after checking for a scope reset.
     applied = tuple(
         deepcopy(dict(item))
-        for item in contract.get("applied_disturbances") or []
+        for item in _applied_disturbances(current_forecasts)
         if isinstance(item, dict)
     )
     scope, requested_action_fingerprint = (

@@ -20,9 +20,7 @@ from .assumptions import (
 
 
 PIPEFORMER_TOOL = "run_pipeformer_forecast"
-# Compatibility export for callers that still import the canonical teacher
-# order from this helper module.  The registry in ``profiles.py`` is the sole
-# owner of the sequence.
+
 CANONICAL_METRIC_NAMES = get_profile_policy(
     EvaluationProfile.TEACHER_TRACE
 ).metric_order

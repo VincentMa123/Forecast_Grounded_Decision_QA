@@ -35,7 +35,7 @@ _ABORT_STATUSES = frozenset(
 
 
 def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
-    """Rule-based per-episode stats used by the gate and the GRPO reward."""
+    """Rule-based per-episode stats used by pass@k evaluation."""
     errors = {code: 0 for code in _ERROR_CODES}
     first_run: Mapping[str, Any] | None = None
     tool_outputs = rollout.get("tool_outputs") or []
@@ -90,7 +90,7 @@ def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
 def composite_reward(
     stats: Mapping[str, Any], report_fields: Mapping[str, Any]
 ) -> float:
-    """Dense rule reward; mirrors the evaluator-facing GRPO reward."""
+    """Dense rule reward for completed evaluation episodes."""
     reward = 0.0
     reward += 0.55 * float(report_fields.get("overall_score") or 0.0) / 100.0
     reward += 0.20 * (1.0 if report_fields.get("hard_gate_passed") else 0.0)

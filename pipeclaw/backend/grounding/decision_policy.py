@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 import re
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
@@ -131,9 +132,10 @@ def nested_value(value: Mapping[str, Any], path: Sequence[str]) -> Any:
 
 def number_value(value: Any) -> Optional[float]:
     try:
-        return float(value) if value is not None else None
+        numeric = float(value) if value is not None else None
     except (TypeError, ValueError):
         return None
+    return numeric if numeric is not None and math.isfinite(numeric) else None
 
 
 def llm_policy_excerpts(policy: Mapping[str, Any]) -> List[str]:
@@ -197,7 +199,17 @@ def normalize_decision_policy(
                 f"invalid_metric_direction:{metric}:{direction}:expected_{definition.direction}"
             )
             continue
-        tolerance = number_value(item.get("tolerance"))
+        raw_tolerance = item.get("tolerance")
+        try:
+            parsed_tolerance = (
+                float(raw_tolerance) if raw_tolerance is not None else None
+            )
+        except (TypeError, ValueError):
+            parsed_tolerance = None
+        if parsed_tolerance is not None and not math.isfinite(parsed_tolerance):
+            errors.append(f"non_finite_metric_tolerance:{metric}")
+            continue
+        tolerance = number_value(parsed_tolerance)
         if tolerance is None:
             tolerance = 0.0
         if tolerance < 0:

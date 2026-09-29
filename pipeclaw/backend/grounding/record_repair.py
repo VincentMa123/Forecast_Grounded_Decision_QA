@@ -177,15 +177,12 @@ def _compact_answer(answer: str, maximum_chars: int) -> str:
     """Extractively compact an answer without inventing replacement facts."""
     cleaned = re.sub(r"(?m)^\s*(?:#{1,6}\s*|---+\s*$)", "", answer)
     cleaned = cleaned.replace("**", "").replace("```", "")
-    lines: List[str] = []
-    seen = set()
+    lines: Dict[str, None] = {}
     for raw_line in cleaned.splitlines():
         line = re.sub(r"\s+", " ", raw_line).strip()
         if not line or re.fullmatch(r"\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)+\|?", line):
             continue
-        if line not in seen:
-            seen.add(line)
-            lines.append(line)
+        lines.setdefault(line, None)
     compact = " ".join(lines)
     if len(compact) <= maximum_chars:
         return compact

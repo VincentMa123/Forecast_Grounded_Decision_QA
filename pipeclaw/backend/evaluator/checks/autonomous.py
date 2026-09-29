@@ -655,7 +655,7 @@ def _evidence_header_fields(context: EvaluationContext) -> set[str]:
 def _claim_alignment_metric(context: EvaluationContext) -> MetricResult:
     """(entity, count) claims in the student answer vs. the reference answer.
 
-    The GRPO prompt records always carry the teacher's ``final_answer``, so a
+    With the teacher's ``final_answer`` as the evaluation reference, a
     fabricated ranking ("上海管网 1个") contradicting the reference is a
     deterministic cheat signal — no LLM needed.  Support = entity named by the
     teacher with the claimed count nearby; entity-tag artifacts glued to a

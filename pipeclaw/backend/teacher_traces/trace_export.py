@@ -71,8 +71,7 @@ def prior_tool_call_provenance(
     conversation_context: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """Keep identifying arguments for prior calls without their bulk payloads."""
-    summarized: List[Dict[str, Any]] = []
-    seen: set[str] = set()
+    summarized: Dict[str, Dict[str, Any]] = {}
     for turn in conversation_context or []:
         for source_call in dict(turn).get("tool_calls") or []:
             call = dict(source_call)
@@ -101,10 +100,8 @@ def prior_tool_call_provenance(
             if projected_arguments:
                 entry["arguments"] = projected_arguments
             fingerprint = json.dumps(entry, ensure_ascii=False, sort_keys=True)
-            if fingerprint not in seen:
-                seen.add(fingerprint)
-                summarized.append(entry)
-    return summarized
+            summarized.setdefault(fingerprint, entry)
+    return list(summarized.values())
 
 
 def _project_sft_record(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:

@@ -113,10 +113,6 @@ def _shared_outcome_line(candidate: Dict[str, Any], chinese: bool) -> str:
     )
 
 
-def _compact_action(action: Dict[str, Any]) -> str:
-    return _format_action(action, False, compact=True)
-
-
 def applied_disturbance_disclosure(contract: Dict[str, Any]) -> str:
     """Return the exact machine-verifiable application evidence block."""
     return "\n".join(canonical_applied_disturbance_lines(contract))
@@ -255,7 +251,7 @@ def _comparison_candidate_lines(
             for item in objectives
         ]
         metrics = ("；" if chinese else "; ").join(tokens)
-        action = _compact_action(dict(candidate.get("action") or {}))
+        action = _format_action(dict(candidate.get("action") or {}), False, compact=True)
         failures = candidate.get("failure_count", 0)
         warnings = candidate.get("warning_count", 0)
         if chinese:

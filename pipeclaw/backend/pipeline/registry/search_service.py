@@ -77,22 +77,13 @@ class PipeFormerRegistrySearchService:
             )
             distances = self._topology_distances(attention_targets)
             if attention_targets:
-                ranked = [
-                    (
-                        distances.get(str(item.get("equipment_id"))),
-                        str(item.get("variable")),
-                        item,
-                    )
-                    for item in variables
-                ]
-                ranked.sort(
+                variables = sorted(
+                    variables,
                     key=lambda item: (
-                        item[0] is None,
-                        item[0] if item[0] is not None else 10**9,
-                        item[1],
-                    )
+                        distances.get(str(item.get("equipment_id")), float("inf")),
+                        str(item.get("variable")),
+                    ),
                 )
-                variables = [item for _, _, item in ranked]
             page = variables[offset : offset + limit]
             result = {
                 "success": True,

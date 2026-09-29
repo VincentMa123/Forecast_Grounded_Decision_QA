@@ -64,6 +64,7 @@ def compact_parsed_task(output: Mapping[str, Any]) -> Dict[str, Any]:
         "case_id",
         "current_operating_condition_number",
         "disturbance_variable",
+        "disturbance_setpoint",
         "disturbance_direction",
         "disturbance_magnitude_percent",
         "disturbance_assumption",
@@ -187,6 +188,7 @@ def _compact_prediction(output: Mapping[str, Any]) -> Dict[str, Any]:
         "current_operating_condition_number",
         "forecast_horizon_minutes",
         "disturbance_variable",
+        "disturbance_setpoint",
         "disturbance_direction",
         "disturbance_magnitude_percent",
         "disturbance_assumption",
@@ -194,6 +196,9 @@ def _compact_prediction(output: Mapping[str, Any]) -> Dict[str, Any]:
         "counterfactual_comparison",
     )
     compact = {key: prediction.get(key) for key in keys}
+    compact["disturbance_setpoint"] = dict(output.get("parsed_task") or {}).get(
+        "disturbance_setpoint", prediction.get("disturbance_setpoint")
+    )
     summaries = dict(prediction.get("output_forecast_summary") or {})
     compact["output_forecast_summary"] = compact_output_summaries(
         summaries, _relevant_forecast_variables(output)

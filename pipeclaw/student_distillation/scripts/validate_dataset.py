@@ -335,26 +335,6 @@ def _required_tool_arguments(tool_schemas: Iterable[dict[str, Any]] | None) -> d
     return required_by_name
 
 
-def _tool_records_by_id(
-    records: list[Any], sample_id: str, *, output: bool
-) -> dict[str, dict[str, Any]]:
-    label = "tool output" if output else "tool call"
-    indexed: dict[str, dict[str, Any]] = {}
-    for record in records:
-        if not isinstance(record, dict):
-            raise DatasetValidationError(f"{sample_id}: {label} must be an object")
-        call_id = _required_text(record, "tool_call_id", sample_id)
-        if call_id in indexed:
-            message = (
-                f"duplicate tool output for {call_id}"
-                if output
-                else f"duplicate tool_call_id {call_id}"
-            )
-            raise DatasetValidationError(f"{sample_id}: {message}")
-        indexed[call_id] = record
-    return indexed
-
-
 def _validate_source_tool_pairs(
     record: dict[str, Any],
     sample_id: str,
@@ -388,7 +368,14 @@ def _validate_source_tool_pairs(
         calls_by_id[call_id] = call
 
     _validate_python_tool_sequence(calls, sample_id)
-    outputs_by_id = _tool_records_by_id(outputs, sample_id, output=True)
+    outputs_by_id: dict[str, dict[str, Any]] = {}
+    for output in outputs:
+        if not isinstance(output, dict):
+            raise DatasetValidationError(f"{sample_id}: tool output must be an object")
+        call_id = _required_text(output, "tool_call_id", sample_id)
+        if call_id in outputs_by_id:
+            raise DatasetValidationError(f"{sample_id}: duplicate tool output for {call_id}")
+        outputs_by_id[call_id] = output
     if calls_by_id.keys() != outputs_by_id.keys():
         raise DatasetValidationError(f"{sample_id}: every tool call must have exactly one matching output")
     for call_id, call in calls_by_id.items():

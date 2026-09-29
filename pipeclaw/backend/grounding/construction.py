@@ -309,26 +309,20 @@ def _pipeformer_contract(
         contract["applied_disturbances"] = applied_disturbances
     return contract
 
-def _latest_by_key(items: Iterable[Dict[str, Any]], key) -> List[Dict[str, Any]]:
-    latest: Dict[str, Dict[str, Any]] = {}
-    for index, item in enumerate(items, 1):
-        latest[key(item, index)] = item
-    return list(latest.values())
-
-
 def _deduplicate_candidate_results(
     results: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """Keep the latest successful result for each stable candidate identifier."""
-    return _latest_by_key(
-        results,
-        lambda item, index: str(
+    latest: Dict[str, Dict[str, Any]] = {}
+    for index, item in enumerate(results, 1):
+        key = str(
             dict(item.get("arguments") or {}).get("candidate_id")
             or dict(item.get("output") or {}).get("candidate_id")
             or item.get("tool_call_id")
             or f"candidate_{index}"
-        ).casefold(),
-    )
+        ).casefold()
+        latest[key] = item
+    return list(latest.values())
 
 
 def _candidate_action_key(candidate: Dict[str, Any]) -> str:
@@ -351,7 +345,8 @@ def _deduplicate_candidate_actions(
     candidates: List[Dict[str, Any]],
 ) -> List[Dict[str, Any]]:
     """Keep the latest candidate for each canonical boundary action."""
-    return _latest_by_key(candidates, lambda candidate, _: _candidate_action_key(candidate))
+    latest = {_candidate_action_key(candidate): candidate for candidate in candidates}
+    return list(latest.values())
 
 def _first_value(
     sources: Iterable[Dict[str, Any]], key: str, *, allow_none: bool = False

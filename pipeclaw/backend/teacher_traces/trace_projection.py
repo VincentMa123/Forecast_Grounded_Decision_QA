@@ -109,6 +109,7 @@ def _legacy_projection(
                 "case_id",
                 "current_operating_condition_number",
                 "disturbance_variable",
+                "disturbance_setpoint",
                 "disturbance_direction",
                 "disturbance_magnitude_percent",
                 "disturbance_assumption",
@@ -434,7 +435,7 @@ class TeacherTraceProjector:
         successful: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
         forecasts: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
     ) -> set[str]:
-        """Select only searches that actually authorize a retained forecast."""
+        """Keep searches grounding retained forecast inputs and observation targets."""
         required: set[str] = set()
         for forecast_index, forecast_call, _ in forecasts:
             preceding = []
@@ -458,14 +459,35 @@ class TeacherTraceProjector:
                 for value in authorization.get("disturbance_search_call_ids") or []
                 if str(value)
             ]
-            if disturbance_call_ids:
-                required.add(disturbance_call_ids[-1])
+            required.update(disturbance_call_ids)
             for call_ids in (
                 authorization.get("candidate_search_call_ids") or {}
             ).values():
                 matching = [str(value) for value in call_ids if str(value)]
-                if matching:
-                    required.add(matching[-1])
+                required.update(matching)
+            arguments = dict(forecast_call.get("arguments") or {})
+            targets = {
+                str(value).strip().casefold()
+                for key in ("attention_targets", "output_state_variables")
+                for value in arguments.get(key) or []
+            }
+            for call in preceding:
+                if call["name"] != "search_pipeformer_registry":
+                    continue
+                output = call.get("output")
+                if not isinstance(output, dict) or output.get("success") is not True:
+                    continue
+                variables = output.get("variables")
+                if not isinstance(variables, list):
+                    continue
+                returned = {
+                    str(item["variable"]).casefold()
+                    for item in variables
+                    if isinstance(item, dict) and item.get("variable")
+                }
+                query = str(call["arguments"].get("query") or "").strip().casefold()
+                if returned and (returned & targets or (query and query in targets)):
+                    required.add(str(call["tool_call_id"]))
         return required
 
     @staticmethod

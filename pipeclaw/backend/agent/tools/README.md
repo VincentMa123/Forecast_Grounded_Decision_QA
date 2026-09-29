@@ -58,8 +58,14 @@ rows = list(nodes.glob("*_node.csv"))
 output.joinpath("answer.txt").write_text(f"files={len(rows)}", encoding="utf-8")
 ```
 
-Use logical paths such as `pipeline_data/node_flow/20190114_node.csv` only with
-`read_file`; do not paste host-specific paths into scripts or tool calls.
+Use these logical path patterns with `read_file`, replacing `YYYYMMDD` with
+the requested date:
+
+- `pipeline_data/node_flow/YYYYMMDD_node.csv`
+- `pipeline_data/pipeline_flow/YYYYMMDD_pipeline.csv`
+- `pipeline_data/consumer_flow/YYYYMMDD_consumer.csv`
+
+Do not paste host-specific paths into scripts or tool calls.
 
 ## PipeFormer configuration
 

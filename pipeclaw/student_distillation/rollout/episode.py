@@ -57,7 +57,7 @@ def dispatch_and_record(
 
     Rollout loops own parsing, turn limits, and terminal decisions.  This
     operation owns only the semantic call exchange shared by those lifecycles.
-    Callers may supply a dispatch wrapper (for example, Swift's lock) while
+    Callers may supply a dispatch wrapper while
     list mutation remains in-place for snapshot consumers.
     """
 
@@ -87,9 +87,8 @@ def dispatch_and_record(
         )
         result.tool_calls.append(call_record)
 
-        # Policy projections consume the schema-normalized call.  This keeps
-        # Swift's callback contract aligned with the pre-refactor scheduler;
-        # the original call is still used for transcript serialization below.
+        # Policy projections consume the schema-normalized call; the original
+        # call is still used for transcript serialization below.
         compact = compact_result(normalized, tool_result, portability)
         result.tool_outputs.append(
             {"tool_call_id": call.call_id, "name": call.name, "output": compact}

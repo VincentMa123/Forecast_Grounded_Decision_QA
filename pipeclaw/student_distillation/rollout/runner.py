@@ -107,7 +107,19 @@ class RolloutRunner:
             result.json_errors.extend(errors)
 
             if calls:
-                self._dispatch_calls(case, result, calls, text)
+                dispatch_and_record(
+                    calls,
+                    dispatcher=self.dispatcher,
+                    result=result,
+                    portability_metadata=lambda call: self.policy.portability_metadata(
+                        call, case
+                    ),
+                    record_arguments=lambda call: self.policy.recorded_arguments(call, case),
+                    compact_result=lambda call, tool_result, portability: self.policy.compact_tool_result(
+                        call, tool_result, portability=portability
+                    ),
+                    assistant_content=text,
+                )
                 continue
 
             if text:
@@ -150,24 +162,3 @@ class RolloutRunner:
         set_case_workspace = getattr(self.dispatcher, "set_case_workspace", None)
         if callable(set_case_workspace) and case.workspace_root is not None:
             set_case_workspace(Path(case.workspace_root))
-
-    def _dispatch_calls(
-        self,
-        case: PromptCase,
-        result: RolloutResult,
-        calls: list[ToolCall],
-        text: str,
-    ) -> None:
-        dispatch_and_record(
-            calls,
-            dispatcher=self.dispatcher,
-            result=result,
-            portability_metadata=lambda call: self.policy.portability_metadata(
-                call, case
-            ),
-            record_arguments=lambda call: self.policy.recorded_arguments(call, case),
-            compact_result=lambda call, tool_result, portability: self.policy.compact_tool_result(
-                call, tool_result, portability=portability
-            ),
-            assistant_content=text,
-        )

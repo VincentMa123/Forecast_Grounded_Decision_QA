@@ -142,8 +142,7 @@ def _canonical_sequence_value(values: Any, fallback: Any) -> str:
 
 
 def canonical_applied_disturbance_lines(contract: Dict[str, Any]) -> List[str]:
-    lines: List[str] = []
-    seen = set()
+    lines: Dict[str, None] = {}
     for raw_item in contract.get("applied_disturbances") or []:
         item = dict(raw_item or {})
         variable = str(item.get("variable") or "")
@@ -172,19 +171,15 @@ def canonical_applied_disturbance_lines(contract: Dict[str, Any]) -> List[str]:
             primary = f"Applied setpoint: {variable}={_canonical_number(requested)}"
         else:
             primary = f"Applied disturbance: {variable}={_canonical_number(requested)}"
-        if primary not in seen:
-            seen.add(primary)
-            lines.append(primary)
+        lines.setdefault(primary, None)
         if item.get("no_op") is True:
             status = (
                 f"Application status: {variable}=no-op; "
                 f"prior={_canonical_sequence_value(item.get('input_values_before'), requested)}; "
                 f"applied={_canonical_sequence_value(item.get('input_values_applied'), requested)}"
             )
-            if status not in seen:
-                seen.add(status)
-                lines.append(status)
-    return lines
+            lines.setdefault(status, None)
+    return list(lines)
 
 
 def answer_without_machine_disclosure(answer: str) -> str:

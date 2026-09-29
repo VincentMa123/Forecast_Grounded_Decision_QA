@@ -85,12 +85,7 @@ def _required_constraints(
     tasks: Sequence[Mapping[str, Any]],
     outputs: Sequence[Mapping[str, Any]],
 ) -> list[str]:
-    values: list[str] = []
-
-    def add(value: Any) -> None:
-        text = str(value)
-        if text not in values:
-            values.append(text)
+    values: dict[str, None] = {}
 
     for task in tasks:
         for key in (
@@ -100,16 +95,16 @@ def _required_constraints(
         ):
             value = task.get(key)
             if isinstance(value, str):
-                add(value)
+                values.setdefault(str(value), None)
             else:
                 for item in sequence(value):
-                    add(item)
+                    values.setdefault(str(item), None)
     for output in outputs:
         statuses = verification_view(output).get("category_status")
         if isinstance(statuses, Mapping):
             for key in statuses:
-                add(key)
-    return values
+                values.setdefault(str(key), None)
+    return list(values)
 
 
 def _inherited_assumption(source: Mapping[str, Any]) -> Mapping[str, Any] | None:

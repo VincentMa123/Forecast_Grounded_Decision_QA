@@ -66,14 +66,6 @@ def expected_applied_disturbance(
     assumed_fields: frozenset[str] | None = None,
 ) -> dict[str, Any] | None:
     """Return the signed percent change the runtime should have applied.
-
-    Explicit task values win.  Provisionally assumed values fall back to the
-    student's executed prediction, because an underspecified request lets the
-    student choose its own direction and magnitude — that choice does not have
-    to equal the teacher's sampled one.  ``assumed_fields`` comes from the
-    teacher record when the caller already resolved it; otherwise it is read
-    off ``actual_task``.  Returns ``None`` when the inputs cannot determine a
-    valid signed magnitude.
     """
 
     assumed = (
