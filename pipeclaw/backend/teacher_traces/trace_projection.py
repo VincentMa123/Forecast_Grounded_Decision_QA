@@ -315,18 +315,14 @@ class TeacherTraceProjector:
                 successful,
                 successful_pipeformer,
             )
-            selected_registry_searches = [
-                pair
-                for pair in successful
+            unique_registry_searches = {}
+            for pair in successful:
                 if (
-                    pair[1].get("name") == "search_pipeformer_registry"
-                    and str(pair[1].get("tool_call_id") or "")
-                    in required_registry_call_ids
-                )
-            ]
-            unique_registry_searches = []
-            seen_registry_searches = set()
-            for pair in selected_registry_searches:
+                    pair[1].get("name") != "search_pipeformer_registry"
+                    or str(pair[1].get("tool_call_id") or "")
+                    not in required_registry_call_ids
+                ):
+                    continue
                 raw_output = (pair[2] or {}).get("output")
                 fingerprint = json.dumps(
                     {
@@ -337,13 +333,10 @@ class TeacherTraceProjector:
                     sort_keys=True,
                     default=str,
                 )
-                if fingerprint in seen_registry_searches:
-                    continue
-                seen_registry_searches.add(fingerprint)
-                unique_registry_searches.append(pair)
+                unique_registry_searches.setdefault(fingerprint, pair)
             selected = sorted(
                 [
-                    *unique_registry_searches,
+                    *unique_registry_searches.values(),
                     *(successful_decision_policies[-1:] if multiple_pipeformer else []),
                     *successful_pipeformer,
                 ],

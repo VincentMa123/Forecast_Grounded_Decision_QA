@@ -232,7 +232,6 @@ def _constraint_diagnostics(
         flags = {str(value) for value in constraint.get("triggered_flags") or []}
         pressure_fail = (
             pressure_rule_fail
-            or any(value.startswith("pressure_violation") for value in flags)
             or rule_status.get("node_pressure_operating_window") == "fail"
         )
         compressor_overload = (

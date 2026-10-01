@@ -398,15 +398,16 @@ def _build_dispatcher(
     if workspace_runner is None:
         allowed.discard("read_file")
     allowed &= schema_names
-    workspace_state: dict[str, Path | None] = {"root": None}
+    active_workspace_root: Path | None = None
     dispatcher: ToolDispatcher | None = None
 
     def setup_workspace(workspace_root: Path) -> None:
+        nonlocal active_workspace_root
         if workspace_runner is None:
             return
         root = Path(workspace_root).resolve() if openclaw else Path(workspace_root)
         if openclaw:
-            workspace_state["root"] = root
+            active_workspace_root = root
         workspace_runner.set_workspace_root(root.parent)
         workspace_runner.set_active_agent(
             root.name.removeprefix("workspace-") or "autonomous-evaluation"
@@ -417,11 +418,10 @@ def _build_dispatcher(
     ) -> Mapping[str, Any] | None:
         if openclaw:
             del completed
-            root = workspace_state["root"]
             return (
                 sandbox_error("OpenClaw workspace has not been initialized")
-                if root is None
-                else openclaw_policy_error(call, root)
+                if active_workspace_root is None
+                else openclaw_policy_error(call, active_workspace_root)
             )
         if call.name not in ("run_pipeformer_forecast", "set_decision_policy"):
             return None
@@ -435,10 +435,9 @@ def _build_dispatcher(
         )
 
     def transform(call: ToolCall) -> Mapping[str, Any]:
-        root = workspace_state["root"]
-        if root is None:
+        if active_workspace_root is None:
             raise RuntimeError("OpenClaw workspace has not been initialized")
-        return normalize_openclaw_execution_arguments(call, root)
+        return normalize_openclaw_execution_arguments(call, active_workspace_root)
 
     dispatcher = ToolDispatcher(
         tool_registry,

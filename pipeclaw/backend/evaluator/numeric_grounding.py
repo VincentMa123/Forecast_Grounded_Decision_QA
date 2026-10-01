@@ -42,8 +42,7 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
         content = str(payload.get("content") or "")
         if flows_column not in content:
             continue
-        per_line_sums: Dict[str, float] = {}
-        per_line_counts: Dict[str, int] = {}
+        per_line_stats: Dict[str, tuple[float, int]] = {}
         try:
             for row in csv.DictReader(io.StringIO(content)):
                 value = row.get(flows_column)
@@ -56,13 +55,12 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
                 pipeline = (
                     row.get("管道划分") or row.get("管线") or row.get("所属地") or "?"
                 )
-                per_line_sums[pipeline] = per_line_sums.get(pipeline, 0.0) + flow
-                per_line_counts[pipeline] = per_line_counts.get(pipeline, 0) + 1
+                total, count = per_line_stats.get(pipeline, (0.0, 0))
+                per_line_stats[pipeline] = (total + flow, count + 1)
         except csv.Error:
             continue
-        for line, total in sorted(per_line_sums.items()):
-            totals.append(round(total, 6))
-            totals.append(float(per_line_counts[line]))
+        for _, (total, count) in sorted(per_line_stats.items()):
+            totals.extend((round(total, 6), float(count)))
     return totals
 
 
@@ -245,21 +243,20 @@ def derived_numeric_values(value: Any) -> List[float]:
                         derived.extend(rounded(value / total * 100.0))
                         derived.extend(rounded(running / total * 100.0))
                 for category_key in category_keys:
-                    grouped: Dict[str, float] = {}
-                    counts: Dict[str, int] = {}
+                    grouped: Dict[str, tuple[float, int]] = {}
                     for row in rows:
                         category = row.get(category_key)
                         value = number(row.get(numeric_key))
                         if isinstance(category, str) and value is not None:
-                            grouped[category] = grouped.get(category, 0.0) + value
-                            counts[category] = counts.get(category, 0) + 1
+                            total, count = grouped.get(category, (0.0, 0))
+                            grouped[category] = (total + value, count + 1)
                     if len(grouped) <= 200:
                         derived.extend(
                             value
-                            for total in grouped.values()
+                            for total, _ in grouped.values()
                             for value in rounded(total)
                         )
-                        derived.extend(float(count) for count in counts.values())
+                        derived.extend(float(count) for _, count in grouped.values())
         return derived + [value for field in item for value in collect(field, totals)]
 
     return collect(value, [])

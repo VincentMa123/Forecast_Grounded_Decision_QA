@@ -4,7 +4,7 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from .checks.common import mapping, normalize, sequence, task_views, verification_view
+from .checks.common import calls, mapping, normalize, sequence, task_views, verification_view
 from .models import EvaluationInputError
 
 
@@ -53,7 +53,7 @@ def _merge_task_fields(
         # Binary disturbances commonly store the target only in the parsed
         # boundary setpoints.  Expose the canonical scalar when the call omitted
         # it, without overriding an explicit call value.
-        if "disturbance_setpoint" not in call and "disturbance_setpoint" not in merged:
+        if "disturbance_setpoint" not in merged:
             variable = merged.get("disturbance_variable")
             setpoints = mapping(
                 mapping(merged.get("boundary_conditions")).get("setpoints")
@@ -169,9 +169,7 @@ def build_teacher_oracle(reference: Mapping[str, Any]) -> dict[str, Any]:
     outputs = _output_views(source)
     first_output = outputs[0] if outputs else {}
     verification = verification_view(first_output)
-    tool_calls = [
-        item for item in sequence(source.get("tool_calls")) if isinstance(item, Mapping)
-    ]
+    tool_calls = calls(source)
     forecast_tasks = [
         dict(item["arguments"])
         for item in tool_calls

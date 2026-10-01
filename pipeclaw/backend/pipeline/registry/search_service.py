@@ -33,11 +33,8 @@ class PipeFormerRegistrySearchService:
             / "variable_registry.json"
         )
 
-    def _topology_path(self) -> Path:
-        return self._registry_path().parent / "save_connect_all_nodes.csv"
-
     def _topology_distances(self, targets: List[str]) -> Dict[str, int]:
-        path = self._topology_path()
+        path = self._registry_path().parent / "save_connect_all_nodes.csv"
         if not targets or not path.is_file():
             return {}
         graph: Dict[str, set[str]] = {}

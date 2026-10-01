@@ -127,8 +127,6 @@ def numeric_claim_values(text: str) -> list[float]:
     values = []
     for match in NUMERIC_SPAN.finditer(normalized):
         raw_value = match.group(0)
-        if raw_value.lstrip("+-").startswith("."):
-            continue
         if any(
             start <= match.start() and match.end() <= end
             for start, end in ignored_spans

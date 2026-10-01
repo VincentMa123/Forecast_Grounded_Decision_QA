@@ -291,8 +291,6 @@ def disturbance_was_applied(
         # The runtime rejects booleans outright; accepting them here would let
         # ``true`` masquerade as the setpoint ``1``.
         return False
-    expected_mode = ""
-    expected_value: Any = None
     if variable in setpoints or setpoint_argument is not None:
         if variable in percentages:
             return False
@@ -308,13 +306,15 @@ def disturbance_was_applied(
                 # The runtime raises on this conflict, so a trace exhibiting it
                 # did not apply the disturbance the caller asked for.
                 return False
-    elif variable in percentages:
+    elif variable in percentages or (
+        magnitude is not None and direction in {"up", "down"}
+    ):
         expected = expected_applied_disturbance(task, prediction, variable)
         if expected is None:
             return False
         expected_mode = "percent_change"
         expected_value = expected["value"]
-        if magnitude is not None:
+        if variable in percentages and magnitude is not None:
             magnitude_value = _finite_number(magnitude)
             if magnitude_value is None:
                 return False
@@ -324,12 +324,6 @@ def disturbance_was_applied(
                 signed,
             ):
                 return False
-    elif magnitude is not None and direction in {"up", "down"}:
-        expected = expected_applied_disturbance(task, prediction, variable)
-        if expected is None:
-            return False
-        expected_mode = "percent_change"
-        expected_value = expected["value"]
     else:
         return False
     applied = sequence(

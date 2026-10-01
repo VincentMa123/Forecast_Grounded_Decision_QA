@@ -153,7 +153,10 @@ class TeacherTraceEvaluationRunner:
         self.report_writer = TeacherTraceQualityReportWriter(self.auditor)
 
     def run(self) -> Dict[str, object]:
-        self._validate_options()
+        if self.args.repair_grounded_records and self.args.repair_output is None:
+            raise ValueError(
+                "--repair-output is required with --repair-grounded-records."
+            )
         annotation_export, reviewer_annotations, reset_review_sample_ids = (
             self._load_review_inputs()
         )
@@ -179,12 +182,6 @@ class TeacherTraceEvaluationRunner:
         )
         write_json(self.args.summary_json, summary, force=True)
         return summary
-
-    def _validate_options(self) -> None:
-        if self.args.repair_grounded_records and self.args.repair_output is None:
-            raise ValueError(
-                "--repair-output is required with --repair-grounded-records."
-            )
 
     def _load_review_inputs(self) -> tuple[object, list[object], set[str]]:
         args = self.args

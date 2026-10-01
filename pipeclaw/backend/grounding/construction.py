@@ -290,8 +290,7 @@ def _pipeformer_contract(
     assumptions = provisional_assumptions(results)
     if assumptions:
         contract["provisional_assumptions"] = assumptions
-    applied_disturbances: List[Dict[str, Any]] = []
-    applied_seen = set()
+    applied_disturbances: Dict[str, Dict[str, Any]] = {}
     for disturbance in [
         *prior_applied_disturbances,
         *_applied_disturbances(results),
@@ -301,12 +300,9 @@ def _pipeformer_contract(
         if not variable or not mode:
             continue
         key = canonical_json(disturbance)
-        if key in applied_seen:
-            continue
-        applied_seen.add(key)
-        applied_disturbances.append(dict(disturbance))
+        applied_disturbances.setdefault(key, dict(disturbance))
     if applied_disturbances:
-        contract["applied_disturbances"] = applied_disturbances
+        contract["applied_disturbances"] = list(applied_disturbances.values())
     return contract
 
 def _deduplicate_candidate_results(
