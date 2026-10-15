@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from functools import partial
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence
 
 from .common import (
+    CATEGORY_DETAILS,
     CATEGORY_ORDER,
     DISPATCH_PRIORITY_ORDER,
     DISPATCH_RULES,
@@ -10,23 +12,148 @@ from .common import (
     STATUS_RANK,
     category_status,
     max_status,
+    run_specs,
     select_requested_categories,
+    status_from_threshold,
+    supply_demand_gaps,
+    variables_for_selector,
 )
-from .compressor import run_compressor_checks
-from .abnormality_warning import run_abnormality_warning_checks
-from .dispatch_priority import (
-    run_dispatch_priority_checks,
-    run_dispatch_priority_policy_checks,
-)
-from .equipment_regulation import run_equipment_regulation_checks
 from .flow import run_flow_checks
-from .human_intervention import (
-    intervention_label_from_checks,
-    run_human_intervention_checks,
-)
 from .linepack import run_linepack_checks
 from .pressure import run_pressure_checks
+from .rule_library import (
+    load_constraint_specs,
+    load_rule_definition,
+    load_rule_document,
+)
 from ..forecast.result import without_none_values
+
+
+# ---------------------------------------------------------------------------
+# Spec-driven categories without a dedicated module
+# ---------------------------------------------------------------------------
+
+COMPRESSOR_SPECS = load_constraint_specs("compressor")
+DISPATCH_PRIORITY_SPECS = load_constraint_specs("dispatch_priority")
+EQUIPMENT_SPECS = load_constraint_specs("equipment_regulation")
+COMPRESSOR_ENVELOPE_RULES = {
+    "compressor_load_limit",
+    "compressor_ratio_boundary",
+    "compressor_rotational_speed_limit",
+}
+
+
+def run_compressor_checks(
+    summaries: Dict[str, Dict[str, Any]], parsed_task: Dict[str, Any]
+) -> List[Dict[str, Any]]:
+    checks = run_specs(COMPRESSOR_SPECS, summaries, parsed_task)
+    envelope_checks = [
+        check for check in checks if check["name"] in COMPRESSOR_ENVELOPE_RULES
+    ]
+    if any(check["status"] == "fail" for check in envelope_checks):
+        envelope_status = "outside_operating_envelope"
+    elif any(check["status"] == "warning" for check in envelope_checks):
+        envelope_status = "approaching_operating_envelope"
+    elif any(check["status"] == "not_evaluated" for check in envelope_checks):
+        envelope_status = "incomplete_operating_envelope"
+    else:
+        envelope_status = "inside_operating_envelope"
+    for check in checks:
+        check["operating_envelope_status"] = envelope_status
+    return checks
+
+
+ABNORMALITY_SPECS = load_constraint_specs("abnormality_warning")
+POTENTIAL_LEAK_RULE = load_rule_definition(
+    "abnormality_warning", "potential_leak_signal"
+)
+
+
+def run_abnormality_warning_checks(
+    summaries: Dict[str, Dict[str, Any]],
+    parsed_task: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    checks = run_specs(ABNORMALITY_SPECS, summaries, parsed_task)
+    leak_check = _potential_leak_check(summaries, checks, parsed_task)
+    checks.append(leak_check)
+    return checks
+
+
+def _potential_leak_check(
+    summaries: Dict[str, Dict[str, Any]],
+    checks: List[Dict[str, Any]],
+    parsed_task: Dict[str, Any],
+) -> Dict[str, Any]:
+    by_name = {check["name"]: check for check in checks}
+    pressure_check = by_name.get("abnormal_pressure_drop", {})
+    flow_check = by_name.get("sudden_flow_change", {})
+    supply_selector = POTENTIAL_LEAK_RULE["supply_selector"]
+    demand_selector = POTENTIAL_LEAK_RULE["demand_selector"]
+    supply_variables = variables_for_selector(summaries, supply_selector, parsed_task)
+    demand_variables = variables_for_selector(summaries, demand_selector, parsed_task)
+    variables = list(
+        dict.fromkeys(
+            pressure_check.get("variables", []) + supply_variables + demand_variables
+        )
+    )
+    _, gaps = supply_demand_gaps(summaries, supply_variables, demand_variables)
+
+    max_gap = max((abs(value) for value in gaps), default=0.0)
+    gap_widening = bool(gaps) and abs(gaps[-1]) > abs(gaps[0])
+    limits = POTENTIAL_LEAK_RULE["limits"]
+    gap_status = status_from_threshold(
+        max_gap,
+        limits.get("warning_gap_threshold"),
+        limits.get("fail_gap_threshold"),
+    )
+    if not gap_widening:
+        gap_status = "pass"
+
+    pressure_status = pressure_check.get("status", "not_evaluated")
+    flow_status = flow_check.get("status", "not_evaluated")
+    evaluated = pressure_status != "not_evaluated" and bool(gaps)
+    corroborating_status = max_status([flow_status, gap_status])
+    if not evaluated:
+        status = "not_evaluated"
+    elif pressure_status in {"warning", "fail"} and corroborating_status in {
+        "warning",
+        "fail",
+    }:
+        status = max_status([pressure_status, corroborating_status])
+    else:
+        status = "pass"
+
+    evidence = {
+        "metric": "cross_signal_potential_leak",
+        "pressure_drop_status": pressure_status,
+        "sudden_flow_change_status": flow_status,
+        "max_abs_supply_demand_gap": round(max_gap, 6),
+        "gap_is_widening": gap_widening,
+        "gap_status": gap_status,
+        "status": status,
+    }
+    flags = POTENTIAL_LEAK_RULE["flags"]
+    return {
+        "name": POTENTIAL_LEAK_RULE["rule_id"],
+        "category": "abnormality_warning",
+        "status": status,
+        "evaluation_status": "evaluated" if evaluated else "not_evaluated",
+        "flag": flags.get(status),
+        "priority": int(POTENTIAL_LEAK_RULE["priority"]),
+        "variables": variables,
+        "description": POTENTIAL_LEAK_RULE["description"],
+        "main_content": CATEGORY_DETAILS["abnormality_warning"],
+        "message": (
+            "Potential-leak signals could not be evaluated because required pressure or flow series were unavailable."
+            if status == "not_evaluated"
+            else "No corroborated potential-leak signal was detected."
+            if status == "pass"
+            else "A pressure-drop signal is corroborated by abnormal flow behavior; engineering review is required."
+        ),
+        "evaluated_values": [evidence] if evaluated else [],
+        "offending_values": [evidence] if status in {"warning", "fail"} else [],
+        "signal_evidence": evidence,
+    }
 
 
 CategoryRunner = Callable[
@@ -38,10 +165,90 @@ CATEGORY_RUNNERS: Dict[str, CategoryRunner] = {
     "flow": run_flow_checks,
     "linepack": run_linepack_checks,
     "compressor": run_compressor_checks,
-    "equipment_regulation": run_equipment_regulation_checks,
+    "equipment_regulation": partial(run_specs, EQUIPMENT_SPECS),
     "abnormality_warning": run_abnormality_warning_checks,
-    "dispatch_priority": run_dispatch_priority_checks,
+    "dispatch_priority": partial(run_specs, DISPATCH_PRIORITY_SPECS),
 }
+
+
+# ---------------------------------------------------------------------------
+# Always-run policy checks: human intervention and dispatch priority
+# ---------------------------------------------------------------------------
+
+INTERVENTION_RULES = load_rule_document("human_intervention")
+SAFETY_CATEGORIES = set(INTERVENTION_RULES["safety_categories"])
+
+
+def intervention_label_from_checks(
+    overall: str, checks: Sequence[Dict[str, Any]]
+) -> str:
+    if overall == INTERVENTION_RULES["no_intervention_status"]:
+        return "no_intervention"
+    if any(
+        check["status"] == INTERVENTION_RULES["immediate_intervention_status"]
+        and check["category"] in SAFETY_CATEGORIES
+        for check in checks
+    ):
+        return "immediate_intervention_required"
+    if (
+        overall in INTERVENTION_RULES["operator_attention_statuses"]
+        and overall == "fail"
+    ):
+        return "operator_attention_required"
+    if any(
+        check["status"] in INTERVENTION_RULES["operator_attention_statuses"]
+        and check["category"] in SAFETY_CATEGORIES
+        for check in checks
+    ):
+        return "operator_attention_required"
+    return str(INTERVENTION_RULES["default_nonpass_label"])
+
+
+def run_human_intervention_checks(label: str) -> List[Dict[str, Any]]:
+    status = (
+        "pass"
+        if label == "no_intervention"
+        else ("fail" if label == "immediate_intervention_required" else "warning")
+    )
+    return [
+        {
+            "name": "human_intervention_rules",
+            "category": "human_intervention",
+            "status": status,
+            "flag": label,
+            "priority": 80,
+            "variables": [],
+            "description": INTERVENTION_RULES["reasons"][label],
+            "main_content": CATEGORY_DETAILS["human_intervention"],
+            "message": f"Human-intervention label: {label}.",
+            "evaluated_values": [],
+            "offending_values": [],
+        }
+    ]
+
+
+def run_dispatch_priority_policy_checks() -> List[Dict[str, Any]]:
+    policy = DISPATCH_RULES["policy_rule"]
+    return [
+        {
+            "name": policy["rule_id"],
+            "category": "dispatch_priority",
+            "status": "pass",
+            "flag": policy["flag"],
+            "priority": int(policy["priority"]),
+            "variables": [],
+            "description": "Apply dispatch priority order when safety and economy conflict.",
+            "main_content": CATEGORY_DETAILS["dispatch_priority"],
+            "message": policy["message"],
+            "evaluated_values": [],
+            "offending_values": [],
+        }
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Engineering verification entry point and evidence projection
+# ---------------------------------------------------------------------------
 
 # Rule ids referenced by the evidence projection.  Each name must match a
 # ``rule_id`` in the library JSON files; the drift test in

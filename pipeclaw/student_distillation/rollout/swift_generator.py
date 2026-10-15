@@ -180,11 +180,8 @@ def coerce_torch_dtype(model_load_kwargs: Mapping[str, Any]) -> dict[str, Any]:
             dtype_name = kwargs.get(key)
             if isinstance(dtype_name, str):
                 kwargs[key] = getattr(torch, dtype_name)
-    except ImportError:  # pragma: no cover - CUDA env supplies torch
-        return kwargs
-    except AttributeError:
-        # Leave an unknown dtype untouched so MS-SWIFT can report its own
-        # version-specific validation error rather than failing here.
+    except (ImportError, AttributeError):
+        # Leave unresolved dtypes to MS-SWIFT's version-specific validation.
         pass
     return kwargs
 
@@ -256,11 +253,6 @@ class SwiftGenerator:
                 "when --adapters is used"
             ) from exc
 
-        if model_type:
-            model_load_kwargs_extra = {"model_type": model_type}
-        else:
-            model_load_kwargs_extra = {}
-
         model_load_spec = resolve_model_load_kwargs(
             Path(adapters) if adapters else None,
             quant_bits=quant_bits,
@@ -276,7 +268,8 @@ class SwiftGenerator:
         else:
             print("[evaluate_autonomous] base-model loading: default (unquantized)")
 
-        model_load_kwargs.update(model_load_kwargs_extra)
+        if model_type:
+            model_load_kwargs["model_type"] = model_type
         model_obj, processor = get_model_processor(model, **model_load_kwargs)
         if adapters:
             model_obj = PeftModel.from_pretrained(model_obj, adapters)

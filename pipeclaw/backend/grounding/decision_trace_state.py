@@ -89,10 +89,6 @@ def _tool_call_ids(calls: Iterable[Dict[str, Any]]) -> Tuple[str, ...]:
     )
 
 
-def _call_mapping(call: Dict[str, Any], key: str) -> Dict[str, Any]:
-    return dict(call.get(key) or {})
-
-
 def _normalized_disturbance(value: Any) -> Dict[str, Any]:
     item = dict(value or {})
     if item.get("requested_value") is None:
@@ -413,14 +409,12 @@ def _merge_applied_disturbances(
 
 
 def _ordered_unique(existing: Iterable[Any], incoming: Iterable[Any]) -> List[Any]:
-    merged = []
-    seen = set()
+    merged = {}
     for item in [*existing, *incoming]:
         key = canonical_json(item)
-        if key not in seen:
-            seen.add(key)
-            merged.append(deepcopy(item))
-    return merged
+        if key not in merged:
+            merged[key] = deepcopy(item)
+    return list(merged.values())
 
 
 def _verified_state_tool_result(item: Dict[str, Any]) -> bool:
@@ -530,8 +524,8 @@ def _compact_single_forecast_snapshot(
     source_turn_id: str,
 ) -> Dict[str, Any]:
     """Project one verified forecast into bounded cross-turn evidence."""
-    arguments = _call_mapping(call, "arguments")
-    output = _call_mapping(call, "output")
+    arguments = dict(call.get("arguments") or {})
+    output = dict(call.get("output") or {})
     verification = dict(
         output.get("verification") or output.get("constraint_check") or {}
     )
@@ -870,7 +864,7 @@ def _delta_from_verified_tool_results(
     successful = [item for item in observed if _verified_state_tool_result(item)]
     if not successful:
         scope, requested_action_fingerprint = (
-            _forecast_transition(_call_mapping(forecasts[-1], "arguments"), current)
+            _forecast_transition(dict(forecasts[-1].get("arguments") or {}), current)
             if forecasts
             else ({}, None)
         )
@@ -896,7 +890,7 @@ def _delta_from_verified_tool_results(
     )
     scope, requested_action_fingerprint = (
         _forecast_transition(
-            _call_mapping(current_forecasts[-1], "arguments"), current, applied
+            dict(current_forecasts[-1].get("arguments") or {}), current, applied
         )
         if current_forecasts
         else ({}, None)
@@ -908,22 +902,22 @@ def _delta_from_verified_tool_results(
         )
         for call in successful
         if call.get("name") == "search_pipeformer_registry"
-        for variable in _call_mapping(call, "output").get("variables") or []
+        for variable in dict(call.get("output") or {}).get("variables") or []
         if isinstance(variable, dict) and variable.get("variable")
     ]
 
     current_by_id = {}
     for call in current_forecasts:
         candidate_id = str(
-            _call_mapping(call, "arguments").get("candidate_id")
-            or _call_mapping(call, "output").get("candidate_id")
+            dict(call.get("arguments") or {}).get("candidate_id")
+            or dict(call.get("output") or {}).get("candidate_id")
             or ""
         )
         if candidate_id:
             current_by_id[candidate_id.casefold()] = call
     if current_by_id and any(
-        not (_call_mapping(call, "arguments").get("candidate_id")
-             or _call_mapping(call, "output").get("candidate_id"))
+        not (dict(call.get("arguments") or {}).get("candidate_id")
+             or dict(call.get("output") or {}).get("candidate_id"))
         for call in current_forecasts
     ):
         # Unnamed forecasts can synthesize IDs that collide with explicit candidates.
@@ -944,7 +938,7 @@ def _delta_from_verified_tool_results(
     for candidate in candidates:
         call = current_by_id.get(str(candidate.get("candidate_id") or "").casefold())
         if call:
-            arguments = _call_mapping(call, "arguments")
+            arguments = dict(call.get("arguments") or {})
             candidate.update({
                 key: arguments[key]
                 for key in ("case_id", "forecast_horizon_minutes")
@@ -962,7 +956,7 @@ def _delta_from_verified_tool_results(
     evidence: Dict[str, Any] = {}
     unresolved = []
     for call in successful:
-        output = _call_mapping(call, "output")
+        output = dict(call.get("output") or {})
         evidence.update({
             key: deepcopy(output[key])
             for key in ("csv_evidence", "topology_summary")

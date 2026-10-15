@@ -32,9 +32,6 @@ from pipeclaw.backend.evaluator.answer_quality import answer_quality_issues
 from pipeclaw.backend.pipeline.scenario_preflight import validate_scenario_sources
 from pipeclaw.backend.teacher_traces.teacher_record_assembly import (
     DEFAULT_NATIVE_EVALUATOR,
-    _assemble_teacher_record,
-    _evaluate_and_repair_answer,
-    _project_forecast_fields,
     build_teacher_record,
     scenario_evidence_text,
 )

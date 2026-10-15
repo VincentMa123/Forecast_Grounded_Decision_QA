@@ -7,7 +7,7 @@ import re
 from typing import Any, Dict, List, Optional
 
 from .registry import register_tool
-from pipeclaw.backend.pipeline.registry.search_service import (
+from pipeclaw.backend.pipeline.registry.variable_registry import (
     PipeFormerRegistrySearchService,
 )
 from pipeclaw.backend.pipeline.forecast.runtime import PipeFormerForecastService

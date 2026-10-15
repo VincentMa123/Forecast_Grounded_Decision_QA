@@ -25,14 +25,16 @@ from pipeclaw.backend.grounding.contract import (
     finalize_applied_disturbance_disclosure,
     grounded_fallback_answer,
 )
-from pipeclaw.backend.evaluator.answer_quality import evaluate_quality_context
+from pipeclaw.backend.evaluator.answer_quality import (
+    build_quality_context,
+    evaluate_quality_context,
+)
 from pipeclaw.backend.evaluator.numeric_grounding import numeric_claims_are_grounded
 from pipeclaw.backend.evaluator.quality_references import numeric_claim_values
 from pipeclaw.backend.grounding.evidence.csv import record_csv_evidence
 from pipeclaw.backend.grounding.evidence.tool import attach_tool_arguments
 from pipeclaw.backend.grounding.evidence.topology import topology_summary_from_tool_outputs
 from pipeclaw.backend.evaluator.scorer import NativeTraceEvaluator, apply_quality_aliases
-from pipeclaw.backend.evaluator.quality_context import build_quality_context
 from pipeclaw.backend.teacher_traces.trace_projection import (
     export_trace_tools,
     final_answer,

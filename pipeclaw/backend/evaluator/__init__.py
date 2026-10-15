@@ -1,9 +1,8 @@
 """Canonical evaluation API for teacher traces and autonomous rollouts."""
 
-from .adapters import build_evaluation_context
 from .aggregation import summarize
-from .checks import assumption_consistency, inferred_task_fields
-from .engine import build_report, evaluate
+from .checks.assumptions import assumption_consistency, inferred_task_fields
+from .engine import build_evaluation_context, build_report, evaluate
 from .models import (
     EvaluationContext,
     EvaluationInputError,

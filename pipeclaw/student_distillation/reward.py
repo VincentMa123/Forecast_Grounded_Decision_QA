@@ -6,7 +6,7 @@ import json
 from typing import Any, Mapping
 
 
-_RUN_TOOL = "run_command"
+RUN_TOOL = "run_command"
 _PRECONDITION_REJECTS = (
     "sandbox_violation",
     "forecast_registry_precondition_failed",
@@ -46,7 +46,7 @@ def episode_stats(rollout: Mapping[str, Any]) -> dict[str, Any]:
         code = payload.get("error_code")
         if code in errors:
             errors[code] += 1
-        if output.get("name") == _RUN_TOOL and first_run is None:
+        if output.get("name") == RUN_TOOL and first_run is None:
             first_run = payload
     first_run_compile = bool(
         first_run
@@ -122,4 +122,4 @@ def composite_reward(
     return round(reward, 6)
 
 
-__all__ = ["composite_reward", "episode_stats"]
+__all__ = ["RUN_TOOL", "composite_reward", "episode_stats"]

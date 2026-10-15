@@ -387,13 +387,11 @@ def evaluate_boundary_change(
         )
         return check
 
-    statuses = []
     for variable, value in percentage_adjustments:
         magnitude = abs(value)
         status = status_from_threshold(
             magnitude, spec.warning_threshold, spec.fail_threshold
         )
-        statuses.append(status)
         evaluated = {
             "variable": variable,
             "metric": "abs_disturbance_percent",
@@ -429,7 +427,6 @@ def evaluate_boundary_change(
         valid_value = value in {0.0, 1.0}
         verified = bool(applied.get("verified")) and applied.get("mode") == "setpoint"
         status = "pass" if valid_value and verified else "fail"
-        statuses.append(status)
         evaluated = {
             "variable": variable,
             "metric": "binary_setpoint",
@@ -443,7 +440,7 @@ def evaluate_boundary_change(
         if status != "pass":
             check["offending_values"].append(evaluated)
 
-    check["status"] = max_status(statuses)
+    check["status"] = max_status(item["status"] for item in check["evaluated_values"])
     check["evaluation_status"] = "evaluated"
     check["flag"] = _flag_for_status(spec, check["status"])
     if check["status"] == "pass":

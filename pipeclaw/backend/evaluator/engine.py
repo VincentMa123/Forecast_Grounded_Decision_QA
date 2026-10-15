@@ -1,17 +1,96 @@
+"""One evaluation pass: normalize the input, run the profile's checks, build the report."""
+
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from copy import deepcopy
 from typing import Any
 
-from .adapters import build_evaluation_context
-from .checks import evaluate_context
+from .checks.autonomous import evaluate_autonomous_checks
+from .checks.teacher import evaluate_teacher_checks
 from .models import (
+    EvaluationContext,
     EvaluationInputError,
     EvaluationProfile,
     EvaluationReport,
     MetricResult,
 )
+from .oracle import build_teacher_oracle
 from .profiles import DEFAULT_MAX_RECORD_CHARS, get_profile_policy
+
+
+# ---------------------------------------------------------------------------
+# Input normalization
+# ---------------------------------------------------------------------------
+
+
+def _copy_mapping(value: Mapping[str, Any], label: str) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        raise EvaluationInputError(f"{label} must be a mapping.")
+    return deepcopy(dict(value))
+
+
+def _issues(values: Iterable[str] | None) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(str(item) for item in (values or ())))
+
+
+def build_evaluation_context(
+    profile: EvaluationProfile,
+    record: Mapping[str, Any],
+    *,
+    reference: Mapping[str, Any] | None = None,
+    hard_issues: Iterable[str] | None = None,
+    diagnostics: Mapping[str, Any] | None = None,
+) -> EvaluationContext:
+    """Normalize one teacher trace or rollout for the canonical checks."""
+
+    profile = EvaluationProfile(profile)
+    if profile is EvaluationProfile.TEACHER_TRACE:
+        return EvaluationContext(
+            profile=profile,
+            record=_copy_mapping(record, "Teacher record"),
+            hard_issues=_issues(hard_issues),
+            diagnostics=_copy_mapping(diagnostics or {}, "Diagnostics"),
+        )
+    if reference is None:
+        raise EvaluationInputError(
+            "Autonomous rollout evaluation requires a teacher reference."
+        )
+    copied_reference = _copy_mapping(reference, "Teacher reference")
+    return EvaluationContext(
+        profile=profile,
+        record=_copy_mapping(record, "Autonomous rollout"),
+        reference=copied_reference,
+        oracle=build_teacher_oracle(copied_reference),
+        hard_issues=_issues(hard_issues),
+        diagnostics=_copy_mapping(diagnostics or {}, "Diagnostics"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Profile check dispatch
+# ---------------------------------------------------------------------------
+
+
+def evaluate_context(
+    context: EvaluationContext,
+    *,
+    derive_hard_issues: bool = False,
+    maximum_chars: int = DEFAULT_MAX_RECORD_CHARS,
+) -> tuple[list[MetricResult], tuple[str, ...], dict[str, Any]]:
+    if context.profile is EvaluationProfile.TEACHER_TRACE:
+        return evaluate_teacher_checks(
+            context,
+            derive_hard_issues=derive_hard_issues,
+            maximum_chars=maximum_chars,
+        )
+    metrics, diagnostics = evaluate_autonomous_checks(context)
+    return metrics, tuple(context.hard_issues), diagnostics
+
+
+# ---------------------------------------------------------------------------
+# Report construction
+# ---------------------------------------------------------------------------
 
 
 def build_report(
@@ -28,7 +107,7 @@ def build_report(
     metric_values = list(metrics)
     if any(not isinstance(metric, MetricResult) for metric in metric_values):
         raise EvaluationInputError("Every metric must be a MetricResult.")
-    issue_values = tuple(dict.fromkeys(str(issue) for issue in (hard_issues or ())))
+    issue_values = _issues(hard_issues)
 
     included = [
         metric
@@ -97,7 +176,6 @@ def evaluate(
 ) -> EvaluationReport:
     """Normalize one input, run canonical checks, and build one report."""
 
-    profile = EvaluationProfile(profile)
     context = build_evaluation_context(
         profile,
         record,
@@ -113,7 +191,7 @@ def evaluate(
     ) = evaluate_context(
         context,
         derive_hard_issues=(
-            profile is EvaluationProfile.TEACHER_TRACE and hard_issues is None
+            context.profile is EvaluationProfile.TEACHER_TRACE and hard_issues is None
         ),
         maximum_chars=max_record_chars,
     )

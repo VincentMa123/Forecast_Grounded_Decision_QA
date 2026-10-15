@@ -4,7 +4,7 @@ import csv
 import io
 import json
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
 from pipeclaw.backend.grounding.evidence.csv import record_csv_evidence
@@ -20,7 +20,44 @@ from .quality_references import (
     time_values_in_minutes,
     walk_numeric_values,
 )
-from .quality_context import trusted_conversation_context
+
+
+def trusted_conversation_context(
+    items: Iterable[Dict[str, Any]],
+    *,
+    verified_evidence_only: bool = False,
+) -> List[Dict[str, Any]]:
+    """Retain trusted context, optionally projecting only verified evidence."""
+
+    if not verified_evidence_only:
+        return [
+            dict(item)
+            if item.get("grounding_verified") is True
+            else {
+                key: value for key, value in item.items() if key != "assistant_output"
+            }
+            for item in items
+        ]
+    context = []
+    for item in items:
+        if item.get("grounding_verified") is True:
+            context.append(dict(item))
+            continue
+        summary = item.get("verified_evidence_summary")
+        legacy_verified_summary = (
+            "tool_evidence_verified" not in item
+            and isinstance(summary, dict)
+            and bool(summary)
+        )
+        if item.get("tool_evidence_verified") is True or legacy_verified_summary:
+            context.append(
+                {
+                    "tool_evidence_verified": True,
+                    "evidence_artifacts": list(item.get("evidence_artifacts") or []),
+                    "verified_evidence_summary": summary,
+                }
+            )
+    return context
 
 
 def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:

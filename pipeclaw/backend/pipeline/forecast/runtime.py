@@ -6,7 +6,7 @@ import logging
 from collections import OrderedDict
 from pathlib import Path
 from threading import Lock
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 from .parser import (
     CATEGORY_ATTENTION_TARGETS,
@@ -17,11 +17,12 @@ from .parser import (
 )
 from ..constraints.common import variables_matching
 from ..constraints.engine import run_engineering_constraint_checks
-from .evidence import summarize_variables, top_variables
 from .result import (
     ForecastResult,
     compact_forecast_window,
     source_name,
+    summarize_variables,
+    top_variables,
 )
 from ..schemas import ForecastRequest
 from .inference import (
@@ -548,21 +549,6 @@ def _validate_binary_state_controls(parsed: Dict[str, Any]) -> None:
             )
 
 
-def _parse_question_condition(
-    question: str,
-) -> Tuple[Dict[str, Any], Optional[str]]:
-    """Parse the free-text question, tolerating (and recording) failures."""
-
-    parsed: Dict[str, Any] = {}
-    parse_error: Optional[str] = None
-    if question:
-        try:
-            parsed = parse_condition(question)
-        except Exception as exc:
-            parse_error = str(exc)
-    return parsed, parse_error
-
-
 def _apply_binary_setpoint(parsed: Dict[str, Any], setpoint: Optional[int]) -> None:
     """Validate and record the setpoint for a binary (``:ST``) disturbance."""
 
@@ -595,19 +581,6 @@ def _apply_binary_setpoint(parsed: Dict[str, Any], setpoint: Optional[int]) -> N
     boundary["setpoints"] = setpoints
     parsed["boundary_conditions"] = boundary
     parsed["disturbance_setpoint"] = int(value)
-
-
-def _sync_boundary_conditions(parsed: Dict[str, Any]) -> None:
-    """Mirror the disturbance fields into boundary_conditions for downstream."""
-
-    boundary = dict(parsed.get("boundary_conditions") or {})
-    for key in (
-        "disturbance_variable",
-        "disturbance_direction",
-        "disturbance_magnitude_percent",
-    ):
-        boundary[key] = parsed.get(key)
-    parsed["boundary_conditions"] = boundary
 
 
 def _resolve_disturbance_source(
@@ -710,7 +683,14 @@ def build_pipeformer_task(
     attributes onto them by name, so this signature must not change.
     """
 
-    parsed, parse_error = _parse_question_condition(question)
+    # Parse before applying explicit overrides, retaining any parse failure.
+    parsed: Dict[str, Any] = {}
+    parse_error: Optional[str] = None
+    if question:
+        try:
+            parsed = parse_condition(question)
+        except Exception as exc:
+            parse_error = str(exc)
     parsed_direction = parsed.get("disturbance_direction")
     parsed_magnitude = parsed.get("disturbance_magnitude_percent")
     assumed_fields: List[str] = []
@@ -755,7 +735,15 @@ def build_pipeformer_task(
         parsed["constraint_verification_types"] = _clean_checks(
             constraint_verification_types
         )
-    _sync_boundary_conditions(parsed)
+    # Mirror the resolved disturbance into the downstream boundary projection.
+    boundary = dict(parsed.get("boundary_conditions") or {})
+    for key in (
+        "disturbance_variable",
+        "disturbance_direction",
+        "disturbance_magnitude_percent",
+    ):
+        boundary[key] = parsed.get(key)
+    parsed["boundary_conditions"] = boundary
 
     source = _resolve_disturbance_source(
         parsed, disturbance_source, disturbance_assumption, candidate_id

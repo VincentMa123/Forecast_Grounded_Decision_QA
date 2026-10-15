@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import copy
+import csv
 import json
-from collections import Counter
+import os
+from collections import Counter, deque
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterable, List
@@ -241,8 +243,7 @@ def normalize_task_variables(
 ) -> Dict[str, Any]:
     """Normalize explicit task variable references using one registry."""
     normalized = copy.deepcopy(parsed_task)
-    resolutions: List[Dict[str, Any]] = []
-    seen = set()
+    resolutions: Dict[tuple[str, str, str], Dict[str, Any]] = {}
 
     def resolve(value: Any) -> str:
         resolution = registry.resolve_name(str(value))
@@ -251,9 +252,8 @@ def normalize_task_variables(
             resolution["resolved_variable"],
             resolution["method"],
         )
-        if resolution["normalization_applied"] and identity not in seen:
-            seen.add(identity)
-            resolutions.append(resolution)
+        if resolution["normalization_applied"]:
+            resolutions.setdefault(identity, resolution)
         return str(resolution["resolved_variable"])
 
     if normalized.get("disturbance_variable"):
@@ -279,7 +279,7 @@ def normalize_task_variables(
             resolved_values[resolved_name] = value
         boundary[field] = resolved_values
     normalized["boundary_conditions"] = boundary
-    normalized["variable_normalizations"] = resolutions
+    normalized["variable_normalizations"] = list(resolutions.values())
     return normalized
 
 
@@ -360,3 +360,97 @@ def _invalid_registry_report(path: Path, error: str) -> Dict[str, Any]:
         "errors": [error],
         "supported": False,
     }
+
+
+# ---------------------------------------------------------------------------
+# Registry search tool service
+# ---------------------------------------------------------------------------
+
+REGISTRY_RESULT_FIELDS = ("variable", "role", "controllable")
+
+
+class PipeFormerRegistrySearchService:
+    """Search and bound the PipeFormer registry result at the application boundary."""
+
+    def __init__(self, repo_or_backend_root: Path) -> None:
+        root = Path(repo_or_backend_root).resolve()
+        self.repo_root = root if (root / "pipeFormer").is_dir() else root.parents[1]
+
+    def _registry_path(self) -> Path:
+        override = os.getenv("PIPEFORMER_VARIABLE_REGISTRY")
+        if override:
+            return Path(override).expanduser().resolve()
+        return (
+            self.repo_root
+            / "pipeFormer"
+            / "data"
+            / "mock_lifecycle"
+            / "static"
+            / "mock_lifecycle"
+            / "variable_registry.json"
+        )
+
+    def _topology_distances(self, targets: List[str]) -> Dict[str, int]:
+        path = self._registry_path().parent / "save_connect_all_nodes.csv"
+        if not targets or not path.is_file():
+            return {}
+        graph: Dict[str, set[str]] = {}
+        with path.open("r", encoding="utf-8-sig", newline="") as handle:
+            for row in csv.DictReader(handle):
+                left = str(row.get("node") or "").strip()
+                right = str(row.get("connected_node") or "").strip()
+                if not left or not right:
+                    continue
+                graph.setdefault(left, set()).add(right)
+                graph.setdefault(right, set()).add(left)
+        distances: Dict[str, int] = {}
+        queue = deque()
+        for target in targets:
+            normalized = str(target).strip()
+            if normalized in graph and normalized not in distances:
+                distances[normalized] = 0
+                queue.append(normalized)
+        while queue:
+            node = queue.popleft()
+            for neighbor in graph.get(node, ()):
+                if neighbor not in distances:
+                    distances[neighbor] = distances[node] + 1
+                    queue.append(neighbor)
+        return distances
+
+    def search(self, **filters: Any) -> Dict[str, Any]:
+        try:
+            registry = VariableRegistry.read(self._registry_path())
+            attention_targets = [
+                str(value) for value in filters.pop("attention_targets", [])
+            ]
+            offset = max(0, int(filters.pop("offset", 0)))
+            limit = max(1, min(int(filters.pop("limit", 12)), 50))
+            variables = registry.search(
+                **filters,
+            )
+            distances = self._topology_distances(attention_targets)
+            if attention_targets:
+                variables = sorted(
+                    variables,
+                    key=lambda item: (
+                        distances.get(str(item.get("equipment_id")), float("inf")),
+                        str(item.get("variable")),
+                    ),
+                )
+            page = variables[offset : offset + limit]
+            result = {
+                "success": True,
+                "matched_variable_count": len(page),
+                "matched_total_count": len(variables),
+                "offset": offset,
+            }
+            if offset + len(page) < len(variables):
+                result["next_offset"] = offset + len(page)
+            result["variables"] = [
+                {key: item[key] for key in REGISTRY_RESULT_FIELDS if key in item}
+                for item in page
+            ]
+            return result
+        except Exception as exc:
+            return {"error": str(exc), "variables": []}

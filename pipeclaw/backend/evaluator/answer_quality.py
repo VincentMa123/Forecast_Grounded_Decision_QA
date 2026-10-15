@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Dict, List, Optional
+from dataclasses import dataclass
+from typing import Any, Dict, Iterable, List, Optional
 
 from pipeclaw.backend.grounding.answer_limits import (
     CHINESE_SINGLE_FORECAST_MAX_CHARS,
@@ -13,10 +14,12 @@ from pipeclaw.backend.grounding.answer_limits import (
 from pipeclaw.backend.grounding.contract import (
     answer_without_machine_disclosure,
     comparison_answer_issues,
+    is_chinese,
     provisional_assumption_disclosed,
     record_grounding_contract,
 )
 from pipeclaw.backend.grounding.decision_trace_state import VerifiedDecisionState
+from pipeclaw.backend.grounding.validation import UNSUPPORTED_UNIT_PATTERN
 from pipeclaw.backend.grounding.evidence.tool import (
     attach_tool_arguments,
     requested_data_retrieved,
@@ -30,15 +33,12 @@ from pipeclaw.backend.grounding.evidence.topology import (
 )
 from pipeclaw.backend.evaluator.numeric_grounding import (
     numeric_claims_are_grounded,
+    trusted_conversation_context,
 )
 from pipeclaw.backend.evaluator.quality_references import (
     file_references,
     numeric_claim_values,
     variable_references,
-)
-from pipeclaw.backend.evaluator.quality_context import (
-    QualityContext,
-    build_quality_context,
 )
 
 UNSUPPORTED_HISTORY_CLAIM = re.compile(
@@ -91,9 +91,7 @@ INFERENCE_QUALIFIER = re.compile(
     r"|\b(?:cannot|insufficient|unresolved|preliminary|may|might|likely|appears?)\b",
     re.IGNORECASE,
 )
-UNSUPPORTED_UNIT_CLAIM = re.compile(
-    r"(?i)(?:万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)"
-)
+UNSUPPORTED_UNIT_CLAIM = re.compile("(?i)" + UNSUPPORTED_UNIT_PATTERN)
 UNSUPPORTED_ABSOLUTE_ASSERTION = re.compile(
     r"最敏感|不丢失(?:任何)?(?:关键)?信息|就能判断|必然(?:导致|说明)|"
     r"合并为|整段已合并|"
@@ -101,6 +99,61 @@ UNSUPPORTED_ABSOLUTE_ASSERTION = re.compile(
     r"\bcan determine\b|\bmerged into\b|\bguarantees?\b",
     re.IGNORECASE,
 )
+
+
+# ---------------------------------------------------------------------------
+# Quality context: the immutable trusted view shared by live and offline checks
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class QualityContext:
+    answer: str
+    question: str
+    pipeformer: Optional[Dict[str, Any]]
+    conversation_context: tuple[Dict[str, Any], ...]
+    tool_outputs: tuple[Dict[str, Any], ...]
+    record_evidence: Dict[str, Any]
+    grounding_evidence: Dict[str, Any]
+
+
+def build_quality_context(
+    *,
+    answer: str,
+    question: str,
+    pipeformer: Optional[Dict[str, Any]],
+    conversation_context: Optional[Iterable[Dict[str, Any]]] = None,
+    tool_outputs: Optional[Iterable[Dict[str, Any]]] = None,
+    record_evidence: Optional[Dict[str, Any]] = None,
+) -> QualityContext:
+    """Build the immutable trusted view used by live and offline validation."""
+
+    trusted_context = trusted_conversation_context(conversation_context or [])
+    normalized_outputs = tuple(dict(item) for item in tool_outputs or [])
+    trusted_tool_outputs = tuple(
+        item for item in normalized_outputs if not tool_evidence_unavailable(item)
+    )
+    normalized_pipeformer = dict(pipeformer) if pipeformer else None
+    normalized_record_evidence = dict(record_evidence or {})
+    return QualityContext(
+        answer=answer,
+        question=question,
+        pipeformer=normalized_pipeformer,
+        conversation_context=tuple(trusted_context),
+        tool_outputs=normalized_outputs,
+        record_evidence=normalized_record_evidence,
+        grounding_evidence={
+            "pipeformer": normalized_pipeformer or {},
+            "conversation_context": trusted_context,
+            "tool_outputs": list(trusted_tool_outputs),
+            "record_evidence": normalized_record_evidence,
+        },
+    )
+
+
+# ---------------------------------------------------------------------------
+# Answer-quality checks
+# ---------------------------------------------------------------------------
 
 
 def answer_quality_issues(
@@ -232,9 +285,7 @@ def _answer_quality_issues(context: QualityContext) -> List[str]:
     )
     is_forecast_comparison = comparison_candidate_count > 1
     budgeted_answer = answer_without_machine_disclosure(answer)
-    has_chinese = any(
-        "一" <= character <= "鿿" for character in budgeted_answer
-    )
+    has_chinese = is_chinese(budgeted_answer)
     if has_forecast_result or successful_forecast_count:
         if has_chinese and len(budgeted_answer) > (
             chinese_comparison_max_chars(comparison_candidate_count)

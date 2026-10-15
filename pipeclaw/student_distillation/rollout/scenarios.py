@@ -8,11 +8,9 @@ from typing import Any, Mapping, Sequence
 from pipeclaw.backend.pipeline.forecast.result import ForecastResult
 
 from pipeclaw.protocols.path_contract import (
-    canonicalize_recorded_tool_arguments,
     is_host_absolute_path,
     redact_host_paths,
 )
-from .models import PromptCase
 from .tools import ToolDispatcher
 from pipeclaw.protocols.tool_calls import ToolCall
 
@@ -198,35 +196,6 @@ def compact_model_tool_result(
     return forecast.model_dump()
 
 
-class ScenarioPolicy:
-    """The ``RolloutPolicy`` used by both PipeFormer and OpenClaw rollouts.
-
-    Portability metadata is only meaningful for the OpenClaw workspace tools, so
-    the scenario type of the case decides whether it is collected; compaction is
-    keyed on the tool name and therefore stays correct for both families.
-    """
-
-    def portability_metadata(
-        self, call: ToolCall, case: PromptCase
-    ) -> Mapping[str, Any]:
-        if not is_openclaw_scenario(case.scenario_type):
-            return {}
-        return openclaw_portability_metadata(call)
-
-    def recorded_arguments(self, call: ToolCall, case: PromptCase) -> Mapping[str, Any]:
-        del case
-        return canonicalize_recorded_tool_arguments(call.name, call.arguments)
-
-    def compact_tool_result(
-        self,
-        call: ToolCall,
-        result: Any,
-        *,
-        portability: Mapping[str, Any] | None = None,
-    ) -> Any:
-        return compact_model_tool_result(call.name, result, portability=portability)
-
-
 def path_within(root: Path, target: Path) -> bool:
     try:
         target.resolve().relative_to(root.resolve())
@@ -351,13 +320,9 @@ def openclaw_policy_error(
     return None
 
 
-def normalize_openclaw_execution_arguments(
-    call: ToolCall,
-    workspace_root: Path,
-) -> Mapping[str, Any]:
+def normalize_openclaw_execution_arguments(call: ToolCall) -> Mapping[str, Any]:
     """Rebase a host or Windows ``cwd`` onto the active evaluation workspace."""
 
-    del workspace_root
     arguments = dict(call.arguments)
     if call.name == "run_command":
         cwd = arguments.get("cwd")
@@ -437,7 +402,7 @@ def _build_dispatcher(
     def transform(call: ToolCall) -> Mapping[str, Any]:
         if active_workspace_root is None:
             raise RuntimeError("OpenClaw workspace has not been initialized")
-        return normalize_openclaw_execution_arguments(call, active_workspace_root)
+        return normalize_openclaw_execution_arguments(call)
 
     dispatcher = ToolDispatcher(
         tool_registry,

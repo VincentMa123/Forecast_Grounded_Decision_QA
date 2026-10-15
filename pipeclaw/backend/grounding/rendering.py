@@ -119,19 +119,17 @@ def applied_disturbance_disclosure(contract: Dict[str, Any]) -> str:
 
 
 def _compact_assumption_lines(contract: Dict[str, Any], chinese: bool) -> List[str]:
-    lines = []
-    seen = set()
+    lines = {}
     for item in contract.get("provisional_assumptions") or []:
         variable = str(item.get("variable") or "disturbance")
         direction = str(item.get("direction") or "unknown")
         magnitude = item.get("magnitude_percent")
         setpoint = item.get("setpoint")
         key = (variable.casefold(), direction.casefold(), format_number(magnitude), format_number(setpoint))
-        if key in seen:
+        if key in lines:
             continue
-        seen.add(key)
         if variable.endswith(":ST") and setpoint is not None:
-            lines.append(
+            lines[key] = (
                 f"LLM暂设：{variable}={format_number(setpoint)}。"
                 if chinese
                 else f"Provisional LLM assumption: {variable}={format_number(setpoint)}."
@@ -140,11 +138,11 @@ def _compact_assumption_lines(contract: Dict[str, Any], chinese: bool) -> List[s
         if chinese:
             direction_label = {"up": "上调", "down": "下调"}.get(direction.casefold(), direction)
             suffix = "" if magnitude is None else f"{format_number(magnitude)}%"
-            lines.append(f"LLM临时假设：{variable}{direction_label}{suffix}。")
+            lines[key] = f"LLM临时假设：{variable}{direction_label}{suffix}。"
         else:
             suffix = "" if magnitude is None else f" {format_number(magnitude)}%"
-            lines.append(f"Provisional LLM assumption: {variable} {direction}{suffix}.")
-    return lines
+            lines[key] = f"Provisional LLM assumption: {variable} {direction}{suffix}."
+    return list(lines.values())
 
 
 def _objective_label(objective: Dict[str, Any], chinese: bool) -> str:

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Mapping, Protocol
 
 from .models import (
     Generator,
@@ -9,69 +8,22 @@ from .models import (
     RolloutConfig,
     RolloutResult,
 )
-from .episode import dispatch_and_record
-from .tools import ToolDispatcher
-from pipeclaw.protocols.tool_calls import ToolCall, jsonable, parse_tool_calls
-
-
-class RolloutPolicy(Protocol):
-    """Scenario-specific normalization applied to recorded calls and outputs."""
-
-    def portability_metadata(
-        self, call: ToolCall, case: PromptCase
-    ) -> Mapping[str, Any]:
-        """Return path-portability diagnostics for one call."""
-
-    def recorded_arguments(self, call: ToolCall, case: PromptCase) -> Mapping[str, Any]:
-        """Return the arguments saved in the rollout record."""
-
-    def compact_tool_result(
-        self,
-        call: ToolCall,
-        result: Any,
-        *,
-        portability: Mapping[str, Any] | None = None,
-    ) -> Any:
-        """Return the bounded tool result shown to the model and saved."""
-
-
-class PassthroughPolicy:
-    """Record calls and results verbatim; used by tests and simple harnesses."""
-
-    def portability_metadata(
-        self, call: ToolCall, case: PromptCase
-    ) -> Mapping[str, Any]:
-        del call, case
-        return {}
-
-    def recorded_arguments(self, call: ToolCall, case: PromptCase) -> Mapping[str, Any]:
-        del case
-        return dict(call.arguments)
-
-    def compact_tool_result(
-        self,
-        call: ToolCall,
-        result: Any,
-        *,
-        portability: Mapping[str, Any] | None = None,
-    ) -> Any:
-        del call, portability
-        return result
+from .scenarios import (
+    compact_model_tool_result,
+    is_openclaw_scenario,
+    openclaw_portability_metadata,
+)
+from .tools import ToolDispatcher, dispatch_and_record
+from pipeclaw.protocols.path_contract import canonicalize_recorded_tool_arguments
+from pipeclaw.protocols.tool_calls import jsonable, parse_tool_calls
 
 
 class RolloutRunner:
     """Run one bounded model/tool conversation and preserve all partial state."""
 
-    def __init__(
-        self,
-        generator: Generator,
-        dispatcher: ToolDispatcher,
-        *,
-        policy: RolloutPolicy | None = None,
-    ) -> None:
+    def __init__(self, generator: Generator, dispatcher: ToolDispatcher) -> None:
         self.generator = generator
         self.dispatcher = dispatcher
-        self.policy: RolloutPolicy = policy or PassthroughPolicy()
 
     def run(self, case: PromptCase, config: RolloutConfig) -> RolloutResult:
         """Execute ``case`` under ``config`` and return its full trajectory."""
@@ -107,16 +59,23 @@ class RolloutRunner:
             result.json_errors.extend(errors)
 
             if calls:
+                # Portability diagnostics exist only for OpenClaw workspace tools;
+                # argument canonicalization and compaction are keyed on the tool
+                # name, so they are correct for both scenario families.
                 dispatch_and_record(
                     calls,
                     dispatcher=self.dispatcher,
                     result=result,
-                    portability_metadata=lambda call: self.policy.portability_metadata(
-                        call, case
+                    portability_metadata=(
+                        openclaw_portability_metadata
+                        if is_openclaw_scenario(case.scenario_type)
+                        else None
                     ),
-                    record_arguments=lambda call: self.policy.recorded_arguments(call, case),
-                    compact_result=lambda call, tool_result, portability: self.policy.compact_tool_result(
-                        call, tool_result, portability=portability
+                    record_arguments=lambda call: canonicalize_recorded_tool_arguments(
+                        call.name, call.arguments
+                    ),
+                    compact_result=lambda call, tool_result, portability: compact_model_tool_result(
+                        call.name, tool_result, portability=portability
                     ),
                     assistant_content=text,
                 )
@@ -142,14 +101,9 @@ class RolloutRunner:
         return result
 
     def _prepare_dispatcher(self, case: PromptCase) -> None:
-        reset_history = getattr(self.dispatcher, "reset_history", None)
-        if callable(reset_history):
-            reset_history()
-        set_current_user_request = getattr(
-            self.dispatcher, "set_current_user_request", None
-        )
-        if callable(set_current_user_request):
-            user_message = next(
+        self.dispatcher.reset_history()
+        self.dispatcher.set_current_user_request(
+            next(
                 (
                     message["content"]
                     for message in reversed(case.messages)
@@ -158,7 +112,6 @@ class RolloutRunner:
                 ),
                 "",
             )
-            set_current_user_request(user_message)
-        set_case_workspace = getattr(self.dispatcher, "set_case_workspace", None)
-        if callable(set_case_workspace) and case.workspace_root is not None:
-            set_case_workspace(Path(case.workspace_root))
+        )
+        if case.workspace_root is not None:
+            self.dispatcher.set_case_workspace(Path(case.workspace_root))

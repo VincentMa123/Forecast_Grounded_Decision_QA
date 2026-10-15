@@ -11,7 +11,7 @@ from pipeclaw.backend.pipeline.scenario_preflight import (
     DATA_FILE_SUBDIRECTORIES,
     DEFAULT_PIPELINE_DATA_ROOT,
 )
-from .pipeline_scope import filter_rows_by_named_pipeline
+from .csv import filter_rows_by_named_pipeline
 
 
 TARGET_STATION_RE = re.compile(

@@ -20,16 +20,14 @@ from .contract import (
     successful_pipeformer_results,
 )
 from .evidence.tool import attach_tool_arguments
+from .validation import UNSUPPORTED_UNIT_PATTERN
 
 
 _LINEPACK_DECLINE_REQUEST = re.compile(
     r"管存.{0,12}(?:持续|下降|走低|消耗)|(?:持续|下降|走低).{0,12}管存|linepack.{0,12}(?:declin|fall|decreas)",
     re.IGNORECASE,
 )
-_UNSUPPORTED_UNIT_TOKEN = re.compile(
-    r"(?:万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)",
-    re.IGNORECASE,
-)
+_UNSUPPORTED_UNIT_TOKEN = re.compile(UNSUPPORTED_UNIT_PATTERN, re.IGNORECASE)
 
 
 def _status_summary(category_status: Dict[str, Any], chinese: bool) -> str:
@@ -243,11 +241,10 @@ def repair_grounded_record(record: Dict[str, Any]) -> Dict[str, Any]:
             "reason": "Multi-candidate answer rebuilt from stored tool evidence.",
         }
 
-    should_render_single = bool(pipeformer_results) and (
+    elif pipeformer_results and (
         legacy_method == "offline_deterministic_repair"
-        or bool(issues & {"answer_too_long", "unsupported_unit_claim"})
-    )
-    if answer_mode != "dispatch_comparison" and should_render_single:
+        or issues & {"answer_too_long", "unsupported_unit_claim"}
+    ):
         repaired["final_answer"] = _single_forecast_answer(
             question, pipeformer_results[0], contract=contract
         )

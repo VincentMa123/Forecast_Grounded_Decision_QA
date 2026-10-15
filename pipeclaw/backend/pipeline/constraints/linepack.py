@@ -178,8 +178,6 @@ def _peak_shaving_reserve_check(
     fail_reserve = float(limits["fail_reserve"])
     registry = registry_index(parsed_task)
     evaluated = []
-    capacity = {}
-    statuses = []
     for variable in variables:
         metadata = registry.get(variable, {})
         lower_bound = float(metadata.get("lower_limit", limits["safe_lower_bound"]))
@@ -200,7 +198,6 @@ def _peak_shaving_reserve_check(
             if reserve <= warning_reserve
             else "pass"
         )
-        statuses.append(status)
         item = {
             "variable": variable,
             "metric": "minimum_linepack_reserve",
@@ -213,15 +210,14 @@ def _peak_shaving_reserve_check(
             "status": status,
         }
         evaluated.append(item)
-        capacity[variable] = item
 
-    status = max_status(statuses)
+    status = max_status(item["status"] for item in evaluated)
     flags = LINEPACK_RESERVE_RULE["flags"]
     return {
         "name": LINEPACK_RESERVE_RULE["rule_id"],
         "category": "linepack",
         "status": status,
-        "evaluation_status": "evaluated" if statuses else "not_evaluated",
+        "evaluation_status": "evaluated" if evaluated else "not_evaluated",
         "flag": flags.get(status),
         "priority": int(LINEPACK_RESERVE_RULE["priority"]),
         "variables": variables,
@@ -236,5 +232,5 @@ def _peak_shaving_reserve_check(
         ),
         "evaluated_values": evaluated,
         "offending_values": [item for item in evaluated if item["status"] != "pass"],
-        "peak_shaving_capacity": capacity,
+        "peak_shaving_capacity": {item["variable"]: item for item in evaluated},
     }

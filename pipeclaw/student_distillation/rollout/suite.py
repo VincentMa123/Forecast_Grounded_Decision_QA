@@ -23,7 +23,6 @@ from .models import PromptCase, RolloutConfig
 from .prompting import build_prompt_case, parse_tool_schemas
 from .runner import RolloutRunner
 from .scenarios import (
-    ScenarioPolicy,
     build_dispatcher,
     evaluation_workspace_key,
     is_openclaw_scenario,
@@ -424,11 +423,8 @@ def build_runner_selector(
 
     generator = load_evaluation_generator(args, **model_options)
     repo_root = Path(getattr(args, "repo_root", "."))
-    policy = ScenarioPolicy()
     runners = {
-        family: RolloutRunner(
-            generator, build_dispatcher(family, schemas, repo_root), policy=policy
-        )
+        family: RolloutRunner(generator, build_dispatcher(family, schemas, repo_root))
         for family, schemas in _group_scenario_schemas(cases, copy_schemas=copy_schemas).items()
     }
 

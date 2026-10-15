@@ -215,7 +215,6 @@ def build_grounding_contract(
     if pipeformer or prior_candidates or prior_applied:
         return _pipeformer_contract(
             pipeformer,
-            question,
             decision_policy=resolved_decision_policy,
             decision_policy_question=decision_policy_question,
             require_decision_policy=require_decision_policy,
@@ -226,7 +225,6 @@ def build_grounding_contract(
 
 def _pipeformer_contract(
     results: List[Dict[str, Any]],
-    question: str,
     *,
     decision_policy: Optional[Dict[str, Any]],
     decision_policy_question: str,

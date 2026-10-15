@@ -15,7 +15,6 @@ from .tool import (
     normalized_tool_path,
     tool_evidence_unavailable,
 )
-from .pipeline_scope import PIPELINE_COLUMNS, filter_rows_by_named_pipeline
 
 
 MAX_EVIDENCE_ROWS = 12
@@ -58,6 +57,39 @@ AGGREGATION_RE = re.compile(
     r"|\b(?:sum|total|aggregate|cumulative)\b",
     re.IGNORECASE,
 )
+PIPELINE_COLUMNS = ("管道划分", "管线", "pipeline")
+
+
+def filter_rows_by_named_pipeline(
+    rows: Iterable[Dict[str, str]],
+    scope_text: str,
+) -> tuple[List[Dict[str, str]], List[str]]:
+    """Filter rows when authoritative text explicitly names a pipeline value.
+
+    Shared with topology evidence, which reads the same pipeline CSV columns.
+    """
+    materialized = list(rows)
+    folded_scope = scope_text.casefold()
+    available = list(
+        dict.fromkeys(
+            value
+            for row in materialized
+            for column in PIPELINE_COLUMNS
+            if (value := str(row.get(column) or "").strip())
+        )
+    )
+    selected = [value for value in available if value.casefold() in folded_scope]
+    if not selected:
+        return materialized, []
+    selected_set = set(selected)
+    return [
+        row
+        for row in materialized
+        if any(
+            str(row.get(column) or "").strip() in selected_set
+            for column in PIPELINE_COLUMNS
+        )
+    ], selected
 ABSOLUTE_RE = re.compile(r"绝对|absolute|\|[^|]+\|", re.IGNORECASE)
 START_COLUMNS = ("起点站名", "起点", "from", "start")
 END_COLUMNS = ("终点站名", "终点", "to", "end")

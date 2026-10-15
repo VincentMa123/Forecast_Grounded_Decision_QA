@@ -11,7 +11,7 @@ from pipeclaw.student_distillation.release_artifacts import (
     atomic_jsonl_writer,
     atomic_write_text,
 )
-from pipeclaw.student_distillation.reward import composite_reward, episode_stats
+from pipeclaw.student_distillation.reward import RUN_TOOL, composite_reward, episode_stats
 from pipeclaw.student_distillation.rollout.models import RolloutConfig
 from pipeclaw.student_distillation.rollout.prompting import build_prompt_case
 from pipeclaw.student_distillation.rollout.scenarios import (
@@ -29,7 +29,6 @@ from pipeclaw.student_distillation.rollout.suite import (
 from tqdm.auto import tqdm
 
 
-RUN_TOOL = "run_command"
 TOPOLOGY_TOOL = "analyze_pipeline_topology"
 
 

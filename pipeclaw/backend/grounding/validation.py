@@ -8,6 +8,9 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence
 from .construction import provisional_assumptions
 
 
+UNSUPPORTED_UNIT_PATTERN = r"(?:万方/日|万立方米/日|立方米/秒|m³/d|m3/d|m³/s|m3/s|MPa|kPa|bar|MW|kW)"
+
+
 def format_number(value: Any) -> str:
     try:
         number = float(value)
