@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from collections.abc import Sequence
+import json
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +34,10 @@ from pipeclaw.student_distillation.scripts.validate_dataset import (
     DatasetValidationError,
     _normalize_tool_schemas,
     load_registered_tool_schemas,
+    projection_selection_for_split,
     projection_writes_python,
     read_jsonl,
+    read_projection_source,
     validate_projection_records,
     validate_source_records,
 )
@@ -224,6 +227,7 @@ def generate_datasets(
     manifest_path: Path,
     expected_counts: dict[str, int],
     created_at: str | None = None,
+    source_selection: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Generate and validate all Task 2 projections plus their manifest."""
     source_root, output_root, manifest_path = (
@@ -235,11 +239,13 @@ def generate_datasets(
     source_hashes: dict[str, str] = {}
     source_ids: dict[str, set[str]] = {}
     for split in SPLITS:
-        if split not in expected_counts:
+        selection = projection_selection_for_split(source_selection, split)
+        if selection is None and split not in expected_counts:
             raise DatasetValidationError(f"missing expected count for {split}")
         path = source_root / f"teacher_trace_{split}.jsonl"
-        records = read_jsonl(path)
-        validate_source_records(records, split=split, expected_count=expected_counts[split])
+        records = read_projection_source(path, selection)
+        count = selection["eligible_count"] if selection is not None else expected_counts[split]
+        validate_source_records(records, split=split, expected_count=count)
         source_records[split] = [redact_host_paths(record) for record in records]
         source_hashes[split] = _sha256_file(path)
         source_ids[split] = {str(record["sample_id"]) for record in records}
@@ -265,6 +271,8 @@ def generate_datasets(
         "projections": {projection: {} for projection in PROJECTIONS},
         "corrective_datasets": {"python_script": {}},
     }
+    if source_selection is not None:
+        manifest["source_selection"] = source_selection
     trace_records: dict[str, list[dict[str, Any]]] = {}
     for projection in PROJECTIONS:
         for split in SPLITS:
@@ -449,8 +457,9 @@ def _paired_tool_messages(
         if output.get("name") != name:
             raise DatasetValidationError(f"{source['sample_id']}: tool name mismatch for {call_id}")
         payload = output.get("output")
-        if not isinstance(payload, dict) or payload.get("success") is not True:
-            raise DatasetValidationError(f"{source['sample_id']}: tool output {call_id} must be successful")
+        if not isinstance(payload, dict):
+            raise DatasetValidationError(f"{source['sample_id']}: tool output {call_id} must be an object")
+        failed = payload.get("success") is not True
         arguments = canonicalize_recorded_tool_arguments(
             name, call.get("arguments") or {}
         )
@@ -458,7 +467,9 @@ def _paired_tool_messages(
             {
                 "role": "tool_call",
                 "content": stable_json({"name": name, "arguments": arguments}),
-                "loss": True,
+                # A rejected call is kept as context but never reinforced: the
+                # student learns the correction, not the mistake.
+                "loss": not failed,
             },
             {
                 "role": "tool_response",
@@ -489,17 +500,30 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--source-root", type=Path, default=DEFAULT_SOURCE_ROOT)
     parser.add_argument("--output-root", type=Path, default=DEFAULT_OUTPUT_ROOT)
     parser.add_argument("--manifest-path", type=Path, default=DEFAULT_MANIFEST_PATH)
+    parser.add_argument("--ablation-manifest", type=Path, help="Match the frozen source selection used by A–D.")
     parser.add_argument(
         "--created-at",
         help="Optional fixed UTC timestamp for reproducible manifest tests.",
     )
     args = parser.parse_args(argv)
+    source_selection = None
+    if args.ablation_manifest:
+        try:
+            ablation = json.loads(args.ablation_manifest.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as exc:
+            parser.error(f"could not read ablation manifest: {exc}")
+        if not isinstance(ablation, dict) or ablation.get("schema_version") != "task2_trace_ablation_v1":
+            parser.error("unsupported ablation manifest schema")
+        source_selection = ablation.get("sources")
+        if not isinstance(source_selection, dict) or set(source_selection) != set(SPLITS):
+            parser.error("ablation manifest must include train, valid, and test sources")
     manifest = generate_datasets(
         source_root=args.source_root,
         output_root=args.output_root,
         manifest_path=args.manifest_path,
         expected_counts=EXPECTED_SOURCE_COUNTS,
         created_at=args.created_at,
+        source_selection=source_selection,
     )
     print(stable_json(manifest))
     return 0

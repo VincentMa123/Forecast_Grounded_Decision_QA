@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from argparse import Namespace
 from dataclasses import dataclass
+import json
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional
 
 from pipeclaw.backend.pipeline.io_utils import load_records, write_json, write_jsonl
@@ -38,10 +40,40 @@ class TeacherTraceStore:
             if paths.output_jsonl.is_file() and paths.output_jsonl.stat().st_size > 0
             else paths.output_json
         )
-        return self.load(source)
+        return self._last_wins(self.load(source), "sample_id")
 
     def load_sessions(self) -> List[Dict[str, Any]]:
-        return self.load(self._require_paths().session_output_jsonl)
+        return self._last_wins(
+            self.load(self._require_paths().session_output_jsonl), "session_record_id"
+        )
+
+    @staticmethod
+    def _last_wins(records: List[Dict[str, Any]], id_field: str) -> List[Dict[str, Any]]:
+        """Collapse ids appended by resumed runs: first position, latest content."""
+        by_id: Dict[str, Dict[str, Any]] = {}
+        for index, item in enumerate(records):
+            by_id[str(item.get(id_field) or f"__no_id_{index}")] = item
+        return list(by_id.values())
+
+    def append_progress(
+        self, records: List[Dict[str, Any]], session_records: List[Dict[str, Any]]
+    ) -> None:
+        """Append one finished scenario so a crash cannot discard completed work."""
+        paths = self._require_paths()
+        if records and not (
+            paths.output_jsonl.is_file() and paths.output_jsonl.stat().st_size > 0
+        ):
+            write_jsonl(paths.output_jsonl, self.load(paths.output_json), force=True)
+        for path, items in (
+            (paths.output_jsonl, records),
+            (paths.session_output_jsonl, session_records),
+        ):
+            if not items:
+                continue
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with path.open("a", encoding="utf-8", newline="\n") as handle:
+                for item in items:
+                    handle.write(json.dumps(item, ensure_ascii=False) + "\n")
 
     def write_master(self, records: List[Dict[str, Any]]) -> None:
         paths = self._require_paths()
@@ -75,7 +107,11 @@ class TeacherTraceStore:
         id_field: str,
     ) -> tuple[List[Dict[str, Any]], int]:
         merged = list(existing)
-        seen = {str(item[id_field]) for item in existing if item.get(id_field)}
+        positions = {
+            str(item[id_field]): idx
+            for idx, item in enumerate(existing)
+            if item.get(id_field)
+        }
         duplicate_count = 0
         for item in generated:
             record_id = str(item.get(id_field) or "")
@@ -83,10 +119,17 @@ class TeacherTraceStore:
                 raise ValueError(
                     f"Generated record is missing required id field {id_field!r}."
                 )
-            if record_id in seen:
+            if record_id in positions:
+                idx = positions[record_id]
+                if (
+                    merged[idx].get("trace_status")
+                    and merged[idx].get("trace_status") != "completed"
+                ):
+                    merged[idx] = item
+                    continue
                 duplicate_count += 1
                 continue
-            seen.add(record_id)
+            positions[record_id] = len(merged)
             merged.append(item)
         return merged, duplicate_count
 
@@ -201,6 +244,7 @@ class TeacherTraceStore:
     @staticmethod
     def validate_splits(records: List[Dict[str, Any]]) -> None:
         scenario_splits: Dict[str, str] = {}
+        case_splits: Dict[str, str] = {}
         for record in records:
             scenario_id = str(record.get("scenario_id") or "")
             split = str(record.get("split") or "")
@@ -212,6 +256,15 @@ class TeacherTraceStore:
                     f"Scenario {scenario_id!r} appears in both {prior!r} and {split!r}; "
                     "regenerate with --force."
                 )
+            match = re.search(r"mock_test_(\d{3})", str(record.get("user_input") or ""))
+            if match:
+                case_id = f"mock_test_{int(match.group(1)):03d}"
+                prior_case = case_splits.setdefault(case_id, split)
+                if prior_case != split:
+                    raise ValueError(
+                        f"Case {case_id!r} appears in both {prior_case!r} and {split!r}; "
+                        "regenerate with --force."
+                    )
 
     @staticmethod
     def sample_ids(scenario: Dict[str, Any]) -> List[str]:

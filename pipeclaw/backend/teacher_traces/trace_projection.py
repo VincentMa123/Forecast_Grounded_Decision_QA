@@ -29,6 +29,19 @@ from pipeclaw.backend.teacher_traces.trace_history import (
 )
 
 
+def script_path_key(value: Any) -> str:
+    """Collapse the spellings the harness accepts for one generated script.
+
+    ``write_file`` may be given the bare ``temporary_dir/x.py`` path, a path prefixed with the
+    agent workspace (``workspace-<agent>/temporary_dir/x.py``) or an absolute path through that
+    workspace, while ``run_command`` normally names the bare form. Comparison therefore has to
+    happen on the scratch-relative tail rather than on the literal string.
+    """
+    path = normalized_tool_path(value)
+    cut = path.rfind("temporary_dir/")
+    return path[cut:] if cut != -1 else path
+
+
 SFT_MAX_TOOL_TEXT_CHARS = 4_000
 SFT_MAX_GENERIC_TOOL_PAIRS = 6
 SFT_MAX_GENERIC_OUTPUT_CHARS = 2_500
@@ -355,7 +368,33 @@ class TeacherTraceProjector:
             multiple_pipeformer = False
             selected = pairs[-1:]
 
+        selected = self._keep_failed_attempts(pairs, selected)
+        selected = self._include_script_producers(pairs, selected)
         return selected, multiple_pipeformer
+
+    @staticmethod
+    def _keep_failed_attempts(
+        pairs: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+        selected: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
+    ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
+        """Keep the failed call that a selected retry of the same tool recovers from."""
+
+        chosen = {pair[0] for pair in selected}
+        for index, call, _ in selected:
+            name = call.get("name")
+            failed = [
+                pair
+                for pair in pairs
+                if pair[0] < index
+                and pair[1].get("name") == name
+                and name != "run_command"
+                and isinstance(pair[2], dict)
+                and (pair[2].get("output") or {}).get("success") is not True
+            ]
+            if failed and failed[-1][0] not in chosen:
+                selected = [*selected, failed[-1]]
+                chosen.add(failed[-1][0])
+        return sorted(selected, key=lambda pair: pair[0])
 
     def _compact_trajectory_pairs(
         self,
@@ -388,8 +427,10 @@ class TeacherTraceProjector:
             if output is None:
                 continue
             raw_output = output.get("output")
-            if call.get("name") == "run_pipeformer_forecast" and isinstance(
-                raw_output, dict
+            if (
+                call.get("name") == "run_pipeformer_forecast"
+                and isinstance(raw_output, dict)
+                and raw_output.get("success") is True
             ):
                 raw_output = self._select_forecast_evidence_for_sft(
                     raw_output,
@@ -407,6 +448,26 @@ class TeacherTraceProjector:
                 # Application-boundary contracts are already bounded; recurse
                 # only to apply the shared text sanitization rules.
                 raw_output = self.compact_sft_output(raw_output)
+                if isinstance(raw_output.get("variables"), list):
+                    vars_list = [
+                        _select_fields(v, ("variable", "role", "controllable", "group"))
+                        if isinstance(v, dict)
+                        else v
+                        for v in raw_output["variables"]
+                    ]
+                    if (
+                        max_pipeformer_variables is not None
+                        and max_pipeformer_variables < SFT_MAX_PIPEFORMER_VARIABLES
+                        and len(vars_list) > 5
+                    ):
+                        ref_tokens = {t.casefold() for t in self._reference_tokens(answer)}
+                        prioritized = [
+                            v for v in vars_list
+                            if isinstance(v, dict) and str(v.get("variable") or "").casefold() in ref_tokens
+                        ]
+                        others = [v for v in vars_list if v not in prioritized]
+                        vars_list = (prioritized + others)[:5]
+                    raw_output = {**raw_output, "variables": vars_list}
             else:
                 raw_output = self._compact_generic_sft_output(
                     raw_output,
@@ -580,7 +641,7 @@ class TeacherTraceProjector:
             )
             write_groups.setdefault(fingerprint, []).append(pair)
         for group in write_groups.values():
-            path = normalized_tool_path(
+            path = script_path_key(
                 dict(group[0][1].get("arguments") or {}).get("path")
             )
             first_run = min(
@@ -589,7 +650,12 @@ class TeacherTraceProjector:
                     for pair in pairs
                     if pair[1].get("name") == "run_command"
                     and path
-                    in command_python_scripts(dict(pair[1].get("arguments") or {}))
+                    in {
+                        script_path_key(script)
+                        for script in command_python_scripts(
+                            dict(pair[1].get("arguments") or {})
+                        )
+                    }
                 ),
                 default=None,
             )
@@ -607,9 +673,10 @@ class TeacherTraceProjector:
         selected: List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]],
     ) -> List[tuple[int, Dict[str, Any], Optional[Dict[str, Any]]]]:
         selected_by_index = {pair[0]: pair for pair in selected}
-        for run_index, call, _ in selected:
+        for run_index, call, output in selected:
             if call.get("name") != "run_command":
                 continue
+            succeeded = (output or {}).get("output", {}).get("success") is True
             for script_path in command_python_scripts(
                 dict(call.get("arguments") or {})
             ):
@@ -618,10 +685,10 @@ class TeacherTraceProjector:
                     for pair in pairs
                     if pair[0] < run_index
                     and pair[1].get("name") == "write_file"
-                    and normalized_tool_path(
+                    and script_path_key(
                         dict(pair[1].get("arguments") or {}).get("path")
                     )
-                    == script_path
+                    == script_path_key(script_path)
                     and isinstance(
                         dict(pair[1].get("arguments") or {}).get("content"),
                         str,
@@ -631,7 +698,7 @@ class TeacherTraceProjector:
                 if producers:
                     producer = producers[-1]
                     selected_by_index[producer[0]] = producer
-                elif (
+                elif succeeded and (
                     script_path.startswith("temporary_dir/")
                     or "/temporary_dir/" in script_path
                 ):
@@ -858,6 +925,13 @@ class TeacherTraceProjector:
             )
             for finding in (verification.get("priority_findings") or [])[:5]
         ]
+        for legacy_key in (
+            "rule_status",
+            "risk_escalations",
+            "omitted_warning_count",
+            "engineering_evidence",
+        ):
+            verification.pop(legacy_key, None)
         compact["evidence"] = _compact_watch_variables(
             evidence,
             include_auxiliary_variables=include_auxiliary_variables,

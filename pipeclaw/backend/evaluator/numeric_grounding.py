@@ -61,7 +61,7 @@ def trusted_conversation_context(
 
 
 def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
-    """Per-(file, pipeline) sums + segment counts parsed from raw read_file content.
+    """Per-(file, pipeline) and window sums/diffs parsed from raw read_file content.
 
     The record's evidence.answer_rows slice is deliberately narrow (top-N scenario
     rows), so derived group-sums for multi-pipeline comparisons can't rebuild the
@@ -70,6 +70,9 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
     """
     totals: List[float] = []
     flows_column = "管道流量"
+    window_line_stats: Dict[str, float] = {}
+    window_seg_stats: Dict[tuple[str, str, str], float] = {}
+    daily_min_diffs: List[float] = []
     for wrapper in record.get("tool_outputs") or []:
         if not isinstance(wrapper, dict) or wrapper.get("name") != "read_file":
             continue
@@ -92,12 +95,46 @@ def _csv_line_totals_from_record(record: Dict[str, Any]) -> List[float]:
                 pipeline = (
                     row.get("管道划分") or row.get("管线") or row.get("所属地") or "?"
                 )
+                start_st = str(row.get("起点站名") or "")
+                end_st = str(row.get("终点站名") or "")
                 total, count = per_line_stats.get(pipeline, (0.0, 0))
                 per_line_stats[pipeline] = (total + flow, count + 1)
+                window_line_stats[pipeline] = window_line_stats.get(pipeline, 0.0) + flow
+                if start_st and end_st:
+                    seg_key = (pipeline, start_st, end_st)
+                    window_seg_stats[seg_key] = window_seg_stats.get(seg_key, 0.0) + flow
         except csv.Error:
             continue
+        day_vals = [total for _, (total, _) in sorted(per_line_stats.items())]
         for _, (total, count) in sorted(per_line_stats.items()):
             totals.extend((round(total, 6), float(count)))
+        for i, a in enumerate(day_vals):
+            for b in day_vals[i + 1 :]:
+                diff = abs(a - b)
+                totals.extend((round(diff, 6), round(-diff, 6), round(diff, 0)))
+                daily_min_diffs.append(diff)
+    if window_line_stats:
+        w_lines = [round(v, 6) for _, v in sorted(window_line_stats.items())]
+        totals.extend(w_lines)
+        for i, a in enumerate(w_lines):
+            for b in w_lines[i + 1 :]:
+                totals.extend((round(abs(a - b), 6), round(a - b, 6), round(b - a, 6)))
+    if window_seg_stats:
+        by_pipe: Dict[str, List[float]] = {}
+        for (pipe, _, _), val in sorted(window_seg_stats.items()):
+            rv = round(val, 6)
+            totals.append(rv)
+            by_pipe.setdefault(pipe, []).append(rv)
+        two_seg_sums: List[float] = []
+        for seg_vals in by_pipe.values():
+            for i, a in enumerate(seg_vals):
+                for b in seg_vals[i + 1 :]:
+                    two_seg_sums.append(round(a + b, 6))
+        totals.extend(two_seg_sums)
+        seg_all = [round(v, 6) for v in window_seg_stats.values()] + two_seg_sums
+        for i, a in enumerate(seg_all):
+            for b in seg_all[i + 1 :]:
+                totals.extend((round(abs(a - b), 6),))
     return totals
 
 
@@ -335,5 +372,12 @@ def _number_is_deterministically_derived(value: float, supported: List[float]) -
             if b:
                 ratio = a / b
                 if abs(value - ratio) <= max(0.005, abs(ratio) * 0.005):
+                    return True
+                pct_diff = abs(a - b) / abs(b) * 100.0
+                if abs(value - pct_diff) <= max(0.5, pct_diff * 0.01):
+                    return True
+            if a + b > 0 and a > 0 and b > 0:
+                share = a / (a + b) * 100.0
+                if abs(value - share) <= max(0.5, share * 0.01):
                     return True
     return False

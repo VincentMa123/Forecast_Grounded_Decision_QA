@@ -172,13 +172,21 @@ def _project_sft_record(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         )
     )
     answer_text = str(projected.get("final_answer") or "")
+    existing_supporting = [
+        float(v)
+        for v in (dict(item.get("evidence") or {}).get("supporting_numeric_values") or [])
+        if isinstance(v, (int, float))
+    ]
     supporting_values = list(
         dict.fromkeys(
-            grounded_numeric_claim_values(
-                answer_text,
-                str(projected.get("user_input") or ""),
-                full_grounding_evidence,
-            )
+            [
+                *existing_supporting,
+                *grounded_numeric_claim_values(
+                    answer_text,
+                    str(projected.get("user_input") or ""),
+                    full_grounding_evidence,
+                ),
+            ]
         )
     )
     if supporting_values:

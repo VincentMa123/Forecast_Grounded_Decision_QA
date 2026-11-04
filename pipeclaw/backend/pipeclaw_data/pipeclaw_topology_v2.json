@@ -3,7 +3,7 @@
     "scenario_id": "scenario_topology_001",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 上海白鹤末站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190101 · 上海白鹤末站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_001_session_001",
@@ -11,11 +11,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 上海白鹤末站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190101_node.csv 和 20190101_pipeline.csv，反向追到 上海白鹤末站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合上海白鹤末站（拓扑场景一·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -25,7 +25,7 @@
     "scenario_id": "scenario_topology_002",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 上海白鹤末站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190102 · 上海站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_002_session_001",
@@ -33,11 +33,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 上海白鹤末站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190102_node.csv 和 20190102_pipeline.csv，给我 上海站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合上海站（拓扑场景二·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -47,7 +47,7 @@
     "scenario_id": "scenario_topology_003",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 上海站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190103 · 中卫站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_003_session_001",
@@ -55,11 +55,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 上海站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190103_node.csv 和 20190103_pipeline.csv，判断 中卫站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合中卫站（拓扑场景三·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -69,7 +69,7 @@
     "scenario_id": "scenario_topology_004",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 上海站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌鲁木齐站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_004_session_001",
@@ -77,11 +77,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 上海站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 乌鲁木齐站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合乌鲁木齐站（拓扑场景四·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -91,7 +91,7 @@
     "scenario_id": "scenario_topology_005",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 上海站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190211 · 南京站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_005_session_001",
@@ -99,11 +99,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 上海站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190211_node.csv 和 20190211_pipeline.csv，给我 南京站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合南京站（拓扑场景五·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -113,7 +113,7 @@
     "scenario_id": "scenario_topology_006",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 中卫站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190223 · 南通站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_006_session_001",
@@ -121,11 +121,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 中卫站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190223_node.csv 和 20190223_pipeline.csv，给我 南通站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合南通站（拓扑场景六·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -135,7 +135,7 @@
     "scenario_id": "scenario_topology_007",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 中卫站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190307 · 哈尔滨站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_007_session_001",
@@ -143,11 +143,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 中卫站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20190307_node.csv 和 20190307_pipeline.csv，判断 哈尔滨站 是否仅依赖于单一气源 黑河首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合哈尔滨站（拓扑场景七·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -157,7 +157,7 @@
     "scenario_id": "scenario_topology_008",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌苏站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190319 · 如皋站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_008_session_001",
@@ -165,11 +165,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 乌苏站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190319_node.csv 和 20190319_pipeline.csv，给我 如皋站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合如皋站（拓扑场景八·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -179,7 +179,7 @@
     "scenario_id": "scenario_topology_009",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌苏站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190401 · 安平站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_009_session_001",
@@ -187,11 +187,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 乌苏站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20190401_node.csv 和 20190401_pipeline.csv，给我 安平站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合安平站（拓扑场景九·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -201,7 +201,7 @@
     "scenario_id": "scenario_topology_010",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌鲁木齐站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190413 · 宝坻站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_010_session_001",
@@ -209,11 +209,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 乌鲁木齐站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190413_node.csv 和 20190413_pipeline.csv，给我 宝坻站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合宝坻站（拓扑场景十·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -223,7 +223,7 @@
     "scenario_id": "scenario_topology_011",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌鲁木齐站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190425 · 武汉站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_011_session_001",
@@ -231,11 +231,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 乌鲁木齐站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20190425_node.csv 和 20190425_pipeline.csv，判断 武汉站 是否仅依赖于单一气源 普光首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合武汉站（拓扑场景十一·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -245,7 +245,7 @@
     "scenario_id": "scenario_topology_012",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 南京站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190510 · 永清站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_012_session_001",
@@ -253,11 +253,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 南京站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190510_node.csv 和 20190510_pipeline.csv，反向追到 永清站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合永清站（拓扑场景十二·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -267,7 +267,7 @@
     "scenario_id": "scenario_topology_013",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 南京站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191201 · 沈阳站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_013_session_001",
@@ -275,11 +275,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 南京站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20191201_node.csv 和 20191201_pipeline.csv，判断 沈阳站 是否仅依赖于单一气源 黑河首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合沈阳站（拓扑场景十三·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -289,7 +289,7 @@
     "scenario_id": "scenario_topology_014",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 南通站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191202 · 海安站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_014_session_001",
@@ -297,11 +297,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 南通站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20191202_node.csv 和 20191202_pipeline.csv，给我 海安站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合海安站（拓扑场景十四·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -311,7 +311,7 @@
     "scenario_id": "scenario_topology_015",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 南通站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191203 · 石家庄站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_015_session_001",
@@ -319,11 +319,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 南通站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20191203_node.csv 和 20191203_pipeline.csv，反向追到 石家庄站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合石家庄站（拓扑场景十五·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -333,7 +333,7 @@
     "scenario_id": "scenario_topology_016",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 南通站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191204 · 精河站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_016_session_001",
@@ -341,11 +341,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 南通站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20191204_node.csv 和 20191204_pipeline.csv，给我 精河站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合精河站（拓扑场景十六·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -355,7 +355,7 @@
     "scenario_id": "scenario_topology_017",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 古浪站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191205 · 通州南站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_017_session_001",
@@ -363,11 +363,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 古浪站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20191205_node.csv 和 20191205_pipeline.csv，反向追到 通州南站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合通州南站（拓扑场景十七·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -377,7 +377,7 @@
     "scenario_id": "scenario_topology_018",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 古浪站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191206 · 长春站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_018_session_001",
@@ -385,11 +385,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 古浪站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20191206_node.csv 和 20191206_pipeline.csv，判断 长春站 是否仅依赖于单一气源 黑河首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合长春站（拓扑场景十八·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -399,7 +399,7 @@
     "scenario_id": "scenario_topology_019",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 哈尔滨站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191207 · 上海白鹤末站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_019_session_001",
@@ -407,11 +407,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 哈尔滨站 是否仅依赖于单一气源 黑河首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20191207_node.csv 和 20191207_pipeline.csv，反向追到 上海白鹤末站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合上海白鹤末站（拓扑场景十九·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -421,7 +421,7 @@
     "scenario_id": "scenario_topology_020",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 如皋站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190101 · 上海白鹤末站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_020_session_001",
@@ -429,11 +429,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 如皋站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190101_node.csv 和 20190101_pipeline.csv，给我 上海白鹤末站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合上海白鹤末站（拓扑场景二十·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -443,7 +443,7 @@
     "scenario_id": "scenario_topology_021",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 如皋站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190102 · 上海站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_021_session_001",
@@ -451,11 +451,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 如皋站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190102_node.csv 和 20190102_pipeline.csv，给我 上海站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合上海站（拓扑场景二十一·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -465,7 +465,7 @@
     "scenario_id": "scenario_topology_022",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 如皋站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190103 · 乌苏站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_022_session_001",
@@ -473,11 +473,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 如皋站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190103_node.csv 和 20190103_pipeline.csv，给我 乌苏站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合乌苏站（拓扑场景二十二·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -487,7 +487,7 @@
     "scenario_id": "scenario_topology_023",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 安平站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 乌鲁木齐站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_023_session_001",
@@ -495,11 +495,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 安平站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 乌鲁木齐站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合乌鲁木齐站（拓扑场景二十三·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -509,7 +509,7 @@
     "scenario_id": "scenario_topology_024",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 安平站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190211 · 南通站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_024_session_001",
@@ -517,11 +517,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 安平站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190211_node.csv 和 20190211_pipeline.csv，反向追到 南通站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合南通站（拓扑场景二十四·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -531,7 +531,7 @@
     "scenario_id": "scenario_topology_025",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 安平站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190223 · 古浪站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_025_session_001",
@@ -539,11 +539,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 安平站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190223_node.csv 和 20190223_pipeline.csv，给我 古浪站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合古浪站（拓扑场景二十五·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -553,7 +553,7 @@
     "scenario_id": "scenario_topology_026",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 宝坻站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190307 · 如皋站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_026_session_001",
@@ -561,11 +561,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 宝坻站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20190307_node.csv 和 20190307_pipeline.csv，反向追到 如皋站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合如皋站（拓扑场景二十六·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -575,7 +575,7 @@
     "scenario_id": "scenario_topology_027",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 宝坻站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190319 · 安平站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_027_session_001",
@@ -583,11 +583,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 宝坻站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190319_node.csv 和 20190319_pipeline.csv，反向追到 安平站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合安平站（拓扑场景二十七·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -597,7 +597,7 @@
     "scenario_id": "scenario_topology_028",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 宝坻站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190401 · 宝坻站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_028_session_001",
@@ -605,11 +605,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 宝坻站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190401_node.csv 和 20190401_pipeline.csv，反向追到 宝坻站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合宝坻站（拓扑场景二十八·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -619,7 +619,7 @@
     "scenario_id": "scenario_topology_029",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 昌吉站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190413 · 昌吉站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_029_session_001",
@@ -627,11 +627,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 昌吉站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190413_node.csv 和 20190413_pipeline.csv，给我 昌吉站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合昌吉站（拓扑场景二十九·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -641,7 +641,7 @@
     "scenario_id": "scenario_topology_030",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 昌吉站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190425 · 永昌站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_030_session_001",
@@ -649,11 +649,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 昌吉站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20190425_node.csv 和 20190425_pipeline.csv，给我 永昌站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合永昌站（拓扑场景三十·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -663,7 +663,7 @@
     "scenario_id": "scenario_topology_031",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 武汉站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190510 · 永清站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_031_session_001",
@@ -671,11 +671,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 武汉站 是否仅依赖于单一气源 普光首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20190510_node.csv 和 20190510_pipeline.csv，给我 永清站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合永清站（拓扑场景三十一·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -685,7 +685,7 @@
     "scenario_id": "scenario_topology_032",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 永昌站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191201 · 海安站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_032_session_001",
@@ -693,11 +693,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 永昌站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20191201_node.csv 和 20191201_pipeline.csv，反向追到 海安站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合海安站（拓扑场景三十二·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -707,7 +707,7 @@
     "scenario_id": "scenario_topology_033",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 永昌站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191202 · 湘潭站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_033_session_001",
@@ -715,11 +715,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 永昌站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20191202_node.csv 和 20191202_pipeline.csv，判断 湘潭站 是否仅依赖于单一气源 普光首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合湘潭站（拓扑场景三十三·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -729,7 +729,7 @@
     "scenario_id": "scenario_topology_034",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 永清站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191203 · 石家庄站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_034_session_001",
@@ -737,11 +737,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 永清站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20191203_node.csv 和 20191203_pipeline.csv，给我 石家庄站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合石家庄站（拓扑场景三十四·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -751,7 +751,7 @@
     "scenario_id": "scenario_topology_035",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 永清站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191204 · 精河站 · 形状C。",
     "sessions": [
       {
         "session_id": "scenario_topology_035_session_001",
@@ -759,11 +759,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 永清站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20191204_node.csv 和 20191204_pipeline.csv，判断 精河站 是否仅依赖于单一气源 霍尔果斯首站，是否可通过其他通道达气。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合精河站（拓扑场景三十五·形状C）的上述分析结果，只用一句话判断这更像单点咽喉，还是某要素冗余。"
           }
         ]
       }
@@ -773,7 +773,7 @@
     "scenario_id": "scenario_topology_036",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 永清站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191205 · 通州南站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_036_session_001",
@@ -781,11 +781,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 永清站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20191205_node.csv 和 20191205_pipeline.csv，给我 通州南站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合通州南站（拓扑场景三十六·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }
@@ -795,7 +795,7 @@
     "scenario_id": "scenario_topology_037",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 沈阳站 · 形状C。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191206 · 阳曲压气站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_037_session_001",
@@ -803,11 +803,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，判断 沈阳站 是否仅依赖于单一气源 黑河首站，是否可通过其他通道达气。"
+            "user_input": "请基于 20191206_node.csv 和 20191206_pipeline.csv，反向追到 阳曲压气站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像单点咽喉，还是某要素冗余。"
+            "user_input": "结合阳曲压气站（拓扑场景三十七·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -817,7 +817,7 @@
     "scenario_id": "scenario_topology_038",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 海安站 · 形状A。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20191207 · 上海白鹤末站 · 形状D。",
     "sessions": [
       {
         "session_id": "scenario_topology_038_session_001",
@@ -825,11 +825,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，反向追到 海安站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
+            "user_input": "请基于 20191207_node.csv 和 20191207_pipeline.csv，给我 上海白鹤末站 的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多源冗余，还是单点依赖。"
+            "user_input": "结合上海白鹤末站（拓扑场景三十八·形状D）的上述分析结果，只用一句话判断这更像多元冗余，还是带宽咽喉。"
           }
         ]
       }
@@ -839,7 +839,7 @@
     "scenario_id": "scenario_topology_039",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 海安站 · 形状B。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190101 · 上海站 · 形状A。",
     "sessions": [
       {
         "session_id": "scenario_topology_039_session_001",
@@ -847,11 +847,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 海安站 站的直接上游站名，并告诉我每条直接上游管段的流量。"
+            "user_input": "请基于 20190101_node.csv 和 20190101_pipeline.csv，反向追到 上海站 的可达气源，告诉我可达气源数，以及最近气源的一条示例最短路径。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像明晰分担，还是接近等负荷。"
+            "user_input": "结合上海站（拓扑场景三十九·形状A）的上述分析结果，只用一句话判断这更像多源冗余，还是单点依赖。"
           }
         ]
       }
@@ -861,7 +861,7 @@
     "scenario_id": "scenario_topology_040",
     "scenario_type": "openclaw",
     "scenario_class_label": "class_12_pipeline_topology",
-    "scenario_description": "拓扑场景（pipeline + node 数据）。20190114 · 海安站 · 形状D。",
+    "scenario_description": "拓扑场景（pipeline + node 数据）。20190102 · 中卫站 · 形状B。",
     "sessions": [
       {
         "session_id": "scenario_topology_040_session_001",
@@ -869,11 +869,11 @@
         "dialogue": [
           {
             "turn_id": 1,
-            "user_input": "请基于 20190114_node.csv 和 20190114_pipeline.csv，给我 海安站 站的多源备用供气路径，分别告诉我可达气源数以及最近两个气源的最短路径。"
+            "user_input": "请基于 20190102_node.csv 和 20190102_pipeline.csv，给我 中卫站 的直接上游站名，并告诉我每条直接上游管段的流量。"
           },
           {
             "turn_id": 2,
-            "user_input": "只用一句话判断这更像多元冗余，还是带宽咽喉。"
+            "user_input": "结合中卫站（拓扑场景四十·形状B）的上述分析结果，只用一句话判断这更像明晰分担，还是接近等负荷。"
           }
         ]
       }

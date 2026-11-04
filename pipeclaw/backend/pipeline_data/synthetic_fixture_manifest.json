@@ -1,16 +1,17 @@
 {
-  "schema_version": "pipeclaw_mock_pipeline_data_v1",
   "synthetic": true,
   "seed": "pipeclaw-dataset-v2-synthetic-v1",
   "dataset_sources": [
     "pipeclaw_dataset_v2",
     "Pipeline_Full_Life_Cycle_Test_Dataset-v4"
   ],
-  "pipeline_file_count": 39,
-  "node_file_count": 31,
-  "consumer_file_count": 76,
+  "pipeline_file_count": 41,
+  "node_file_count": 34,
+  "consumer_file_count": 79,
   "pipeline_dates": [
+    "2019-01-01",
     "2019-01-02",
+    "2019-01-03",
     "2019-01-05",
     "2019-01-08",
     "2019-01-11",
@@ -51,6 +52,9 @@
     "2019-12-07"
   ],
   "node_dates": [
+    "2019-01-01",
+    "2019-01-02",
+    "2019-01-03",
     "2019-01-14",
     "2019-02-11",
     "2019-02-23",
@@ -84,6 +88,9 @@
     "2019-12-07"
   ],
   "consumer_dates": [
+    "2019-01-01",
+    "2019-01-02",
+    "2019-01-03",
     "2019-01-14",
     "2019-04-01",
     "2019-04-13",

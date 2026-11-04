@@ -5,10 +5,11 @@ import hashlib
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MAPPING_CSV = (
@@ -93,7 +94,7 @@ def load_backend_env() -> None:
         return
     from dotenv import load_dotenv
 
-    load_dotenv(env_path, override=False)
+    load_dotenv(env_path, override=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -224,9 +225,21 @@ def _build_session_record(
     }
 
 
+def _pipeformer_case_group(scenario_id: str) -> Optional[Tuple[str, str]]:
+    match = re.match(r"^scenario_pipeformer_(prediction|dispatch)_(\d{3})$", scenario_id)
+    if not match:
+        return None
+    kind, idx = match.group(1), int(match.group(2))
+    if not (1 <= idx <= 40):
+        return None
+    case_num = idx if kind == "prediction" else (idx + 20 if idx <= 20 else idx - 20)
+    block = "pipeformer_cases_01_20" if case_num <= 20 else "pipeformer_cases_21_40"
+    return block, f"mock_test_{case_num:03d}"
+
+
 def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, str]:
-    """Create deterministic 80/10/10 splits, stratified by scenario type."""
-    groups: Dict[str, List[str]] = {}
+    """Create deterministic 80/10/10 splits, stratified by scenario type and mock_test case."""
+    groups: Dict[str, Dict[str, List[str]]] = {}
     scenario_types: Dict[str, str] = {}
     for scenario in scenarios:
         scenario_id = str(scenario.get("scenario_id") or "")
@@ -238,28 +251,36 @@ def scenario_split_map(scenarios: List[Dict[str, Any]], seed: str) -> Dict[str, 
             )
         scenario_types[scenario_id] = scenario_type
     for scenario_id, scenario_type in scenario_types.items():
-        groups.setdefault(scenario_type, []).append(scenario_id)
+        pf_group = _pipeformer_case_group(scenario_id) if scenario_type == "pipeformer" else None
+        if pf_group is not None:
+            group_name, unit_key = pf_group
+        else:
+            group_name, unit_key = scenario_type, scenario_id
+        groups.setdefault(group_name, {}).setdefault(unit_key, []).append(scenario_id)
     result: Dict[str, str] = {}
-    for scenario_type, scenario_ids in groups.items():
-        ordered = sorted(
-            scenario_ids,
+    for group_name, unit_map in groups.items():
+        hash_prefix = "pipeformer-case-v21" if group_name.startswith("pipeformer_cases_") else f"{seed}:{group_name}"
+        ordered_units = sorted(
+            unit_map,
             key=lambda value: hashlib.sha256(
-                f"{seed}:{scenario_type}:{value}".encode("utf-8")
+                f"{hash_prefix}:{value}".encode("utf-8")
             ).hexdigest(),
         )
-        count = len(ordered)
+        count = len(ordered_units)
         holdout_count = max(1, round(count * 0.1)) if count >= 3 else 0
         valid_count = holdout_count
         test_count = holdout_count
         train_end = count - valid_count - test_count
-        for index, scenario_id in enumerate(ordered):
-            result[scenario_id] = (
+        for index, unit_key in enumerate(ordered_units):
+            split = (
                 "train"
                 if index < train_end
                 else "valid"
                 if index < train_end + valid_count
                 else "test"
             )
+            for scenario_id in unit_map[unit_key]:
+                result[scenario_id] = split
     return result
 
 
@@ -679,11 +700,13 @@ class TeacherTraceGenerator:
             str(record.get("sample_id"))
             for record in existing_records
             if record.get("sample_id")
+            and record.get("trace_status") == "completed"
         }
         existing_session_ids = {
             str(record.get("session_record_id"))
             for record in existing_session_records
             if record.get("session_record_id")
+            and bool(record.get("complete", True))
         }
         skipped_scenarios = 0
         for index, scenario in enumerate(scope.scenarios, start=1):
@@ -706,6 +729,8 @@ class TeacherTraceGenerator:
                 continue
             split = split_map[scenario_id]
             scenario_history: List[Dict[str, Any]] = []
+            scenario_records: List[Dict[str, Any]] = []
+            scenario_sessions: List[Dict[str, Any]] = []
             for session_index, source_session in enumerate(
                 scenario.get("sessions") or [], start=1
             ):
@@ -718,8 +743,12 @@ class TeacherTraceGenerator:
                     split,
                     scenario_history,
                 )
-                records.extend(turn_records)
-                session_records.append(session_record)
+                scenario_records.extend(turn_records)
+                scenario_sessions.append(session_record)
+            records.extend(scenario_records)
+            session_records.extend(scenario_sessions)
+            if not self.args.force and not scope.replacement_mode:
+                self.store.append_progress(scenario_records, scenario_sessions)
         failed_session_count = sum(
             not bool(item.get("complete")) for item in session_records
         )

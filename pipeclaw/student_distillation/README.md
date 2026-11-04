@@ -20,8 +20,9 @@ Teacher-trace source splits
                          autonomous rollout + evaluator
 ```
 
-The frozen source splits currently contain 1,073 train, 147 validation, and
-139 test records. The test split is reserved for final evaluation.
+The baseline projections use the ablation manifest's matched selection of
+1,615 train, 331 validation, and 326 test source records. The test split is
+reserved for final evaluation.
 
 ## Environments
 
@@ -44,7 +45,7 @@ memory before starting a remote run.
 Run from the repository root:
 
 ```bash
-python -m pipeclaw.student_distillation.scripts.prepare_dataset
+python -m pipeclaw.student_distillation.scripts.prepare_dataset --ablation-manifest pipeclaw/student_distillation/data/ablation/manifest.json
 python -m pipeclaw.student_distillation.scripts.validate_dataset
 ```
 
@@ -64,10 +65,9 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
   --projections answer_only trace_level constraint_multitask
 ```
 
-The checked-in profile covers 5,166 train/validation records; the
-trace-level maximum is 18,127 tokens. The remote SFT configuration currently uses
-`max_length: 18432` with `truncation_strategy: delete`; re-profile any changed
-dataset and confirm that this behavior is acceptable before a training run.
+The remote SFT configuration uses `max_length: 18432` with
+`truncation_strategy: delete`. Profile the current release to check which
+records fit that limit before a training run.
 
 ## Train a student
 

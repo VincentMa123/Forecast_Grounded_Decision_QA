@@ -163,7 +163,12 @@ def _single_forecast_answer(
             if chinese
             else f"Watch variables: {', '.join(watch)}."
         )
-    return "".join(lines) if chinese else " ".join(lines)
+    disclosure = canonical_applied_disturbance_lines(grounding_contract)
+    body_lines = lines[len(disclosure):]
+    body = "\n".join(body_lines) if chinese else " ".join(body_lines)
+    if not body:
+        return "\n".join(disclosure)
+    return "\n".join([*disclosure, body])
 
 
 def _strip_unsupported_units(answer: str) -> str:
@@ -201,6 +206,10 @@ def _compact_answer(answer: str, maximum_chars: int) -> str:
         selected.append(sentence)
     if ending not in selected and len(" ".join(selected + [ending])) <= maximum_chars:
         selected.append(ending)
+    if len(selected) <= 1 and len(compact) > maximum_chars:
+        # Nothing but the closing sentence fits (e.g. one oversized leading sentence
+        # in a table-heavy answer): fall back to a prefix cut instead of returning a stub.
+        return compact[:maximum_chars].rstrip(" ，,；;")
     compacted = " ".join(selected)
     if compacted:
         return compacted

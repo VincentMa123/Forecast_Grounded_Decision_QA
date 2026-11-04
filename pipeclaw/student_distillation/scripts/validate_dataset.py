@@ -11,6 +11,7 @@ from pipeclaw.backend.grounding.evidence.tool import (
     command_python_scripts,
     normalized_tool_path,
 )
+from pipeclaw.backend.teacher_traces.trace_projection import script_path_key
 from pipeclaw.protocols.path_contract import (
     is_host_absolute_path,
     redact_host_paths,
@@ -28,7 +29,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 SPLITS = ("train", "valid", "test")
 PROJECTIONS = ("answer_only", "trace_level", "constraint_multitask")
 CORRECTION_SPLITS = ("train", "valid")
-EXPECTED_SOURCE_COUNTS = {"train": 1073, "valid": 147, "test": 139}
+EXPECTED_SOURCE_COUNTS = {"train": 1078, "valid": 146, "test": 136}
 DEFAULT_SOURCE_ROOT = REPO_ROOT / "pipeclaw" / "backend" / "generated_teacher_traces" / "splits"
 DEFAULT_OUTPUT_ROOT = REPO_ROOT / "pipeclaw" / "student_distillation" / "data"
 DEFAULT_MANIFEST_PATH = DEFAULT_OUTPUT_ROOT / "manifests" / "task2_dataset_manifest.json"
@@ -108,6 +109,45 @@ _required_text = partial(required_text, error_factory=DatasetValidationError)
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     """Read a UTF-8 JSONL file and reject blank, invalid, or non-object rows."""
     return read_jsonl_domain(path, error_factory=DatasetValidationError)
+
+
+def read_projection_source(
+    path: Path, selection: dict[str, Any] | None = None
+) -> list[dict[str, Any]]:
+    """Read a source split, optionally applying its frozen ablation exclusions."""
+    records = read_jsonl(path)
+    if selection is None:
+        return records
+    if not isinstance(selection, dict):
+        raise DatasetValidationError(f"{path}: ablation source selection must be an object")
+    if _sha256_file(path) != selection.get("sha256"):
+        raise DatasetValidationError(f"{path}: ablation source checksum mismatch")
+    exclusions = selection.get("exclusions")
+    if not isinstance(exclusions, list) or any(
+        not isinstance(entry, dict) or not isinstance(entry.get("source_sample_id"), str)
+        for entry in exclusions
+    ):
+        raise DatasetValidationError(f"{path}: invalid ablation exclusions")
+    excluded = [entry["source_sample_id"] for entry in exclusions]
+    excluded_ids = set(excluded)
+    if (
+        len(records) != selection.get("record_count")
+        or len(excluded_ids) != len(excluded)
+        or not excluded_ids <= {record["sample_id"] for record in records}
+    ):
+        raise DatasetValidationError(f"{path}: invalid ablation source selection")
+    retained = [record for record in records if record["sample_id"] not in excluded_ids]
+    if len(retained) != selection.get("eligible_count"):
+        raise DatasetValidationError(f"{path}: ablation eligible count mismatch")
+    return retained
+
+
+def projection_selection_for_split(selection: Any, split: str) -> dict[str, Any] | None:
+    if selection is None:
+        return None
+    if not isinstance(selection, dict) or not isinstance(entry := selection.get(split), dict):
+        raise DatasetValidationError(f"{split}: missing or invalid ablation source selection")
+    return entry
 
 
 def validate_source_records(
@@ -206,13 +246,15 @@ def validate_release(
 
     source_by_split: dict[str, dict[str, dict[str, Any]]] = {}
     all_source_ids: dict[str, str] = {}
+    source_selection = manifest.get("source_selection")
     for split in SPLITS:
         source_path = source_root / f"teacher_trace_{split}.jsonl"
-        records = read_jsonl(source_path)
+        selection = projection_selection_for_split(source_selection, split)
+        records = read_projection_source(source_path, selection)
         validate_source_records(
             records,
             split=split,
-            expected_count=expected_counts[split],
+            expected_count=selection["eligible_count"] if selection is not None else expected_counts[split],
             tool_schemas=tool_schemas,
         )
         source_by_split[split] = {str(record["sample_id"]): record for record in records}
@@ -378,13 +420,13 @@ def _validate_source_tool_pairs(
         outputs_by_id[call_id] = output
     if calls_by_id.keys() != outputs_by_id.keys():
         raise DatasetValidationError(f"{sample_id}: every tool call must have exactly one matching output")
-    for call_id, call in calls_by_id.items():
+    for call in calls:
+        call_id = str(call["tool_call_id"])
         output = outputs_by_id[call_id]
         if output.get("name") != call.get("name"):
             raise DatasetValidationError(f"{sample_id}: tool name mismatch for {call_id}")
-        payload = output.get("output")
-        if not isinstance(payload, dict) or payload.get("success") is not True:
-            raise DatasetValidationError(f"{sample_id}: tool output {call_id} must be successful")
+        if not isinstance(output.get("output"), dict):
+            raise DatasetValidationError(f"{sample_id}: tool output {call_id} must be an object")
 
 
 def _validate_v8_dispatch_lifecycle(record: dict[str, Any], sample_id: str) -> None:
@@ -513,12 +555,10 @@ def _validate_messages(
             unknown = sorted(schema_names - registered_tool_names)
             raise DatasetValidationError(f"{example_id}: unregistered tool schema {unknown}")
 
-    allow_failures = record.get("quality_flag") == "recovery"
     call_count = _validate_tool_messages(
         messages,
         example_id=example_id,
         registered_tool_names=registered_tool_names,
-        allow_failed_responses=allow_failures,
     )
     if projection == "trace_level" and messages[-1].get("role") != "assistant":
         raise DatasetValidationError(f"{example_id}: trace must end with a final assistant answer")
@@ -580,7 +620,6 @@ def _validate_tool_messages(
     *,
     example_id: str,
     registered_tool_names: set[str],
-    allow_failed_responses: bool = False,
 ) -> int:
     call_count = 0
     parsed_calls: list[dict[str, Any]] = []
@@ -603,8 +642,6 @@ def _validate_tool_messages(
         if not isinstance(call.get("arguments"), dict):
             raise DatasetValidationError(f"{example_id}: tool_call arguments must be an object")
         parsed_calls.append(call)
-        if message.get("loss") is not True:
-            raise DatasetValidationError(f"{example_id}: tool_call must receive loss")
         if (
             index + 1 >= len(messages)
             or messages[index + 1].get("role") != "tool_response"
@@ -616,9 +653,13 @@ def _validate_tool_messages(
         if response.get("loss") is not False:
             raise DatasetValidationError(f"{example_id}: tool_response must not receive loss")
         payload = _parse_json(response["content"], f"{example_id}: tool_response")
-        if not isinstance(payload, dict) or payload.get("success") is not True:
-            if not allow_failed_responses:
-                raise DatasetValidationError(f"{example_id}: tool_response must be successful")
+        if not isinstance(payload, dict):
+            raise DatasetValidationError(f"{example_id}: tool_response must be an object")
+        failed = payload.get("success") is not True
+        if failed and message.get("loss") is not False:
+            raise DatasetValidationError(f"{example_id}: failed tool_call must be masked")
+        if not failed and message.get("loss") is not True:
+            raise DatasetValidationError(f"{example_id}: tool_call must receive loss")
         index += 2
     _validate_python_tool_sequence(parsed_calls, example_id)
     return call_count
@@ -634,7 +675,7 @@ def _validate_python_tool_sequence(
         if not isinstance(arguments, dict):
             continue
         if name == "write_file":
-            path = normalized_tool_path(arguments.get("path"))
+            path = script_path_key(arguments.get("path"))
             if not path.endswith(".py"):
                 continue
             content = arguments.get("content")
@@ -653,7 +694,7 @@ def _validate_python_tool_sequence(
             written_scripts.add(path)
         elif name == "run_command":
             for script in command_python_scripts(arguments):
-                if script not in written_scripts:
+                if script_path_key(script) not in written_scripts:
                     raise DatasetValidationError(
                         f"{location}: Python execution for {script!r} requires a "
                         "preceding write_file with the complete script"

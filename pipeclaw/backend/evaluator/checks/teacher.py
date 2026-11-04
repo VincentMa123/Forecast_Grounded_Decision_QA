@@ -123,6 +123,7 @@ def _task_is_complete(task: Mapping[str, Any]) -> bool:
     boundary = mapping(task.get("boundary_conditions"))
     has_change = (
         task.get("disturbance_magnitude_percent") is not None
+        or task.get("disturbance_setpoint") is not None
         or variable in mapping(boundary.get("setpoints"))
         or variable in mapping(boundary.get("percentage_changes"))
     )
