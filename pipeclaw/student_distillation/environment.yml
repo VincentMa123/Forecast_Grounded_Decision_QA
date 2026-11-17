@@ -1,4 +1,4 @@
-name: task2-ms-swift
+name: ms-swift
 
 channels:
   - conda-forge

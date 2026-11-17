@@ -32,7 +32,7 @@ declared by `environment.yml`:
 
 ```bash
 conda env create -f pipeclaw/student_distillation/environment.yml
-conda activate task2-ms-swift
+conda activate ms-swift
 python -m pip check
 ```
 
@@ -57,7 +57,7 @@ structured targets, and SHA-256 checksums. See
 
 ## Profile token lengths
 
-Before selecting `max_length`, measure the exact MS-SWIFT/Qwen3.5 rendering for
+Before selecting `max_length`, measure the exact MS-SWIFT/Qwen3.8 rendering for
 train and validation records:
 
 ```bash
@@ -65,7 +65,7 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
   --projections answer_only trace_level constraint_multitask
 ```
 
-The remote SFT configuration uses `max_length: 18432` with
+The remote SFT configuration uses `max_length: 24576` with
 `truncation_strategy: delete`. Profile the current release to check which
 records fit that limit before a training run.
 
@@ -74,22 +74,19 @@ records fit that limit before a training run.
 Configuration files and their intended hardware are documented in
 [configs/README.md](configs/README.md).
 
-For a local wiring check, run the 0.8B smoke pair in order:
+For a local wiring check, run the smoke test:
 
 ```bash
-swift sft pipeclaw/student_distillation/configs/qwen35_08b_smoke_step10.yaml
-swift sft pipeclaw/student_distillation/configs/qwen35_08b_smoke_resume_step20.yaml
+swift sft pipeclaw/student_distillation/configs/qwen38_27b_smoke_step10.yaml
 ```
 
-For the 9B trace-level experiment, benchmark first and then launch the full
-configuration:
+For the 27B SFT experiment, launch the full configuration:
 
 ```bash
-swift sft pipeclaw/student_distillation/configs/qwen35_9b_remote_benchmark_step20.yaml
-swift sft pipeclaw/student_distillation/configs/qwen35_9b.yaml
+swift sft pipeclaw/student_distillation/configs/qwen38_27b.yaml
 ```
 
-The remote files default to four processes with DeepSpeed ZeRO-2. On one GPU,
+The remote configuration defaults to multi-GPU with DeepSpeed ZeRO-2. On one GPU,
 remove `NPROC_PER_NODE` and `deepspeed`, then increase gradient accumulation to
 preserve the effective batch size. Do not upload checkpoints or generated
 outputs to the repository.
@@ -108,7 +105,7 @@ python -m pipeclaw.student_distillation.scripts.evaluate_autonomous `
   --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl `
   --tool-schema-source pipeclaw/student_distillation/data/trace_level/test.jsonl `
   --scenario-type pipeformer `
-  --adapters pipeclaw/student_distillation/outputs/qwen35_9b_trace_level/checkpoint-20 `
+  --adapters pipeclaw/student_distillation/outputs/trace_level/checkpoint-85 `
   --output-dir pipeclaw/student_distillation/outputs/evaluation/autonomous
 ```
 

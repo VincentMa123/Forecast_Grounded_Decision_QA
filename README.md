@@ -82,7 +82,7 @@ Student distillation uses its own Python 3.12/MS-SWIFT environment. The normal s
 
 ```bash
 conda env create -f pipeclaw/student_distillation/environment.yml
-conda activate task2-ms-swift
+conda activate ms-swift
 ```
 
 Prepare and validate the derived datasets from the repository root in an

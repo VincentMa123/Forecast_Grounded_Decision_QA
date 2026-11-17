@@ -1,0 +1,389 @@
+{
+  "mode": "autonomous",
+  "record_count": 204,
+  "overall": {
+    "mean_score": 81.789216,
+    "minimum_score": 33.333333,
+    "maximum_score": 100.0,
+    "pass_count": 78,
+    "pass_rate": 0.38235294117647056
+  },
+  "metrics": {
+    "answer_claim_support": {
+      "numerator": 32,
+      "denominator": 32,
+      "pass_rate": 1.0,
+      "failure_rate": 0.0,
+      "status": "ok"
+    },
+    "answer_completeness": {
+      "numerator": 174,
+      "denominator": 204,
+      "pass_rate": 0.8529411764705882,
+      "failure_rate": 0.14705882352941177,
+      "status": "ok"
+    },
+    "artifact_evidence": {
+      "numerator": 85,
+      "denominator": 94,
+      "pass_rate": 0.9042553191489362,
+      "failure_rate": 0.09574468085106383,
+      "status": "ok"
+    },
+    "assumption_consistency": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "checkpoint_inference": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "claim_alignment": {
+      "numerator": 4,
+      "denominator": 52,
+      "pass_rate": 0.07692307692307693,
+      "failure_rate": 0.9230769230769231,
+      "status": "ok"
+    },
+    "constraint_execution": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "constraint_judgment": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "dispatch": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "disturbance_application": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "evidence_consistency": {
+      "numerator": 132,
+      "denominator": 204,
+      "pass_rate": 0.6470588235294118,
+      "failure_rate": 0.35294117647058826,
+      "status": "ok"
+    },
+    "forecast_horizon": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "json_validity": {
+      "numerator": 186,
+      "denominator": 186,
+      "pass_rate": 1.0,
+      "failure_rate": 0.0,
+      "status": "ok"
+    },
+    "manual_intervention": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "question_anchor": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "record_contract": {
+      "numerator": 204,
+      "denominator": 204,
+      "pass_rate": 1.0,
+      "failure_rate": 0.0,
+      "status": "ok"
+    },
+    "registry_ordering": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "risk": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "task_parsing": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    },
+    "tool_call": {
+      "numerator": 128,
+      "denominator": 186,
+      "pass_rate": 0.6881720430107527,
+      "failure_rate": 0.3118279569892473,
+      "status": "ok"
+    },
+    "verification_completeness": {
+      "numerator": 0,
+      "denominator": 0,
+      "pass_rate": null,
+      "failure_rate": null,
+      "status": "not_applicable"
+    }
+  },
+  "diagnostics": {
+    "hallucination": {
+      "numerator": 130,
+      "denominator": 204,
+      "pass_rate": 0.6372549019607843,
+      "failure_rate": 0.3627450980392157,
+      "status": "ok"
+    },
+    "tool_recovery": {
+      "numerator": 8,
+      "denominator": 23,
+      "pass_rate": 0.34782608695652173,
+      "failure_rate": 0.6521739130434783,
+      "status": "ok"
+    }
+  },
+  "hallucination_rate": 0.3627450980392157,
+  "tool_call_execution": {
+    "successful_calls": 939,
+    "total_calls": 1096,
+    "success_rate": 0.8567518248175182,
+    "duplicate_successful_calls": 255
+  },
+  "portability": {
+    "cwd_rebased_calls": 0,
+    "records_with_cwd_rebased": 0,
+    "rebased_execution_successes": 0,
+    "rebased_execution_failures": 0,
+    "portable_path_normalization_calls": 0
+  },
+  "by_scenario_type": {
+    "openclaw": {
+      "mode": "autonomous",
+      "record_count": 204,
+      "overall": {
+        "mean_score": 81.789216,
+        "minimum_score": 33.333333,
+        "maximum_score": 100.0,
+        "pass_count": 78,
+        "pass_rate": 0.38235294117647056
+      },
+      "metrics": {
+        "answer_claim_support": {
+          "numerator": 32,
+          "denominator": 32,
+          "pass_rate": 1.0,
+          "failure_rate": 0.0,
+          "status": "ok"
+        },
+        "answer_completeness": {
+          "numerator": 174,
+          "denominator": 204,
+          "pass_rate": 0.8529411764705882,
+          "failure_rate": 0.14705882352941177,
+          "status": "ok"
+        },
+        "artifact_evidence": {
+          "numerator": 85,
+          "denominator": 94,
+          "pass_rate": 0.9042553191489362,
+          "failure_rate": 0.09574468085106383,
+          "status": "ok"
+        },
+        "assumption_consistency": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "checkpoint_inference": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "claim_alignment": {
+          "numerator": 4,
+          "denominator": 52,
+          "pass_rate": 0.07692307692307693,
+          "failure_rate": 0.9230769230769231,
+          "status": "ok"
+        },
+        "constraint_execution": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "constraint_judgment": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "dispatch": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "disturbance_application": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "evidence_consistency": {
+          "numerator": 132,
+          "denominator": 204,
+          "pass_rate": 0.6470588235294118,
+          "failure_rate": 0.35294117647058826,
+          "status": "ok"
+        },
+        "forecast_horizon": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "json_validity": {
+          "numerator": 186,
+          "denominator": 186,
+          "pass_rate": 1.0,
+          "failure_rate": 0.0,
+          "status": "ok"
+        },
+        "manual_intervention": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "question_anchor": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "record_contract": {
+          "numerator": 204,
+          "denominator": 204,
+          "pass_rate": 1.0,
+          "failure_rate": 0.0,
+          "status": "ok"
+        },
+        "registry_ordering": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "risk": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "task_parsing": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        },
+        "tool_call": {
+          "numerator": 128,
+          "denominator": 186,
+          "pass_rate": 0.6881720430107527,
+          "failure_rate": 0.3118279569892473,
+          "status": "ok"
+        },
+        "verification_completeness": {
+          "numerator": 0,
+          "denominator": 0,
+          "pass_rate": null,
+          "failure_rate": null,
+          "status": "not_applicable"
+        }
+      },
+      "diagnostics": {
+        "hallucination": {
+          "numerator": 130,
+          "denominator": 204,
+          "pass_rate": 0.6372549019607843,
+          "failure_rate": 0.3627450980392157,
+          "status": "ok"
+        },
+        "tool_recovery": {
+          "numerator": 8,
+          "denominator": 23,
+          "pass_rate": 0.34782608695652173,
+          "failure_rate": 0.6521739130434783,
+          "status": "ok"
+        }
+      },
+      "hallucination_rate": 0.3627450980392157,
+      "tool_call_execution": {
+        "successful_calls": 939,
+        "total_calls": 1096,
+        "success_rate": 0.8567518248175182,
+        "duplicate_successful_calls": 255
+      },
+      "portability": {
+        "cwd_rebased_calls": 0,
+        "records_with_cwd_rebased": 0,
+        "rebased_execution_successes": 0,
+        "rebased_execution_failures": 0,
+        "portable_path_normalization_calls": 0
+      }
+    }
+  },
+  "execution_mode": "production-agent",
+  "runtime": {
+    "count": 204,
+    "average_latency_seconds": 184.251486,
+    "minimum_latency_seconds": 4.372309,
+    "maximum_latency_seconds": 1552.346292
+  }
+}

@@ -6,43 +6,35 @@ them from the repository root after creating the
 
 ## Local smoke test
 
-The two smoke files use `Qwen/Qwen3.5-0.8B`, 4-bit LoRA, the answer-only
+The smoke file uses `Qwen/Qwen3.5-0.8B`, 4-bit LoRA, the answer-only
 projection, 32 training rows, and 8 validation rows:
 
-1. `qwen35_08b_smoke_step10.yaml` trains for 10 optimizer steps and saves
-   `checkpoint-10`.
-2. `qwen35_08b_smoke_resume_step20.yaml` restores that checkpoint and continues
-   to step 20 with the optimizer, scheduler, random state, and data position.
+- `qwen38_27b_smoke_step10.yaml` trains for 10 optimizer steps and saves
+  `checkpoint-10`.
 
-Run both in order:
+Run:
 
 ```bash
-swift sft pipeclaw/student_distillation/configs/qwen35_08b_smoke_step10.yaml
-swift sft pipeclaw/student_distillation/configs/qwen35_08b_smoke_resume_step20.yaml
+swift sft pipeclaw/student_distillation/configs/qwen38_27b_smoke_step10.yaml
 ```
 
-The smoke configurations intentionally use `max_length: 2048`, no packing, and
-`resume_only_model: false` so the resume path exercises the complete trainer
+The smoke configuration intentionally uses `max_length: 2048`, no packing, and
+`resume_only_model: false` so the setup exercises the complete trainer
 state.
 
-## Remote 9B SFT
+## Remote 27B SFT
 
-- `qwen35_9b_remote_benchmark_step20.yaml` — 20-step benchmark for measuring
-  memory and throughput.
-- `qwen35_9b.yaml` — full trace-level SFT run for five epochs.
+- `qwen38_27b.yaml` — trace-level / ablation SFT run for five epochs.
 
-Both use the trace-level projection, `Qwen/Qwen3.5-9B`, 4-bit NF4 QLoRA (rank 32,
-alpha 64), Flash Attention, and DeepSpeed ZeRO-2 across four processes by
-default. The checked-in `max_length: 18432` setting (compactly,
-`max_length=18432`) is the full-release ceiling, and the configs use
-`truncation_strategy: delete`; run the token profiler before a new run and
-confirm that the selected records fit that limit.
+Uses `Qwen/Qwen3.8-27B`, 4-bit NF4 QLoRA (rank 32,
+alpha 64), Flash Attention, and DeepSpeed ZeRO-2 across three visible processes by
+default. The checked-in setting uses `max_length: 24576` with
+`truncation_strategy: delete`.
 
 ```bash
 conda env create -f pipeclaw/student_distillation/environment.yml
-conda activate task2-ms-swift
-swift sft pipeclaw/student_distillation/configs/qwen35_9b_remote_benchmark_step20.yaml
-swift sft pipeclaw/student_distillation/configs/qwen35_9b.yaml
+conda activate ms-swift
+swift sft pipeclaw/student_distillation/configs/qwen38_27b.yaml
 ```
 
 For a single GPU, remove `NPROC_PER_NODE` and `deepspeed`, then set

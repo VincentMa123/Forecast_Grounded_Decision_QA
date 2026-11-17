@@ -1,0 +1,12 @@
+{
+  "episodes": 214,
+  "scenarios": 176,
+  "first_try_exit0_rate": 0.35514018691588783,
+  "recovered_after_error_rate": 0.0,
+  "thrash_rate": 0.009345794392523364,
+  "mean_overall_score": 68.51524256542056,
+  "passed_rate": 0.19626168224299065,
+  "mean_reward": 0.4618806074766355,
+  "zero_variance_share": 0.0,
+  "syntax_error_share": 0.0
+}

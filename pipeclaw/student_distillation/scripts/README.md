@@ -34,7 +34,7 @@ writes projections, avoiding a second source of truth.
 
 `profile_tokens.py` keeps encoding, measurement, summaries, provenance checks,
 and report publication together in execution order. It renders train and valid
-records through the MS-SWIFT/Qwen3.5 training template without loading model
+records through the MS-SWIFT/Qwen3.8 training template without loading model
 weights or silently truncating input:
 
 ```bash
@@ -43,9 +43,7 @@ python -m pipeclaw.student_distillation.scripts.profile_tokens \
 ```
 
 Only `train` and `valid` are accepted for profiling. The script writes a
-reviewable summary JSON and, optionally, a per-record JSONL audit. Choose a
-configuration `max_length` only after checking the reported maximum; the full
-release configuration uses `max_length: 18432`.
+reviewable summary JSON and, optionally, a per-record JSONL audit.
 
 ## Autonomous evaluation
 
@@ -58,7 +56,7 @@ python -m pipeclaw.student_distillation.scripts.evaluate_autonomous `
   --source pipeclaw/backend/generated_teacher_traces/splits/teacher_trace_test.jsonl `
   --tool-schema-source pipeclaw/student_distillation/data/trace_level/test.jsonl `
   --scenario-type pipeformer `
-  --adapters pipeclaw/student_distillation/outputs/qwen35_9b_trace_level/checkpoint-20 `
+  --adapters pipeclaw/student_distillation/outputs/trace_level/checkpoint-85 `
   --output-dir pipeclaw/student_distillation/outputs/evaluation/autonomous
 ```
 
